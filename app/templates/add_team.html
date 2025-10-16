@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<form method="POST" class="mt-4">
+    <div class="mb-3">
+        <label class="form-label">Team Name</label>
+        <input type="text" name="name" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Team Number</label>
+        <input type="number" name="number" class="form-control" min="1">
+    </div>
+    <button type="submit" class="btn btn-primary">Add Team</button>
+</form>
+
+<div class="mb-3">
+  <label class="form-label">Assign Group (optional)</label>
+  <select name="group_id" class="form-select">
+    <option value="">— None —</option>
+    {% for g in groups %}
+      <option value="{{ g.id }}"
+        {% if team is defined %}
+          {% for tg in team.group_assignments %}
+            {% if tg.group_id == g.id and tg.active %}selected{% endif %}
+          {% endfor %}
+        {% endif %}
+      >{{ g.name }}</option>
+    {% endfor %}
+  </select>
+  <div class="form-text">Controls which checkpoints appear & how “next” is computed on the map.</div>
+</div>
+
+{% endblock %}

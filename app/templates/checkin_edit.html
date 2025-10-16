@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Edit Check-in</h5>
+
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">Team</label>
+        <select name="team_id" class="form-select" required>
+          {% for t in teams %}
+            <option value="{{ t.id }}" {% if t.id == c.team_id %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Checkpoint</label>
+        <select name="checkpoint_id" class="form-select" required>
+          {% for cp in checkpoints %}
+            <option value="{{ cp.id }}" {% if cp.id == c.checkpoint_id %}selected{% endif %}>{{ cp.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-3">
+  <label class="form-label">Timestamp</label>
+  <input type="datetime-local"
+         name="timestamp"
+         class="form-control"
+         step="1"
+         value="{{ timestamp_local }}"
+         required>
+
+  <label class="form-label mt-2">Timezone</label>
+  <select name="timezone" class="form-select">
+    {% set zones = ["Europe/Ljubljana", "UTC", "America/New_York", "Asia/Jakarta"] %}
+    {% for z in zones %}
+      <option value="{{ z }}" {% if z == "Europe/Ljubljana" %}selected{% endif %}>{{ z }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+      <button type="submit" class="btn btn-primary">Save Changes</button>
+      <a href="{{ url_for('main.view_checkins') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<form method="POST" class="mt-4">
+    <div class="mb-3">
+        <label class="form-label">Select Team</label>
+        <select name="team_id" class="form-select" required>
+            {% for team in teams %}
+            <option value="{{ team.id }}">{{ team.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Select Checkpoint</label>
+        <select name="checkpoint_id" class="form-select" required>
+            {% for checkpoint in checkpoints %}
+            <option value="{{ checkpoint.id }}">{{ checkpoint.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-success">Record Check-in</button>
+</form>
+{% endblock %}

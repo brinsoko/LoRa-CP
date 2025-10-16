@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% block title %}Group Members{% endblock %}{% block content %}
+<h4 class="mb-3">Group: {{ group.name }}</h4>
+
+<form method="post" class="card p-3 mb-4">
+  <input type="hidden" name="action" value="add_cp">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-6">
+      <label class="form-label">Add checkpoint</label>
+      <select name="checkpoint_id" class="form-select">
+        {% for cp in available %}
+          <option value="{{ cp.id }}">{{ cp.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-primary">Add</button>
+    </div>
+  </div>
+</form>
+
+{% if members %}
+<table class="table table-striped align-middle">
+  <thead><tr><th>Order</th><th>Checkpoint</th><th class="text-end">Actions</th></tr></thead>
+  <tbody>
+  {% for m in members %}
+    <tr>
+      <td>{{ m.seq_index }}</td>
+      <td>{{ m.checkpoint.name }}</td>
+      <td class="text-end">
+        <form method="post" class="d-inline">
+          <input type="hidden" name="link_id" value="{{ m.id }}">
+          <input type="hidden" name="action" value="move_up">
+          <button class="btn btn-sm btn-outline-secondary">↑</button>
+        </form>
+        <form method="post" class="d-inline">
+          <input type="hidden" name="link_id" value="{{ m.id }}">
+          <input type="hidden" name="action" value="move_down">
+          <button class="btn btn-sm btn-outline-secondary">↓</button>
+        </form>
+        <form method="post" class="d-inline" onsubmit="return confirm('Remove from group?');">
+          <input type="hidden" name="link_id" value="{{ m.id }}">
+          <input type="hidden" name="action" value="remove_cp">
+          <button class="btn btn-sm btn-outline-danger">Remove</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="text-muted">No checkpoints in this group yet.</p>{% endif %}
+{% endblock %}

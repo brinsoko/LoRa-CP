@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title mb-3">All Check-ins</h5>
+
+    <!-- (existing filter form + export button stays the same) -->
+
+    {% if checkins %}
+    <div class="table-responsive">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Time (UTC)</th>
+            <th scope="col">Team</th>
+            <th scope="col">Checkpoint</th>
+            <th scope="col" style="width:160px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in checkins %}
+          <tr>
+            <td>{{ c.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>{{ c.team.name if c.team else '—' }}</td>
+            <td>{{ c.checkpoint.name if c.checkpoint else '—' }}</td>
+            <td class="text-end">
+              <a href="{{ url_for('checkins.edit_checkin', checkin_id=c.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+              <form method="post" action="{{ url_for('checkins.delete_checkin', checkin_id=c.id) }}" class="d-inline"
+                    onsubmit="return confirm('Delete this check-in?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-muted">No check-ins match your filters.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

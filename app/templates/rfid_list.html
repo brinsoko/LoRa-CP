@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}RFID ↔ Team Mappings{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="card-title mb-0">RFID ↔ Team Mappings</h5>
+
+      {# Management buttons visible only to judges/admins and only when not read-only #}
+      {% if (read_only is not defined or not read_only) and has_role('judge','admin') %}
+        <div class="d-flex gap-2">
+          <a class="btn btn-sm btn-primary" href="{{ url_for('rfid.add_rfid') }}">Add Mapping</a>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('rfid.rfid_upload_csv_form') }}">Upload CSV</a>
+        </div>
+      {% endif %}
+    </div>
+
+    {% if cards and cards|length > 0 %}
+      <div class="table-responsive">
+        <table class="table table-striped align-middle">
+          <thead>
+            <tr>
+              <th>Card #</th>
+              <th>UID</th>
+              <th>Team</th>
+              <th>Team #</th>
+              {% if (read_only is not defined or not read_only) and has_role('judge','admin') %}
+                <th class="text-end" style="width: 180px;">Actions</th>
+              {% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in cards %}
+            <tr>
+              <td>{{ c.number or '—' }}</td>
+              <td class="font-monospace">{{ c.uid }}</td>
+              <td>{{ c.team.name if c.team else '—' }}</td>
+              <td>{{ c.team.number if c.team else '—' }}</td>
+              {% if (read_only is not defined or not read_only) and has_role('judge','admin') %}
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('rfid.edit_rfid', card_id=c.id) }}">Edit</a>
+                <form method="post" class="d-inline"
+                      action="{{ url_for('rfid.delete_rfid', card_id=c.id) }}"
+                      onsubmit="return confirm('Delete this mapping?');">
+                  <button class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted mb-0">No RFID mappings yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

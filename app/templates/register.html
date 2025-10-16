@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:520px;">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Create User</h5>
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">Username</label>
+        <input name="username" class="form-control" required autofocus>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input name="password" type="password" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Role</label>
+        <select name="role" class="form-select" required>
+          <option value="public">public</option>
+          <option value="judge">judge</option>
+          <option value="admin">admin</option>
+        </select>
+      </div>
+      <button class="btn btn-primary">Create</button>
+      <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

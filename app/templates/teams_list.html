@@ -1,0 +1,47 @@
+{# app/templates/teams_list.html #}
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Teams</h2>
+    {% if has_role('judge','admin') %}
+      <a class="btn btn-primary" href="{{ url_for('teams.add_team') }}">Add Team</a>
+    {% endif %}
+  </div>
+
+  <div class="text-muted mb-2">Total: {{ teams|length }}</div>
+
+  {% if teams|length == 0 %}
+    <div class="alert alert-info">No teams found.</div>
+  {% else %}
+    <table class="table table-striped align-middle">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Number</th>
+          {% if has_role('judge','admin') %}<th class="text-end">Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in teams %}
+        <tr>
+          <td>{{ t.name }}</td>
+          <td>{{ t.number or '—' }}</td>
+          {% if has_role('judge','admin') %}
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary"
+               href="{{ url_for('teams.edit_team', team_id=t.id) }}">Edit</a>
+            <form method="post" class="d-inline"
+                  action="{{ url_for('teams.delete_team', team_id=t.id) }}"
+                  onsubmit="return confirm('Delete this team?');">
+              <button class="btn btn-sm btn-outline-danger">Delete</button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+{% endblock %}

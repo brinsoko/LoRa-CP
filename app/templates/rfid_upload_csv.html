@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Upload RFID Mappings (CSV)</h5>
+
+    <p class="mb-2">Accepted columns (header required):</p>
+    <ul>
+      <li><code>uid, team_id</code> (UID + numeric team ID)</li>
+      <li><code>uid, team_name[, team_number]</code> (UID + team name; number optional)</li>
+    </ul>
+    <p class="text-muted">UID is normalized (colons/hyphens removed, uppercased). Existing UIDs will be reassigned to the specified team.</p>
+
+    <form method="post" enctype="multipart/form-data">
+      <div class="mb-3">
+        <input type="file" name="file" accept=".csv,text/csv" class="form-control" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Upload</button>
+      <a href="{{ url_for('rfid.list_rfid') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}
