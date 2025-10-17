@@ -33,7 +33,6 @@ def parse_positive_int_or_none(value: str | None):
 # List all RFID mappings
 # -------------------------------
 @rfid_bp.route("/", methods=["GET"])
-@roles_required("judge", "admin")
 def list_rfid():
     cards = RFIDCard.query.order_by(RFIDCard.number.asc().nulls_last(), RFIDCard.uid.asc()).all()
     teams = Team.query.order_by(Team.name.asc()).all()

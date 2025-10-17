@@ -15,33 +15,46 @@
     <div class="alert alert-info">No teams found.</div>
   {% else %}
     <table class="table table-striped align-middle">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Number</th>
-          {% if has_role('judge','admin') %}<th class="text-end">Actions</th>{% endif %}
-        </tr>
-      </thead>
-      <tbody>
-        {% for t in teams %}
-        <tr>
-          <td>{{ t.name }}</td>
-          <td>{{ t.number or '—' }}</td>
-          {% if has_role('judge','admin') %}
-          <td class="text-end">
-            <a class="btn btn-sm btn-outline-primary"
-               href="{{ url_for('teams.edit_team', team_id=t.id) }}">Edit</a>
-            <form method="post" class="d-inline"
-                  action="{{ url_for('teams.delete_team', team_id=t.id) }}"
-                  onsubmit="return confirm('Delete this team?');">
-              <button class="btn btn-sm btn-outline-danger">Delete</button>
-            </form>
-          </td>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Number</th>
+      <th>Groups</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for team in teams %}
+      <tr>
+        <td>{{ team.name }}</td>
+        <td>{{ team.number or "—" }}</td>
+
+        <td>
+          {% if team.group_assignments %}
+            {% for tg in team.group_assignments %}
+              {% if tg.group %}
+                <span class="badge {% if tg.active %}bg-success{% else %}bg-secondary{% endif %}">
+                  {{ tg.group.name }}
+                </span>
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            <span class="text-muted">No groups</span>
           {% endif %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </td>
+
+        <td>
+          <a href="{{ url_for('teams.edit_team', team_id=team.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+          <form action="{{ url_for('teams.delete_team', team_id=team.id) }}" method="post" class="d-inline">
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    onclick="return confirm('Delete this team?')">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
   {% endif %}
 </div>
 {% endblock %}
+

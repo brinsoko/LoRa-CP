@@ -2,18 +2,18 @@
 {% block body %}
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title mb-3">Add Group</h5>
+    <h5 class="card-title mb-3">Edit Group</h5>
     <form method="post">
       <div class="mb-3">
         <label class="form-label">Name</label>
-        <input class="form-control" name="name" required>
+        <input class="form-control" name="name" value="{{ g.name }}" required>
       </div>
       <div class="mb-3">
         <label class="form-label">Description</label>
-        <textarea class="form-control" name="description" rows="2"></textarea>
+        <textarea class="form-control" name="description" rows="2">{{ g.description or '' }}</textarea>
       </div>
       <div class="d-flex gap-2">
-        <button class="btn btn-primary" type="submit">Create</button>
+        <button class="btn btn-primary" type="submit">Save</button>
         <a class="btn btn-secondary" href="{{ url_for('groups.list_groups') }}">Cancel</a>
       </div>
     </form>

@@ -1,5 +1,5 @@
 # app/blueprints/teams/routes.py
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import Team, CheckpointGroup, TeamGroup
@@ -9,7 +9,6 @@ teams_bp = Blueprint("teams", __name__, template_folder="../../templates")
 
 
 def _active_group_id_for(team: Team) -> int | None:
-    """Return the active group_id for a team, if any."""
     for tg in team.group_assignments:
         if tg.active:
             return tg.group_id
@@ -19,13 +18,13 @@ def _active_group_id_for(team: Team) -> int | None:
 # ============ LIST ============
 @teams_bp.route("/", methods=["GET"])
 def list_teams():
-    # Everyone can see teams
     teams = (
         Team.query
         .options(joinedload(Team.group_assignments).joinedload(TeamGroup.group))
         .order_by(Team.name.asc())
         .all()
     )
+    # No sets in template needed here
     return render_template("teams_list.html", teams=teams)
 
 
@@ -37,95 +36,80 @@ def add_team():
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
-        number_raw = (request.form.get("number") or "").strip()
-        group_id = request.form.get("group_id", type=int)
+        number = request.form.get("number", type=int)
 
-        # Basic validation
+        # Gather checkbox selections; DO NOT call set() in template
+        selected_ids = {int(x) for x in request.form.getlist("group_ids")}
+        current_app.logger.debug("[teams.add] name=%r number=%r selected_ids=%r",
+                                 name, number, selected_ids)
+
         if not name:
             flash("Team name is required.", "warning")
-            return render_template("add_team.html", groups=groups)
+            return render_template("add_team.html",
+                                   groups=groups,
+                                   selected_group_ids=set())
 
-        number = None
-        if number_raw:
-            try:
-                number = int(number_raw)
-                if number <= 0:
-                    raise ValueError()
-            except ValueError:
-                flash("Team number must be a positive integer.", "warning")
-                return render_template("add_team.html", groups=groups)
+        t = Team(name=name, number=number)
+        db.session.add(t)
+        db.session.flush()  # get t.id
 
-        # Create team
-        team = Team(name=name, number=number)
-        db.session.add(team)
-        db.session.commit()  # so team.id exists
+        for gid in selected_ids:
+            db.session.add(TeamGroup(team_id=t.id, group_id=gid, active=True))
 
-        # Optional group assignment
-        if group_id:
-            # deactivate any existing (just in case) and set chosen active
-            TeamGroup.query.filter_by(team_id=team.id, active=True).update({"active": False})
-            db.session.add(TeamGroup(team_id=team.id, group_id=group_id, active=True))
-            db.session.commit()
-
-        flash(f"Team '{team.name}' created.", "success")
+        db.session.commit()
+        flash("Team created.", "success")
         return redirect(url_for("teams.list_teams"))
 
-    # GET
-    return render_template("add_team.html", groups=groups)
+    # Provide an empty set so template can do: {% if g.id in selected_group_ids %}
+    return render_template("add_team.html", groups=groups, selected_group_ids=set())
 
 
 # ============ EDIT ============
 @teams_bp.route("/<int:team_id>/edit", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def edit_team(team_id):
-    team = Team.query.get_or_404(team_id)
+    team = (
+        Team.query
+        .options(joinedload(Team.group_assignments))
+        .get_or_404(team_id)
+    )
     groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
 
     if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        number_raw = (request.form.get("number") or "").strip()
-        group_id = request.form.get("group_id", type=int)
+        team.name = (request.form.get("name") or "").strip()
+        team.number = request.form.get("number", type=int)
 
-        if not name:
-            flash("Team name is required.", "warning")
-            return render_template("team_edit.html", team=team, groups=groups)
+        selected_ids = {int(x) for x in request.form.getlist("group_ids")}
+        current_ids = {tg.group_id for tg in team.group_assignments}
 
-        # number handling
-        if number_raw:
-            try:
-                n = int(number_raw)
-                if n <= 0:
-                    raise ValueError()
-                team.number = n
-            except ValueError:
-                flash("Team number must be a positive integer.", "warning")
-                return render_template("team_edit.html", team=team, groups=groups)
-        else:
-            team.number = None
+        current_app.logger.debug(
+            "[teams.edit] team_id=%s selected_ids=%r current_ids=%r",
+            team.id, selected_ids, current_ids
+        )
 
-        team.name = name
+        # Delete assignments that are no longer checked
+        if current_ids - selected_ids:
+            q = (db.session.query(TeamGroup)
+                 .filter(TeamGroup.team_id == team.id))
+            if selected_ids:
+                q = q.filter(~TeamGroup.group_id.in_(list(selected_ids)))
+            # If no selections, delete all rows for this team
+            q.delete(synchronize_session=False)
 
-        # Group assignment update
-        if group_id:
-            # Deactivate all current actives for this team
-            TeamGroup.query.filter_by(team_id=team.id, active=True).update({"active": False})
-            # Ensure (team, group) row exists; set active
-            tg = TeamGroup.query.filter_by(team_id=team.id, group_id=group_id).first()
-            if tg:
-                tg.active = True
-            else:
-                db.session.add(TeamGroup(team_id=team.id, group_id=group_id, active=True))
-        else:
-            # If "None" selected (empty), deactivate any active assignments
-            TeamGroup.query.filter_by(team_id=team.id, active=True).update({"active": False})
+        # Add new assignments
+        for gid in (selected_ids - current_ids):
+            db.session.add(TeamGroup(team_id=team.id, group_id=gid, active=True))
 
         db.session.commit()
         flash("Team updated.", "success")
         return redirect(url_for("teams.list_teams"))
 
-    # GET
-    active_gid = _active_group_id_for(team)
-    return render_template("team_edit.html", team=team, groups=groups, active_gid=active_gid)
+    # Provide a ready-to-use set for the template
+    selected_group_ids = {tg.group_id for tg in team.group_assignments}
+    return render_template("team_edit.html",
+                           team=team,
+                           groups=groups,
+                           selected_group_ids=selected_group_ids)
 
 
 # ============ DELETE ============
@@ -138,7 +122,6 @@ def delete_team(team_id):
         flash("Cannot delete team with existing check-ins.", "warning")
         return redirect(url_for("teams.list_teams"))
 
-    # Delete group assignment rows first (cascade may also handle this)
     TeamGroup.query.filter_by(team_id=team.id).delete()
     db.session.delete(team)
     db.session.commit()

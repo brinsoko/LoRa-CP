@@ -6,10 +6,12 @@ from flask import current_app as cap
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models import Checkpoint
+from app.models import Checkpoint, CheckpointGroup
 from app.utils.perms import roles_required
 
 import json
+
+
 
 checkpoints_bp = Blueprint("checkpoints", __name__, template_folder="../../templates")
 
@@ -26,9 +28,10 @@ def list_checkpoints():
     return render_template("checkpoints_list.html", checkpoints=checkpoints)
 
 
-@checkpoints_bp.route("/add", methods=["GET", "POST"])
+@checkpoints_bp.route("/add", methods=["GET", 'POST'])
 @roles_required("judge", "admin")
 def add_checkpoint():
+    groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
         location = (request.form.get("location") or "").strip()
@@ -36,11 +39,9 @@ def add_checkpoint():
         easting = request.form.get("easting", type=float)
         northing = request.form.get("northing", type=float)
 
-        cap.logger.debug("[checkpoints] ADD POST name=%r e=%r n=%r", name, easting, northing)
-
         if not name:
             flash("Name is required.", "warning")
-            return render_template("add_checkpoint.html")
+            return render_template("add_checkpoint.html", groups=groups)
 
         cp = Checkpoint(
             name=name,
@@ -49,43 +50,52 @@ def add_checkpoint():
             easting=easting,
             northing=northing,
         )
+
+        # read multi-select group IDs
+        raw_ids = request.form.getlist("group_ids")  # strings
+        try:
+            ids = [int(x) for x in raw_ids if x.strip()]
+        except ValueError:
+            ids = []
+        if ids:
+            sel_groups = CheckpointGroup.query.filter(CheckpointGroup.id.in_(ids)).all()
+            cp.groups = sel_groups
+
         db.session.add(cp)
         db.session.commit()
         flash("Checkpoint added.", "success")
-        cap.logger.debug("[checkpoints] ADD -> created id=%s", cp.id)
         return redirect(url_for("checkpoints.list_checkpoints"))
 
-    cap.logger.debug("[checkpoints] ADD GET")
-    return render_template("add_checkpoint.html")
+    return render_template("add_checkpoint.html", groups=groups)
 
 
-@checkpoints_bp.route("/<int:cp_id>/edit", methods=["GET", "POST"])
-@roles_required("judge", "admin")
-def edit_checkpoint(cp_id: int):
+
+@checkpoints_bp.route("/<int:cp_id>/edit", methods=["GET","POST"])
+@roles_required("judge","admin")
+def edit_checkpoint(cp_id):
     cp = Checkpoint.query.get_or_404(cp_id)
+    groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
+
     if request.method == "POST":
-        before = (cp.name, cp.easting, cp.northing, cp.location, cp.description)
         cp.name = (request.form.get("name") or "").strip()
         cp.location = (request.form.get("location") or "").strip() or None
         cp.description = (request.form.get("description") or "").strip() or None
         cp.easting = request.form.get("easting", type=float)
         cp.northing = request.form.get("northing", type=float)
 
-        cap.logger.debug(
-            "[checkpoints] EDIT POST id=%s before=%r after=%r",
-            cp_id, before, (cp.name, cp.easting, cp.northing, cp.location, cp.description)
-        )
+        # Save checkbox selection → many-to-many
+        selected_ids = {int(x) for x in request.form.getlist("group_ids")}
+        cp.groups = [g for g in groups if g.id in selected_ids]
 
         if not cp.name:
             flash("Name is required.", "warning")
-            return render_template("checkpoint_edit.html", cp=cp)
+            return render_template("checkpoint_edit.html", cp=cp, groups=groups)
 
         db.session.commit()
         flash("Checkpoint updated.", "success")
         return redirect(url_for("checkpoints.list_checkpoints"))
 
-    cap.logger.debug("[checkpoints] EDIT GET id=%s", cp_id)
-    return render_template("checkpoint_edit.html", cp=cp)
+    return render_template("checkpoint_edit.html", cp=cp, groups=groups)
 
 
 @checkpoints_bp.route("/<int:cp_id>/delete", methods=["POST"])

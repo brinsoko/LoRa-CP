@@ -13,8 +13,6 @@ def index():
     return render_template("base.html")
 
 
-
-
 def _parse_date_range(date_from_str, date_to_str):
     start = end = None
     try:

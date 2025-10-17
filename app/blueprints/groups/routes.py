@@ -1,120 +1,138 @@
 # app/blueprints/groups/routes.py
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from __future__ import annotations
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from sqlalchemy.orm import joinedload
 from app.extensions import db
-from app.models import Checkpoint, Team, CheckpointGroup, GroupCheckpoint, TeamGroup
+from app.models import CheckpointGroup, Checkpoint, TeamGroup, Team
 from app.utils.perms import roles_required
 
 groups_bp = Blueprint("groups", __name__, template_folder="../../templates")
 
-# ---- List groups ----
+# ---------- Helpers ----------
+def _parse_checkpoint_ids(form_field_values) -> list[int]:
+    ids: list[int] = []
+    for v in (form_field_values or []):
+        try:
+            n = int(v)
+            if n > 0:
+                ids.append(n)
+        except Exception:
+            pass
+    return ids
+
+# ---------- List groups ----------
 @groups_bp.route("/", methods=["GET"])
 @roles_required("judge","admin")
 def list_groups():
     groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
+    # In template use: {{ g.checkpoints|length }}
     return render_template("groups_list.html", groups=groups)
 
-# ---- Add group ----
-@groups_bp.route("/add", methods=["GET","POST"])
-@roles_required("judge","admin")
+# ---------- Create group ----------
+@groups_bp.route("/add", methods=["GET", "POST"])
+@roles_required("judge", "admin")
 def add_group():
+    cps = db.session.query(Checkpoint).order_by(Checkpoint.name.asc()).all()
+
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
-        desc = (request.form.get("description") or "").strip()
+        desc = (request.form.get("description") or "").strip() or None
+        selected_ids = _parse_checkpoint_ids(request.form.getlist("checkpoint_ids"))
+
         if not name:
-            flash("Name required.", "warning")
-            return render_template("group_add.html")
-        if CheckpointGroup.query.filter_by(name=name).first():
-            flash("Group name already exists.", "warning")
-            return render_template("group_add.html")
+            flash("Group name is required.", "warning")
+            return render_template("group_edit.html", mode="add", cps=cps)
+
         g = CheckpointGroup(name=name, description=desc)
-        db.session.add(g); db.session.commit()
+        if selected_ids:
+            g.checkpoints = db.session.query(Checkpoint).filter(Checkpoint.id.in_(selected_ids)).all()
+
+        db.session.add(g)
+        db.session.commit()
         flash("Group created.", "success")
         return redirect(url_for("groups.list_groups"))
-    return render_template("group_add.html")
 
-# ---- Manage group membership (add/remove checkpoints, order) ----
-@groups_bp.route("/<int:group_id>/members", methods=["GET","POST"])
-@roles_required("judge","admin")
-def group_members(group_id):
-    g = CheckpointGroup.query.get_or_404(group_id)
+    return render_template("group_edit.html", mode="add", cps=cps)
 
-    if request.method == "POST":
-        action = request.form.get("action")
-        if action == "add_cp":
-            cp_id = request.form.get("checkpoint_id", type=int)
-            if not cp_id:
-                flash("Choose a checkpoint.", "warning")
-            else:
-                exists = GroupCheckpoint.query.filter_by(group_id=g.id, checkpoint_id=cp_id).first()
-                if exists:
-                    flash("Checkpoint already in group.", "warning")
-                else:
-                    # seq_index = next index
-                    max_seq = db.session.query(db.func.max(GroupCheckpoint.seq_index)).filter_by(group_id=g.id).scalar() or 0
-                    db.session.add(GroupCheckpoint(group_id=g.id, checkpoint_id=cp_id, seq_index=max_seq+1))
-                    db.session.commit()
-                    flash("Added checkpoint.", "success")
-
-        elif action in ("move_up","move_down"):
-            link_id = request.form.get("link_id", type=int)
-            link = GroupCheckpoint.query.get_or_404(link_id)
-            if link.group_id != g.id:
-                flash("Invalid item.", "warning")
-            else:
-                delta = -1 if action == "move_up" else 1
-                neighbor = (GroupCheckpoint.query
-                            .filter_by(group_id=g.id, seq_index=link.seq_index + delta)
-                            .first())
-                if neighbor:
-                    link.seq_index, neighbor.seq_index = neighbor.seq_index, link.seq_index
-                    db.session.commit()
-
-        elif action == "remove_cp":
-            link_id = request.form.get("link_id", type=int)
-            link = GroupCheckpoint.query.get_or_404(link_id)
-            if link.group_id == g.id:
-                db.session.delete(link); db.session.commit()
-                flash("Removed checkpoint.", "success")
-
-        return redirect(url_for("groups.group_members", group_id=g.id))
-
-    # GET: show current members + available checkpoints
-    members = (GroupCheckpoint.query
-               .options(joinedload(GroupCheckpoint.checkpoint))
-               .filter_by(group_id=g.id)
-               .order_by(GroupCheckpoint.seq_index.asc())
-               .all())
-    member_cp_ids = [m.checkpoint_id for m in members]
-    available = Checkpoint.query.filter(~Checkpoint.id.in_(member_cp_ids)).order_by(Checkpoint.name.asc()).all()
-
-    return render_template("group_members.html", group=g, members=members, available=available)
-
-# ---- Assign team to a group (or change) ----
-@groups_bp.route("/assign", methods=["GET","POST"])
-@roles_required("judge","admin")
-def assign_team_group():
-    teams = Team.query.order_by(Team.name.asc()).all()
-    groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
+# ---------- Edit group (incl. assign checkpoints) ----------
+@groups_bp.route("/<int:group_id>/edit", methods=["GET", "POST"])
+@roles_required("judge", "admin")
+def edit_group(group_id: int):
+    g = (
+        db.session.query(CheckpointGroup)
+        .options(joinedload(CheckpointGroup.checkpoints))
+        .get_or_404(group_id)
+    )
+    cps = db.session.query(Checkpoint).order_by(Checkpoint.name.asc()).all()
 
     if request.method == "POST":
-        team_id = request.form.get("team_id", type=int)
-        group_id = request.form.get("group_id", type=int)
-        if not team_id or not group_id:
-            flash("Choose both team and group.", "warning")
-            return render_template("assign_team_group.html", teams=teams, groups=groups)
+        g.name = (request.form.get("name") or "").strip()
+        g.description = (request.form.get("description") or "").strip() or None
+        selected_ids = _parse_checkpoint_ids(request.form.getlist("checkpoint_ids"))
 
-        # deactivate existing actives then set selected active
-        TeamGroup.query.filter_by(team_id=team_id, active=True).update({"active": False})
-        # ensure unique row exists
-        tg = TeamGroup.query.filter_by(team_id=team_id, group_id=group_id).first()
-        if not tg:
-            tg = TeamGroup(team_id=team_id, group_id=group_id, active=True)
-            db.session.add(tg)
+        if not g.name:
+            flash("Group name is required.", "warning")
+            return render_template("group_edit.html", mode="edit", g=g, cps=cps, selected_ids={cp.id for cp in g.checkpoints})
+
+        # Replace many-to-many members with exactly the selected ones
+        if selected_ids:
+            g.checkpoints = db.session.query(Checkpoint).filter(Checkpoint.id.in_(selected_ids)).all()
         else:
-            tg.active = True
-        db.session.commit()
-        flash("Team assignment updated.", "success")
-        return redirect(url_for("groups.assign_team_group"))
+            g.checkpoints = []
 
-    return render_template("assign_team_group.html", teams=teams, groups=groups)
+        db.session.commit()
+        flash("Group updated.", "success")
+        return redirect(url_for("groups.list_groups"))
+
+    selected_ids = {cp.id for cp in g.checkpoints}
+    return render_template("group_edit.html", mode="edit", g=g, cps=cps, selected_ids=selected_ids)
+
+# ---------- Delete group ----------
+@groups_bp.route("/<int:group_id>/delete", methods=["POST"])
+@roles_required("admin")
+def delete_group(group_id: int):
+    g = db.session.query(CheckpointGroup).get_or_404(group_id)
+
+    # If you want to forbid deleting groups that are active for teams:
+    active_refs = db.session.query(TeamGroup).filter(
+        TeamGroup.group_id == group_id,
+        TeamGroup.active.is_(True),
+    ).count()
+    if active_refs:
+        flash("Cannot delete a group that is active for one or more teams.", "warning")
+        return redirect(url_for("groups.list_groups"))
+
+    db.session.delete(g)
+    db.session.commit()
+    flash("Group deleted.", "success")
+    return redirect(url_for("groups.list_groups"))
+
+# ---------- Set a team's active group (quick action) ----------
+@groups_bp.route("/set_active", methods=["POST"])
+@roles_required("judge", "admin")
+def set_active_group_for_team():
+    team_id = request.form.get("team_id", type=int)
+    group_id = request.form.get("group_id", type=int)
+
+    if not team_id or not group_id:
+        flash("team_id and group_id are required.", "warning")
+        return redirect(url_for("groups.list_groups"))
+
+    team = db.session.query(Team).get(team_id)
+    group = db.session.query(CheckpointGroup).get(group_id)
+    if not team or not group:
+        flash("Invalid team or group.", "warning")
+        return redirect(url_for("groups.list_groups"))
+
+    # Deactivate existing active assignment(s) and set the new one active
+    TeamGroup.query.filter_by(team_id=team.id, active=True).update({"active": False})
+    tg = TeamGroup.query.filter_by(team_id=team.id, group_id=group.id).first()
+    if tg:
+        tg.active = True
+    else:
+        db.session.add(TeamGroup(team_id=team.id, group_id=group.id, active=True))
+
+    db.session.commit()
+    flash(f"Set active group for team '{team.name}' to '{group.name}'.", "success")
+    return redirect(url_for("groups.list_groups"))
+

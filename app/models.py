@@ -1,25 +1,35 @@
 # app/models.py
 from __future__ import annotations
 from datetime import datetime
-from typing import List, Optional
-from enum import Enum
-
-from app.extensions import db
-from sqlalchemy import String, Integer, Text, DateTime, ForeignKey, CheckConstraint, UniqueConstraint, Index, Float
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin
+from sqlalchemy import CheckConstraint, UniqueConstraint, ForeignKey
+from app.extensions import db
 
+# ============================================================
+# Association table: MANY-TO-MANY between checkpoints & groups
+# (Must be defined BEFORE models that reference it)
+# ============================================================
+checkpoint_group_links = db.Table(
+    "checkpoint_group_links",
+    db.Column("checkpoint_id", db.Integer,
+              db.ForeignKey("checkpoints.id", ondelete="CASCADE"),
+              primary_key=True),
+    db.Column("group_id", db.Integer,
+              db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"),
+              primary_key=True),
+    db.UniqueConstraint("checkpoint_id", "group_id", name="uq_cp_group"),
+)
 
-# ----------------------------
-# Users / Auth
-# ----------------------------
+# =================
+# User (auth/roles)
+# =================
 class User(UserMixin, db.Model):
     __tablename__ = "users"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[str] = mapped_column(String(20), nullable=False, default="public")
+    id          = db.Column(db.Integer, primary_key=True)
+    username    = db.Column(db.String(50), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role        = db.Column(db.String(20), nullable=False, default="public")  # public|judge|admin
 
     def set_password(self, raw: str) -> None:
         self.password_hash = generate_password_hash(raw)
@@ -27,29 +37,36 @@ class User(UserMixin, db.Model):
     def check_password(self, raw: str) -> bool:
         return check_password_hash(self.password_hash, raw)
 
-
-# ----------------------------
-# Core domain
-# ----------------------------
+# =========
+# Team
+# =========
 class Team(db.Model):
     __tablename__ = "teams"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    id      = db.Column(db.Integer, primary_key=True)
+    name    = db.Column(db.String(100), nullable=False)
+    number  = db.Column(db.Integer, nullable=True)
 
-    # 1:1 RFID
-    rfid_card: Mapped[Optional["RFIDCard"]] = relationship(
-        back_populates="team", uselist=False, cascade="all, delete-orphan", passive_deletes=True
+    # relationships
+    rfid_card = db.relationship(
+        "RFIDCard",
+        back_populates="team",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    checkins = db.relationship(
+        "Checkin",
+        back_populates="team",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
-    # 1:N Checkins
-    checkins: Mapped[List["Checkin"]] = relationship(
-        back_populates="team", cascade="all, delete-orphan", passive_deletes=True
-    )
-
-    # Group assignments
-    group_assignments: Mapped[List["TeamGroup"]] = relationship(
-        back_populates="team", cascade="all, delete-orphan"
+    # ADD: optional many-assignments with 'active' flag via TeamGroup
+    group_assignments = db.relationship(
+        "TeamGroup",
+        back_populates="team",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     __table_args__ = (
@@ -57,100 +74,111 @@ class Team(db.Model):
     )
 
 
+
+# ==============
+# RFIDCard
+# ==============
 class RFIDCard(db.Model):
     __tablename__ = "rfid_cards"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    uid: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    team_id: Mapped[int] = mapped_column(
-        ForeignKey("teams.id", ondelete="CASCADE"),
-        unique=True, nullable=False
-    )
-    # Optional human-friendly label; must be positive if set
-    number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    id       = db.Column(db.Integer, primary_key=True)
+    uid      = db.Column(db.String(100), unique=True, nullable=False)
+    team_id  = db.Column(db.Integer, db.ForeignKey("teams.id", ondelete="CASCADE"),
+                         unique=True, nullable=False)
+    # Optional human-friendly identifier, must be positive if set
+    number   = db.Column(db.Integer, nullable=True)
 
-    team: Mapped["Team"] = relationship(back_populates="rfid_card")
+    team     = db.relationship("Team", back_populates="rfid_card")
 
     __table_args__ = (
         CheckConstraint("number IS NULL OR number > 0", name="ck_rfid_number_positive"),
     )
 
-
-class Checkpoint(db.Model):
-    __tablename__ = "checkpoints"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
-    location: Mapped[Optional[str]] = mapped_column(String(255))
-    description: Mapped[Optional[str]] = mapped_column(Text)
-
-    # numeric coords from JSON
-    easting: Mapped[Optional[float]] = mapped_column(Float)
-    northing: Mapped[Optional[float]] = mapped_column(Float)
-
-    # 1:N Checkins (mirror of Checkin.checkpoint)
-    checkins: Mapped[List["Checkin"]] = relationship(back_populates="checkpoint")
-
-
-class Checkin(db.Model):
-    __tablename__ = "checkins"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
-    checkpoint_id: Mapped[int] = mapped_column(ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-
-    team: Mapped["Team"] = relationship(back_populates="checkins")
-    checkpoint: Mapped["Checkpoint"] = relationship(back_populates="checkins")
-
-
-# (Optional enum if you need it later; not used by schema below)
-class TargetStatus(str, Enum):
-    NOT_FOUND = "not_found"
-    NEXT = "next"
-    FOUND = "found"
-
-
-# ----------------------------
-# Groups for checkpoints
-# ----------------------------
+# ====================
+# CheckpointGroup
+# ====================
 class CheckpointGroup(db.Model):
     __tablename__ = "checkpoint_groups"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    id          = db.Column(db.Integer, primary_key=True)
+    name        = db.Column(db.String(120), unique=True, nullable=False)
+    description = db.Column(db.Text)
 
-    checkpoints: Mapped[List["GroupCheckpoint"]] = relationship(
-        back_populates="group", cascade="all, delete-orphan", order_by="GroupCheckpoint.seq_index.asc()"
-    )
-    team_assignments: Mapped[List["TeamGroup"]] = relationship(
-        back_populates="group", cascade="all, delete-orphan"
-    )
-
-
-class GroupCheckpoint(db.Model):
-    __tablename__ = "group_checkpoints"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    group_id: Mapped[int] = mapped_column(ForeignKey("checkpoint_groups.id"), nullable=False, index=True)
-    checkpoint_id: Mapped[int] = mapped_column(ForeignKey("checkpoints.id"), nullable=False, index=True)
-    seq_index: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-
-    group: Mapped["CheckpointGroup"] = relationship(back_populates="checkpoints")
-    checkpoint: Mapped["Checkpoint"] = relationship(backref="group_links")
-
-    __table_args__ = (
-        UniqueConstraint("group_id", "checkpoint_id", name="uq_group_checkpoint"),
-        Index("ix_group_seq", "group_id", "seq_index"),
+    # many-to-many backref defined on Checkpoint.groups
+    checkpoints = db.relationship(
+        "Checkpoint",
+        secondary=checkpoint_group_links,
+        back_populates="groups",
+        order_by="Checkpoint.name.asc()",
+        cascade="save-update",
+        passive_deletes=True,
     )
 
+# ============
+# Checkpoint
+# ============
+class Checkpoint(db.Model):
+    __tablename__ = "checkpoints"
+    id          = db.Column(db.Integer, primary_key=True)
+    name        = db.Column(db.String(120), nullable=False, unique=True)
+    location    = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    easting     = db.Column(db.Float)   # numeric coords
+    northing    = db.Column(db.Float)
 
+    # one-to-many from Checkin (declared in Checkin)
+    checkins    = db.relationship("Checkin", back_populates="checkpoint", lazy=True)
+
+    # many-to-many groups
+    groups      = db.relationship(
+        "CheckpointGroup",
+        secondary=checkpoint_group_links,
+        back_populates="checkpoints",
+        order_by="CheckpointGroup.name.asc()",
+        cascade="save-update",
+        passive_deletes=True,
+    )
+
+# =========
+# Checkin
+# =========
+class Checkin(db.Model):
+    __tablename__ = "checkins"
+    id            = db.Column(db.Integer, primary_key=True)
+    team_id       = db.Column(db.Integer, db.ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
+    checkpoint_id = db.Column(db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False)
+    timestamp     = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    team       = db.relationship("Team", back_populates="checkins")
+    checkpoint = db.relationship("Checkpoint", back_populates="checkins")
+
+
+# =========================
+# TeamGroup (team ↔ group with 'active' flag)
+# =========================
 class TeamGroup(db.Model):
     __tablename__ = "team_groups"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), nullable=False, index=True)
-    group_id: Mapped[int] = mapped_column(ForeignKey("checkpoint_groups.id"), nullable=False, index=True)
-    active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    id = db.Column(db.Integer, primary_key=True)
 
-    team: Mapped["Team"] = relationship(back_populates="group_assignments")
-    group: Mapped["CheckpointGroup"] = relationship(back_populates="team_assignments")
+    team_id  = db.Column(
+        db.Integer,
+        db.ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    group_id = db.Column(
+        db.Integer,
+        db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Current active assignment? (only one should be active at a time per team)
+    active = db.Column(db.Boolean, nullable=False, default=True)
+
+    # Relationships
+    team  = db.relationship("Team", back_populates="group_assignments")
+    group = db.relationship("CheckpointGroup", backref="team_assignments")
 
     __table_args__ = (
+        # A team cannot have the same group twice
         UniqueConstraint("team_id", "group_id", name="uq_team_group"),
     )

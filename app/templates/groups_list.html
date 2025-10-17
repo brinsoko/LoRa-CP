@@ -1,22 +1,31 @@
-{% extends "base.html" %}{% block title %}Groups{% endblock %}{% block content %}
+{% extends "base.html" %}
+{% block body %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="mb-0">Checkpoint Groups</h4>
-  <a class="btn btn-sm btn-primary" href="{{ url_for('groups.add_group') }}">Add Group</a>
+  <h4>Groups</h4>
+  <a class="btn btn-primary" href="{{ url_for('groups.add_group') }}">Add Group</a>
 </div>
+
 {% if groups %}
 <table class="table table-striped align-middle">
-  <thead><tr><th>Name</th><th>Description</th><th></th></tr></thead>
+  <thead><tr><th>Name</th><th>Description</th><th>Checkpoints</th><th style="width:160px;"></th></tr></thead>
   <tbody>
-  {% for g in groups %}
+    {% for g in groups %}
     <tr>
       <td>{{ g.name }}</td>
-      <td class="text-break">{{ g.description or '—' }}</td>
+      <td>{{ g.description or '—' }}</td>
+      <td>{{ g.checkpoints|length }}</td>
       <td class="text-end">
-        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('groups.group_members', group_id=g.id) }}">Members</a>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('groups.edit_group', group_id=g.id) }}">Edit</a>
+        <form class="d-inline" method="post" action="{{ url_for('groups.delete_group', group_id=g.id) }}"
+              onsubmit="return confirm('Delete group {{ g.name }}?');">
+          <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+        </form>
       </td>
     </tr>
-  {% endfor %}
+    {% endfor %}
   </tbody>
 </table>
-{% else %}<p class="text-muted">No groups yet.</p>{% endif %}
+{% else %}
+  <p class="text-muted">No groups yet.</p>
+{% endif %}
 {% endblock %}
