@@ -1,43 +1,126 @@
 {% extends "base.html" %}
+{% block title %}Check-ins{% endblock %}
 {% block content %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label">Team</label>
+        <select name="team_id" class="form-select">
+          <option value="">— All teams —</option>
+          {% for t in teams %}
+            <option value="{{ t.id }}"
+              {% if selected_team_id == t.id %}selected{% endif %}>
+              {{ t.name }}{% if t.number is not none %} ({{ t.number }}){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label">Checkpoint</label>
+        <select name="checkpoint_id" class="form-select">
+          <option value="">— All checkpoints —</option>
+          {% for cp in checkpoints %}
+            <option value="{{ cp.id }}"
+              {% if selected_checkpoint_id == cp.id %}selected{% endif %}>
+              {{ cp.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">From</label>
+        <input type="date" class="form-control" name="date_from"
+               value="{{ selected_date_from }}">
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">To</label>
+        <input type="date" class="form-control" name="date_to"
+               value="{{ selected_date_to }}">
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label">Sort</label>
+        <select name="sort" class="form-select">
+          <option value="new"  {% if selected_sort == 'new'  %}selected{% endif %}>Newest first</option>
+          <option value="old"  {% if selected_sort == 'old'  %}selected{% endif %}>Oldest first</option>
+          <option value="team" {% if selected_sort == 'team' %}selected{% endif %}>Team (name, number)</option>
+        </select>
+      </div>
+
+      <div class="col-12 col-md-9 d-flex gap-2 justify-content-md-end">
+        <button class="btn btn-primary" type="submit">Apply Filters</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('checkins.list_checkins') }}">Reset</a>
+
+        <a class="btn btn-outline-info"
+           href="{{ url_for('checkins.export_checkins_csv',
+                            team_id=selected_team_id,
+                            checkpoint_id=selected_checkpoint_id,
+                            date_from=selected_date_from,
+                            date_to=selected_date_to,
+                            sort=selected_sort) }}">
+          Export CSV
+        </a>
+
+        {% if has_role('judge','admin') %}
+          <a class="btn btn-success" href="{{ url_for('checkins.add_checkin') }}">Add Check-in</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+
+{% if checkins %}
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title mb-3">All Check-ins</h5>
-
-    <!-- (existing filter form + export button stays the same) -->
-
-    {% if checkins %}
     <div class="table-responsive">
       <table class="table table-striped align-middle">
         <thead>
           <tr>
-            <th scope="col">Time (UTC)</th>
-            <th scope="col">Team</th>
-            <th scope="col">Checkpoint</th>
-            <th scope="col" style="width:160px;">Actions</th>
+            <th style="width: 60px;">#</th>  {# ← New counter column #}
+            <th>Time (UTC)</th>
+            <th>Team</th>
+            <th>Team #</th>
+            <th>Checkpoint</th>
+            {% if has_role('judge','admin') %}
+              <th class="text-end" style="width:160px;">Actions</th>
+            {% endif %}
           </tr>
         </thead>
         <tbody>
           {% for c in checkins %}
           <tr>
+            <td>{{ loop.index }}</td>  {# ← Auto numbering (1, 2, 3...) #}
             <td>{{ c.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
             <td>{{ c.team.name if c.team else '—' }}</td>
+            <td>{{ c.team.number if c.team and c.team.number is not none else '—' }}</td>
             <td>{{ c.checkpoint.name if c.checkpoint else '—' }}</td>
+            {% if has_role('judge','admin') %}
             <td class="text-end">
-              <a href="{{ url_for('checkins.edit_checkin', checkin_id=c.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-              <form method="post" action="{{ url_for('checkins.delete_checkin', checkin_id=c.id) }}" class="d-inline"
+              <a href="{{ url_for('checkins.edit_checkin', checkin_id=c.id) }}"
+                 class="btn btn-sm btn-outline-primary">Edit</a>
+              <form method="post"
+                    action="{{ url_for('checkins.delete_checkin', checkin_id=c.id) }}"
+                    class="d-inline"
                     onsubmit="return confirm('Delete this check-in?');">
                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
               </form>
             </td>
+            {% endif %}
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    {% else %}
-      <p class="text-muted">No check-ins match your filters.</p>
-    {% endif %}
   </div>
 </div>
+{% else %}
+  <p class="text-muted">No check-ins match your filters.</p>
+{% endif %}
+
 {% endblock %}

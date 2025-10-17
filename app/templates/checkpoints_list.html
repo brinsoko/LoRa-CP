@@ -4,9 +4,12 @@
 <div class="card">
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="card-title mb-0">Checkpoints</h5>
+      <h5 class="d-flex gap-2">Checkpoints</h5>
       {% if has_role('judge','admin') %}
-        <a href="{{ url_for('checkpoints.add_checkpoint') }}" class="btn btn-sm btn-primary">Add Checkpoint</a>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('checkpoints.add_checkpoint') }}" class="btn btn-sm btn-primary">Add Checkpoint</a>
+          <a href="{{ url_for('checkpoints.import_checkpoints_json') }}" class="btn btn-sm btn-outline-secondary">Import Checkpoints (JSON)</a>
+        </div>
       {% endif %}
     </div>
 
@@ -15,9 +18,11 @@
         <table class="table table-striped align-middle">
           <thead>
             <tr>
+              <th style="width: 60px;">#</th>  {# ← Counter column #}
               <th>Name</th>
               <th>Location</th>
               <th>Description</th>
+              <th>Groups</th>
               {% if has_role('judge','admin') %}
                 <th class="text-end" style="width: 180px;">Actions</th>
               {% endif %}
@@ -26,9 +31,19 @@
           <tbody>
             {% for cp in checkpoints %}
             <tr>
+              <td>{{ loop.index }}</td>  {# ← Auto counter from 1 #}
               <td>{{ cp.name }}</td>
               <td>{{ cp.location or '—' }}</td>
               <td class="text-break" style="max-width: 360px;">{{ cp.description or '—' }}</td>
+              <td>
+                {% if cp.groups %}
+                  {% for g in cp.groups %}
+                    <span class="badge bg-secondary">{{ g.name }}</span>
+                  {% endfor %}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
               {% if has_role('judge','admin') %}
               <td class="text-end">
                 <a href="{{ url_for('checkpoints.edit_checkpoint', cp_id=cp.id) }}"

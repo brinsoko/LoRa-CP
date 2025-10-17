@@ -18,14 +18,52 @@ def _active_group_id_for(team: Team) -> int | None:
 # ============ LIST ============
 @teams_bp.route("/", methods=["GET"])
 def list_teams():
-    teams = (
+    """
+    Teams list with search, wildcard filter, group filter, and sorting.
+    Query params:
+      - q: search string (supports * wildcards)
+      - group_id: filter by group (int)
+      - sort: one of name_asc, name_desc, number_asc, number_desc
+    """
+    q = (request.args.get("q") or "").strip()
+    group_id = request.args.get("group_id", type=int)
+    sort = (request.args.get("sort") or "name_asc").strip()
+
+    query = (
         Team.query
         .options(joinedload(Team.group_assignments).joinedload(TeamGroup.group))
-        .order_by(Team.name.asc())
-        .all()
     )
-    # No sets in template needed here
-    return render_template("teams_list.html", teams=teams)
+
+ 
+
+    # --------- Group filter ---------
+    if group_id:
+        query = (
+            query.join(TeamGroup, TeamGroup.team_id == Team.id)
+                 .filter(TeamGroup.group_id == group_id)
+        )
+
+    # --------- Sorting ---------
+    if sort == "name_desc":
+        query = query.order_by(Team.name.desc())
+    elif sort == "number_asc":
+        query = query.order_by(Team.number.asc().nulls_last(), Team.name.asc())
+    elif sort == "number_desc":
+        query = query.order_by(Team.number.desc().nulls_last(), Team.name.asc())
+    else:  # name_asc default
+        query = query.order_by(Team.name.asc())
+
+    teams = query.all()
+    groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
+
+    return render_template(
+        "teams_list.html",
+        teams=teams,
+        groups=groups,
+        selected_q=q,
+        selected_group_id=group_id,
+        selected_sort=sort,
+    )
 
 
 # ============ ADD ============

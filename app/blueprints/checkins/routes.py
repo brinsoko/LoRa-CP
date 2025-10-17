@@ -58,7 +58,8 @@ def _filtered_query(team_id: int | None, checkpoint_id: int | None,
 def list_checkins():
     """
     Public view with filters.
-    Query params: team_id, checkpoint_id, date_from (YYYY-MM-DD), date_to (YYYY-MM-DD)
+    Query params: team_id, checkpoint_id, date_from (YYYY-MM-DD), date_to (YYYY-MM-DD), sort
+    sort: 'new' (default), 'old', 'team'
     """
     teams = Team.query.order_by(Team.name.asc()).all()
     checkpoints = Checkpoint.query.order_by(Checkpoint.name.asc()).all()
@@ -67,8 +68,28 @@ def list_checkins():
     checkpoint_id = request.args.get("checkpoint_id", type=int)
     date_from = request.args.get("date_from")  # str | None
     date_to = request.args.get("date_to")      # str | None
+    sort = (request.args.get("sort") or "new").lower()
 
-    checkins = _filtered_query(team_id, checkpoint_id, date_from, date_to).all()
+    q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
+
+    # Sorting:
+    # - new: timestamp desc
+    # - old: timestamp asc
+    # - team: Team.name asc, Team.number asc (NULLS LAST), then timestamp asc
+    if sort == "old":
+        q = q.order_by(Checkin.timestamp.asc())
+    elif sort == "team":
+        # join Team for ordering by team fields
+        q = q.join(Team, Checkin.team_id == Team.id).order_by(
+            Team.name.asc(),
+            Team.number.asc().nulls_last(),
+            Checkin.timestamp.asc(),
+        )
+    else:
+        # default 'new'
+        q = q.order_by(Checkin.timestamp.desc())
+
+    checkins = q.all()
 
     return render_template(
         "view_checkins.html",
@@ -79,27 +100,50 @@ def list_checkins():
         selected_checkpoint_id=checkpoint_id,
         selected_date_from=date_from or "",
         selected_date_to=date_to or "",
+        selected_sort=sort,
     )
 
 
 @checkins_bp.route("/export.csv", methods=["GET"])
 def export_checkins_csv():
-    """CSV export with the same filters as list view."""
+    """CSV export with the same filters and sort as the list view."""
     team_id = request.args.get("team_id", type=int)
     checkpoint_id = request.args.get("checkpoint_id", type=int)
     date_from = request.args.get("date_from")
     date_to = request.args.get("date_to")
+    sort = (request.args.get("sort") or "new").lower()
 
-    rows = _filtered_query(team_id, checkpoint_id, date_from, date_to).all()
+    q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
+
+    if sort == "old":
+        q = q.order_by(Checkin.timestamp.asc())
+    elif sort == "team":
+        q = q.join(Team, Checkin.team_id == Team.id).order_by(
+            Team.name.asc(),
+            Team.number.asc().nulls_last(),
+            Checkin.timestamp.asc(),
+        )
+    else:
+        q = q.order_by(Checkin.timestamp.desc())
+
+    rows = q.all()
 
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["timestamp_utc", "team_id", "team_name", "checkpoint_id", "checkpoint_name"])
+    w.writerow([
+        "timestamp_utc",
+        "team_id",
+        "team_name",
+        "team_number",
+        "checkpoint_id",
+        "checkpoint_name",
+    ])
     for r in rows:
         w.writerow([
             r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             r.team.id if r.team else "",
             r.team.name if r.team else "",
+            r.team.number if r.team and r.team.number is not None else "",
             r.checkpoint.id if r.checkpoint else "",
             r.checkpoint.name if r.checkpoint else "",
         ])

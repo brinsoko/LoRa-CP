@@ -1,22 +1,46 @@
+{# app/templates/add_checkin.html #}
 {% extends "base.html" %}
+{% block title %}Add Check-in{% endblock %}
 {% block content %}
-<form method="POST" class="mt-4">
-    <div class="mb-3">
-        <label class="form-label">Select Team</label>
+
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title mb-4">Add Check-in</h5>
+
+    <form method="POST" class="row g-3">
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold">Select Team</label>
         <select name="team_id" class="form-select" required>
-            {% for team in teams %}
-            <option value="{{ team.id }}">{{ team.name }}</option>
-            {% endfor %}
+          {% for team in teams %}
+            <option value="{{ team.id }}">{{ team.name }}{% if team.number %} ({{ team.number }}){% endif %}</option>
+          {% endfor %}
         </select>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Select Checkpoint</label>
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold">Select Checkpoint</label>
         <select name="checkpoint_id" class="form-select" required>
-            {% for checkpoint in checkpoints %}
+          {% for checkpoint in checkpoints %}
             <option value="{{ checkpoint.id }}">{{ checkpoint.name }}</option>
-            {% endfor %}
+          {% endfor %}
         </select>
-    </div>
-    <button type="submit" class="btn btn-success">Record Check-in</button>
-</form>
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold">Timestamp (optional)</label>
+        <input type="datetime-local"
+               name="timestamp"
+               class="form-control"
+               value="{{ now.strftime('%Y-%m-%dT%H:%M') if now else '' }}">
+        <div class="form-text">Leave blank to use the current time automatically.</div>
+      </div>
+
+      <div class="col-12 text-end mt-3">
+        <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-success">Record Check-in</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% endblock %}

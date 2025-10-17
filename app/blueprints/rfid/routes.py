@@ -69,7 +69,8 @@ def add_rfid():
             flash("Card number must be a positive integer (or leave blank).", "warning")
             return render_template("rfid_add.html", teams=teams)
 
-        card = RFIDCard(uid, team_id, number)
+        # ✅ use keyword args here
+        card = RFIDCard(uid=uid, team_id=team_id, number=number)
         db.session.add(card)
 
         try:

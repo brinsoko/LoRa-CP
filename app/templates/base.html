@@ -70,15 +70,15 @@
 
 
     <a href="{{ url_for('teams.list_teams') }}" class="btn btn-outline-primary">Teams</a>
-    <a href="{{ url_for('rfid.public_mappings') }}" class="btn btn-outline-info">RFID Mappings</a>
-    <a href="{{ url_for('maps.index') }}" class="btn btn-outline-primary">Map</a>
+    
 
     {% if current_user.is_authenticated and current_user.role in ['judge','admin'] %}
       <a href="{{ url_for('checkpoints.list_checkpoints') }}" class="btn btn-outline-secondary">Checkpoints</a>
-      <a href="{{ url_for('checkpoints.import_checkpoints_json') }}" class="btn btn-outline-secondary">Import Checkpoints (JSON)</a>
+      
 
-      <a href="{{ url_for('checkins.add_checkin') }}" class="btn btn-success">Add Check-in</a>
+      
       <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-outline-info">View Check-ins</a>
+      <a href="{{ url_for('checkins.add_checkin') }}" class="btn btn-success">Add Check-in</a>
 
       <a href="{{ url_for('rfid.list_rfid') }}" class="btn btn-outline-info">Map RFID ↔ Team</a>
 
@@ -87,7 +87,9 @@
       {% if 'groups.assign_team_group' in current_app.view_functions %}
         <a href="{{ url_for('groups.assign_team_group') }}" class="btn btn-outline-secondary">Assign Team → Group</a>
       {% endif %}
+      <a href="{{ url_for('maps.index') }}" class="btn btn-outline-primary">Map</a>
     {% endif %}
+    
   </div>
 
   <!-- FLASH MESSAGES -->

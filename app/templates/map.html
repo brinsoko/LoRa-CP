@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Checkpoint Map{% endblock %}
 {% block content %}
+
 <div class="d-flex align-items-end gap-3 mb-3">
   <div class="flex-grow-1">
     <label class="form-label">Team</label>
@@ -14,124 +15,115 @@
   <div class="text-muted small">
     Legend:&nbsp;
     <span class="badge bg-success">found</span>
-    <span class="badge bg-primary">next</span>
-    <span class="badge bg-secondary">not&nbsp;found</span>
+    <span class="badge bg-secondary">not found</span>
   </div>
 </div>
 
-<div id="map" style="height: 70vh; width: 100%; border-radius: 12px;"></div>
+<div id="map" style="height: 70vh; width: 100%; border-radius: 12px; overflow: hidden;"></div>
+
+<!-- Leaflet (no API key needed) -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""
+/>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
 
 <script>
-  // Colors for statuses
-  const COLOR_FOUND = "#198754";     // bootstrap success
-  const COLOR_NEXT = "#0d6efd";      // bootstrap primary
-  const COLOR_NOT_FOUND = "#6c757d"; // bootstrap secondary
+  const COLOR_FOUND = "#198754";      // bootstrap success
+  const COLOR_NOT_FOUND = "#6c757d";  // bootstrap secondary
 
-  let map;
-  let markers = [];
+  let map, markers = [];
+  let checkpoints = [];
 
-  function clearMarkers() {
-    for (const m of markers) m.setMap(null);
-    markers = [];
-  }
-
-  // TEMP projection stub: converts (easting, northing) -> fake lat/lng for demo.
-  // Replace with real projection (or store lat/lng) when ready.
-  function toLatLng(easting, northing) {
-    const originLat = 45.95;   // adjust to your area
-    const originLng = 14.36;   // adjust to your area
-    const scale = 0.00001;
-    return {
-      lat: originLat + (northing || 0) * scale,
-      lng: originLng + (easting || 0) * scale
-    };
-  }
-
-  async function getTargets(teamId) {
-    const url = '{{ url_for("maps.api_team_targets") }}' + '?team_id=' + encodeURIComponent(teamId);
-    const r = await fetch(url);
+  async function getJSON(url) {
+    const r = await fetch(url, { credentials: "same-origin" });
     if (!r.ok) throw new Error(await r.text());
-    // Expected shape: [{checkpoint_id, name, easting, northing, status}]
     return await r.json();
   }
 
-  function drawTargets(targets) {
+  function clearMarkers() {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+  }
+
+  // ⚠️ Stub conversion: replace with your real projection when ready.
+  function toLatLng(easting, northing) {
+    const originLat = 45.95;
+    const originLng = 14.36;
+    const scale = 0.00001;
+    const lat = originLat + ((northing || 0) * scale);
+    const lng = originLng + ((easting || 0) * scale);
+    return [lat, lng];
+  }
+
+  function drawMarkers(foundSet) {
     clearMarkers();
-    if (!targets || !targets.length) return;
+    const latlngs = [];
 
-    // Compute a reasonable map center
-    let sumLat = 0, sumLng = 0, count = 0;
-    for (const cp of targets) {
-      const pos = toLatLng(cp.easting, cp.northing);
-      if (Number.isFinite(pos.lat) && Number.isFinite(pos.lng)) {
-        sumLat += pos.lat; sumLng += pos.lng; count++;
-      }
-    }
-    if (count > 0) {
-      map.setCenter({ lat: sumLat / count, lng: sumLng / count });
-    }
+    checkpoints.forEach(cp => {
+      const found = foundSet.has(cp.id);
+      const latlng = toLatLng(cp.easting, cp.northing);
+      latlngs.push(latlng);
 
-    for (const cp of targets) {
-      const pos = toLatLng(cp.easting, cp.northing);
-      const status = (cp.status || 'not_found').toLowerCase();
-      const color = status === 'found' ? COLOR_FOUND
-                   : status === 'next' ? COLOR_NEXT
-                   : COLOR_NOT_FOUND;
+      const circle = L.circleMarker(latlng, {
+        radius: 6,
+        color: found ? COLOR_FOUND : COLOR_NOT_FOUND,
+        fillColor: found ? COLOR_FOUND : COLOR_NOT_FOUND,
+        fillOpacity: 1,
+        weight: 1,
+      }).bindPopup(
+        `<strong>${cp.name}</strong><br>E: ${cp.easting ?? "—"}, N: ${cp.northing ?? "—"}<br>Status: ${found ? "found" : "not found"}`
+      );
 
-      const marker = new google.maps.Marker({
-        position: pos,
-        map,
-        title: `${cp.name} (${status})`,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: color,
-          fillOpacity: 1.0,
-          strokeColor: color,
-          strokeWeight: 1,
-          scale: 6
-        }
-      });
+      circle.addTo(map);
+      markers.push(circle);
+    });
 
-      const info = new google.maps.InfoWindow({
-        content: `
-          <div>
-            <strong>${cp.name}</strong><br>
-            Status: <code>${status}</code><br>
-            E: ${cp.easting ?? '—'}, N: ${cp.northing ?? '—'}
-          </div>`
-      });
-      marker.addListener('click', () => info.open({ anchor: marker, map, shouldFocus: false }));
-      markers.push(marker);
+    // Fit bounds if we have points; otherwise set a sensible center.
+    if (latlngs.length > 0) {
+      const bounds = L.latLngBounds(latlngs);
+      map.fitBounds(bounds.pad(0.2));
+    } else {
+      map.setView([45.95, 14.36], 12);
     }
   }
 
   async function refresh(teamId) {
-    if (!teamId) { clearMarkers(); return; }
-    const targets = await getTargets(teamId);
-    drawTargets(targets);
+    if (!teamId) {
+      drawMarkers(new Set());
+      return;
+    }
+    const data = await getJSON(`{{ url_for('maps.api_team_found') }}?team_id=${teamId}`);
+    const foundSet = new Set(data.found || []);
+    drawMarkers(foundSet);
   }
 
   async function init() {
-    map = new google.maps.Map(document.getElementById("map"), {
-      center: { lat: 45.95, lng: 14.36 },
-      zoom: 12,
-      mapTypeId: 'terrain'
-    });
+    // Base map
+    map = L.map("map");
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
 
-    // On change, pull team targets and redraw
+    // Load checkpoints and draw initial markers (all grey)
+    checkpoints = await getJSON(`{{ url_for('maps.api_checkpoints') }}`);
+    drawMarkers(new Set());
+
+    // Team selection handler
     document.getElementById("teamSelect").addEventListener("change", (e) => {
       const teamId = e.target.value || "";
       refresh(teamId);
     });
   }
-</script>
 
-{% if google_maps_key %}
-<script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&callback=init"></script>
-{% else %}
-<script>
-  // If no Google Maps key yet, still initialize to render markers with stubbed projection
   document.addEventListener("DOMContentLoaded", init);
 </script>
-{% endif %}
+
 {% endblock %}

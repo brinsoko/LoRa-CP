@@ -1,60 +1,101 @@
 {# app/templates/teams_list.html #}
 {% extends "base.html" %}
+{% block title %}Teams{% endblock %}
 {% block content %}
-<div class="container mt-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>Teams</h2>
-    {% if has_role('judge','admin') %}
-      <a class="btn btn-primary" href="{{ url_for('teams.add_team') }}">Add Team</a>
-    {% endif %}
+
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+        
+
+      <div class="col-12 col-md-4">
+        <label class="form-label">Group</label>
+        <select name="group_id" class="form-select">
+          <option value="">— All groups —</option>
+          {% for g in groups %}
+            <option value="{{ g.id }}" {% if selected_group_id == g.id %}selected{% endif %}>
+              {{ g.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label">Sort</label>
+        <select name="sort" class="form-select">
+          <option value="name_asc"   {% if selected_sort == 'name_asc' %}selected{% endif %}>Name (A→Z)</option>
+          <option value="name_desc"  {% if selected_sort == 'name_desc' %}selected{% endif %}>Name (Z→A)</option>
+          <option value="number_asc" {% if selected_sort == 'number_asc' %}selected{% endif %}>Number (↑)</option>
+          <option value="number_desc"{% if selected_sort == 'number_desc' %}selected{% endif %}>Number (↓)</option>
+        </select>
+      </div>
+
+      <div class="col-12 d-flex gap-2 justify-content-md-end mt-2">
+        <button class="btn btn-primary" type="submit">Apply</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('teams.list_teams') }}">Reset</a>
+        {% if has_role('judge','admin') %}
+          <a class="btn btn-success" href="{{ url_for('teams.add_team') }}">Add Team</a>
+        {% endif %}
+      </div>
+    </form>
   </div>
-
-  <div class="text-muted mb-2">Total: {{ teams|length }}</div>
-
-  {% if teams|length == 0 %}
-    <div class="alert alert-info">No teams found.</div>
-  {% else %}
-    <table class="table table-striped align-middle">
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Number</th>
-      <th>Groups</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for team in teams %}
-      <tr>
-        <td>{{ team.name }}</td>
-        <td>{{ team.number or "—" }}</td>
-
-        <td>
-          {% if team.group_assignments %}
-            {% for tg in team.group_assignments %}
-              {% if tg.group %}
-                <span class="badge {% if tg.active %}bg-success{% else %}bg-secondary{% endif %}">
-                  {{ tg.group.name }}
-                </span>
-              {% endif %}
-            {% endfor %}
-          {% else %}
-            <span class="text-muted">No groups</span>
-          {% endif %}
-        </td>
-
-        <td>
-          <a href="{{ url_for('teams.edit_team', team_id=team.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-          <form action="{{ url_for('teams.delete_team', team_id=team.id) }}" method="post" class="d-inline">
-            <button type="submit" class="btn btn-sm btn-outline-danger"
-                    onclick="return confirm('Delete this team?')">Delete</button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
-  {% endif %}
 </div>
-{% endblock %}
 
+<div class="text-muted mb-2">Total: {{ teams|length }}</div>
+
+{% if teams|length == 0 %}
+  <div class="alert alert-info">No teams found.</div>
+{% else %}
+  <div class="table-responsive">
+    <table class="table table-bordered table-striped align-middle">
+      <thead>
+        <tr>
+          <th style="width:60px;">#</th>
+          <th>Name</th>
+          <th style="width:120px;">Number</th>
+          <th>Groups</th>
+          {% if has_role('judge','admin') %}
+            <th class="text-end" style="width:180px;">Actions</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for team in teams %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ team.name }}</td>
+            <td>{{ team.number or "—" }}</td>
+
+            <td>
+              {% if team.group_assignments %}
+                {% for tg in team.group_assignments %}
+                  {% if tg.group %}
+                    <span class="badge {% if tg.active %}bg-success{% else %}bg-secondary{% endif %} me-1 mb-1">
+                      {{ tg.group.name }}
+                    </span>
+                  {% endif %}
+                {% endfor %}
+              {% else %}
+                <span class="text-muted">No groups</span>
+              {% endif %}
+            </td>
+
+            {% if has_role('judge','admin') %}
+              <td class="text-end">
+                <a href="{{ url_for('teams.edit_team', team_id=team.id) }}"
+                   class="btn btn-sm btn-outline-primary">Edit</a>
+                <form action="{{ url_for('teams.delete_team', team_id=team.id) }}"
+                      method="post" class="d-inline"
+                      onsubmit="return confirm('Delete this team?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
+{% endblock %}
