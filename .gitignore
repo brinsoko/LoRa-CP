@@ -7,9 +7,11 @@ __pycache__/
 instance/
 *.sqlite3
 
+
 # Virtual environments
 venv/
 env/
+*.env
 
 # Editors
 .vscode/

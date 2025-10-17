@@ -83,7 +83,7 @@
         <thead>
           <tr>
             <th style="width: 60px;">#</th>  {# ← New counter column #}
-            <th>Time (UTC)</th>
+            <th>Time (local)</th>
             <th>Team</th>
             <th>Team #</th>
             <th>Checkpoint</th>
@@ -96,7 +96,7 @@
           {% for c in checkins %}
           <tr>
             <td>{{ loop.index }}</td>  {# ← Auto numbering (1, 2, 3...) #}
-            <td>{{ c.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>{{ c.timestamp | local_dt }}</td>
             <td>{{ c.team.name if c.team else '—' }}</td>
             <td>{{ c.team.number if c.team and c.team.number is not none else '—' }}</td>
             <td>{{ c.checkpoint.name if c.checkpoint else '—' }}</td>

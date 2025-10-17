@@ -6,7 +6,7 @@ from flask import current_app as cap
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models import Checkpoint, CheckpointGroup
+from app.models import Checkpoint, CheckpointGroup, LoRaDevice
 from app.utils.perms import roles_required
 
 import json
@@ -19,62 +19,81 @@ checkpoints_bp = Blueprint("checkpoints", __name__, template_folder="../../templ
 # -----------------------------
 # List / CRUD
 # -----------------------------
+# ---------- LIST ----------
 @checkpoints_bp.route("/", methods=["GET"])
 @roles_required("judge", "admin")
 def list_checkpoints():
-    cap.logger.debug("[checkpoints] LIST")
     checkpoints = Checkpoint.query.order_by(Checkpoint.name.asc()).all()
-    cap.logger.debug("[checkpoints] LIST -> count=%d", len(checkpoints))
     return render_template("checkpoints_list.html", checkpoints=checkpoints)
 
 
-@checkpoints_bp.route("/add", methods=["GET", 'POST'])
+# ---------- ADD ----------
+@checkpoints_bp.route("/add", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def add_checkpoint():
     groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
+    devices = LoRaDevice.query.order_by(LoRaDevice.name.asc().nulls_last(), LoRaDevice.dev_eui.asc()).all()
+
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
-        location = (request.form.get("location") or "").strip()
-        description = (request.form.get("description") or "").strip()
+        location = (request.form.get("location") or "").strip() or None
+        description = (request.form.get("description") or "").strip() or None
         easting = request.form.get("easting", type=float)
         northing = request.form.get("northing", type=float)
 
+        # LoRa device (nullable)
+        lora_device_id = request.form.get("lora_device_id", type=int)
+        lora_device = LoRaDevice.query.get(lora_device_id) if lora_device_id else None
+
         if not name:
             flash("Name is required.", "warning")
-            return render_template("add_checkpoint.html", groups=groups)
+            return render_template(
+                "add_checkpoint.html",
+                groups=groups,
+                devices=devices,
+                selected_group_ids=[],         # <- LIST, not set()
+                selected_device_id=lora_device_id or "",
+            )
 
         cp = Checkpoint(
             name=name,
-            location=location or None,
-            description=description or None,
+            location=location,
+            description=description,
             easting=easting,
             northing=northing,
+            lora_device=lora_device
         )
-
-        # read multi-select group IDs
-        raw_ids = request.form.getlist("group_ids")  # strings
-        try:
-            ids = [int(x) for x in raw_ids if x.strip()]
-        except ValueError:
-            ids = []
-        if ids:
-            sel_groups = CheckpointGroup.query.filter(CheckpointGroup.id.in_(ids)).all()
-            cp.groups = sel_groups
-
         db.session.add(cp)
+
+        # groups (checkboxes)
+        selected_ids = [int(x) for x in request.form.getlist("group_ids")]
+        if selected_ids:
+            selected_groups = CheckpointGroup.query.filter(CheckpointGroup.id.in_(selected_ids)).all()
+            cp.groups = selected_groups  # many-to-many assignment
+
         db.session.commit()
         flash("Checkpoint added.", "success")
         return redirect(url_for("checkpoints.list_checkpoints"))
 
-    return render_template("add_checkpoint.html", groups=groups)
+    # GET
+    return render_template(
+        "add_checkpoint.html",
+        groups=groups,
+        devices=devices,
+        selected_group_ids=[],   # <- LIST
+        selected_device_id=""
+    )
 
 
 
-@checkpoints_bp.route("/<int:cp_id>/edit", methods=["GET","POST"])
-@roles_required("judge","admin")
+
+# ---------- EDIT ----------
+@checkpoints_bp.route("/<int:cp_id>/edit", methods=["GET", "POST"])
+@roles_required("judge", "admin")
 def edit_checkpoint(cp_id):
     cp = Checkpoint.query.get_or_404(cp_id)
     groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
+    devices = LoRaDevice.query.order_by(LoRaDevice.name.asc().nulls_last(), LoRaDevice.dev_eui.asc()).all()
 
     if request.method == "POST":
         cp.name = (request.form.get("name") or "").strip()
@@ -83,38 +102,53 @@ def edit_checkpoint(cp_id):
         cp.easting = request.form.get("easting", type=float)
         cp.northing = request.form.get("northing", type=float)
 
-        # Save checkbox selection → many-to-many
-        selected_ids = {int(x) for x in request.form.getlist("group_ids")}
-        cp.groups = [g for g in groups if g.id in selected_ids]
+        # LoRa device (nullable)
+        lora_device_id = request.form.get("lora_device_id", type=int)
+        cp.lora_device = LoRaDevice.query.get(lora_device_id) if lora_device_id else None
 
         if not cp.name:
             flash("Name is required.", "warning")
-            return render_template("checkpoint_edit.html", cp=cp, groups=groups)
+            return render_template(
+                "checkpoint_edit.html",
+                cp=cp,
+                groups=groups,
+                devices=devices,
+                selected_group_ids=[g.id for g in cp.groups],  # <- LIST
+                selected_device_id=cp.lora_device_id or ""
+            )
+
+        # groups (checkboxes)
+        selected_ids = [int(x) for x in request.form.getlist("group_ids")]
+        selected_groups = CheckpointGroup.query.filter(CheckpointGroup.id.in_(selected_ids)).all() if selected_ids else []
+        cp.groups = selected_groups  # replace full set
 
         db.session.commit()
         flash("Checkpoint updated.", "success")
         return redirect(url_for("checkpoints.list_checkpoints"))
 
-    return render_template("checkpoint_edit.html", cp=cp, groups=groups)
+    # GET
+    return render_template(
+        "checkpoint_edit.html",
+        cp=cp,
+        groups=groups,
+        devices=devices,
+        selected_group_ids=[g.id for g in cp.groups],  # <- LIST
+        selected_device_id=cp.lora_device_id or ""
+    )
 
 
+# ---------- DELETE ----------
 @checkpoints_bp.route("/<int:cp_id>/delete", methods=["POST"])
 @roles_required("admin")
-def delete_checkpoint(cp_id: int):
+def delete_checkpoint(cp_id):
     cp = Checkpoint.query.get_or_404(cp_id)
-    cap.logger.debug("[checkpoints] DELETE id=%s", cp_id)
-
     if cp.checkins:
         flash("Cannot delete checkpoint with existing check-ins.", "warning")
-        cap.logger.debug("[checkpoints] DELETE blocked: has checkins")
         return redirect(url_for("checkpoints.list_checkpoints"))
-
     db.session.delete(cp)
     db.session.commit()
     flash("Checkpoint deleted.", "success")
-    cap.logger.debug("[checkpoints] DELETE ok")
     return redirect(url_for("checkpoints.list_checkpoints"))
-
 
 # -----------------------------
 # JSON Import (upload → preview → confirm)

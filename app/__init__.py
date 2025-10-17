@@ -3,11 +3,21 @@ from flask import Flask, request, render_template, current_app
 from flask_login import current_user
 from .extensions import db, login_manager
 from .utils.perms import inject_perms
+from app.utils.time import to_datetime_local
 import logging
+import os
 
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config.from_object("config.Config")
+    app.jinja_env.filters["local_dt"] = to_datetime_local
+
+    os.makedirs(app.instance_path, exist_ok=True)
+
+    # If no DB URI was provided, default to instance/app.db (absolute path)
+    if not app.config.get("SQLALCHEMY_DATABASE_URI"):
+        db_path = os.path.join(app.instance_path, "app.db")
+        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 
     # ---- Logging setup ----
     for h in list(app.logger.handlers):
@@ -54,7 +64,9 @@ def create_app() -> Flask:
     from .blueprints.rfid.routes import rfid_bp
     from .blueprints.map.routes import maps_bp
     from .blueprints.groups.routes import groups_bp
+    from .blueprints.lora.routes import lora_bp
 
+    app.register_blueprint(lora_bp, url_prefix="/lora")
     app.register_blueprint(groups_bp,    url_prefix="/groups")
     app.register_blueprint(maps_bp,      url_prefix="/map")
     app.register_blueprint(auth_bp)                         # /login, /logout, etc

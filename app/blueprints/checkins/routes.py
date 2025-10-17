@@ -12,7 +12,10 @@ from app.models import Checkin, Team, Checkpoint
 from app.utils.perms import roles_required
 from app.utils.time import to_datetime_local, from_datetime_local
 
+
 checkins_bp = Blueprint("checkins", __name__, template_folder="../../templates")
+
+
 
 
 # --------------------------- helpers ---------------------------
@@ -50,6 +53,40 @@ def _filtered_query(team_id: int | None, checkpoint_id: int | None,
         q = q.filter(Checkin.timestamp < end)
 
     return q.order_by(Checkin.timestamp.desc())
+
+
+
+def _parse_timestamp_from_form(fallback_dt: datetime | None = None) -> datetime:
+    """
+    Parse <input name="timestamp"> or <input name="timestamp_local"> with an optional
+    <select name="timezone">. Never returns None. If parsing fails or fields are blank,
+    return fallback_dt, or utcnow() if fallback_dt is None.
+    """
+    ts_str = (request.form.get("timestamp") or
+              request.form.get("timestamp_local") or "").strip()
+    tz_name = (request.form.get("timezone") or
+               request.form.get("tz") or "").strip()
+
+    # Default result if anything goes wrong
+    default_dt = fallback_dt or datetime.utcnow()
+
+    if not ts_str:
+        return default_dt
+
+    # Try local->UTC first if a timezone was provided
+    if tz_name:
+        try:
+            dt = from_datetime_local(ts_str, tz_name)
+            if dt:                       # <- guard against None returns
+                return dt
+        except Exception:
+            pass  # fall through to ISO parser / default
+
+    # Try plain ISO (datetime-local produces e.g. 2025-10-17T02:36 or with seconds)
+    try:
+        return datetime.fromisoformat(ts_str)
+    except Exception:
+        return default_dt
 
 
 # --------------------------- view & export ---------------------------
@@ -155,6 +192,8 @@ def export_checkins_csv():
     )
 
 
+
+
 # --------------------------- add / edit / delete ---------------------------
 
 @checkins_bp.route("/add", methods=["GET", "POST"])
@@ -166,23 +205,43 @@ def add_checkin():
     if request.method == "POST":
         team_id = request.form.get("team_id", type=int)
         checkpoint_id = request.form.get("checkpoint_id", type=int)
+        override = request.form.get("override")
 
-        if not Team.query.get(team_id):
-            flash("Invalid team.", "warning")
-            return render_template("add_checkin.html", teams=teams, checkpoints=checkpoints)
+        # validate FKs
+        if not Team.query.get(team_id) or not Checkpoint.query.get(checkpoint_id):
+            flash("Invalid team or checkpoint.", "warning")
+            return render_template("add_checkin.html", teams=teams, checkpoints=checkpoints, now=datetime.utcnow())
 
-        if not Checkpoint.query.get(checkpoint_id):
-            flash("Invalid checkpoint.", "warning")
-            return render_template("add_checkin.html", teams=teams, checkpoints=checkpoints)
+        # parse local → UTC; fallback is now()
+        timestamp = _parse_timestamp_from_form(datetime.utcnow())
 
-        # Use server UTC time for manual add
-        c = Checkin(team_id=team_id, checkpoint_id=checkpoint_id, timestamp=datetime.utcnow())
-        db.session.add(c)
+        existing = Checkin.query.filter_by(team_id=team_id, checkpoint_id=checkpoint_id).first()
+        if existing and override != "replace":
+            flash("This team has already checked in at this checkpoint.", "warning")
+            return render_template(
+                "add_checkin.html",
+                teams=teams,
+                checkpoints=checkpoints,
+                dup_team_id=team_id,
+                dup_checkpoint_id=checkpoint_id,
+                # keep user input in the field if they posted it
+                timestamp_prefill=request.form.get("timestamp_local") or "",
+                suggest_override=True,
+            )
+
+        if existing and override == "replace":
+            existing.timestamp = timestamp
+            db.session.commit()
+            flash("Existing check-in replaced with the new timestamp.", "success")
+            return redirect(url_for("checkins.list_checkins"))
+
+        db.session.add(Checkin(team_id=team_id, checkpoint_id=checkpoint_id, timestamp=timestamp))
         db.session.commit()
         flash("Check-in recorded.", "success")
         return redirect(url_for("checkins.list_checkins"))
 
-    return render_template("add_checkin.html", teams=teams, checkpoints=checkpoints)
+    # GET
+    return render_template("add_checkin.html", teams=teams, checkpoints=checkpoints, now=datetime.utcnow())
 
 
 @checkins_bp.route("/<int:checkin_id>/edit", methods=["GET", "POST"])
@@ -195,30 +254,66 @@ def edit_checkin(checkin_id: int):
     if request.method == "POST":
         new_team_id = request.form.get("team_id", type=int)
         new_cp_id = request.form.get("checkpoint_id", type=int)
-        ts_str = request.form.get("timestamp")  # value from <input type="datetime-local">
-        tz_name = request.form.get("timezone")  # optional select
+        override = request.form.get("override")
 
-        # validate foreign keys first
-        if not Team.query.get(new_team_id):
-            flash("Invalid team.", "warning")
-            return redirect(url_for("checkins.edit_checkin", checkin_id=checkin_id))
 
-        if not Checkpoint.query.get(new_cp_id):
-            flash("Invalid checkpoint.", "warning")
-            return redirect(url_for("checkins.edit_checkin", checkin_id=checkin_id))
+        # validate FKs
+        if not Team.query.get(new_team_id) or not Checkpoint.query.get(new_cp_id):
+            flash("Invalid team or checkpoint.", "warning")
+            return render_template(
+                "checkin_edit.html",
+                c=c,
+                teams=teams,
+                checkpoints=checkpoints,
+                timestamp_local=to_datetime_local(c.timestamp),
+            )
 
-        # convert local -> UTC (naive) if provided; otherwise keep current
-        new_ts = from_datetime_local(ts_str, tz_name) if ts_str else c.timestamp
+        # parse local → UTC; fallback is current stored timestamp
+        new_ts = _parse_timestamp_from_form(c.timestamp)
 
+        # Is there another row with same (team, checkpoint)?
+        dup = (
+            Checkin.query
+            .filter(
+                Checkin.team_id == new_team_id,
+                Checkin.checkpoint_id == new_cp_id,
+                Checkin.id != checkin_id,
+            )
+            .first()
+        )
+
+        if dup and override != "replace":
+            flash("Another check-in for that team & checkpoint already exists.", "warning")
+            return render_template(
+                "checkin_edit.html",
+                c=c,
+                teams=teams,
+                checkpoints=checkpoints,
+                timestamp_local=to_datetime_local(new_ts),
+                suggest_override=True,
+                pending_team_id=new_team_id,
+                pending_cp_id=new_cp_id,
+            )
+
+        if dup and override == "replace":
+            db.session.delete(dup)
+            db.session.flush()
+            c.team_id = new_team_id
+            c.checkpoint_id = new_cp_id
+            c.timestamp = new_ts
+            db.session.commit()
+            flash("Replaced the other check-in and saved your changes.", "success")
+            return redirect(url_for("checkins.list_checkins"))
+
+        # Normal update
         c.team_id = new_team_id
         c.checkpoint_id = new_cp_id
         c.timestamp = new_ts
-
         db.session.commit()
         flash("Check-in updated.", "success")
         return redirect(url_for("checkins.list_checkins"))
 
-    # GET
+    # ---- GET: render the form ----
     return render_template(
         "checkin_edit.html",
         c=c,

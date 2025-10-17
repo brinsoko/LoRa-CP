@@ -1,0 +1,15 @@
+[postgresql]
+dsn="postgres://chirpstack:supersecret@postgres:5432/chirpstack?sslmode=disable"
+automigrate=true
+
+[redis]
+servers=["redis://redis:6379"]
+
+[mqtt]
+server="tcp://mosquitto:1883"
+
+[api]
+bind="0.0.0.0:8081"
+
+[http]
+bind="0.0.0.0:8080"

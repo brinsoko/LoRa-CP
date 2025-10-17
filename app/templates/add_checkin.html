@@ -1,43 +1,69 @@
-{# app/templates/add_checkin.html #}
 {% extends "base.html" %}
 {% block title %}Add Check-in{% endblock %}
 {% block content %}
 
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title mb-4">Add Check-in</h5>
+    <h5 class="card-title mb-3">Add Check-in</h5>
 
-    <form method="POST" class="row g-3">
-      <div class="col-12 col-md-6">
-        <label class="form-label fw-semibold">Select Team</label>
-        <select name="team_id" class="form-select" required>
-          {% for team in teams %}
-            <option value="{{ team.id }}">{{ team.name }}{% if team.number %} ({{ team.number }}){% endif %}</option>
-          {% endfor %}
-        </select>
+    <form method="post">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Team</label>
+          <select name="team_id" class="form-select" required>
+            {% for t in teams %}
+              <option value="{{ t.id }}" {% if dup_team_id and dup_team_id==t.id %}selected{% endif %}>
+                {{ t.name }}{% if t.number is not none %} ({{ t.number }}){% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Checkpoint</label>
+          <select name="checkpoint_id" class="form-select" required>
+            {% for cp in checkpoints %}
+              <option value="{{ cp.id }}" {% if dup_checkpoint_id and dup_checkpoint_id==cp.id %}selected{% endif %}>
+                {{ cp.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Local time (optional)</label>
+          <input type="datetime-local"
+                 name="timestamp_local"
+                 class="form-control"
+                 step="1"
+                 value="{{ timestamp_prefill or (now.strftime('%Y-%m-%dT%H:%M:%S') if now else '') }}">
+          <div class="form-text">Leave blank to use current time (UTC now).</div>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Timezone</label>
+          {% set tz_default = 'Europe/Ljubljana' %}
+          {% set tz_current = request.form.get('timezone') or tz_default %}
+          <select name="timezone" class="form-select">
+            <option value="Europe/Ljubljana" {% if tz_current=='Europe/Ljubljana' %}selected{% endif %}>Europe/Ljubljana</option>
+            <option value="UTC" {% if tz_current=='UTC' %}selected{% endif %}>UTC</option>
+            <option value="Europe/Vienna" {% if tz_current=='Europe/Vienna' %}selected{% endif %}>Europe/Vienna</option>
+            <option value="Europe/Berlin" {% if tz_current=='Europe/Berlin' %}selected{% endif %}>Europe/Berlin</option>
+            <option value="Europe/Paris" {% if tz_current=='Europe/Paris' %}selected{% endif %}>Europe/Paris</option>
+          </select>
+        </div>
       </div>
 
-      <div class="col-12 col-md-6">
-        <label class="form-label fw-semibold">Select Checkpoint</label>
-        <select name="checkpoint_id" class="form-select" required>
-          {% for checkpoint in checkpoints %}
-            <option value="{{ checkpoint.id }}">{{ checkpoint.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
+      {% if suggest_override %}
+        <input type="hidden" name="override" value="replace">
+        <div class="alert alert-warning mt-3">
+          This team already checked in at that checkpoint. Submit again to replace the previous timestamp.
+        </div>
+      {% endif %}
 
-      <div class="col-12 col-md-6">
-        <label class="form-label fw-semibold">Timestamp (optional)</label>
-        <input type="datetime-local"
-               name="timestamp"
-               class="form-control"
-               value="{{ now.strftime('%Y-%m-%dT%H:%M') if now else '' }}">
-        <div class="form-text">Leave blank to use the current time automatically.</div>
-      </div>
-
-      <div class="col-12 text-end mt-3">
-        <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-outline-secondary">Cancel</a>
-        <button type="submit" class="btn btn-success">Record Check-in</button>
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-success" type="submit">Record Check-in</button>
+        <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-secondary">Cancel</a>
       </div>
     </form>
   </div>

@@ -83,6 +83,7 @@
       <a href="{{ url_for('rfid.list_rfid') }}" class="btn btn-outline-info">Map RFID ↔ Team</a>
 
       <a href="{{ url_for('groups.list_groups') }}" class="btn btn-outline-secondary">Groups</a>
+      <a href="{{ url_for('lora.lora_list') }}" class="btn btn-outline-secondary">LoRa</a>
       {# Only show if the endpoint exists in your blueprint #}
       {% if 'groups.assign_team_group' in current_app.view_functions %}
         <a href="{{ url_for('groups.assign_team_group') }}" class="btn btn-outline-secondary">Assign Team → Group</a>

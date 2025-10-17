@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Add LoRa Device{% endblock %}
+{% block content %}
+<div class="card"><div class="card-body">
+  <h5 class="card-title mb-3">Add LoRa Device</h5>
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label">DevEUI</label>
+      <input class="form-control" name="dev_eui" placeholder="ABCDEF1234567890" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Name (optional)</label>
+      <input class="form-control" name="name" placeholder="North Gate">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Note</label>
+      <textarea class="form-control" name="note" rows="2"></textarea>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-primary" type="submit">Save</button>
+      <a class="btn btn-secondary" href="{{ url_for('lora.lora_list') }}">Cancel</a>
+    </div>
+  </form>
+</div></div>
+{% endblock %}
