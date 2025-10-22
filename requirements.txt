@@ -20,6 +20,7 @@ pytz==2024.1
 
 # --- Optional Serial / Hardware access ---
 pyserial==3.5
+requests==2.32.5
 
 # --- Data Handling ---
 pandas==2.2.3

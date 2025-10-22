@@ -6,7 +6,11 @@
   <form method="post">
     <div class="mb-3">
       <label class="form-label">DevEUI</label>
-      <input class="form-control" name="dev_eui" value="{{ d.dev_eui }}" required>
+      <input class="form-control" name="dev_eui" value="{{ d.dev_eui }}">
+    </div>
+        <div class="mb-3">
+      <label class="form-label">Device Number</label>
+      <input class="form-control" type="number" name="dev_num" value="{{ d.dev_num }}" required>
     </div>
     <div class="mb-3">
       <label class="form-label">Name</label>

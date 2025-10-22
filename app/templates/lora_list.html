@@ -10,7 +10,7 @@
 <div class="table-responsive">
   <table class="table table-striped align-middle">
     <thead>
-      <tr><th>#</th><th>Name</th><th>DevEUI</th><th>Active</th><th>Checkpoint</th><th>Last Seen</th><th class="text-end" style="width:160px;">Actions</th></tr>
+      <tr><th>#</th><th>Name</th><th>DevEUI</th><th>DevNum</th><th>Active</th><th>Checkpoint</th><th>Last Seen (UTC)</th><th class="text-end" style="width:160px;">Actions</th></tr>
     </thead>
     <tbody>
       {% for d in devices %}
@@ -18,6 +18,7 @@
         <td>{{ loop.index }}</td>
         <td>{{ d.name or '—' }}</td>
         <td><code>{{ d.dev_eui }}</code></td>
+        <td>{{ d.dev_num }}</td>
         <td>{{ 'Yes' if d.active else 'No' }}</td>
         <td>{{ d.checkpoint.name if d.checkpoint else '—' }}</td>
         <td>{{ d.last_seen.strftime('%Y-%m-%d %H:%M:%S') if d.last_seen else '—' }}</td>

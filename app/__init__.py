@@ -1,5 +1,5 @@
 # app/__init__.py — app factory and blueprint registration
-from flask import Flask, request, render_template, current_app
+from flask import Flask, app, request, render_template, current_app
 from flask_login import current_user
 from .extensions import db, login_manager
 from .utils.perms import inject_perms
@@ -65,7 +65,11 @@ def create_app() -> Flask:
     from .blueprints.map.routes import maps_bp
     from .blueprints.groups.routes import groups_bp
     from .blueprints.lora.routes import lora_bp
-
+    from app.blueprints.messages.routes import messages_bp
+    from app.blueprints.ingest.routes import ingest_bp
+    
+    app.register_blueprint(ingest_bp)   # no prefix -> /api/ingest
+    app.register_blueprint(messages_bp, url_prefix="/messages")
     app.register_blueprint(lora_bp, url_prefix="/lora")
     app.register_blueprint(groups_bp,    url_prefix="/groups")
     app.register_blueprint(maps_bp,      url_prefix="/map")

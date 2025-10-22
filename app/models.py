@@ -162,7 +162,7 @@ class Checkpoint(db.Model):
     # one-to-many from Checkin
     checkins = db.relationship("Checkin", back_populates="checkpoint", lazy=True)
 
-    # NEW: many-to-many groups (this was missing before)
+    # many-to-many groups
     groups = db.relationship(
         "CheckpointGroup",
         secondary=checkpoint_group_links,
@@ -239,15 +239,28 @@ class LoRaDevice(db.Model):
     __tablename__ = "lora_devices"
 
     id = db.Column(db.Integer, primary_key=True)
-    dev_eui = db.Column(db.String(32), unique=True, nullable=False)  # e.g., 16-byte hex string
+    dev_eui = db.Column(db.String(32), unique=True, nullable=True)  # e.g., 16-byte hex string
+    dev_num = db.Column(db.Integer, unique=True, index=True, nullable=False)
     name = db.Column(db.String(120), nullable=True)                  # friendly label
     note = db.Column(db.Text, nullable=True)
+    model = db.Column(db.String(64), nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=True)
+    
 
     # optional telemetry-ish fields
     last_seen = db.Column(db.DateTime)
     last_rssi = db.Column(db.Float)
     battery = db.Column(db.Float)
 
+
     # inverse: which checkpoint references this device (0 or 1)
     checkpoint = db.relationship("Checkpoint", back_populates="lora_device", uselist=False)
+
+class LoRaMessage(db.Model):
+    __tablename__ = "lora_messages"
+    id = db.Column(db.Integer, primary_key=True)
+    dev_id = db.Column(db.String(64), index=True, nullable=False)
+    payload = db.Column(db.Text, nullable=False)
+    rssi = db.Column(db.Float)
+    snr = db.Column(db.Float)
+    received_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)

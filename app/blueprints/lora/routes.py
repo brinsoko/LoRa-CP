@@ -19,16 +19,17 @@ def lora_list():
 @roles_required("judge","admin")
 def add_device():
     if request.method == "POST":
-        dev_eui = (request.form.get("dev_eui") or "").strip()
+        dev_eui = (request.form.get("dev_eui") or "").strip() or None
+        dev_num  = (request.form.get("dev_num") or "").strip()
         name    = (request.form.get("name") or "").strip() or None
         note    = (request.form.get("note") or "").strip() or None
-        if not dev_eui:
-            flash("Device EUI is required.", "warning")
+        if not dev_num:
+            flash("Device number is required.", "warning")
             return render_template("lora_add.html")
-        if LoRaDevice.query.filter_by(dev_eui=dev_eui).first():
-            flash("A device with that EUI already exists.", "warning")
+        if LoRaDevice.query.filter_by(dev_num=dev_num).first():
+            flash("A device with that number already exists.", "warning")
             return render_template("lora_add.html")
-        d = LoRaDevice(dev_eui=dev_eui, name=name, note=note, active=True)
+        d = LoRaDevice(dev_eui=dev_eui,dev_num=dev_num, name=name, note=note, active=True)
         db.session.add(d); db.session.commit()
         flash("LoRa device added.", "success")
         return redirect(url_for("lora.lora_list"))
@@ -39,7 +40,8 @@ def add_device():
 def edit_device(device_id):
     d = LoRaDevice.query.get_or_404(device_id)
     if request.method == "POST":
-        d.dev_eui = (request.form.get("dev_eui") or "").strip()
+        d.dev_eui = (request.form.get("dev_eui") or "").strip() or None
+        d.dev_num  = (request.form.get("dev_num") or "").strip()
         d.name    = (request.form.get("name") or "").strip() or None
         d.note    = (request.form.get("note") or "").strip() or None
         d.active  = bool(request.form.get("active"))
@@ -68,67 +70,3 @@ def delete_device(device_id):
     db.session.commit()
     flash("LoRa device deleted.", "success")
     return redirect(url_for("lora.lora_list"))
-
-# ---------- Webhook (optional) ----------
-@lora_bp.route("/webhook", methods=["POST"])
-def lora_webhook():
-    """
-    Minimal example payload (customize to match your network):
-    {
-      "secret": "XYZ123",               # simple shared secret
-      "dev_eui": "ABCDEF1234567890",
-      "uid": "04AABBCCDD",              # RFID card UID read at that checkpoint (optional)
-      "rssi": -85,                      # optional
-      "battery": 3.7                    # optional
-    }
-    Behavior:
-      - find device by dev_eui -> map to checkpoint
-      - if uid present -> map to Team via RFIDCard.uid and create/replace check-in for that team at that checkpoint
-      - update device last_seen/rssi/battery
-    """
-    data = request.get_json(silent=True) or {}
-    secret = (data.get("secret") or "").strip()
-    if not secret or secret != getattr(current_app.config, "LORA_WEBHOOK_SECRET", None):
-        abort(403)
-
-    dev_eui = (data.get("dev_eui") or "").strip()
-    if not dev_eui:
-        return jsonify({"ok": False, "error": "Missing dev_eui"}), 400
-
-    d = LoRaDevice.query.filter_by(dev_eui=dev_eui).first()
-    if not d:
-        return jsonify({"ok": False, "error": "Unknown device"}), 404
-
-    # update telemetry
-    d.last_seen = datetime.utcnow()
-    if "rssi" in data:    d.last_rssi = data.get("rssi")
-    if "battery" in data: d.battery   = data.get("battery")
-
-    cp = d.checkpoint
-    if not cp:
-        db.session.commit()
-        return jsonify({"ok": True, "warning": "Device not linked to a checkpoint; nothing recorded."}), 200
-
-    uid = (data.get("uid") or "").strip()
-    if not uid:
-        db.session.commit()
-        return jsonify({"ok": True, "info": "No UID provided; only device status updated."}), 200
-
-    # Map UID -> Team via RFIDCard
-    card = RFIDCard.query.filter_by(uid=uid).first()
-    if not card or not card.team_id:
-        db.session.commit()
-        return jsonify({"ok": True, "warning": "UID not mapped to a team; status updated only."}), 200
-
-    team_id = card.team_id
-
-    # Enforce one check-in per team per checkpoint: replace if exists
-    existing = Checkin.query.filter_by(team_id=team_id, checkpoint_id=cp.id).first()
-    if existing:
-        existing.timestamp = datetime.utcnow()
-        db.session.commit()
-        return jsonify({"ok": True, "action": "replaced"}), 200
-    else:
-        db.session.add(Checkin(team_id=team_id, checkpoint_id=cp.id, timestamp=datetime.utcnow()))
-        db.session.commit()
-        return jsonify({"ok": True, "action": "created"}), 201
