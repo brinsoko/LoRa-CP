@@ -67,7 +67,11 @@ def create_app() -> Flask:
     from .blueprints.lora.routes import lora_bp
     from app.blueprints.messages.routes import messages_bp
     from app.blueprints.ingest.routes import ingest_bp
-    
+    from app.blueprints.docs.routes import docs_bp
+    from app.blueprints.users.routes import users_bp
+
+    app.register_blueprint(users_bp, url_prefix="/users")
+    app.register_blueprint(docs_bp, url_prefix="/docs")
     app.register_blueprint(ingest_bp)   # no prefix -> /api/ingest
     app.register_blueprint(messages_bp, url_prefix="/messages")
     app.register_blueprint(lora_bp, url_prefix="/lora")

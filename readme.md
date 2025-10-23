@@ -1,10 +1,10 @@
-# 🛰️ LoRa Checkpoint Tracking System
+#  LoRa Checkpoint Tracking System
 
 A full-featured **RFID & LoRa-based checkpoint management platform** built with **Flask**, designed for scouting events, outdoor competitions, or any scenario where teams check in at physical checkpoints.
 
 ---
 
-## 🚀 Features
+##  Features
 
 - **User roles:** Admin, Judge, and Public views with role-based permissions  
 - **Teams:** Create, edit, and manage teams with unique numbers  
@@ -29,7 +29,7 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 
 ---
 
-## 🧩 Tech Stack
+##  Tech Stack
 
 - **Backend:** Flask (Python 3.10+)
 - **Database:** SQLite (SQLAlchemy ORM)
@@ -38,3 +38,27 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 - **Authentication:** Flask-Login
 - **Logging:** Built-in Flask logger with DEBUG output
 - **Environment:** macOS/Linux/Windows (works best with virtualenv)
+
+
+---
+
+## API Docs
+
+- Swagger UI: `http://localhost:5001/docs`
+- Raw spec: `http://localhost:5001/docs/openapi.yaml`
+
+### Auth
+Cookie-based session from `/login` (form POST). Many routes are public; judge/admin routes require login.
+
+### Quick Calls
+
+Ingest a LoRa message (JSON):
+```bash
+curl -X POST http://localhost:5001/api/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"dev_id":1,"payload":"A1B2C3D4","rssi":-62.5,"snr":9.0}'
+
+Export check-ins (CSV):
+
+```bash
+  curl "http://localhost:5001/checkins/export.csv?sort=new"

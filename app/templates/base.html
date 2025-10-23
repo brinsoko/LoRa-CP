@@ -61,6 +61,13 @@
             Create User
           </a>
         {% endif %}
+        x<!-- inside your navbar -->
+        {% if current_user.is_authenticated and current_user.role == 'admin' %}
+          <li class="nav-item">
+            <a class="nav-link{% if request.blueprint == 'users' %} active{% endif %}"
+              href="{{ url_for('users.list_users') }}">Users</a>
+          </li>
+        {% endif %}
          <div class="theme-toggle bg-body-tertiary border rounded-3 px-3 py-2 shadow">
           <label class="form-check-label" for="themeSwitch">Dark mode</label>
             <div class="form-check form-switch m-0">

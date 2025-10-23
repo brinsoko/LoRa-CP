@@ -271,27 +271,3 @@ def public_mappings():
     )
     return render_template("rfid_list.html", cards=cards, read_only=True)
 
-# PUBLIC JSON (optional)
-@rfid_bp.route("/public.json", methods=["GET"])
-def public_mappings_json():
-    cards = (
-        RFIDCard.query
-        .options(joinedload(RFIDCard.team))
-        .order_by(RFIDCard.number.asc().nulls_last(), RFIDCard.uid.asc())
-        .all()
-    )
-    return {
-        "cards": [
-            {
-                "id": c.id,
-                "uid": c.uid,
-                "number": c.number,
-                "team": {
-                    "id": c.team.id if c.team else None,
-                    "name": c.team.name if c.team else None,
-                    "number": c.team.number if c.team else None,
-                },
-            }
-            for c in cards
-        ]
-    }, 200
