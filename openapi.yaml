@@ -32,6 +32,8 @@ tags:
     description: RFID mappings and tools
   - name: teams
     description: Team management
+  - name: users
+    description: User management
 
 
 paths:

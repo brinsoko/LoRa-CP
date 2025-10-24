@@ -57,8 +57,23 @@ Ingest a LoRa message (JSON):
 curl -X POST http://localhost:5001/api/ingest \
   -H "Content-Type: application/json" \
   -d '{"dev_id":1,"payload":"A1B2C3D4","rssi":-62.5,"snr":9.0}'
+  ```
 
 Export check-ins (CSV):
 
 ```bash
   curl "http://localhost:5001/checkins/export.csv?sort=new"
+  ```
+
+
+
+To do:
+- add rfid reader
+- add SD card support, when it does not recieve ACK
+- design a PCB
+- Fix import checkpoints to a specific coordinate system
+- look into adding mailing client for registration via email (public deployment)
+- look into upgrading the database, to support multiple competitions
+- Look into adding a scoring system (per CP)
+- fix serial data from LoRa module
+- add wifi support for data transfers??

@@ -57,24 +57,24 @@
           <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-outline-primary">Login</a>
         {% endif %}
         {% if current_user.is_authenticated and current_user.role == 'admin' %}
-          <a href="{{ url_for('auth.register') }}" class="btn btn-sm btn-outline-warning">
+          <a href="{{ url_for('auth.register') }}" class="btn btn-sm btn-outline-success">
             Create User
           </a>
         {% endif %}
-        x<!-- inside your navbar -->
         {% if current_user.is_authenticated and current_user.role == 'admin' %}
           <li class="nav-item">
-            <a class="nav-link{% if request.blueprint == 'users' %} active{% endif %}"
-              href="{{ url_for('users.list_users') }}">Users</a>
+            <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">Users</a>
           </li>
         {% endif %}
+
+        <!-- THEME TOGGLE -->
          <div class="theme-toggle bg-body-tertiary border rounded-3 px-3 py-2 shadow">
           <label class="form-check-label" for="themeSwitch">Dark mode</label>
             <div class="form-check form-switch m-0">
               <input class="form-check-input" type="checkbox" role="switch" id="themeSwitch" />
             </div>
           </div>
-        <!-- THEME TOGGLE -->
+        
 
    
 

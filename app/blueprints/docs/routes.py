@@ -8,7 +8,6 @@ SPEC_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file_
 
 @docs_bp.route("/openapi.json")
 def openapi_json():
-    # If you store YAML only, you can convert once at build time; for now just link to YAML.
     return jsonify({"detail": "Use /docs/openapi.yaml or /docs for Swagger UI"})
 
 @docs_bp.route("/openapi.yaml")
@@ -19,7 +18,3 @@ def openapi_yaml():
 def swagger_ui():
     # Simple Swagger UI via CDN
     return render_template("swagger_ui.html", spec_url="/docs/openapi.yaml")
-
-@docs_bp.route("/redoc")
-def redoc_ui():
-    return render_template("redoc.html", spec_url="/docs/openapi.yaml")
