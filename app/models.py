@@ -5,30 +5,9 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 
-from sqlalchemy import CheckConstraint, UniqueConstraint
+from sqlalchemy import CheckConstraint, UniqueConstraint, event
+from sqlalchemy.ext.associationproxy import association_proxy
 from app.extensions import db
-
-
-# ============================================================
-# Association table: MANY-TO-MANY between checkpoints & groups
-# (Must be defined BEFORE models that reference it)
-# ============================================================
-checkpoint_group_links = db.Table(
-    "checkpoint_group_links",
-    db.Column(
-        "checkpoint_id",
-        db.Integer,
-        db.ForeignKey("checkpoints.id", ondelete="CASCADE"),
-        primary_key=True,
-    ),
-    db.Column(
-        "group_id",
-        db.Integer,
-        db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"),
-        primary_key=True,
-    ),
-    db.UniqueConstraint("checkpoint_id", "group_id", name="uq_cp_group"),
-)
 
 
 # =================
@@ -121,14 +100,17 @@ class CheckpointGroup(db.Model):
     name = db.Column(db.String(120), unique=True, nullable=False)
     description = db.Column(db.Text)
 
-    # many-to-many backref defined on Checkpoint.groups
-    checkpoints = db.relationship(
-        "Checkpoint",
-        secondary=checkpoint_group_links,
-        back_populates="groups",
-        order_by="Checkpoint.name.asc()",
-        cascade="save-update",
+    checkpoint_links = db.relationship(
+        "CheckpointGroupLink",
+        back_populates="group",
+        cascade="all, delete-orphan",
         passive_deletes=True,
+        order_by="CheckpointGroupLink.position.asc()",
+    )
+    checkpoints = association_proxy(
+        "checkpoint_links",
+        "checkpoint",
+        creator=lambda checkpoint: CheckpointGroupLink(checkpoint=checkpoint),
     )
 
     # If you prefer explicit:
@@ -162,14 +144,38 @@ class Checkpoint(db.Model):
     # one-to-many from Checkin
     checkins = db.relationship("Checkin", back_populates="checkpoint", lazy=True)
 
-    # many-to-many groups
-    groups = db.relationship(
-        "CheckpointGroup",
-        secondary=checkpoint_group_links,
-        back_populates="checkpoints",
-        order_by="CheckpointGroup.name.asc()",
-        cascade="save-update",
+    group_links = db.relationship(
+        "CheckpointGroupLink",
+        back_populates="checkpoint",
+        cascade="all, delete-orphan",
         passive_deletes=True,
+    )
+    groups = association_proxy(
+        "group_links",
+        "group",
+        creator=lambda group: CheckpointGroupLink(group=group),
+    )
+
+class CheckpointGroupLink(db.Model):
+    __tablename__ = "checkpoint_group_links"
+
+    group_id = db.Column(
+        db.Integer,
+        db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    checkpoint_id = db.Column(
+        db.Integer,
+        db.ForeignKey("checkpoints.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    position = db.Column(db.Integer, nullable=False)
+
+    group = db.relationship("CheckpointGroup", back_populates="checkpoint_links")
+    checkpoint = db.relationship("Checkpoint", back_populates="group_links")
+
+    __table_args__ = (
+        UniqueConstraint("checkpoint_id", "group_id", name="uq_cp_group"),
     )
 
 
@@ -264,3 +270,19 @@ class LoRaMessage(db.Model):
     rssi = db.Column(db.Float)
     snr = db.Column(db.Float)
     received_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+
+@event.listens_for(CheckpointGroup.checkpoint_links, "append")
+def _set_checkpoint_link_position(group: CheckpointGroup, link: CheckpointGroupLink, *_):
+    """
+    Ensure new group↔checkpoint links receive a position at the end of the current ordered list.
+    """
+    if link.position is not None:
+        return
+
+    existing_positions = [
+        l.position
+        for l in group.checkpoint_links
+        if l is not link and l.position is not None
+    ]
+    link.position = (max(existing_positions) + 1) if existing_positions else 0

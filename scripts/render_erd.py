@@ -20,7 +20,7 @@ with app.app_context():
         concentrate=False,            # avoid overlapping lines
     )
 
-    graph.write_png("erd.png")
-    graph.write_pdf("erd.pdf")
+    graph.write_png("docs/erd.png") # type: ignore
+    graph.write_pdf("docs/erd.pdf") # type: ignore
 
-print("ERD generated: erd.png and erd.pdf")
+print("ERD generated: docs/erd.png and docs/erd.pdf")

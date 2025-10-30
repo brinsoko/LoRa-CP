@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from sqlalchemy.orm import joinedload
 from app.extensions import db
-from app.models import CheckpointGroup, Checkpoint, TeamGroup, Team
+from app.models import CheckpointGroup, Checkpoint, CheckpointGroupLink, TeamGroup, Team
 from app.utils.perms import roles_required
 
 groups_bp = Blueprint("groups", __name__, template_folder="../../templates")
@@ -19,6 +19,38 @@ def _parse_checkpoint_ids(form_field_values) -> list[int]:
         except Exception:
             pass
     return ids
+
+def _sync_group_checkpoints(group: CheckpointGroup, ordered_ids: list[int]) -> None:
+    """
+    Update group's checkpoints to match ordered_ids while preserving links that remain
+    and assigning sequential position values for ordering.
+    """
+    existing = {link.checkpoint_id: link for link in group.checkpoint_links}
+    new_links: list[CheckpointGroupLink] = []
+
+    for position, cp_id in enumerate(ordered_ids):
+        link = existing.pop(cp_id, None)
+        if link is None:
+            checkpoint = db.session.get(Checkpoint, cp_id)
+            if not checkpoint:
+                continue  # skip invalid IDs silently
+            link = CheckpointGroupLink(group=group, checkpoint=checkpoint)
+        link.position = position
+        new_links.append(link)
+
+    # Remove links that are no longer selected
+    for obsolete in existing.values():
+        db.session.delete(obsolete)
+
+    group.checkpoint_links = new_links
+
+
+def _partition_checkpoints(all_checkpoints: list[Checkpoint], ordered_ids: list[int]) -> tuple[list[Checkpoint], list[Checkpoint]]:
+    lookup = {cp.id: cp for cp in all_checkpoints}
+    selected = [lookup[cp_id] for cp_id in ordered_ids if cp_id in lookup]
+    selected_ids = set(ordered_ids)
+    available = [cp for cp in all_checkpoints if cp.id not in selected_ids]
+    return selected, available
 
 # ---------- List groups ----------
 @groups_bp.route("/", methods=["GET"])
@@ -37,22 +69,41 @@ def add_group():
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
         desc = (request.form.get("description") or "").strip() or None
-        selected_ids = _parse_checkpoint_ids(request.form.getlist("checkpoint_ids"))
+        has_checkpoint_payload = request.form.get("checkpoint_ids_present") == "1"
+        selected_ids = _parse_checkpoint_ids(request.form.getlist("checkpoint_ids")) if has_checkpoint_payload else []
+        selected_items, available_items = _partition_checkpoints(cps, selected_ids)
 
         if not name:
             flash("Group name is required.", "warning")
-            return render_template("group_edit.html", mode="add", cps=cps)
+            return render_template(
+                "group_edit.html",
+                mode="add",
+                cps=cps,
+                selected_ids=selected_ids,
+                selected_checkpoints=selected_items,
+                available_checkpoints=available_items,
+            )
 
         g = CheckpointGroup(name=name, description=desc)
-        if selected_ids:
-            g.checkpoints = db.session.query(Checkpoint).filter(Checkpoint.id.in_(selected_ids)).all()
-
         db.session.add(g)
+        db.session.flush()
+
+        if has_checkpoint_payload:
+            _sync_group_checkpoints(g, selected_ids)
+
         db.session.commit()
         flash("Group created.", "success")
         return redirect(url_for("groups.list_groups"))
 
-    return render_template("group_edit.html", mode="add", cps=cps)
+    selected_items, available_items = _partition_checkpoints(cps, [])
+    return render_template(
+        "group_edit.html",
+        mode="add",
+        cps=cps,
+        selected_ids=[],
+        selected_checkpoints=selected_items,
+        available_checkpoints=available_items,
+    )
 
 # ---------- Edit group (incl. assign checkpoints) ----------
 @groups_bp.route("/<int:group_id>/edit", methods=["GET", "POST"])
@@ -60,7 +111,10 @@ def add_group():
 def edit_group(group_id: int):
     g = (
         db.session.query(CheckpointGroup)
-        .options(joinedload(CheckpointGroup.checkpoints))
+        .options(
+            joinedload(CheckpointGroup.checkpoint_links)
+            .joinedload(CheckpointGroupLink.checkpoint)
+        )
         .get_or_404(group_id)
     )
     cps = db.session.query(Checkpoint).order_by(Checkpoint.name.asc()).all()
@@ -68,24 +122,44 @@ def edit_group(group_id: int):
     if request.method == "POST":
         g.name = (request.form.get("name") or "").strip()
         g.description = (request.form.get("description") or "").strip() or None
-        selected_ids = _parse_checkpoint_ids(request.form.getlist("checkpoint_ids"))
+        has_checkpoint_payload = request.form.get("checkpoint_ids_present") == "1"
+        selected_ids = _parse_checkpoint_ids(request.form.getlist("checkpoint_ids")) if has_checkpoint_payload else []
+        selected_items, available_items = _partition_checkpoints(cps, selected_ids)
 
         if not g.name:
             flash("Group name is required.", "warning")
-            return render_template("group_edit.html", mode="edit", g=g, cps=cps, selected_ids={cp.id for cp in g.checkpoints})
+            if not selected_items:
+                selected_items = [link.checkpoint for link in g.checkpoint_links]
+                existing_ids = {link.checkpoint_id for link in g.checkpoint_links}
+                available_items = [cp for cp in cps if cp.id not in existing_ids]
+            return render_template(
+                "group_edit.html",
+                mode="edit",
+                g=g,
+                cps=cps,
+                selected_ids=[link.checkpoint_id for link in g.checkpoint_links],
+                selected_checkpoints=selected_items,
+                available_checkpoints=available_items,
+            )
 
-        # Replace many-to-many members with exactly the selected ones
-        if selected_ids:
-            g.checkpoints = db.session.query(Checkpoint).filter(Checkpoint.id.in_(selected_ids)).all()
-        else:
-            g.checkpoints = []
+        if has_checkpoint_payload:
+            _sync_group_checkpoints(g, selected_ids)
 
         db.session.commit()
         flash("Group updated.", "success")
         return redirect(url_for("groups.list_groups"))
 
-    selected_ids = {cp.id for cp in g.checkpoints}
-    return render_template("group_edit.html", mode="edit", g=g, cps=cps, selected_ids=selected_ids)
+    selected_ids = [link.checkpoint_id for link in g.checkpoint_links]
+    selected_items, available_items = _partition_checkpoints(cps, selected_ids)
+    return render_template(
+        "group_edit.html",
+        mode="edit",
+        g=g,
+        cps=cps,
+        selected_ids=selected_ids,
+        selected_checkpoints=selected_items,
+        available_checkpoints=available_items,
+    )
 
 # ---------- Delete group ----------
 @groups_bp.route("/<int:group_id>/delete", methods=["POST"])
@@ -135,4 +209,3 @@ def set_active_group_for_team():
     db.session.commit()
     flash(f"Set active group for team '{team.name}' to '{group.name}'.", "success")
     return redirect(url_for("groups.list_groups"))
-

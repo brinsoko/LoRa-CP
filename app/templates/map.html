@@ -15,6 +15,7 @@
   <div class="text-muted small">
     Legend:&nbsp;
     <span class="badge bg-success">found</span>
+    <span class="badge bg-primary">next</span>
     <span class="badge bg-secondary">not found</span>
   </div>
 </div>
@@ -35,8 +36,10 @@
 ></script>
 
 <script>
-  const COLOR_FOUND = "#198754";      // bootstrap success
-  const COLOR_NOT_FOUND = "#6c757d";  // bootstrap secondary
+  // Colors: Bootstrap palette
+  const COLOR_FOUND     = "#198754"; // success
+  const COLOR_NEXT      = "#0d6efd"; // primary
+  const COLOR_NOT_FOUND = "#6c757d"; // secondary
 
   let map, markers = [];
   let checkpoints = [];
@@ -52,7 +55,7 @@
     markers = [];
   }
 
-  // ⚠️ Stub conversion: replace with your real projection when ready.
+  // ⚠️ Stub: replace with your real projection when ready
   function toLatLng(easting, northing) {
     const originLat = 45.95;
     const originLng = 14.36;
@@ -62,30 +65,41 @@
     return [lat, lng];
   }
 
-  function drawMarkers(foundSet) {
+  function colorForStatus(status) {
+    switch ((status || "").toLowerCase()) {
+      case "found": return COLOR_FOUND;
+      case "next": return COLOR_NEXT;
+      default: return COLOR_NOT_FOUND;
+    }
+  }
+
+  function drawMarkers(itemsWithStatus) {
     clearMarkers();
     const latlngs = [];
 
-    checkpoints.forEach(cp => {
-      const found = foundSet.has(cp.id);
+    itemsWithStatus.forEach(cp => {
       const latlng = toLatLng(cp.easting, cp.northing);
       latlngs.push(latlng);
 
+      const status = (cp.status || "not_found");
+      const color  = colorForStatus(status);
+
       const circle = L.circleMarker(latlng, {
         radius: 6,
-        color: found ? COLOR_FOUND : COLOR_NOT_FOUND,
-        fillColor: found ? COLOR_FOUND : COLOR_NOT_FOUND,
+        color,
+        fillColor: color,
         fillOpacity: 1,
         weight: 1,
       }).bindPopup(
-        `<strong>${cp.name}</strong><br>E: ${cp.easting ?? "—"}, N: ${cp.northing ?? "—"}<br>Status: ${found ? "found" : "not found"}`
+        `<strong>${cp.name}</strong><br>` +
+        `E: ${cp.easting ?? "—"}, N: ${cp.northing ?? "—"}<br>` +
+        `Status: ${status.replace("_"," ")}`
       );
 
       circle.addTo(map);
       markers.push(circle);
     });
 
-    // Fit bounds if we have points; otherwise set a sensible center.
     if (latlngs.length > 0) {
       const bounds = L.latLngBounds(latlngs);
       map.fitBounds(bounds.pad(0.2));
@@ -94,14 +108,22 @@
     }
   }
 
+  async function fetchStatusItemsRest(teamId) {
+    const url = teamId
+      ? `/api/map/checkpoints?team_id=${encodeURIComponent(teamId)}`
+      : `/api/map/checkpoints`;
+    const data = await getJSON(url);
+    // If backend doesn’t add `status` yet, normalize to "not_found"
+    return (data || []).map(d => ({ ...d, status: d.status || "not_found" }));
+  }
+
+  async function fetchStatusItems(teamId) {
+    return await fetchStatusItemsRest(teamId);
+  }
+
   async function refresh(teamId) {
-    if (!teamId) {
-      drawMarkers(new Set());
-      return;
-    }
-    const data = await getJSON(`{{ url_for('maps.api_team_found') }}?team_id=${teamId}`);
-    const foundSet = new Set(data.found || []);
-    drawMarkers(foundSet);
+    const items = await fetchStatusItems(teamId);
+    drawMarkers(items);
   }
 
   async function init() {
@@ -112,9 +134,9 @@
       attribution: "&copy; OpenStreetMap contributors"
     }).addTo(map);
 
-    // Load checkpoints and draw initial markers (all grey)
-    checkpoints = await getJSON(`{{ url_for('maps.api_checkpoints') }}`);
-    drawMarkers(new Set());
+    // Initial load: all checkpoints as not_found
+    const items = await fetchStatusItems(""); // no team
+    drawMarkers(items);
 
     // Team selection handler
     document.getElementById("teamSelect").addEventListener("change", (e) => {

@@ -15,10 +15,16 @@ services:
 
 
   serial-reader:
-    build: .
-    command: ["python", "-u", "serial/serial_reader.py"]
+    build:
+      context: .
+      dockerfile: serial/Dockerfile
     environment:
-      SERIAL_PORT: socket://socat:2001
-      BAUDRATE: "115200"
-      API_URL: http://web:5000/api/ingest
+      - SERIAL_URL=socket://host.docker.internal:2001
+      - INGEST_URL=http://web:5000/api/ingest
+      - SERIAL_TIMEOUT=0.2
+      - DEBUG=1
+    depends_on:
+      - web
     restart: unless-stopped
+
+    

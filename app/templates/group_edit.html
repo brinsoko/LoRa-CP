@@ -1,17 +1,64 @@
 {% extends "base.html" %}
+{% block title %}{{ "Add Group" if mode == "add" else "Edit Group" }}{% endblock %}
 {% block body %}
+{% set selected_items = (selected_checkpoints or []) %}
+{% set available_items = (available_checkpoints or []) %}
+{% set group_obj = g if g is defined else None %}
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title mb-3">Edit Group</h5>
+    <h5 class="card-title mb-3">{{ "Add Group" if mode == "add" else "Edit Group" }}</h5>
     <form method="post">
+      <input type="hidden" name="checkpoint_ids_present" id="checkpointIdsPresent" value="0">
       <div class="mb-3">
         <label class="form-label">Name</label>
-        <input class="form-control" name="name" value="{{ g.name }}" required>
+        <input class="form-control" name="name" value="{{ group_obj.name if group_obj else request.form.get('name', '') }}" required>
       </div>
-      <div class="mb-3">
+      <div class="mb-4">
         <label class="form-label">Description</label>
-        <textarea class="form-control" name="description" rows="2">{{ g.description or '' }}</textarea>
+        <textarea class="form-control" name="description" rows="2">{{ group_obj.description if group_obj else request.form.get('description', '') }}</textarea>
       </div>
+
+      <div class="mb-4">
+        <label class="form-label">Checkpoints</label>
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div class="border rounded p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-semibold">Selected order</span>
+                <small class="text-muted">Drag the handle to reorder</small>
+              </div>
+              <ul id="selectedCheckpoints" class="list-group" data-empty-text="No checkpoints selected yet.">
+                {% for cp in selected_items %}
+                  <li class="list-group-item d-flex align-items-center gap-2" data-cp-id="{{ cp.id }}" data-cp-name="{{ cp.name }}">
+                    <span class="drag-handle text-muted">::</span>
+                    <span class="flex-grow-1">{{ cp.name }}</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove">Remove</button>
+                  </li>
+                {% endfor %}
+              </ul>
+              <div id="selectedEmptyNotice" class="text-muted small {% if selected_items %}d-none{% endif %} mt-2">No checkpoints selected yet.</div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="border rounded p-3 h-100">
+              <label class="form-label">Add checkpoint</label>
+              <div class="d-flex gap-2">
+                <select id="availableCheckpoints" class="form-select">
+                  <option value="" disabled {% if not available_items %}selected{% endif %}>Select checkpoint</option>
+                  {% for cp in available_items %}
+                    <option value="{{ cp.id }}">{{ cp.name }}</option>
+                  {% endfor %}
+                </select>
+                <button id="addCheckpointBtn" class="btn btn-outline-primary" type="button">Add</button>
+              </div>
+              <div class="form-text mt-2">Add checkpoints to include them in the group. Use drag-and-drop to arrange the visit order.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="checkpointHiddenInputs"></div>
+
       <div class="d-flex gap-2">
         <button class="btn btn-primary" type="submit">Save</button>
         <a class="btn btn-secondary" href="{{ url_for('groups.list_groups') }}">Cancel</a>
@@ -19,4 +66,129 @@
     </form>
   </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const selectedList = document.getElementById("selectedCheckpoints");
+  const checkpointFlag = document.getElementById("checkpointIdsPresent");
+  const availableSelect = document.getElementById("availableCheckpoints");
+  const addButton = document.getElementById("addCheckpointBtn");
+  const hiddenContainer = document.getElementById("checkpointHiddenInputs");
+  const emptyNotice = document.getElementById("selectedEmptyNotice");
+
+  function updateEmptyState() {
+    if (!emptyNotice || !selectedList) return;
+    const hasItems = selectedList.querySelectorAll("[data-cp-id]").length > 0;
+    emptyNotice.classList.toggle("d-none", hasItems);
+  }
+
+  function refreshHiddenInputs() {
+    if (!hiddenContainer || !selectedList) return;
+    hiddenContainer.innerHTML = "";
+    selectedList.querySelectorAll("[data-cp-id]").forEach((item) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "checkpoint_ids";
+      input.value = item.dataset.cpId;
+      hiddenContainer.appendChild(input);
+    });
+  }
+
+  function sortAvailableOptions() {
+    if (!availableSelect) return;
+    const placeholder = availableSelect.querySelector("option[value='']");
+    const options = Array.from(availableSelect.options).filter((opt) => opt.value !== "");
+    options.sort((a, b) => a.text.localeCompare(b.text));
+    availableSelect.innerHTML = "";
+    if (placeholder) {
+      placeholder.selected = !options.length;
+      availableSelect.appendChild(placeholder);
+    } else {
+      const defaultOption = document.createElement("option");
+      defaultOption.value = "";
+      defaultOption.disabled = true;
+      defaultOption.selected = !options.length;
+      defaultOption.textContent = "Select checkpoint";
+      availableSelect.appendChild(defaultOption);
+    }
+    options.forEach((opt) => availableSelect.appendChild(opt));
+  }
+
+  function attachRemoveHandler(item) {
+    const removeBtn = item.querySelector("[data-action='remove']");
+    if (!removeBtn) return;
+    removeBtn.addEventListener("click", () => {
+      const cpId = item.dataset.cpId;
+      const cpName = item.dataset.cpName;
+      item.remove();
+      if (availableSelect && cpId) {
+        const option = document.createElement("option");
+        option.value = cpId;
+        option.textContent = cpName;
+        availableSelect.appendChild(option);
+        sortAvailableOptions();
+      }
+      refreshHiddenInputs();
+      updateEmptyState();
+    });
+  }
+
+  function createSelectedItem(cpId, cpName) {
+    const li = document.createElement("li");
+    li.className = "list-group-item d-flex align-items-center gap-2";
+    li.dataset.cpId = cpId;
+    li.dataset.cpName = cpName;
+
+    const handle = document.createElement("span");
+    handle.className = "drag-handle text-muted";
+    handle.textContent = "::";
+
+    const label = document.createElement("span");
+    label.className = "flex-grow-1";
+    label.textContent = cpName;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn btn-sm btn-outline-danger";
+    removeBtn.dataset.action = "remove";
+    removeBtn.textContent = "Remove";
+
+    li.appendChild(handle);
+    li.appendChild(label);
+    li.appendChild(removeBtn);
+
+    attachRemoveHandler(li);
+    return li;
+  }
+
+  addButton?.addEventListener("click", () => {
+    if (!availableSelect) return;
+    const option = availableSelect.selectedOptions && availableSelect.selectedOptions[0];
+    if (!option || !option.value) return;
+    const item = createSelectedItem(option.value, option.textContent);
+    selectedList.appendChild(item);
+    option.remove();
+    refreshHiddenInputs();
+    updateEmptyState();
+  });
+
+  if (selectedList) {
+    Sortable.create(selectedList, {
+      handle: ".drag-handle",
+      animation: 150,
+      onSort: refreshHiddenInputs,
+      onEnd: refreshHiddenInputs,
+    });
+  }
+
+  selectedList?.querySelectorAll("[data-cp-id]").forEach(attachRemoveHandler);
+  sortAvailableOptions();
+  refreshHiddenInputs();
+  updateEmptyState();
+  if (checkpointFlag) {
+    checkpointFlag.value = "1";
+  }
+});
+</script>
 {% endblock %}

@@ -53,17 +53,23 @@ def compute_team_statuses(team_id: int) -> Dict:
     # Decide "next" as the first checkpoint in group order that is not found.
     next_id = None
     items = []
-    for cp in cps:
+    for order_index, cp in enumerate(cps):
         is_found = cp.id in found_ids
-        status = "found" if is_found else "not_found"
-        if not is_found and next_id is None:
-            next_id = cp.id
+        if is_found:
+            status = "found"
+        else:
+            if next_id is None:
+                next_id = cp.id
+                status = "next"
+            else:
+                status = "not_found"
         items.append({
             "id": cp.id,
             "name": cp.name,
             "easting": cp.easting,
             "northing": cp.northing,
             "status": status,
+            "order": order_index,
         })
 
     return {

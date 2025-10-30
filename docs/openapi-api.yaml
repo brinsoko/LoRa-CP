@@ -1,0 +1,782 @@
+openapi: 3.0.3
+info:
+  title: LoRa Checkpoint API
+  version: "1.1.0"
+  description: >
+    REST API for programmatic access to the LoRa Checkpoint system.
+    Used by devices, dashboards, and external integrations.
+
+servers:
+  - url: http://localhost:5001/api
+    description: Local API server
+
+tags:
+  - name: auth
+    description: Authentication and session control
+  - name: users
+    description: User management (admin only)
+  - name: ingest
+    description: LoRa message ingestion and check-in automation
+  - name: checkpoints
+    description: Data access to checkpoints
+  - name: checkins
+    description: Team check-ins and history
+  - name: maps
+    description: Read-only endpoints powering the map UI (checkpoints + team status)
+  /api/map/teams:
+    get:
+      summary: List teams with current map status
+      description: >
+        Returns all teams with their latest known checkpoint and status for use in the map UI.
+      tags: [maps]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List of teams with map status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  teams:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: Team ID
+                        name:
+                          type: string
+                          description: Team name
+                        number:
+                          type: integer
+                          description: Team number
+                        last_checkpoint:
+                          $ref: "#/components/schemas/CheckpointRef"
+                        last_checkin_time:
+                          type: string
+                          format: date-time
+                          description: Last check-in ISO-8601 UTC datetime
+                        status:
+                          type: string
+                          description: Status string for UI (e.g., "checked_in", "not_checked_in")
+              examples:
+                ok:
+                  value:
+                    teams:
+                      - id: 1
+                        name: Wolves
+                        number: 11
+                        last_checkpoint: { id: 5, name: "CP-05" }
+                        last_checkin_time: "2025-10-17T02:36:00Z"
+                        status: checked_in
+
+  /api/map/checkpoints:
+    get:
+      summary: List all checkpoints for map display
+      description: >
+        Returns all checkpoints with their order and map-related attributes for the map UI.
+      tags: [maps]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: List of checkpoints for the map
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MapCheckpointsResponse"
+              examples:
+                ok:
+                  value:
+                    checkpoints:
+                      - id: 5
+                        name: CP-05
+                        latitude: 46.056
+                        longitude: 14.505
+                        found: true
+                        next: false
+                        order_index: 2
+
+paths:
+  /auth/login:
+    post:
+      summary: Authenticate user (session-based)
+      description: >
+        Authenticates a user via JSON and sets a Flask session cookie.
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        "200": { description: Successful login }
+        "401": { description: Invalid credentials }
+
+  /auth/logout:
+    post:
+      summary: Log out current user
+      tags: [auth]
+      security: [ { cookieAuth: [] } ]
+      responses:
+        "200": { description: Logged out }
+
+  /users:
+    get:
+      summary: List users (admin)
+      tags: [users]
+      security: [ { cookieAuth: [] } ]
+      responses:
+        "200":
+          description: List of all users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserInfo"
+        "403": { description: Requires admin role }
+
+    post:
+      summary: Create user (admin)
+      tags: [users]
+      security: [ { cookieAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+      responses:
+        "201": { description: Created }
+        "403": { description: Requires admin role }
+
+  /api/ingest:
+    post:
+      summary: Ingest a LoRa message and optionally create a Check-in
+      description: >
+        Stores the raw LoRa message, updates `LoRaDevice` telemetry, ensures a
+        `Checkpoint` is linked to the device (`dev_num`), and if `payload`
+        matches a known RFID UID, creates a `Checkin` for that team at the
+        device's checkpoint (only if one doesn't already exist).
+      tags: [ingest]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+            examples:
+              basic:
+                value: { dev_id: 1, payload: "A1B2C3D4", rssi: -62.5, snr: 9.0, ts: 1730200000 }
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+      responses:
+        '201':
+          description: Message ingested successfully
+          headers:
+            Location:
+              description: URL of the created message resource (future expansion)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+              examples:
+                createdCheckin:
+                  value:
+                    ok: true
+                    message_id: 123
+                    dev_id: 1
+                    uid_seen: true
+                    team: "Wolves"
+                    checkpoint: "LoRa Gateway 1"
+                    checkin_created: true
+                noCheckin:
+                  value:
+                    ok: true
+                    message_id: 124
+                    dev_id: 2
+                    uid_seen: false
+                    team: null
+                    checkpoint: "LoRa Gateway 2"
+                    checkin_created: false
+        '400':
+          description: Validation error (missing/invalid fields)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              examples:
+                missing_dev_id:
+                  value:
+                    message:
+                      dev_id: "dev_id is required (int)."
+                    errors: { dev_id: "Missing required parameter in the JSON body or the post body or the query string" }
+        '500':
+          description: Database error while processing the message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerError'
+              examples:
+                db_error:
+                  value:
+                    ok: false
+                    error: "database_error"
+                    detail: "SQLAlchemyError"
+
+  /api/checkins:
+    get:
+      security:
+        - cookieAuth: []
+      summary: List check-ins
+      description: |
+        Returns check-ins with optional filters and sorting. Timestamps are UTC.
+      tags: [checkins]
+      parameters:
+        - in: query
+          name: team_id
+          schema: { type: integer, format: int32 }
+          required: false
+          description: Filter by Team ID.
+        - in: query
+          name: checkpoint_id
+          schema: { type: integer, format: int32 }
+          required: false
+          description: Filter by Checkpoint ID.
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+          required: false
+          description: Inclusive start date (YYYY-MM-DD).
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+          required: false
+          description: Inclusive end date (YYYY-MM-DD). Implemented internally as `< end + 1 day`.
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [new, old, team]
+            default: new
+          required: false
+          description: |
+            - `new`: newest first  
+            - `old`: oldest first  
+            - `team`: Team name asc, Team number asc (NULLS LAST), then timestamp asc
+      responses:
+        "200":
+          description: List of check-ins
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checkins:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Checkin"
+                required: [checkins]
+              examples:
+                ok:
+                  value:
+                    checkins:
+                      - id: 101
+                        timestamp_utc: "2025-10-17 02:36:00"
+                        team: { id: 1, name: "Wolves", number: 11 }
+                        checkpoint: { id: 5, name: "CP-05" }
+
+    post:
+      security:
+        - cookieAuth: []
+      summary: Create a check-in
+      description: |
+        Creates a check-in for (team_id, checkpoint_id).  
+        If a duplicate exists, returns **409** unless `override=replace` is provided,
+        in which case the existing check-in's timestamp is replaced.
+      tags: [checkins]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CheckinCreate" }
+            examples:
+              create:
+                value:
+                  team_id: 1
+                  checkpoint_id: 5
+                  timestamp: "2025-10-17T02:36:00"
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/CheckinCreate" }
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              schema: { type: string }
+              description: URL of the created check-in (future-friendly).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  created: { type: boolean }
+                  checkin: { $ref: "#/components/schemas/Checkin" }
+                required: [ok, created, checkin]
+        "409":
+          description: Duplicate (existing check-in for the same team & checkpoint)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DuplicateError" }
+        "400":
+          description: Validation or FK error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/checkins/{checkin_id}:
+    parameters:
+      - in: path
+        name: checkin_id
+        required: true
+        schema: { type: integer, format: int32 }
+    get:
+      security:
+        - cookieAuth: []
+      summary: Get a check-in
+      tags: [checkins]
+      responses:
+        "200":
+          description: Check-in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Checkin" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+    put:
+      security:
+        - cookieAuth: []
+      summary: Replace a check-in
+      description: |
+        Replaces **team_id**, **checkpoint_id**, and/or **timestamp**.  
+        Duplicate protection applies; use `override=replace` to replace the other row if it exists.
+      tags: [checkins]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CheckinUpdate" }
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/CheckinUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  updated: { type: boolean }
+                  checkin: { $ref: "#/components/schemas/Checkin" }
+                required: [ok, updated, checkin]
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: Duplicate conflict without override
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DuplicateError" }
+        "400":
+          description: Validation or FK error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+    patch:
+      security:
+        - cookieAuth: []
+      summary: Partially update a check-in
+      description: |
+        Partially updates fields. Same duplicate protection behavior as PUT.
+      tags: [checkins]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CheckinUpdatePartial" }
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/CheckinUpdatePartial" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  updated: { type: boolean }
+                  checkin: { $ref: "#/components/schemas/Checkin" }
+                required: [ok, updated, checkin]
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: Duplicate conflict without override
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DuplicateError" }
+        "400":
+          description: Validation or FK error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+    delete:
+      security:
+        - cookieAuth: []
+      summary: Delete a check-in
+      tags: [checkins]
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  deleted: { type: boolean }
+                required: [ok, deleted]
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/checkins/export.csv:
+    get:
+      security:
+        - cookieAuth: []
+      summary: Export check-ins (CSV)
+      description: |
+        Exports the same filtered/sorted set as `GET /api/checkins`.  
+        Content-Disposition header suggests `checkins.csv` filename.
+      tags: [checkins]
+      parameters:
+        - in: query
+          name: team_id
+          schema: { type: integer, format: int32 }
+        - in: query
+          name: checkpoint_id
+          schema: { type: integer, format: int32 }
+        - in: query
+          name: date_from
+          schema: { type: string, format: date }
+        - in: query
+          name: date_to
+          schema: { type: string, format: date }
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [new, old, team]
+            default: new
+      responses:
+        "200":
+          description: CSV stream
+          headers:
+            Content-Disposition:
+              description: attachment; filename=checkins.csv
+              schema: { type: string }
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+  schemas:
+    UserInfo:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        role: { type: string, enum: [public, judge, admin] }
+    UserCreate:
+      type: object
+      required: [username, password, role]
+      properties:
+        username: { type: string }
+        password: { type: string, format: password }
+        role: { type: string, enum: [public, judge, admin] }
+
+    IngestRequest:
+      type: object
+      required: [dev_id, payload]
+      properties:
+        dev_id:
+          type: integer
+          description: Numeric identifier of the LoRa device/gateway (== LoRaDevice.dev_num).
+          example: 1
+        payload:
+          type: string
+          description: Raw payload string (in this app, an RFID UID).
+          example: "A1B2C3D4"
+        rssi:
+          type: number
+          format: float
+          nullable: true
+          description: Received signal strength in dBm.
+          example: -62.5
+        snr:
+          type: number
+          format: float
+          nullable: true
+          description: Signal-to-noise ratio in dB.
+          example: 9.0
+        ts:
+          type: integer
+          format: int64
+          nullable: true
+          description: Unix time (seconds) when the message originated; if omitted, server uses current UTC.
+          example: 1730200000
+
+    IngestResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        message_id:
+          type: integer
+          description: Primary key of the stored `LoRaMessage`.
+          example: 123
+        dev_id:
+          type: integer
+          example: 1
+        uid_seen:
+          type: boolean
+          description: Whether `payload` matched a known RFID card UID.
+          example: true
+        team:
+          type: string
+          nullable: true
+          description: Team name if UID matched.
+          example: "Wolves"
+        checkpoint:
+          type: string
+          nullable: true
+          description: Resolved checkpoint name for the device.
+          example: "LoRa Gateway 1"
+        checkin_created:
+          type: boolean
+          description: True if a new `Checkin` row was inserted.
+          example: true
+      required: [ok, message_id, dev_id, uid_seen, checkin_created]
+
+    ValidationError:
+      type: object
+      description: Error format typically returned by Flask-RESTful `reqparse`.
+      properties:
+        message:
+          oneOf:
+            - type: string
+            - type: object
+              additionalProperties: true
+          description: Human-readable or field-mapped messages.
+        errors:
+          type: object
+          additionalProperties: true
+          description: Optional field-specific error details.
+      example:
+        message:
+          dev_id: "dev_id is required (int)."
+
+    ServerError:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: database_error
+        detail:
+          type: string
+          example: SQLAlchemyError
+      required: [ok, error]
+
+    TeamRef:
+      type: object
+      properties:
+        id: { type: integer, format: int32, nullable: true }
+        name: { type: string, nullable: true }
+        number: { type: integer, format: int32, nullable: true }
+
+    CheckpointRef:
+      type: object
+      properties:
+        id: { type: integer, format: int32, nullable: true }
+        name: { type: string, nullable: true }
+
+    Checkin:
+      type: object
+      properties:
+        id: { type: integer, format: int32 }
+        timestamp_utc:
+          type: string
+          example: "2025-10-17 02:36:00"
+        team:
+          $ref: "#/components/schemas/TeamRef"
+        checkpoint:
+          $ref: "#/components/schemas/CheckpointRef"
+      required: [id, timestamp_utc, team, checkpoint]
+
+    CheckinCreate:
+      type: object
+      required: [team_id, checkpoint_id]
+      properties:
+        team_id: { type: integer, format: int32 }
+        checkpoint_id: { type: integer, format: int32 }
+        # choose one style:
+        timestamp:
+          type: string
+          description: ISO-8601 UTC datetime (e.g., 2025-10-17T02:36:00)
+        timestamp_local:
+          type: string
+          description: Local datetime used together with `timezone`.
+        timezone:
+          type: string
+          description: IANA TZ for `timestamp_local` (e.g., Europe/Ljubljana).
+        tz:
+          type: string
+          description: Alias for `timezone`.
+        override:
+          type: string
+          enum: [replace]
+          description: Replace existing team+checkpoint check-in timestamp if it exists.
+
+    CheckinUpdate:
+      type: object
+      required: [team_id, checkpoint_id]
+      properties:
+        team_id: { type: integer, format: int32 }
+        checkpoint_id: { type: integer, format: int32 }
+        timestamp:
+          type: string
+          description: ISO-8601 UTC datetime
+        timestamp_local:
+          type: string
+        timezone:
+          type: string
+        tz:
+          type: string
+        override:
+          type: string
+          enum: [replace]
+
+    CheckinUpdatePartial:
+      type: object
+      properties:
+        team_id: { type: integer, format: int32 }
+        checkpoint_id: { type: integer, format: int32 }
+        timestamp:
+          type: string
+          description: ISO-8601 UTC datetime
+        timestamp_local:
+          type: string
+        timezone:
+          type: string
+        tz:
+          type: string
+        override:
+          type: string
+          enum: [replace]
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        detail: { type: string }
+
+    DuplicateError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: duplicate
+        detail:
+          type: string
+          example: Check-in for this team and checkpoint already exists. Use override=replace to update its timestamp.
+        checkin:
+          $ref: "#/components/schemas/Checkin"
+      required: [error, detail]
+
+    MapCheckpointItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Checkpoint ID
+        name:
+          type: string
+          description: Checkpoint name
+        latitude:
+          type: number
+          format: float
+          description: Latitude (WGS84)
+        longitude:
+          type: number
+          format: float
+          description: Longitude (WGS84)
+        found:
+          type: boolean
+          description: Whether this checkpoint has been found by the team (if applicable)
+        next:
+          type: boolean
+          description: Whether this is the next checkpoint for the team
+        order_index:
+          type: integer
+          description: Sort order of the checkpoint in the route
+      required: [id, name, latitude, longitude, found, next, order_index]
+
+    MapCheckpointsResponse:
+      type: object
+      properties:
+        checkpoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/MapCheckpointItem"
+      required: [checkpoints]
