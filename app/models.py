@@ -272,12 +272,11 @@ class LoRaMessage(db.Model):
     received_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 
-@event.listens_for(CheckpointGroup.checkpoint_links, "append")
-def _set_checkpoint_link_position(group: CheckpointGroup, link: CheckpointGroupLink, *_):
-    """
-    Ensure new group↔checkpoint links receive a position at the end of the current ordered list.
-    """
+def _assign_checkpoint_link_position(link: CheckpointGroupLink) -> None:
     if link.position is not None:
+        return
+    group = link.group
+    if not group:
         return
 
     existing_positions = [
@@ -286,3 +285,15 @@ def _set_checkpoint_link_position(group: CheckpointGroup, link: CheckpointGroupL
         if l is not link and l.position is not None
     ]
     link.position = (max(existing_positions) + 1) if existing_positions else 0
+
+
+@event.listens_for(CheckpointGroup.checkpoint_links, "append")
+def _on_group_link_append(group: CheckpointGroup, link: CheckpointGroupLink, *_):
+    """Ensure new links created via group.checkpoints get a position."""
+    _assign_checkpoint_link_position(link)
+
+
+@event.listens_for(Checkpoint.group_links, "append")
+def _on_checkpoint_link_append(checkpoint: Checkpoint, link: CheckpointGroupLink, *_):
+    """Ensure new links created via checkpoint.groups get a position."""
+    _assign_checkpoint_link_position(link)

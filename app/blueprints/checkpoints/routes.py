@@ -2,350 +2,184 @@
 from __future__ import annotations
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask import current_app as cap
-from sqlalchemy import func
 
-from app.extensions import db
-from app.models import Checkpoint, CheckpointGroup, LoRaDevice
+from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
-
-import json
-
 
 
 checkpoints_bp = Blueprint("checkpoints", __name__, template_folder="../../templates")
 
 
-# -----------------------------
-# List / CRUD
-# -----------------------------
-# ---------- LIST ----------
+def _fetch_groups():
+    resp, payload = api_json("GET", "/api/groups")
+    if resp.status_code != 200:
+        flash("Could not load groups.", "warning")
+        return []
+    return payload.get("groups", [])
+
+
+def _fetch_devices():
+    resp, payload = api_json("GET", "/api/lora/devices")
+    if resp.status_code != 200:
+        flash("Could not load LoRa devices.", "warning")
+        return []
+    return payload.get("devices", [])
+
+
+def _fetch_checkpoints():
+    resp, payload = api_json("GET", "/api/checkpoints")
+    if resp.status_code != 200:
+        flash("Could not load checkpoints.", "warning")
+        return []
+    return payload.get("checkpoints", [])
+
+
+def _normalize_checkpoint_form(form):
+    name = (form.get("name") or "").strip()
+    location = (form.get("location") or "").strip() or None
+    description = (form.get("description") or "").strip() or None
+    easting_raw = form.get("easting")
+    northing_raw = form.get("northing")
+    easting = float(easting_raw) if easting_raw else None
+    northing = float(northing_raw) if northing_raw else None
+    lora_device_raw = form.get("lora_device_id")
+    lora_device_id = int(lora_device_raw) if lora_device_raw else None
+    group_ids = [int(x) for x in form.getlist("group_ids")]
+
+    return {
+        "name": name,
+        "location": location,
+        "description": description,
+        "easting": easting,
+        "northing": northing,
+        "lora_device_id": lora_device_id,
+        "group_ids": group_ids,
+    }
+
+
 @checkpoints_bp.route("/", methods=["GET"])
 @roles_required("judge", "admin")
 def list_checkpoints():
-    checkpoints = Checkpoint.query.order_by(Checkpoint.name.asc()).all()
+    checkpoints = _fetch_checkpoints()
     return render_template("checkpoints_list.html", checkpoints=checkpoints)
 
 
-# ---------- ADD ----------
 @checkpoints_bp.route("/add", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def add_checkpoint():
-    groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
-    devices = LoRaDevice.query.order_by(LoRaDevice.name.asc().nulls_last(), LoRaDevice.dev_eui.asc()).all()
+    groups = _fetch_groups()
+    devices = _fetch_devices()
+
+    form_data = _normalize_checkpoint_form(request.form) if request.method == "POST" else None
 
     if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        location = (request.form.get("location") or "").strip() or None
-        description = (request.form.get("description") or "").strip() or None
-        easting = request.form.get("easting", type=float)
-        northing = request.form.get("northing", type=float)
-
-        # LoRa device (nullable)
-        lora_device_id = request.form.get("lora_device_id", type=int)
-        lora_device = LoRaDevice.query.get(lora_device_id) if lora_device_id else None
-
-        if not name:
+        if not form_data["name"]:
             flash("Name is required.", "warning")
             return render_template(
                 "add_checkpoint.html",
                 groups=groups,
                 devices=devices,
-                selected_group_ids=[],         # <- LIST, not set()
-                selected_device_id=lora_device_id or "",
+                selected_group_ids=form_data["group_ids"],
+                selected_device_id=form_data["lora_device_id"] or "",
             )
 
-        cp = Checkpoint(
-            name=name,
-            location=location,
-            description=description,
-            easting=easting,
-            northing=northing,
-            lora_device=lora_device
-        )
-        db.session.add(cp)
+        resp, payload = api_json("POST", "/api/checkpoints", json=form_data)
+        if resp.status_code == 201:
+            flash("Checkpoint added.", "success")
+            return redirect(url_for("checkpoints.list_checkpoints"))
 
-        # groups (checkboxes)
-        selected_ids = [int(x) for x in request.form.getlist("group_ids")]
-        if selected_ids:
-            selected_groups = CheckpointGroup.query.filter(CheckpointGroup.id.in_(selected_ids)).all()
-            cp.groups = selected_groups  # many-to-many assignment
+        flash(payload.get("error") or payload.get("detail") or "Could not add checkpoint.", "warning")
 
-        db.session.commit()
-        flash("Checkpoint added.", "success")
-        return redirect(url_for("checkpoints.list_checkpoints"))
-
-    # GET
     return render_template(
         "add_checkpoint.html",
         groups=groups,
         devices=devices,
-        selected_group_ids=[],   # <- LIST
-        selected_device_id=""
+        selected_group_ids=form_data["group_ids"] if form_data else [],
+        selected_device_id=form_data["lora_device_id"] if form_data else "",
     )
 
 
-
-
-# ---------- EDIT ----------
 @checkpoints_bp.route("/<int:cp_id>/edit", methods=["GET", "POST"])
 @roles_required("judge", "admin")
-def edit_checkpoint(cp_id):
-    cp = Checkpoint.query.get_or_404(cp_id)
-    groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
-    devices = LoRaDevice.query.order_by(LoRaDevice.name.asc().nulls_last(), LoRaDevice.dev_eui.asc()).all()
-
-    if request.method == "POST":
-        cp.name = (request.form.get("name") or "").strip()
-        cp.location = (request.form.get("location") or "").strip() or None
-        cp.description = (request.form.get("description") or "").strip() or None
-        cp.easting = request.form.get("easting", type=float)
-        cp.northing = request.form.get("northing", type=float)
-
-        # LoRa device (nullable)
-        lora_device_id = request.form.get("lora_device_id", type=int)
-        cp.lora_device = LoRaDevice.query.get(lora_device_id) if lora_device_id else None
-
-        if not cp.name:
-            flash("Name is required.", "warning")
-            return render_template(
-                "checkpoint_edit.html",
-                cp=cp,
-                groups=groups,
-                devices=devices,
-                selected_group_ids=[g.id for g in cp.groups],  # <- LIST
-                selected_device_id=cp.lora_device_id or ""
-            )
-
-        # groups (checkboxes)
-        selected_ids = [int(x) for x in request.form.getlist("group_ids")]
-        selected_groups = CheckpointGroup.query.filter(CheckpointGroup.id.in_(selected_ids)).all() if selected_ids else []
-        cp.groups = selected_groups  # replace full set
-
-        db.session.commit()
-        flash("Checkpoint updated.", "success")
+def edit_checkpoint(cp_id: int):
+    cp_resp, cp_payload = api_json("GET", f"/api/checkpoints/{cp_id}")
+    if cp_resp.status_code != 200:
+        flash("Checkpoint not found.", "warning")
         return redirect(url_for("checkpoints.list_checkpoints"))
 
-    # GET
+    checkpoint = cp_payload or {}
+    if not isinstance(checkpoint, dict):
+        checkpoint = {}
+    groups = _fetch_groups()
+    devices = _fetch_devices()
+
+    existing_group_ids = [g.get("id") for g in checkpoint.get("groups", []) if isinstance(g, dict)]
+
+    if request.method == "POST":
+        form_data = _normalize_checkpoint_form(request.form)
+
+        if not form_data["name"]:
+            flash("Name is required.", "warning")
+            checkpoint.update({k: v for k, v in form_data.items() if k != "group_ids"})
+            checkpoint["groups"] = [
+                next((g for g in groups if g.get("id") == gid), {"id": gid, "name": "Unknown"})
+                for gid in form_data["group_ids"]
+            ]
+            return render_template(
+                "checkpoint_edit.html",
+                cp=checkpoint,
+                groups=groups,
+                devices=devices,
+                selected_group_ids=form_data["group_ids"],
+                selected_device_id=form_data["lora_device_id"] or "",
+            )
+
+        resp, payload = api_json("PATCH", f"/api/checkpoints/{cp_id}", json=form_data)
+        if resp.status_code == 200:
+            flash("Checkpoint updated.", "success")
+            return redirect(url_for("checkpoints.list_checkpoints"))
+
+        flash(payload.get("error") or payload.get("detail") or "Could not update checkpoint.", "warning")
+        checkpoint.update({k: v for k, v in form_data.items() if k != "group_ids"})
+        checkpoint["groups"] = [
+            next((g for g in groups if g.get("id") == gid), {"id": gid, "name": "Unknown"})
+            for gid in form_data["group_ids"]
+        ]
+        selected_ids = form_data["group_ids"]
+        selected_device_id = form_data["lora_device_id"] or ""
+    else:
+        selected_ids = existing_group_ids
+        lora_info = checkpoint.get("lora_device") or {}
+        if not isinstance(lora_info, dict):
+            lora_info = {}
+        selected_device_id = lora_info.get("id") or ""
+
     return render_template(
         "checkpoint_edit.html",
-        cp=cp,
+        cp=checkpoint,
         groups=groups,
         devices=devices,
-        selected_group_ids=[g.id for g in cp.groups],  # <- LIST
-        selected_device_id=cp.lora_device_id or ""
+        selected_group_ids=selected_ids,
+        selected_device_id=selected_device_id,
     )
 
 
-# ---------- DELETE ----------
 @checkpoints_bp.route("/<int:cp_id>/delete", methods=["POST"])
 @roles_required("admin")
-def delete_checkpoint(cp_id):
-    cp = Checkpoint.query.get_or_404(cp_id)
-    if cp.checkins:
-        flash("Cannot delete checkpoint with existing check-ins.", "warning")
-        return redirect(url_for("checkpoints.list_checkpoints"))
-    db.session.delete(cp)
-    db.session.commit()
-    flash("Checkpoint deleted.", "success")
+def delete_checkpoint(cp_id: int):
+    resp, payload = api_json("DELETE", f"/api/checkpoints/{cp_id}")
+
+    if resp.status_code == 200:
+        flash("Checkpoint deleted.", "success")
+    else:
+        flash(payload.get("detail") or payload.get("error") or "Could not delete checkpoint.", "warning")
+
     return redirect(url_for("checkpoints.list_checkpoints"))
 
-# -----------------------------
-# JSON Import (upload → preview → confirm)
-# -----------------------------
+
 @checkpoints_bp.route("/import_json", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def import_checkpoints_json():
-    """
-    Step 1 (GET): show upload form
-    Step 2 (POST action=preview): parse JSON, normalize, diff, render preview
-    Step 3 (POST action=confirm): apply upsert based on normalized payload from hidden field
-    """
-    if request.method == "GET":
-        cap.logger.debug("[checkpoints/import_json] GET -> render upload form")
-        return render_template("checkpoints_import.html")
-
-    action = request.form.get("action")
-    cap.logger.debug("[checkpoints/import_json] POST action=%r", action)
-
-    # ---------- Step 3: CONFIRM ----------
-    if action == "confirm":
-        payload_text = request.form.get("payload", "")
-        cap.logger.debug("[checkpoints/import_json] CONFIRM payload bytes=%d", len(payload_text.encode("utf-8")))
-
-        try:
-            normalized_items = json.loads(payload_text)
-        except Exception:
-            cap.logger.exception("[checkpoints/import_json] CONFIRM payload parse failed")
-            flash("Could not parse confirmation payload. Please try again.", "warning")
-            return redirect(url_for("checkpoints.import_checkpoints_json"))
-
-        created = updated = skipped = 0
-
-        for it in normalized_items:
-            name = (it.get("name") or "").strip()
-            if not name:
-                skipped += 1
-                continue
-
-            easting = it.get("easting", None)
-            northing = it.get("northing", None)
-            desc = it.get("description") or None
-            loc = it.get("location") or None
-            action_kind = it.get("action")
-
-            cp = Checkpoint.query.filter(func.lower(Checkpoint.name) == name.lower()).first()
-            if cp:
-                if action_kind == "update":
-                    cp.easting = easting
-                    cp.northing = northing
-                    cp.description = desc
-                    cp.location = loc
-                    updated += 1
-                else:
-                    skipped += 1
-            else:
-                if action_kind in ("create", "update"):  # allow update->create if missing
-                    db.session.add(Checkpoint(
-                        name=name, easting=easting, northing=northing,
-                        description=desc, location=loc
-                    ))
-                    created += 1
-                else:
-                    skipped += 1
-
-        db.session.commit()
-        cap.logger.debug(
-            "[checkpoints/import_json] CONFIRM -> created=%d updated=%d skipped=%d",
-            created, updated, skipped
-        )
-        flash(f"Import complete: {created} created, {updated} updated, {skipped} skipped.", "success")
-        return redirect(url_for("checkpoints.list_checkpoints"))
-
-    # ---------- Step 2: PREVIEW ----------
-    # Default branch if not confirm
-    file = request.files.get("file")
-    cap.logger.debug("[checkpoints/import_json] PREVIEW file present=%s", bool(file))
-    if not file:
-        flash("Please choose a JSON file.", "warning")
-        cap.logger.debug("[checkpoints/import_json] PREVIEW -> no file, render upload")
-        return render_template("checkpoints_import.html")
-
-    try:
-        raw = file.stream.read().decode("utf-8", errors="ignore")
-        payload = json.loads(raw)
-        cap.logger.debug("[checkpoints/import_json] PREVIEW raw_len=%d type=%s",
-                         len(raw), type(payload).__name__)
-    except Exception as e:
-        cap.logger.exception("[checkpoints/import_json] PREVIEW JSON parse failed")
-        flash(f"Could not parse JSON: {e}", "warning")
-        return render_template("checkpoints_import.html")
-
-    # normalize supported shapes:
-    # 1) [ {...}, ... ]
-    # 2) { "checkpoints": [ ... ] }
-    # 3) { "cps": [ ... ] }  # your kt_Cerknica.json format
-    if isinstance(payload, list):
-        items = payload; source = "array"
-    elif isinstance(payload, dict):
-        if isinstance(payload.get("checkpoints"), list):
-            items = payload["checkpoints"]; source = "checkpoints"
-        elif isinstance(payload.get("cps"), list):
-            items = payload["cps"]; source = "cps"
-        else:
-            items = None; source = "unknown-dict"
-    else:
-        items = None; source = "unknown"
-
-    if not isinstance(items, list):
-        cap.logger.debug("[checkpoints/import_json] PREVIEW invalid shape source=%s", source)
-        flash("JSON must be an array or an object with 'checkpoints' or 'cps' array.", "warning")
-        return render_template("checkpoints_import.html")
-
-    if len(items) == 0:
-        cap.logger.debug("[checkpoints/import_json] PREVIEW zero items")
-        flash("JSON contained zero checkpoints.", "warning")
-        return render_template("checkpoints_import.html")
-
-    # Build set of existing names to avoid collisions for generated names
-    existing_names = {
-        name for (name,) in db.session.query(Checkpoint.name).filter(Checkpoint.name.isnot(None)).all()
-    }
-
-    def _to_float(v):
-        if v in (None, ""):
-            return None
-        try:
-            return float(v)
-        except Exception:
-            return None
-
-    def _next_name(counter=[1]):
-        # generate CP-1, CP-2, ... avoiding collisions
-        while True:
-            candidate = f"CP-{counter[0]}"
-            counter[0] += 1
-            if candidate not in existing_names:
-                existing_names.add(candidate)
-                return candidate
-
-    preview_rows = []
-    create_n = update_n = skip_n = 0
-
-    for row in items:
-        if not isinstance(row, dict):
-            skip_n += 1
-            continue
-
-        raw_name = (row.get("name") or row.get("label") or "").strip()
-        name = raw_name if raw_name else _next_name()
-
-        easting = _to_float(row.get("e"))
-        northing = _to_float(row.get("n"))
-        desc = (row.get("description") or "").strip() or None
-        loc = (row.get("location") or "").strip() or None
-
-        current = Checkpoint.query.filter(func.lower(Checkpoint.name) == name.lower()).first()
-        if current:
-            changed = (
-                (current.easting or None) != easting or
-                (current.northing or None) != northing or
-                (current.description or None) != desc or
-                (current.location or None) != loc
-            )
-            action = "update" if changed else "skip"
-            if changed: update_n += 1
-            else:       skip_n += 1
-        else:
-            action = "create"
-            create_n += 1
-
-        preview_rows.append({
-            "name": name,
-            "easting": easting,
-            "northing": northing,
-            "description": desc,
-            "location": loc,
-            "action": action,
-        })
-
-    MAX_PREVIEW = 5000
-    if len(preview_rows) > MAX_PREVIEW:
-        cap.logger.debug("[checkpoints/import_json] PREVIEW truncated %d -> %d", len(preview_rows), MAX_PREVIEW)
-        flash(f"Preview truncated to first {MAX_PREVIEW} rows (total: {len(preview_rows)}).", "warning")
-        preview_rows = preview_rows[:MAX_PREVIEW]
-
-    payload_text = json.dumps(preview_rows, ensure_ascii=False)
-    cap.logger.debug(
-        "[checkpoints/import_json] PREVIEW -> create=%d update=%d skip=%d rows_out=%d",
-        create_n, update_n, skip_n, len(preview_rows)
-    )
-
-    return render_template(
-        "checkpoints_import_preview.html",
-        rows=preview_rows,
-        count_create=create_n,
-        count_update=update_n,
-        count_skip=skip_n,
-        payload_text=payload_text
-    )
+    # TODO: reimplement using API if bulk import endpoint becomes available
+    flash("JSON import via UI is temporarily disabled; use the API directly.", "warning")
+    return redirect(url_for("checkpoints.list_checkpoints"))

@@ -1,132 +1,110 @@
 # app/blueprints/checkins/routes.py
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-import io, csv
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
-from sqlalchemy.orm import joinedload
 
-from app.extensions import db
-from app.models import Checkin, Team, Checkpoint
+from app.utils.frontend_api import api_json, api_request
 from app.utils.perms import roles_required
-from app.utils.time import to_datetime_local, from_datetime_local
-
 
 checkins_bp = Blueprint("checkins", __name__, template_folder="../../templates")
 
 
+DEFAULT_TIMEZONE = ZoneInfo("Europe/Ljubljana")
 
 
-# --------------------------- helpers ---------------------------
-
-def _parse_date_range(date_from_str: str | None, date_to_str: str | None):
-    """Build an inclusive day range for YYYY-MM-DD inputs."""
-    start = end = None
-    try:
-        if date_from_str:
-            start = datetime.fromisoformat(date_from_str)
-        if date_to_str:
-            # end is exclusive: add 1 day so we can use '< end'
-            end = datetime.fromisoformat(date_to_str) + timedelta(days=1)
-    except ValueError:
-        # leave as None if user typed a bad date
-        pass
-    return start, end
+def _fetch_teams():
+    resp, payload = api_json("GET", "/api/teams", params={"sort": "name_asc"})
+    if resp.status_code != 200:
+        flash("Could not load teams.", "warning")
+        return []
+    return payload.get("teams", [])
 
 
-def _filtered_query(team_id: int | None, checkpoint_id: int | None,
-                    date_from_str: str | None, date_to_str: str | None):
-    """Return a SQLAlchemy query over Checkin with eager-loaded relations and filters applied."""
-    q = (Checkin.query
-         .options(joinedload(Checkin.team), joinedload(Checkin.checkpoint)))
-
-    if team_id:
-        q = q.filter(Checkin.team_id == team_id)
-    if checkpoint_id:
-        q = q.filter(Checkin.checkpoint_id == checkpoint_id)
-
-    start, end = _parse_date_range(date_from_str, date_to_str)
-    if start:
-        q = q.filter(Checkin.timestamp >= start)
-    if end:
-        q = q.filter(Checkin.timestamp < end)
-
-    return q.order_by(Checkin.timestamp.desc())
+def _fetch_checkpoints():
+    resp, payload = api_json("GET", "/api/checkpoints")
+    if resp.status_code != 200:
+        flash("Could not load checkpoints.", "warning")
+        return []
+    return payload.get("checkpoints", [])
 
 
-
-def _parse_timestamp_from_form(fallback_dt: datetime | None = None) -> datetime:
-    """
-    Parse <input name="timestamp"> or <input name="timestamp_local"> with an optional
-    <select name="timezone">. Never returns None. If parsing fails or fields are blank,
-    return fallback_dt, or utcnow() if fallback_dt is None.
-    """
-    ts_str = (request.form.get("timestamp") or
-              request.form.get("timestamp_local") or "").strip()
-    tz_name = (request.form.get("timezone") or
-               request.form.get("tz") or "").strip()
-
-    # Default result if anything goes wrong
-    default_dt = fallback_dt or datetime.utcnow()
+def _parse_timestamp_from_form(fallback: datetime | None = None) -> datetime:
+    ts_str = (request.form.get("timestamp") or request.form.get("timestamp_local") or "").strip()
+    tz_name = (request.form.get("timezone") or request.form.get("tz") or "").strip()
+    default_dt = fallback or datetime.utcnow()
 
     if not ts_str:
         return default_dt
 
-    # Try local->UTC first if a timezone was provided
-    if tz_name:
-        try:
-            dt = from_datetime_local(ts_str, tz_name)
-            if dt:                       # <- guard against None returns
-                return dt
-        except Exception:
-            pass  # fall through to ISO parser / default
-
-    # Try plain ISO (datetime-local produces e.g. 2025-10-17T02:36 or with seconds)
     try:
-        return datetime.fromisoformat(ts_str)
-    except Exception:
+        local_dt = datetime.fromisoformat(ts_str)
+    except ValueError:
         return default_dt
 
+    if not tz_name:
+        return local_dt
 
-# --------------------------- view & export ---------------------------
+    try:
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        tz = DEFAULT_TIMEZONE
+
+    aware_local = local_dt.replace(tzinfo=tz)
+    utc_dt = aware_local.astimezone(ZoneInfo("UTC"))
+    return utc_dt.replace(tzinfo=None)
+
+
+def _decorate_checkins(items):
+    decorated = []
+    for item in items:
+        ts = item.get("timestamp_utc")
+        dt = None
+        if ts:
+            try:
+                dt = datetime.fromisoformat(ts)
+            except Exception:
+                dt = None
+        decorated.append(
+            {
+                "id": item.get("id"),
+                "timestamp": dt,
+                "team": item.get("team") or {},
+                "checkpoint": item.get("checkpoint") or {},
+            }
+        )
+    return decorated
+
 
 @checkins_bp.route("/", methods=["GET"])
 def list_checkins():
-    """
-    Public view with filters.
-    Query params: team_id, checkpoint_id, date_from (YYYY-MM-DD), date_to (YYYY-MM-DD), sort
-    sort: 'new' (default), 'old', 'team'
-    """
-    teams = Team.query.order_by(Team.name.asc()).all()
-    checkpoints = Checkpoint.query.order_by(Checkpoint.name.asc()).all()
-
     team_id = request.args.get("team_id", type=int)
     checkpoint_id = request.args.get("checkpoint_id", type=int)
-    date_from = request.args.get("date_from")  # str | None
-    date_to = request.args.get("date_to")      # str | None
+    date_from = request.args.get("date_from") or ""
+    date_to = request.args.get("date_to") or ""
     sort = (request.args.get("sort") or "new").lower()
 
-    q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
+    params = {"sort": sort}
+    if team_id:
+        params["team_id"] = team_id
+    if checkpoint_id:
+        params["checkpoint_id"] = checkpoint_id
+    if date_from:
+        params["date_from"] = date_from
+    if date_to:
+        params["date_to"] = date_to
 
-    # Sorting:
-    # - new: timestamp desc
-    # - old: timestamp asc
-    # - team: Team.name asc, Team.number asc (NULLS LAST), then timestamp asc
-    if sort == "old":
-        q = q.order_by(Checkin.timestamp.asc())
-    elif sort == "team":
-        # join Team for ordering by team fields
-        q = q.join(Team, Checkin.team_id == Team.id).order_by(
-            Team.name.asc(),
-            Team.number.asc().nulls_last(),
-            Checkin.timestamp.asc(),
-        )
+    resp, payload = api_json("GET", "/api/checkins", params=params)
+    if resp.status_code != 200:
+        flash(payload.get("detail") or payload.get("error") or "Could not load check-ins.", "warning")
+        checkins = []
     else:
-        # default 'new'
-        q = q.order_by(Checkin.timestamp.desc())
+        checkins = _decorate_checkins(payload.get("checkins", []))
 
-    checkins = q.all()
+    teams = _fetch_teams()
+    checkpoints = _fetch_checkpoints()
 
     return render_template(
         "view_checkins.html",
@@ -135,199 +113,186 @@ def list_checkins():
         checkpoints=checkpoints,
         selected_team_id=team_id,
         selected_checkpoint_id=checkpoint_id,
-        selected_date_from=date_from or "",
-        selected_date_to=date_to or "",
+        selected_date_from=date_from,
+        selected_date_to=date_to,
         selected_sort=sort,
     )
 
 
 @checkins_bp.route("/export.csv", methods=["GET"])
 def export_checkins_csv():
-    """CSV export with the same filters and sort as the list view."""
-    team_id = request.args.get("team_id", type=int)
-    checkpoint_id = request.args.get("checkpoint_id", type=int)
-    date_from = request.args.get("date_from")
-    date_to = request.args.get("date_to")
-    sort = (request.args.get("sort") or "new").lower()
+    params = {
+        key: value
+        for key, value in {
+            "team_id": request.args.get("team_id"),
+            "checkpoint_id": request.args.get("checkpoint_id"),
+            "date_from": request.args.get("date_from"),
+            "date_to": request.args.get("date_to"),
+            "sort": request.args.get("sort"),
+        }.items()
+        if value not in (None, "")
+    }
 
-    q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
+    resp = api_request("GET", "/api/checkins/export.csv", params=params)
+    output = resp.get_data()
+    return Response(output, mimetype="text/csv", headers={"Content-Disposition": "attachment; filename=checkins.csv"})
 
-    if sort == "old":
-        q = q.order_by(Checkin.timestamp.asc())
-    elif sort == "team":
-        q = q.join(Team, Checkin.team_id == Team.id).order_by(
-            Team.name.asc(),
-            Team.number.asc().nulls_last(),
-            Checkin.timestamp.asc(),
-        )
-    else:
-        q = q.order_by(Checkin.timestamp.desc())
-
-    rows = q.all()
-
-    buf = io.StringIO()
-    w = csv.writer(buf)
-    w.writerow([
-        "timestamp_utc",
-        "team_id",
-        "team_name",
-        "team_number",
-        "checkpoint_id",
-        "checkpoint_name",
-    ])
-    for r in rows:
-        w.writerow([
-            r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            r.team.id if r.team else "",
-            r.team.name if r.team else "",
-            r.team.number if r.team and r.team.number is not None else "",
-            r.checkpoint.id if r.checkpoint else "",
-            r.checkpoint.name if r.checkpoint else "",
-        ])
-
-    return Response(
-        buf.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=checkins.csv"},
-    )
-
-
-
-
-# --------------------------- add / edit / delete ---------------------------
 
 @checkins_bp.route("/add", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def add_checkin():
-    teams = Team.query.order_by(Team.name.asc()).all()
-    checkpoints = Checkpoint.query.order_by(Checkpoint.name.asc()).all()
+    teams = _fetch_teams()
+    checkpoints = _fetch_checkpoints()
+    now = datetime.utcnow()
+
+    context = {
+        "teams": teams,
+        "checkpoints": checkpoints,
+        "now": now,
+        "dup_team_id": None,
+        "dup_checkpoint_id": None,
+        "timestamp_prefill": request.form.get("timestamp_local") if request.method == "POST" else now.astimezone(DEFAULT_TIMEZONE).strftime("%Y-%m-%dT%H:%M:%S"),
+        "suggest_override": request.form.get("override") == "replace",
+    }
 
     if request.method == "POST":
         team_id = request.form.get("team_id", type=int)
         checkpoint_id = request.form.get("checkpoint_id", type=int)
         override = request.form.get("override")
 
-        # validate FKs
-        if not Team.query.get(team_id) or not Checkpoint.query.get(checkpoint_id):
-            flash("Invalid team or checkpoint.", "warning")
-            return render_template("add_checkin.html", teams=teams, checkpoints=checkpoints, now=datetime.utcnow())
+        payload = {
+            "team_id": team_id,
+            "checkpoint_id": checkpoint_id,
+            "timestamp": _parse_timestamp_from_form(now).isoformat(),
+        }
+        if override == "replace":
+            payload["override"] = "replace"
 
-        # parse local → UTC; fallback is now()
-        timestamp = _parse_timestamp_from_form(datetime.utcnow())
+        resp, body = api_json("POST", "/api/checkins", json=payload)
 
-        existing = Checkin.query.filter_by(team_id=team_id, checkpoint_id=checkpoint_id).first()
-        if existing and override != "replace":
-            flash("This team has already checked in at this checkpoint.", "warning")
-            return render_template(
-                "add_checkin.html",
-                teams=teams,
-                checkpoints=checkpoints,
-                dup_team_id=team_id,
-                dup_checkpoint_id=checkpoint_id,
-                # keep user input in the field if they posted it
-                timestamp_prefill=request.form.get("timestamp_local") or "",
-                suggest_override=True,
-            )
-
-        if existing and override == "replace":
-            existing.timestamp = timestamp
-            db.session.commit()
-            flash("Existing check-in replaced with the new timestamp.", "success")
+        if resp.status_code in (200, 201):
+            message = "Existing check-in replaced." if resp.status_code == 200 else "Check-in recorded."
+            flash(message, "success")
             return redirect(url_for("checkins.list_checkins"))
 
-        db.session.add(Checkin(team_id=team_id, checkpoint_id=checkpoint_id, timestamp=timestamp))
-        db.session.commit()
-        flash("Check-in recorded.", "success")
-        return redirect(url_for("checkins.list_checkins"))
+        if resp.status_code == 409 and body.get("error") == "duplicate":
+            flash("This team has already checked in at this checkpoint. Submit again to replace the timestamp.", "warning")
+            context.update(
+                {
+                    "dup_team_id": team_id,
+                    "dup_checkpoint_id": checkpoint_id,
+                    "suggest_override": True,
+                }
+            )
+            return render_template("add_checkin.html", **context)
 
-    # GET
-    return render_template("add_checkin.html", teams=teams, checkpoints=checkpoints, now=datetime.utcnow())
+        flash(body.get("detail") or body.get("error") or "Could not record check-in.", "warning")
+
+    return render_template("add_checkin.html", **context)
+
+
+def _load_checkin(checkin_id: int):
+    resp, payload = api_json("GET", f"/api/checkins/{checkin_id}")
+    if resp.status_code != 200:
+        return None, None
+    decorated = _decorate_checkins([payload])[0]
+    timestamp_local_value = ""
+    if decorated["timestamp"]:
+        timestamp_local_value = decorated["timestamp"].strftime("%Y-%m-%dT%H:%M:%S")
+    team = payload.get("team") or {}
+    checkpoint = payload.get("checkpoint") or {}
+    decorated.update(
+        {
+            "team_id": team.get("id"),
+            "checkpoint_id": checkpoint.get("id"),
+            "timestamp_local": timestamp_local_value,
+        }
+    )
+    return payload, decorated
 
 
 @checkins_bp.route("/<int:checkin_id>/edit", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def edit_checkin(checkin_id: int):
-    c = Checkin.query.get_or_404(checkin_id)
-    teams = Team.query.order_by(Team.name.asc()).all()
-    checkpoints = Checkpoint.query.order_by(Checkpoint.name.asc()).all()
-
-    if request.method == "POST":
-        new_team_id = request.form.get("team_id", type=int)
-        new_cp_id = request.form.get("checkpoint_id", type=int)
-        override = request.form.get("override")
-
-
-        # validate FKs
-        if not Team.query.get(new_team_id) or not Checkpoint.query.get(new_cp_id):
-            flash("Invalid team or checkpoint.", "warning")
-            return render_template(
-                "checkin_edit.html",
-                c=c,
-                teams=teams,
-                checkpoints=checkpoints,
-                timestamp_local=to_datetime_local(c.timestamp),
-            )
-
-        # parse local → UTC; fallback is current stored timestamp
-        new_ts = _parse_timestamp_from_form(c.timestamp)
-
-        # Is there another row with same (team, checkpoint)?
-        dup = (
-            Checkin.query
-            .filter(
-                Checkin.team_id == new_team_id,
-                Checkin.checkpoint_id == new_cp_id,
-                Checkin.id != checkin_id,
-            )
-            .first()
-        )
-
-        if dup and override != "replace":
-            flash("Another check-in for that team & checkpoint already exists.", "warning")
-            return render_template(
-                "checkin_edit.html",
-                c=c,
-                teams=teams,
-                checkpoints=checkpoints,
-                timestamp_local=to_datetime_local(new_ts),
-                suggest_override=True,
-                pending_team_id=new_team_id,
-                pending_cp_id=new_cp_id,
-            )
-
-        if dup and override == "replace":
-            db.session.delete(dup)
-            db.session.flush()
-            c.team_id = new_team_id
-            c.checkpoint_id = new_cp_id
-            c.timestamp = new_ts
-            db.session.commit()
-            flash("Replaced the other check-in and saved your changes.", "success")
-            return redirect(url_for("checkins.list_checkins"))
-
-        # Normal update
-        c.team_id = new_team_id
-        c.checkpoint_id = new_cp_id
-        c.timestamp = new_ts
-        db.session.commit()
-        flash("Check-in updated.", "success")
+    raw_checkin, decorated = _load_checkin(checkin_id)
+    if not raw_checkin:
+        flash("Check-in not found.", "warning")
         return redirect(url_for("checkins.list_checkins"))
 
-    # ---- GET: render the form ----
-    return render_template(
-        "checkin_edit.html",
-        c=c,
-        teams=teams,
-        checkpoints=checkpoints,
-        timestamp_local=to_datetime_local(c.timestamp),
-    )
+    teams = _fetch_teams()
+    checkpoints = _fetch_checkpoints()
+
+    context = {
+        "c": decorated,
+        "teams": teams,
+        "checkpoints": checkpoints,
+        "timestamp_local": decorated.get("timestamp_local"),
+        "suggest_override": request.form.get("override") == "replace",
+        "pending_team_id": None,
+        "pending_cp_id": None,
+    }
+
+    if request.method == "POST":
+        team_id = request.form.get("team_id", type=int)
+        checkpoint_id = request.form.get("checkpoint_id", type=int)
+        override = request.form.get("override")
+
+        payload = {
+            "team_id": team_id,
+            "checkpoint_id": checkpoint_id,
+            "timestamp": _parse_timestamp_from_form(decorated.get("timestamp") or datetime.utcnow()).isoformat(),
+        }
+        if override == "replace":
+            payload["override"] = "replace"
+
+        resp, body = api_json("PATCH", f"/api/checkins/{checkin_id}", json=payload)
+
+        if resp.status_code == 200:
+            flash("Check-in updated.", "success")
+            return redirect(url_for("checkins.list_checkins"))
+
+        if resp.status_code == 409 and body.get("error") == "duplicate":
+            flash("Another check-in exists for that team and checkpoint. Submit again to replace it.", "warning")
+            context["c"]["team_id"] = team_id
+            context["c"]["checkpoint_id"] = checkpoint_id
+            context["timestamp_local"] = request.form.get("timestamp_local") or context.get("timestamp_local")
+            context.update(
+                {
+                    "suggest_override": True,
+                    "pending_team_id": team_id,
+                    "pending_cp_id": checkpoint_id,
+                }
+            )
+            return render_template("checkin_edit.html", **context)
+
+        flash(body.get("detail") or body.get("error") or "Could not update check-in.", "warning")
+        decorated.update(
+            {
+                "team_id": team_id,
+                "checkpoint_id": checkpoint_id,
+                "timestamp_local": request.form.get("timestamp_local") or decorated.get("timestamp_local"),
+            }
+        )
+        return render_template("checkin_edit.html", **context)
+
+    return render_template("checkin_edit.html", **context)
 
 
 @checkins_bp.route("/<int:checkin_id>/delete", methods=["POST"])
-@roles_required("judge", "admin")
+@roles_required("admin")
 def delete_checkin(checkin_id: int):
-    c = Checkin.query.get_or_404(checkin_id)
-    db.session.delete(c)
-    db.session.commit()
-    flash("Check-in deleted.", "success")
+    resp, body = api_json("DELETE", f"/api/checkins/{checkin_id}")
+
+    if resp.status_code == 200:
+        flash("Check-in deleted.", "success")
+    else:
+        flash(body.get("detail") or body.get("error") or "Could not delete check-in.", "warning")
+
+    return redirect(url_for("checkins.list_checkins"))
+
+
+@checkins_bp.route("/import_json", methods=["GET", "POST"])
+@roles_required("judge", "admin")
+def import_checkins_json():
+    flash("JSON import via UI is disabled. Use the /api/checkins endpoint instead.", "warning")
     return redirect(url_for("checkins.list_checkins"))

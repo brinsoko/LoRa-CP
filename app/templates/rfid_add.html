@@ -10,6 +10,7 @@
         <label class="form-label">RFID UID</label>
         <div class="input-group">
           <input type="text" class="form-control" name="uid" id="uidInput"
+                 value="{{ uid_value or '' }}"
                  placeholder="Enter RFID UID" required>
           <!-- Optional: scan button (works if serial reader is connected & endpoint enabled) -->
           <button class="btn btn-outline-secondary" type="button" id="scanBtn">Scan UID</button>
@@ -20,7 +21,8 @@
       <div class="mb-3">
         <label class="form-label">Card Number (optional)</label>
         <input type="number" class="form-control" name="number" id="numberInput"
-               inputmode="numeric" min="1" step="1" placeholder="e.g. 101">
+               inputmode="numeric" min="1" step="1" placeholder="e.g. 101"
+               value="{{ number_value or '' }}">
         <div class="form-text">Must be a positive integer if provided.</div>
       </div>
 
@@ -29,7 +31,7 @@
         <select name="team_id" class="form-select" required>
           <option value="">— Select Team —</option>
           {% for team in teams %}
-            <option value="{{ team.id }}">{{ team.name }}{% if team.number %} ({{ team.number }}){% endif %}</option>
+            <option value="{{ team.id }}" {% if selected_team_id == team.id %}selected{% endif %}>{{ team.name }}{% if team.number %} ({{ team.number }}){% endif %}</option>
           {% endfor %}
         </select>
       </div>

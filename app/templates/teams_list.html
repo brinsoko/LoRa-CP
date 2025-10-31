@@ -67,16 +67,11 @@
             <td>{{ team.number or "—" }}</td>
 
             <td>
-              {% if team.group_assignments %}
-                {% for tg in team.group_assignments %}
-                  {% if tg.group %}
-                    <span class="badge {% if tg.active %}bg-success{% else %}bg-secondary{% endif %} me-1 mb-1">
-                      {{ tg.group.name }}
-                    </span>
-                  {% endif %}
-                {% endfor %}
+              {% set assignment = team.group_assignments[0] if team.group_assignments else None %}
+              {% if assignment and assignment.group %}
+                <span class="badge bg-success">{{ assignment.group.name }}</span>
               {% else %}
-                <span class="text-muted">No groups</span>
+                <span class="text-muted">No group</span>
               {% endif %}
             </td>
 

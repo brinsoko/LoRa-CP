@@ -1,273 +1,139 @@
+# app/blueprints/rfid/routes.py
+from __future__ import annotations
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
-from app.extensions import db
-from app.models import RFIDCard, Team
+
+from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
-from app.utils.serial_helpers import normalize_uid, read_uid_once
-from config import Config
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import joinedload
-import io, csv
 
-rfid_bp = Blueprint('rfid', __name__, template_folder="../../templates")
-
-# config access
-BAUD = Config.SERIAL_BAUDRATE
-HINT = Config.SERIAL_HINT
-TIMEOUT = Config.SERIAL_TIMEOUT
+rfid_bp = Blueprint("rfid", __name__, template_folder="../../templates")
 
 
-# -------------------------------
-# Helpers
-# -------------------------------
-def parse_positive_int_or_none(value: str | None):
-    if not value:
-        return None
-    try:
-        n = int(value)
-        return n if n > 0 else None
-    except ValueError:
-        return None
+def _fetch_cards():
+    resp, payload = api_json("GET", "/api/rfid/cards")
+    if resp.status_code != 200:
+        flash("Could not load RFID mappings.", "warning")
+        return []
+    return payload.get("cards", [])
 
 
-# -------------------------------
-# List all RFID mappings
-# -------------------------------
+def _fetch_teams():
+    resp, payload = api_json("GET", "/api/teams", params={"sort": "name_asc"})
+    if resp.status_code != 200:
+        flash("Could not load teams.", "warning")
+        return []
+    return payload.get("teams", [])
+
+
 @rfid_bp.route("/", methods=["GET"])
+@roles_required("judge", "admin")
 def list_rfid():
-    cards = RFIDCard.query.order_by(RFIDCard.number.asc().nulls_last(), RFIDCard.uid.asc()).all()
-    teams = Team.query.order_by(Team.name.asc()).all()
-    return render_template("rfid_list.html", cards=cards, teams=teams)
+    cards = _fetch_cards()
+    return render_template("rfid_list.html", cards=cards)
 
 
-# -------------------------------
-# Add a new RFID mapping
-# -------------------------------
 @rfid_bp.route("/add", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def add_rfid():
-    teams = Team.query.order_by(Team.name.asc()).all()
+    teams = _fetch_teams()
+    selected_team_id = request.form.get("team_id", type=int) if request.method == "POST" else None
+    uid_value = request.form.get("uid", "") if request.method == "POST" else ""
+    number_value = request.form.get("number", "") if request.method == "POST" else ""
 
     if request.method == "POST":
-        uid_raw = request.form.get("uid", "").strip()
-        uid = normalize_uid(uid_raw)
+        uid = (request.form.get("uid") or "").strip()
         team_id = request.form.get("team_id", type=int)
         number = request.form.get("number", type=int)
 
-        if not uid:
-            flash("UID is required.", "warning")
-            return render_template("rfid_add.html", teams=teams)
+        payload = {"uid": uid, "team_id": team_id, "number": number}
 
-        if not Team.query.get(team_id):
-            flash("Invalid team.", "warning")
-            return render_template("rfid_add.html", teams=teams)
-
-        if RFIDCard.query.filter_by(team_id=team_id).first():
-            flash("This team already has an RFID card assigned.", "warning")
-            return render_template("rfid_add.html", teams=teams)
-
-        if request.form.get("number") and number is None:
-            flash("Card number must be a positive integer (or leave blank).", "warning")
-            return render_template("rfid_add.html", teams=teams)
-
-        # ✅ use keyword args here
-        card = RFIDCard(uid=uid, team_id=team_id, number=number)
-        db.session.add(card)
-
-        try:
-            db.session.commit()
+        resp, body = api_json("POST", "/api/rfid/cards", json=payload)
+        if resp.status_code == 201:
             flash("RFID mapping created.", "success")
             return redirect(url_for("rfid.list_rfid"))
-        except IntegrityError:
-            db.session.rollback()
-            flash("UID already exists. Use Edit to reassign or change UID.", "warning")
-            return render_template("rfid_add.html", teams=teams)
 
-    return render_template("rfid_add.html", teams=teams)
+        flash(body.get("detail") or body.get("error") or "Could not create RFID mapping.", "warning")
+
+    return render_template(
+        "rfid_add.html",
+        teams=teams,
+        selected_team_id=selected_team_id,
+        uid_value=uid_value,
+        number_value=number_value,
+    )
 
 
-# -------------------------------
-# Edit an existing RFID mapping
-# -------------------------------
 @rfid_bp.route("/<int:card_id>/edit", methods=["GET", "POST"])
 @roles_required("judge", "admin")
-def edit_rfid(card_id):
-    card = RFIDCard.query.get_or_404(card_id)
-    teams = Team.query.order_by(Team.name.asc()).all()
+def edit_rfid(card_id: int):
+    card_resp, card_payload = api_json("GET", f"/api/rfid/cards/{card_id}")
+    if card_resp.status_code != 200:
+        flash("RFID card not found.", "warning")
+        return redirect(url_for("rfid.list_rfid"))
+
+    card = card_payload
+    teams = _fetch_teams()
+    selected_team_id = request.form.get("team_id", type=int) if request.method == "POST" else (card.get("team", {}) or {}).get("id")
 
     if request.method == "POST":
-        new_uid = normalize_uid(request.form.get("uid", "").strip())
-        new_team_id = request.form.get("team_id", type=int)
-        new_number = request.form.get("number", type=int)
+        uid = (request.form.get("uid") or "").strip()
+        team_id = request.form.get("team_id", type=int)
+        number = request.form.get("number", type=int)
 
-        if not new_uid:
-            flash("UID is required.", "warning")
-            return render_template("rfid_edit.html", card=card, teams=teams)
+        payload = {"uid": uid, "team_id": team_id, "number": number}
 
-        if not Team.query.get(new_team_id):
-            flash("Invalid team.", "warning")
-            return render_template("rfid_edit.html", card=card, teams=teams)
-
-        if request.form.get("number") and new_number is None:
-            flash("Card number must be a positive integer (or leave blank).", "warning")
-            return render_template("rfid_edit.html", card=card, teams=teams)
-
-        # Prevent multiple cards for same team
-        existing_for_team = RFIDCard.query.filter(
-            RFIDCard.team_id == new_team_id, RFIDCard.id != card.id
-        ).first()
-        if existing_for_team:
-            flash("That team already has an RFID card assigned.", "warning")
-            return render_template("rfid_edit.html", card=card, teams=teams)
-
-        card.uid = new_uid
-        card.team_id = new_team_id
-        card.number = new_number
-
-        try:
-            db.session.commit()
+        resp, body = api_json("PATCH", f"/api/rfid/cards/{card_id}", json=payload)
+        if resp.status_code == 200:
             flash("RFID mapping updated.", "success")
             return redirect(url_for("rfid.list_rfid"))
-        except IntegrityError:
-            db.session.rollback()
-            flash("UID already exists. Choose a different UID.", "warning")
-            return render_template("rfid_edit.html", card=card, teams=teams)
 
-    return render_template("rfid_edit.html", card=card, teams=teams)
+        flash(body.get("detail") or body.get("error") or "Could not update RFID mapping.", "warning")
+        card.update({"uid": uid, "number": number})
+        if selected_team_id:
+            team_info = next((t for t in teams if t.get("id") == selected_team_id), None)
+            card["team"] = {
+                "id": team_info.get("id") if team_info else selected_team_id,
+                "name": team_info.get("name") if team_info else None,
+                "number": team_info.get("number") if team_info else None,
+            }
+        else:
+            card["team"] = None
+
+    return render_template(
+        "rfid_edit.html",
+        card=card,
+        teams=teams,
+        selected_team_id=selected_team_id,
+    )
 
 
-# -------------------------------
-# Delete RFID mapping
-# -------------------------------
 @rfid_bp.route("/<int:card_id>/delete", methods=["POST"])
 @roles_required("admin")
-def delete_rfid(card_id):
-    card = RFIDCard.query.get_or_404(card_id)
-    db.session.delete(card)
-    db.session.commit()
-    flash("RFID mapping deleted.", "success")
+def delete_rfid(card_id: int):
+    resp, body = api_json("DELETE", f"/api/rfid/cards/{card_id}")
+    if resp.status_code == 200:
+        flash("RFID mapping deleted.", "success")
+    else:
+        flash(body.get("detail") or body.get("error") or "Could not delete RFID mapping.", "warning")
     return redirect(url_for("rfid.list_rfid"))
 
 
-# -------------------------------
-# Scan RFID via serial
-# -------------------------------
 @rfid_bp.route("/scan_once", methods=["POST"])
 @roles_required("judge", "admin")
 def rfid_scan_once():
-    uid = read_uid_once(BAUD, HINT, TIMEOUT)
-    if not uid:
-        return jsonify({"ok": False, "error": "No UID read (check device, cable, or increase timeout)."}), 200
-    return jsonify({"ok": True, "uid": uid}), 200
+    resp, body = api_json("POST", "/api/rfid/scan")
+    return jsonify(body), resp.status_code
 
 
-# -------------------------------
-# CSV upload (supports "number" column)
-# -------------------------------
 @rfid_bp.route("/upload_csv", methods=["GET"])
 @roles_required("admin")
 def rfid_upload_csv_form():
-    return render_template("rfid_upload_csv.html")
+    flash("CSV upload via UI is disabled. Use /api/rfid/import instead.", "warning")
+    return redirect(url_for("rfid.list_rfid"))
 
 
 @rfid_bp.route("/upload_csv", methods=["POST"])
 @roles_required("admin")
 def rfid_upload_csv():
-    file = request.files.get('file')
-    if not file:
-        flash("Please choose a CSV file.", "warning")
-        return redirect(url_for("rfid.rfid_upload_csv_form"))
-
-    try:
-        stream = io.StringIO(file.stream.read().decode('utf-8', errors='ignore'))
-        reader = csv.DictReader(stream)
-    except Exception:
-        flash("Could not read CSV. Ensure it has a header row.", "warning")
-        return redirect(url_for("rfid.rfid_upload_csv_form"))
-
-    created = updated = skipped = 0
-    errors = []
-
-    for i, row in enumerate(reader, start=2):
-        raw_uid = (row.get('uid') or '').strip()
-        uid = normalize_uid(raw_uid)
-        if not uid:
-            skipped += 1
-            errors.append(f"Line {i}: missing uid")
-            continue
-
-        team = None
-        team_id_val = (row.get('team_id') or '').strip()
-        team_name = (row.get('team_name') or '').strip()
-        team_number = (row.get('team_number') or '').strip()
-
-        if team_id_val:
-            try:
-                tid = int(team_id_val)
-                team = Team.query.get(tid)
-            except Exception:
-                pass
-        else:
-            if team_name:
-                q = Team.query.filter(Team.name == team_name)
-                if team_number:
-                    try:
-                        q = q.filter(Team.number == int(team_number))
-                    except ValueError:
-                        pass
-                team = q.first()
-
-        if not team:
-            skipped += 1
-            errors.append(f"Line {i}: could not resolve team")
-            continue
-
-        number = parse_positive_int_or_none((row.get('number') or '').strip())
-
-        card = RFIDCard.query.filter_by(uid=uid).first()
-        if card:
-            changed = False
-            if card.team_id != team.id:
-                card.team_id = team.id
-                changed = True
-            if card.number != number:
-                card.number = number
-                changed = True
-            if changed:
-                try:
-                    db.session.commit()
-                    updated += 1
-                except IntegrityError:
-                    db.session.rollback()
-                    skipped += 1
-                    errors.append(f"Line {i}: DB error updating {uid}")
-            else:
-                skipped += 1
-        else:
-            try:
-                db.session.add(RFIDCard(uid=uid, team_id=team.id, number=number))
-                db.session.commit()
-                created += 1
-            except IntegrityError:
-                db.session.rollback()
-                skipped += 1
-                errors.append(f"Line {i}: UID exists {uid}")
-
-    msg = f"CSV processed: {created} created, {updated} updated, {skipped} skipped."
-    if errors:
-        preview = "\n".join(errors[:8])
-        flash(msg + " Some issues:\n" + preview + ("" if len(errors) <= 8 else "\n…"), "warning")
-    else:
-        flash(msg, "success")
-
+    flash("CSV upload via UI is disabled. Use /api/rfid/import instead.", "warning")
     return redirect(url_for("rfid.list_rfid"))
-
-@rfid_bp.route("/public", methods=["GET"])
-def public_mappings():
-    cards = (
-        RFIDCard.query
-        .options(joinedload(RFIDCard.team))
-        .order_by(RFIDCard.number.asc().nulls_last(), RFIDCard.uid.asc())
-        .all()
-    )
-    return render_template("rfid_list.html", cards=cards, read_only=True)
-

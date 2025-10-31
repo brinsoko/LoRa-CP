@@ -1,167 +1,166 @@
 # app/blueprints/teams/routes.py
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
-from sqlalchemy.orm import joinedload
-from app.extensions import db
-from app.models import Team, CheckpointGroup, TeamGroup
+from __future__ import annotations
+
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+
+from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
 
 teams_bp = Blueprint("teams", __name__, template_folder="../../templates")
 
 
-def _active_group_id_for(team: Team) -> int | None:
-    for tg in team.group_assignments:
-        if tg.active:
-            return tg.group_id
-    return None
+def _transform_team_payload(team: dict) -> dict:
+    assignments = []
+    for grp in team.get("groups", []):
+        assignments.append({
+            "group": {"id": grp.get("id"), "name": grp.get("name")},
+            "active": grp.get("active", False),
+        })
+    team["group_assignments"] = assignments
+    return team
 
 
-# ============ LIST ============
 @teams_bp.route("/", methods=["GET"])
 def list_teams():
-    """
-    Teams list with search, wildcard filter, group filter, and sorting.
-    Query params:
-      - q: search string (supports * wildcards)
-      - group_id: filter by group (int)
-      - sort: one of name_asc, name_desc, number_asc, number_desc
-    """
     q = (request.args.get("q") or "").strip()
-    group_id = request.args.get("group_id", type=int)
-    sort = (request.args.get("sort") or "name_asc").strip()
+    group_id = request.args.get("group_id")
+    sort = (request.args.get("sort") or "name_asc").strip().lower()
 
-    query = (
-        Team.query
-        .options(joinedload(Team.group_assignments).joinedload(TeamGroup.group))
-    )
-
- 
-
-    # --------- Group filter ---------
+    params = {"sort": sort}
+    if q:
+        params["q"] = q
     if group_id:
-        query = (
-            query.join(TeamGroup, TeamGroup.team_id == Team.id)
-                 .filter(TeamGroup.group_id == group_id)
-        )
+        params["group_id"] = group_id
 
-    # --------- Sorting ---------
-    if sort == "name_desc":
-        query = query.order_by(Team.name.desc())
-    elif sort == "number_asc":
-        query = query.order_by(Team.number.asc().nulls_last(), Team.name.asc())
-    elif sort == "number_desc":
-        query = query.order_by(Team.number.desc().nulls_last(), Team.name.asc())
-    else:  # name_asc default
-        query = query.order_by(Team.name.asc())
+    team_resp, team_payload = api_json("GET", "/api/teams", params=params)
+    groups_resp, groups_payload = api_json("GET", "/api/groups")
 
-    teams = query.all()
-    groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
+    if team_resp.status_code != 200:
+        flash("Could not load teams.", "warning")
+    teams = [_transform_team_payload(t) for t in team_payload.get("teams", [])]
+
+    if groups_resp.status_code != 200:
+        flash("Could not load groups.", "warning")
+    groups = groups_payload.get("groups", [])
+
+    selected_group_id = int(group_id) if group_id else None
 
     return render_template(
         "teams_list.html",
         teams=teams,
         groups=groups,
         selected_q=q,
-        selected_group_id=group_id,
+        selected_group_id=selected_group_id,
         selected_sort=sort,
     )
 
 
-# ============ ADD ============
 @teams_bp.route("/add", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def add_team():
-    groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
+    _, groups_payload = api_json("GET", "/api/groups")
+    groups = groups_payload.get("groups", [])
+    selected_group_id = None
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
-        number = request.form.get("number", type=int)
-
-        # Gather checkbox selections; DO NOT call set() in template
-        selected_ids = {int(x) for x in request.form.getlist("group_ids")}
-        current_app.logger.debug("[teams.add] name=%r number=%r selected_ids=%r",
-                                 name, number, selected_ids)
+        number_raw = request.form.get("number")
+        number = int(number_raw) if number_raw else None
+        selected_group_id = request.form.get("group_id", type=int)
 
         if not name:
             flash("Team name is required.", "warning")
-            return render_template("add_team.html",
-                                   groups=groups,
-                                   selected_group_ids=set())
+            return render_template("add_team.html", groups=groups, selected_group_id=selected_group_id)
 
-        t = Team(name=name, number=number)
-        db.session.add(t)
-        db.session.flush()  # get t.id
-
-        for gid in selected_ids:
-            db.session.add(TeamGroup(team_id=t.id, group_id=gid, active=True))
-
-        db.session.commit()
-        flash("Team created.", "success")
-        return redirect(url_for("teams.list_teams"))
-
-    # Provide an empty set so template can do: {% if g.id in selected_group_ids %}
-    return render_template("add_team.html", groups=groups, selected_group_ids=set())
-
-
-# ============ EDIT ============
-@teams_bp.route("/<int:team_id>/edit", methods=["GET", "POST"])
-@roles_required("judge", "admin")
-def edit_team(team_id):
-    team = (
-        Team.query
-        .options(joinedload(Team.group_assignments))
-        .get_or_404(team_id)
-    )
-    groups = CheckpointGroup.query.order_by(CheckpointGroup.name.asc()).all()
-
-    if request.method == "POST":
-        team.name = (request.form.get("name") or "").strip()
-        team.number = request.form.get("number", type=int)
-
-        selected_ids = {int(x) for x in request.form.getlist("group_ids")}
-        current_ids = {tg.group_id for tg in team.group_assignments}
-
-        current_app.logger.debug(
-            "[teams.edit] team_id=%s selected_ids=%r current_ids=%r",
-            team.id, selected_ids, current_ids
+        resp, payload = api_json(
+            "POST",
+            "/api/teams",
+            json={
+                "name": name,
+                "number": number,
+                "group_id": selected_group_id,
+            },
         )
 
-        # Delete assignments that are no longer checked
-        if current_ids - selected_ids:
-            q = (db.session.query(TeamGroup)
-                 .filter(TeamGroup.team_id == team.id))
-            if selected_ids:
-                q = q.filter(~TeamGroup.group_id.in_(list(selected_ids)))
-            # If no selections, delete all rows for this team
-            q.delete(synchronize_session=False)
+        if resp.status_code == 201:
+            flash("Team created.", "success")
+            return redirect(url_for("teams.list_teams"))
 
-        # Add new assignments
-        for gid in (selected_ids - current_ids):
-            db.session.add(TeamGroup(team_id=team.id, group_id=gid, active=True))
+        flash(payload.get("error") or "Could not create team.", "warning")
 
-        db.session.commit()
-        flash("Team updated.", "success")
+    return render_template("add_team.html", groups=groups, selected_group_id=selected_group_id)
+
+
+@teams_bp.route("/<int:team_id>/edit", methods=["GET", "POST"])
+@roles_required("judge", "admin")
+def edit_team(team_id: int):
+    team_resp, team_payload = api_json("GET", f"/api/teams/{team_id}")
+    if team_resp.status_code != 200:
+        flash("Team not found.", "warning")
         return redirect(url_for("teams.list_teams"))
 
-    # Provide a ready-to-use set for the template
-    selected_group_ids = {tg.group_id for tg in team.group_assignments}
-    return render_template("team_edit.html",
-                           team=team,
-                           groups=groups,
-                           selected_group_ids=selected_group_ids)
+    team = _transform_team_payload(team_payload.get("team", team_payload))
+
+    _, groups_payload = api_json("GET", "/api/groups")
+    groups = groups_payload.get("groups", [])
+
+    selected_group_id = next((g.get("group", {}).get("id") for g in team.get("group_assignments", []) if g.get("group")), None)
+
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        number_raw = request.form.get("number")
+        number = int(number_raw) if number_raw else None
+        selected_group_id = request.form.get("group_id", type=int)
+
+        if not name:
+            flash("Team name is required.", "warning")
+            team["name"] = name
+            team["number"] = number
+            return render_template(
+                "team_edit.html",
+                team=team,
+                groups=groups,
+                selected_group_id=selected_group_id,
+            )
+
+        resp, payload = api_json(
+            "PATCH",
+            f"/api/teams/{team_id}",
+            json={"name": name, "number": number, "group_id": selected_group_id},
+        )
+
+        if resp.status_code == 200:
+            flash("Team updated.", "success")
+            return redirect(url_for("teams.list_teams"))
+
+        flash(payload.get("error") or "Could not update team.", "warning")
+        team["name"] = name
+        team["number"] = number
+        grp = next((g for g in groups if g.get("id") == selected_group_id), None)
+        if grp:
+            team["group_assignments"] = [{
+                "group": {"id": grp.get("id"), "name": grp.get("name")},
+                "active": True,
+            }]
+        else:
+            team["group_assignments"] = []
+
+    return render_template(
+        "team_edit.html",
+        team=team,
+        groups=groups,
+        selected_group_id=selected_group_id,
+    )
 
 
-# ============ DELETE ============
 @teams_bp.route("/<int:team_id>/delete", methods=["POST"])
 @roles_required("admin")
-def delete_team(team_id):
-    team = Team.query.get_or_404(team_id)
+def delete_team(team_id: int):
+    resp, payload = api_json("DELETE", f"/api/teams/{team_id}")
 
-    if team.checkins:
-        flash("Cannot delete team with existing check-ins.", "warning")
-        return redirect(url_for("teams.list_teams"))
+    if resp.status_code == 200:
+        flash("Team deleted.", "success")
+    else:
+        flash(payload.get("detail") or payload.get("error") or "Could not delete team.", "warning")
 
-    TeamGroup.query.filter_by(team_id=team.id).delete()
-    db.session.delete(team)
-    db.session.commit()
-    flash("Team deleted.", "success")
     return redirect(url_for("teams.list_teams"))

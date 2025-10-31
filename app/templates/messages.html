@@ -28,7 +28,7 @@
     <tbody>
     {% for m in messages %}
       <tr>
-        <td>{{ m.received_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+        <td>{{ m.display_received_at }}</td>
         <td>{{ m.dev_id }}</td>
         <td><code class="small">{{ m.payload }}</code></td>
         <td class="text-end">{{ '%.1f'|format(m.rssi) if m.rssi is not none else '' }}</td>
@@ -43,7 +43,7 @@
   <ul class="pagination">
     {% if pagination.has_prev %}
       <li class="page-item">
-        <a class="page-link" href="{{ url_for('messages.list_messages', page=pagination.prev_num, dev_id=selected_dev_id) }}">Previous</a>
+        <a class="page-link" href="{{ pagination.prev_url }}">Previous</a>
       </li>
     {% else %}
       <li class="page-item disabled"><span class="page-link">Previous</span></li>
@@ -55,7 +55,7 @@
 
     {% if pagination.has_next %}
       <li class="page-item">
-        <a class="page-link" href="{{ url_for('messages.list_messages', page=pagination.next_num, dev_id=selected_dev_id) }}">Next</a>
+        <a class="page-link" href="{{ pagination.next_url }}">Next</a>
       </li>
     {% else %}
       <li class="page-item disabled"><span class="page-link">Next</span></li>

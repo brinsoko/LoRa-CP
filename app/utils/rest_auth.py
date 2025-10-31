@@ -1,6 +1,5 @@
 # app/utils/rest_auth.py
-from flask import jsonify
-from flask_login import current_user, login_required
+from flask_login import current_user
 from functools import wraps
 
 def json_login_required(fn):

@@ -19,9 +19,9 @@
         <label class="form-label">Assigned Team</label>
         <select name="team_id" class="form-select" required>
           {% for team in teams %}
-          <option value="{{ team.id }}" {% if team.id == card.team_id %}selected{% endif %}>
-            {{ team.name }} ({{ team.number }})
-          </option>
+            <option value="{{ team.id }}" {% if selected_team_id == team.id %}selected{% endif %}>
+              {{ team.name }}{% if team.number %} ({{ team.number }}){% endif %}
+            </option>
           {% endfor %}
         </select>
       </div>

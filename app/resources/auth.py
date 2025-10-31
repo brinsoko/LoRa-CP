@@ -2,12 +2,12 @@
 from __future__ import annotations
 from flask import request, jsonify
 from flask_restful import Resource
-from flask_login import login_user, logout_user, login_required, current_user
+from flask_login import login_user, logout_user, current_user
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models import User
-from app.utils.perms import roles_required  # your existing decorator
+from app.utils.rest_auth import json_login_required, json_roles_required
 
 # ---------- helpers ----------
 def _validate_new_password(username: str, pw1: str, pw2: str) -> str | None:
@@ -54,7 +54,7 @@ class AuthLogin(Resource):
 
 
 class AuthLogout(Resource):
-    method_decorators = [login_required]
+    method_decorators = [json_login_required]
 
     def post(self):
         logout_user()
@@ -62,7 +62,7 @@ class AuthLogout(Resource):
 
 
 class AuthChangePassword(Resource):
-    method_decorators = [login_required]
+    method_decorators = [json_login_required]
 
     def post(self):
         data, err_resp, err_code = _json()
@@ -87,7 +87,7 @@ class AuthChangePassword(Resource):
 
 class UserList(Resource):
     # admin-only for creating/listing users
-    method_decorators = [roles_required("admin")]
+    method_decorators = [json_roles_required("admin")]
 
     def get(self):
         users = User.query.order_by(User.username.asc()).all()
@@ -138,7 +138,7 @@ class UserList(Resource):
 
 class UserItem(Resource):
     # admin-only: get/patch/delete a specific user
-    method_decorators = [roles_required("admin")]
+    method_decorators = [json_roles_required("admin")]
 
     def get(self, user_id: int):
         u = User.query.get_or_404(user_id)
@@ -188,7 +188,7 @@ class UserItem(Resource):
 
 # optional: self-service fetch/update for the current user
 class Me(Resource):
-    method_decorators = [login_required]
+    method_decorators = [json_login_required]
 
     def get(self):
         u = current_user

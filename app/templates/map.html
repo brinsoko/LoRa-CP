@@ -34,7 +34,6 @@
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
   crossorigin=""
 ></script>
-
 <script>
   // Colors: Bootstrap palette
   const COLOR_FOUND     = "#198754"; // success
@@ -55,14 +54,63 @@
     markers = [];
   }
 
-  // ⚠️ Stub: replace with your real projection when ready
   function toLatLng(easting, northing) {
-    const originLat = 45.95;
-    const originLng = 14.36;
-    const scale = 0.00001;
-    const lat = originLat + ((northing || 0) * scale);
-    const lng = originLng + ((easting || 0) * scale);
-    return [lat, lng];
+    if (easting == null || northing == null) {
+      return null;
+    }
+    const x = Number(easting);
+    const y = Number(northing);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return null;
+    }
+
+    const a = 6378137.0;
+    const f = 1 / 298.257222101;
+    const e2 = 2 * f - f * f;
+    const e4 = e2 * e2;
+    const e6 = e4 * e2;
+    const ep2 = e2 / (1 - e2);
+
+    const k0 = 0.9999;
+    const lon0 = 15 * Math.PI / 180;
+    const falseE = 500000.0;
+    const falseN = -5000000.0;
+
+    const E = (x - falseE) / k0;
+    const N = (y - falseN) / k0;
+
+    const M = N;
+    const mu = M / (a * (1 - e2/4 - 3*e4/64 - 5*e6/256));
+    const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+
+    const J1 = (3*e1/2 - 27*Math.pow(e1,3)/32);
+    const J2 = (21*Math.pow(e1,2)/16 - 55*Math.pow(e1,4)/32);
+    const J3 = (151*Math.pow(e1,3)/96);
+    const J4 = (1097*Math.pow(e1,4)/512);
+
+    const phi1 = mu + J1 * Math.sin(2*mu) + J2 * Math.sin(4*mu) + J3 * Math.sin(6*mu) + J4 * Math.sin(8*mu);
+
+    const sinPhi1 = Math.sin(phi1);
+    const cosPhi1 = Math.cos(phi1);
+    const tanPhi1 = Math.tan(phi1);
+
+    const C1 = ep2 * cosPhi1 * cosPhi1;
+    const T1 = tanPhi1 * tanPhi1;
+    const N1 = a / Math.sqrt(1 - e2 * sinPhi1 * sinPhi1);
+    const R1 = a * (1 - e2) / Math.pow(1 - e2 * sinPhi1 * sinPhi1, 1.5);
+    const D = E / N1;
+
+    const lat = phi1 - (N1 * tanPhi1 / R1) * (Math.pow(D,2) / 2 - (5 + 3*T1 + 10*C1 - 4*C1*C1 - 9*ep2) * Math.pow(D,4) / 24 + (61 + 90*T1 + 298*C1 + 45*T1*T1 - 252*ep2 - 3*C1*C1) * Math.pow(D,6) / 720);
+    const lon = lon0 + (D - (1 + 2*T1 + C1) * Math.pow(D,3) / 6 + (5 - 2*C1 + 28*T1 - 3*C1*C1 + 8*ep2 + 24*T1*T1) * Math.pow(D,5) / 120) / cosPhi1;
+
+    const latDeg = lat * 180 / Math.PI;
+    const lonDeg = lon * 180 / Math.PI;
+
+    if (!Number.isFinite(latDeg) || !Number.isFinite(lonDeg)) {
+      return null;
+    }
+
+    return [latDeg, lonDeg];
   }
 
   function colorForStatus(status) {
@@ -79,6 +127,10 @@
 
     itemsWithStatus.forEach(cp => {
       const latlng = toLatLng(cp.easting, cp.northing);
+      if (!latlng) {
+        console.warn("Skipping checkpoint without valid coords", cp);
+        return;
+      }
       latlngs.push(latlng);
 
       const status = (cp.status || "not_found");

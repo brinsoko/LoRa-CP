@@ -17,11 +17,11 @@
       <tr>
         <td>{{ loop.index }}</td>
         <td>{{ d.name or '—' }}</td>
-        <td><code>{{ d.dev_eui }}</code></td>
-        <td>{{ d.dev_num }}</td>
+        <td><code>{{ d.dev_eui or '—' }}</code></td>
+        <td>{{ d.dev_num or '—' }}</td>
         <td>{{ 'Yes' if d.active else 'No' }}</td>
-        <td>{{ d.checkpoint.name if d.checkpoint else '—' }}</td>
-        <td>{{ d.last_seen.strftime('%Y-%m-%d %H:%M:%S') if d.last_seen else '—' }}</td>
+        <td>{{ d.checkpoint_name or '—' }}</td>
+        <td>{{ d.display_last_seen }}</td>
         <td class="text-end">
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('lora.edit_device', device_id=d.id) }}">Edit</a>
           <form class="d-inline" method="post" action="{{ url_for('lora.delete_device', device_id=d.id) }}"

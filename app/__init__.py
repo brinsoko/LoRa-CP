@@ -1,11 +1,11 @@
 # app/__init__.py
-from flask import Flask, request, render_template, current_app
+from flask import Flask, request, current_app, render_template
 from flask_restful import Api
 from flask_login import current_user
 from .extensions import db, login_manager
 from .resources import register_resources
-from .utils.perms import inject_perms
 from app.utils.time import to_datetime_local
+from .utils.perms import inject_perms
 import logging
 import os
 
@@ -74,8 +74,8 @@ def create_app() -> Flask:
     app.register_blueprint(lora_bp, url_prefix="/lora")
     app.register_blueprint(groups_bp, url_prefix="/groups")
     app.register_blueprint(maps_bp,   url_prefix="/map")
-    app.register_blueprint(auth_bp)   # /login, /logout, etc
-    app.register_blueprint(main_bp)   # /
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(main_bp)
     app.register_blueprint(teams_bp,        url_prefix="/teams")
     app.register_blueprint(checkpoints_bp,  url_prefix="/checkpoints")
     app.register_blueprint(checkins_bp,     url_prefix="/checkins")
@@ -92,11 +92,21 @@ def create_app() -> Flask:
             getattr(current_user, "is_authenticated", False),
             getattr(current_user, "role", None),
         )
+        if request.path.startswith("/api") or request.accept_mimetypes.best == "application/json":
+            return {"error": "forbidden"}, 403
         return render_template("403.html"), 403
 
     @app.get("/health")
     def health():
         return {"ok": True}, 200
+
+    @app.get("/api")
+    def api_root():
+        return {
+            "service": "LoRa KT API",
+            "version": current_app.config.get("APP_VERSION", "v1"),
+            "docs": "/api/docs/openapi.json",
+        }, 200
 
     @app.context_processor
     def inject_current_app():
