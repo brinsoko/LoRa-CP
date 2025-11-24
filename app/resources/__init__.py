@@ -26,7 +26,7 @@ from .rfid import (
 )
 from .lora import LoRaDeviceListResource, LoRaDeviceItemResource
 from .messages import LoRaMessageListResource
-from .map import MapCheckpoints
+from .map import MapCheckpoints, LoRaMapPoints
 from .docs_resource import ApiDocsListResource, ApiSpecResource
 
 
@@ -75,6 +75,7 @@ def register_resources(api: Api) -> None:
 
     # Map
     api.add_resource(MapCheckpoints, "/api/map/checkpoints")
+    api.add_resource(LoRaMapPoints, "/api/map/lora-points")
 
     # Documentation
     api.add_resource(ApiDocsListResource, "/api/docs")

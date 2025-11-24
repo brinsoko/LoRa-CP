@@ -6,11 +6,12 @@ from flask_restful import Resource
 
 from app.extensions import db
 from app.models import LoRaMessage
+from app.utils.payloads import parse_gps_payload
 from app.utils.rest_auth import json_roles_required
 
 
 def _serialize_message(msg: LoRaMessage) -> dict:
-    return {
+    data = {
         "id": msg.id,
         "dev_id": msg.dev_id,
         "payload": msg.payload,
@@ -18,6 +19,10 @@ def _serialize_message(msg: LoRaMessage) -> dict:
         "snr": msg.snr,
         "received_at": msg.received_at.isoformat() if msg.received_at else None,
     }
+    gps = parse_gps_payload(msg.payload)
+    if gps is not None:
+        data["gps"] = gps
+    return data
 
 
 class LoRaMessageListResource(Resource):

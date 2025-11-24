@@ -14,7 +14,7 @@ from app.models import (
     CheckpointGroupLink,
     TeamGroup,
 )
-from app.utils.rest_auth import json_login_required, json_roles_required
+from app.utils.rest_auth import json_roles_required
 
 
 def _serialize_group(group: CheckpointGroup, include_checkpoints: bool = True) -> dict:
@@ -68,8 +68,6 @@ def _sync_group_checkpoints(group: CheckpointGroup, ordered_ids: List[int]) -> N
 
 
 class GroupListResource(Resource):
-    method_decorators = [json_login_required]
-
     def get(self):
         groups = (
             db.session.query(CheckpointGroup)
@@ -106,8 +104,6 @@ class GroupListResource(Resource):
 
 
 class GroupItemResource(Resource):
-    method_decorators = [json_login_required]
-
     def get(self, group_id: int):
         group = (
             db.session.query(CheckpointGroup)

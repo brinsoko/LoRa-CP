@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}LoRa Map{% endblock %}
+{% block content %}
+
+<div class="d-flex align-items-end gap-3 mb-3">
+  <div class="flex-grow-1">
+    <label class="form-label">LoRa Devices (multi-select)</label>
+    <select id="deviceSelect" class="form-select" multiple size="6">
+      {% for d in devices %}
+        <option value="{{ d.dev_num }}">{{ d.name or ("Dev " ~ d.dev_num) }}{% if d.dev_num %} (#{{ d.dev_num }}){% endif %}</option>
+      {% endfor %}
+    </select>
+    <div class="form-text">Leave none selected to show latest point per device.</div>
+  </div>
+  <div class="text-muted small">
+    Showing positions reported by devices via GPS payloads.
+  </div>
+  <div class="d-flex flex-column">
+    <label class="form-label">History</label>
+    <select id="historyLimit" class="form-select">
+      <option value="1">Latest only</option>
+      <option value="10">Last 10</option>
+      <option value="50" selected>Last 50</option>
+      <option value="100">Last 100</option>
+    </select>
+  </div>
+  <div class="form-check mt-4">
+    <input class="form-check-input" type="checkbox" id="showTrack" checked>
+    <label class="form-check-label" for="showTrack">Show track line</label>
+  </div>
+  <div class="d-flex align-items-end gap-2">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="autoRefresh">
+      <label class="form-check-label" for="autoRefresh">Auto refresh</label>
+    </div>
+    <select id="autoRefreshInterval" class="form-select">
+      <option value="5">5s</option>
+      <option value="15" selected>15s</option>
+      <option value="30">30s</option>
+      <option value="60">60s</option>
+    </select>
+    <button id="refreshBtn" class="btn btn-outline-secondary">Refresh</button>
+  </div>
+  
+</div>
+
+<div id="map" style="height: 70vh; width: 100%; border-radius: 12px; overflow: hidden;"></div>
+
+<div class="mt-2" id="legend" style="display:flex; flex-wrap: wrap; gap: 8px;"></div>
+
+<!-- Leaflet (no API key needed) -->
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""
+/>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
+<script>
+  const COLOR_POINT = "#0d6efd"; // Bootstrap primary (default)
+  const COLOR_TRACK = "#6c757d"; // secondary (default)
+
+  let map, markers = [], polylines = [];
+
+  async function getJSON(url) {
+    const r = await fetch(url, { credentials: "same-origin" });
+    if (!r.ok) throw new Error(await r.text());
+    return await r.json();
+  }
+
+  function clearMap() {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+    polylines.forEach(p => map.removeLayer(p));
+    polylines = [];
+  }
+
+  function markerColorForIndex(idx) {
+    // Distinct HSL colors
+    const hue = (idx * 47) % 360;
+    return `hsl(${hue} 80% 45%)`;
+  }
+
+  function drawSingleDevice(points, idx, showTrack) {
+    const latlngs = [];
+    const color = markerColorForIndex(idx);
+
+    points.forEach(p => {
+      const latlng = [p.lat, p.lon];
+      latlngs.push(latlng);
+      const label = `Dev ${p.dev_id}<br>${p.received_at || ''}<br>RSSI: ${p.rssi ?? '—'}, SNR: ${p.snr ?? '—'}`;
+
+      const circle = L.circleMarker(latlng, {
+        radius: 6,
+        color: color,
+        fillColor: color,
+        fillOpacity: 1,
+        weight: 1,
+      }).bindPopup(label);
+
+      circle.addTo(map);
+      markers.push(circle);
+    });
+
+    if (showTrack && points.length > 1) {
+      const line = L.polyline(points.map(p => [p.lat, p.lon]), { color: color, weight: 2, opacity: 0.8 });
+      line.addTo(map);
+      polylines.push(line);
+    }
+
+    return latlngs;
+  }
+
+  function drawPoints(points) {
+    clearMap();
+    const latlngs = [];
+    updateLegend([]); // clear legend for aggregate
+
+    // Default aggregate draw (one color)
+    points.forEach(p => {
+      const latlng = [p.lat, p.lon];
+      latlngs.push(latlng);
+      const label = `Dev ${p.dev_id}<br>${p.received_at || ''}<br>RSSI: ${p.rssi ?? '—'}, SNR: ${p.snr ?? '—'}`;
+      const circle = L.circleMarker(latlng, {
+        radius: 6,
+        color: COLOR_POINT,
+        fillColor: COLOR_POINT,
+        fillOpacity: 1,
+        weight: 1,
+      }).bindPopup(label);
+      circle.addTo(map);
+      markers.push(circle);
+    });
+
+    if (latlngs.length > 0) {
+      const bounds = L.latLngBounds(latlngs);
+      map.fitBounds(bounds.pad(0.2));
+    } else {
+      map.setView([46.05, 14.50], 10);
+    }
+  }
+
+  async function loadPoints(devId, limit) {
+    const base = "/api/map/lora-points";
+    const url = devId ? `${base}?dev_id=${encodeURIComponent(devId)}&limit=${encodeURIComponent(limit)}` : base;
+    return await getJSON(url);
+  }
+
+  function getSelectedDeviceIds() {
+    const el = document.getElementById("deviceSelect");
+    return Array.from(el.selectedOptions).map(o => o.value).filter(Boolean);
+  }
+
+  async function refresh() {
+    const selected = getSelectedDeviceIds();
+    const limit = document.getElementById("historyLimit").value || 50;
+    const showTrack = document.getElementById("showTrack").checked;
+
+    if (selected.length === 0) {
+      // Aggregate: latest point per device
+      const data = await loadPoints("", limit);
+      drawPoints(data || []);
+      return;
+    }
+
+    // Multi-device: fetch each track and render with per-device color
+    clearMap();
+    const results = await Promise.all(selected.map(id => loadPoints(id, limit)));
+    // Build legend entries based on selected list
+    const legendItems = selected.map((id, idx) => ({ id, color: markerColorForIndex(idx) }));
+    updateLegend(legendItems);
+    let allLatlngs = [];
+    results.forEach((points, idx) => {
+      const latlngs = drawSingleDevice(points || [], idx, showTrack);
+      allLatlngs = allLatlngs.concat(latlngs);
+    });
+    if (allLatlngs.length > 0) {
+      const bounds = L.latLngBounds(allLatlngs);
+      map.fitBounds(bounds.pad(0.2));
+    } else {
+      map.setView([46.05, 14.50], 10);
+    }
+  }
+
+  let refreshTimer = null;
+  function updateAutoRefresh() {
+    const enabled = document.getElementById("autoRefresh").checked;
+    const intervalSec = parseInt(document.getElementById("autoRefreshInterval").value || "15", 10);
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+    }
+    if (enabled) {
+      refreshTimer = setInterval(refresh, Math.max(3000, intervalSec * 1000));
+    }
+  }
+
+  async function init() {
+    map = L.map("map");
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    await refresh();
+
+    document.getElementById("deviceSelect").addEventListener("change", refresh);
+    document.getElementById("historyLimit").addEventListener("change", refresh);
+    document.getElementById("showTrack").addEventListener("change", refresh);
+    document.getElementById("refreshBtn").addEventListener("click", refresh);
+    document.getElementById("autoRefresh").addEventListener("change", updateAutoRefresh);
+    document.getElementById("autoRefreshInterval").addEventListener("change", updateAutoRefresh);
+    updateAutoRefresh();
+  }
+
+  function updateLegend(items) {
+    const el = document.getElementById('legend');
+    if (!el) return;
+    el.innerHTML = '';
+    if (!items || items.length === 0) {
+      const span = document.createElement('span');
+      span.className = 'text-secondary';
+      span.textContent = 'Legend: All devices (latest only)';
+      el.appendChild(span);
+      return;
+    }
+    items.forEach(({ id, color }) => {
+      const item = document.createElement('div');
+      item.style.display = 'inline-flex';
+      item.style.alignItems = 'center';
+      item.style.gap = '6px';
+      const swatch = document.createElement('span');
+      swatch.style.display = 'inline-block';
+      swatch.style.width = '14px';
+      swatch.style.height = '14px';
+      swatch.style.borderRadius = '3px';
+      swatch.style.background = color;
+      const label = document.createElement('span');
+      label.textContent = `Dev ${id}`;
+      item.appendChild(swatch);
+      item.appendChild(label);
+      el.appendChild(item);
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+</script>
+
+{% endblock %}

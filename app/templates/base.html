@@ -57,9 +57,7 @@
           <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-outline-primary">Login</a>
         {% endif %}
         {% if current_user.is_authenticated and current_user.role == 'admin' %}
-          <a href="{{ url_for('auth.register') }}" class="btn btn-sm btn-outline-success">
-            Create User
-          </a>
+          <a href="{{ url_for('auth.register') }}" class="btn btn-sm btn-outline-success">Create User</a>
         {% endif %}
         {% if current_user.is_authenticated and current_user.role == 'admin' %}
           <li class="nav-item">
@@ -110,6 +108,7 @@
 
       {% endif %}
       <a href="{{ url_for('maps.index') }}" class="btn btn-outline-primary">Map</a>
+      <a href="{{ url_for('maps.lora_map') }}" class="btn btn-outline-primary">LoRa Map</a>
     {% endif %}
     
   </div>

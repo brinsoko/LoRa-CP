@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models import (
     LoRaMessage, RFIDCard, Team, Checkpoint, Checkin, LoRaDevice
 )
+from app.utils.payloads import parse_gps_payload
 
 def resolve_checkpoint_for_dev(dev_num: int) -> Checkpoint:
     device = LoRaDevice.query.filter_by(dev_num=dev_num).first()
@@ -46,21 +47,48 @@ def resolve_checkpoint_for_dev(dev_num: int) -> Checkpoint:
 
 _parser = reqparse.RequestParser(bundle_errors=True)
 _parser.add_argument("dev_id", type=int, required=True, help="dev_id is required (int).")
-_parser.add_argument("payload", type=str, required=True, help="payload is required (string).")
+_parser.add_argument("payload", type=str, required=False)  # optional if gps_* provided
 _parser.add_argument("rssi", type=float)
 _parser.add_argument("snr", type=float)
 _parser.add_argument("ts", type=int)  # unix seconds
+
+# Optional GPS fields (allow posting structured GPS instead of string payload)
+_parser.add_argument("gps_lat", type=float)
+_parser.add_argument("gps_lon", type=float)
+_parser.add_argument("gps_alt", type=float)
+_parser.add_argument("gps_age_ms", type=int)
 
 class IngestResource(Resource):
     def post(self):
         args = _parser.parse_args()  # supports JSON and form bodies
         dev_id  = args["dev_id"]
-        payload = args["payload"]
+        payload = args.get("payload")
         rssi    = args.get("rssi")
         snr     = args.get("snr")
         ts_unix = args.get("ts")
+        gps_lat = args.get("gps_lat")
+        gps_lon = args.get("gps_lon")
+        gps_alt = args.get("gps_alt")
+        gps_age = args.get("gps_age_ms")
 
         received_at = datetime.utcfromtimestamp(ts_unix) if ts_unix else datetime.utcnow()
+
+        # Accept either a raw payload string or structured GPS fields.
+        if (payload is None or str(payload).strip() == "") and (gps_lat is not None and gps_lon is not None):
+            # Normalize: create the same payload format sent by device firmware
+            # pos,<lat>,<lon>,<alt>,<age_ms>
+            lat = float(gps_lat)
+            lon = float(gps_lon)
+            alt = float(gps_alt) if gps_alt is not None else 0.0
+            age = int(gps_age) if gps_age is not None else 0
+            payload = f"pos,{lat:.6f},{lon:.6f},{alt:.1f},{age}"
+        
+        if payload is None or str(payload).strip() == "":
+            return {
+                "ok": False,
+                "error": "invalid_request",
+                "detail": "Provide either 'payload' or ('gps_lat' and 'gps_lon').",
+            }, 400
 
         try:
             # 1) Store raw message
@@ -124,5 +152,11 @@ class IngestResource(Resource):
             "checkpoint": checkpoint_name,
             "checkin_created": created_checkin,
         }
+
+        # Optional: include structured GPS if payload matches expected format
+        gps = parse_gps_payload(msg.payload)
+        if gps is not None:
+            resp["gps"] = gps
+
         headers = {"Location": f"/api/messages/{msg.id}"}  # optional future resource
         return resp, 201, headers

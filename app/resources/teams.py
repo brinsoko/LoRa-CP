@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import Team, TeamGroup, CheckpointGroup
-from app.utils.rest_auth import json_login_required, json_roles_required
+from app.utils.rest_auth import json_roles_required
 
 
 def _serialize_team(team: Team) -> dict:
@@ -87,7 +87,6 @@ def _apply_group_assignment(team: Team, selected_group_id: Optional[int]) -> tup
 
 
 class TeamListResource(Resource):
-    method_decorators = [json_login_required]
 
     def get(self):
         """
@@ -138,6 +137,7 @@ class TeamListResource(Resource):
             },
         }, 200
 
+    @json_roles_required("judge", "admin")
     @json_roles_required("judge", "admin")
     def post(self):
         payload = request.get_json(silent=True) or {}
@@ -192,8 +192,6 @@ class TeamListResource(Resource):
 
 
 class TeamItemResource(Resource):
-    method_decorators = [json_login_required]
-
     def get(self, team_id: int):
         team = (
             Team.query
