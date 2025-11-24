@@ -10,6 +10,11 @@
       </div>
 
       <div class="mb-3">
+        <label class="form-label">Rod / Org</label>
+        <input name="organization" class="form-control" value="{{ team.organization or '' }}" placeholder="e.g. mGG / local org">
+      </div>
+
+      <div class="mb-3">
         <label class="form-label">Number</label>
         <input type="number" name="number" class="form-control" value="{{ team.number if team.number is not none }}">
       </div>

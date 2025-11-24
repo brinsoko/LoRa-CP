@@ -103,6 +103,13 @@
               "null"
             ]
           },
+          "organization": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Rod / organization the team belongs to"
+          },
           "groups": {
             "type": "array",
             "items": {
@@ -840,6 +847,10 @@
                 "properties": {
                   "name": {
                     "type": "string"
+                  },
+                  "organization": {
+                    "type": "string",
+                    "description": "Rod / organization the team belongs to"
                   },
                   "number": {
                     "type": "integer"

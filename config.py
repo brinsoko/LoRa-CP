@@ -13,3 +13,9 @@ class Config:
     SERIAL_BAUDRATE = int(os.environ.get("SERIAL_BAUDRATE", "9600"))
     SERIAL_HINT = os.environ.get("SERIAL_HINT", "")
     SERIAL_TIMEOUT = float(os.environ.get("SERIAL_TIMEOUT", "8.0"))
+
+    # Google Sheets / service account
+    GOOGLE_SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")
+    GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")  # optional: raw JSON string
+    GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
+    GOOGLE_SHEETS_TEAMS_SHEET = os.getenv("GOOGLE_SHEETS_TEAMS_SHEET", "Teams")

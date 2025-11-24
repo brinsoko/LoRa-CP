@@ -19,6 +19,7 @@ def _serialize_team(team: Team) -> dict:
         "id": team.id,
         "name": team.name,
         "number": team.number,
+        "organization": team.organization,
         "groups": [
             {
                 "id": tg.group_id,
@@ -109,6 +110,7 @@ class TeamListResource(Resource):
             query = query.filter(
                 or_(
                     Team.name.ilike(like),
+                    Team.organization.ilike(like),
                     Team.number.cast(db.String).ilike(like),
                 )
             )
@@ -143,10 +145,11 @@ class TeamListResource(Resource):
         payload = request.get_json(silent=True) or {}
         name = (payload.get("name") or "").strip()
         number = payload.get("number", None)
+        org = (payload.get("organization") or "").strip() or None
         if not name:
             return {"error": "validation_error", "detail": "name is required"}, 400
 
-        team = Team(name=name)
+        team = Team(name=name, organization=org)
         if number is not None:
             try:
                 team.number = int(number)
@@ -236,6 +239,10 @@ class TeamItemResource(Resource):
                     team.number = int(number)
                 except Exception:
                     return {"error": "validation_error", "detail": "number must be integer"}, 400
+
+        if "organization" in payload or not partial:
+            org = (payload.get("organization") or "").strip()
+            team.organization = org or None
 
         change_group = False
         selected_group_id: Optional[int] = None

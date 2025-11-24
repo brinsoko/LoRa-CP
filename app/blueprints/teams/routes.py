@@ -66,6 +66,7 @@ def add_team():
         name = (request.form.get("name") or "").strip()
         number_raw = request.form.get("number")
         number = int(number_raw) if number_raw else None
+        organization = (request.form.get("organization") or "").strip() or None
         selected_group_id = request.form.get("group_id", type=int)
 
         if not name:
@@ -78,6 +79,7 @@ def add_team():
             json={
                 "name": name,
                 "number": number,
+                "organization": organization,
                 "group_id": selected_group_id,
             },
         )
@@ -110,12 +112,14 @@ def edit_team(team_id: int):
         name = (request.form.get("name") or "").strip()
         number_raw = request.form.get("number")
         number = int(number_raw) if number_raw else None
+        organization = (request.form.get("organization") or "").strip() or None
         selected_group_id = request.form.get("group_id", type=int)
 
         if not name:
             flash("Team name is required.", "warning")
             team["name"] = name
             team["number"] = number
+            team["organization"] = organization
             return render_template(
                 "team_edit.html",
                 team=team,
@@ -126,7 +130,12 @@ def edit_team(team_id: int):
         resp, payload = api_json(
             "PATCH",
             f"/api/teams/{team_id}",
-            json={"name": name, "number": number, "group_id": selected_group_id},
+            json={
+                "name": name,
+                "number": number,
+                "organization": organization,
+                "group_id": selected_group_id,
+            },
         )
 
         if resp.status_code == 200:

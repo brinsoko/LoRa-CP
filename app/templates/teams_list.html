@@ -52,6 +52,7 @@
         <tr>
           <th style="width:60px;">#</th>
           <th>Name</th>
+          <th>Rod / Org</th>
           <th style="width:120px;">Number</th>
           <th>Groups</th>
           {% if has_role('judge','admin') %}
@@ -64,6 +65,7 @@
           <tr>
             <td>{{ loop.index }}</td>
             <td>{{ team.name }}</td>
+            <td>{{ team.organization or "—" }}</td>
             <td>{{ team.number or "—" }}</td>
 
             <td>

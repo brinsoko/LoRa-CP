@@ -82,13 +82,16 @@ db-reset:
 	@echo "!!! DANGER: Dropping and recreating ALL tables !!!"
 	@read -p "Type 'yes' to continue: " ans; \
 	if [ "$$ans" = "yes" ]; then \
-		$(PYTHON) - <<'PY'; \
-from app import create_app; from app.extensions import db; \
-app=create_app(); \
-with app.app_context(): \
-    db.drop_all(); db.create_all(); \
-print("Done."); \
-PY \
+		$(PYTHON) - <<-PY
+		from app import create_app
+		from app.extensions import db
+
+		app = create_app()
+		with app.app_context():
+		    db.drop_all()
+		    db.create_all()
+		print("Done.")
+		PY
 	else echo "Cancelled."; fi
 
 # --- Docker compose helpers ---

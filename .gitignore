@@ -21,3 +21,7 @@ env/
 .DS_Store
 Thumbs.db
 ESP_TEST/
+
+#
+2025_data/
+google_sa.json
