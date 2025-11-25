@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Sheets Admin{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Google Sheets (admin)</h4>
+</div>
+
+<div class="row g-3">
+  <div class="col-12">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title">Add checkpoint tab</h5>
+        <form method="post" action="{{ url_for('sheets_admin.add_tab') }}">
+          <div class="mb-3">
+            <label class="form-label">Spreadsheet ID</label>
+            <input class="form-control" name="spreadsheet_id" placeholder="Existing spreadsheet ID">
+            <div class="form-text">Use an existing scoring sheet (ID is visible in the URL).</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Tab title</label>
+            <input class="form-control" name="tab_title" placeholder="Checkpoint tab (e.g., Časovnica)">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Checkpoint (optional)</label>
+            <select class="form-select" name="checkpoint_id">
+              <option value="">— none —</option>
+              {% for cp in checkpoints %}
+                <option value="{{ cp.id }}">{{ cp.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Groups & fields</label>
+            <textarea class="form-control" rows="4" name="groups_raw" placeholder="GroupName|field1,field2&#10;sGG|&#10;PP|custom1,custom2"></textarea>
+            <div class="form-text">One line per group. Format: <code>GroupName|field1,field2</code>. Fields are optional.</div>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Arrived header</label>
+              <input class="form-control" name="arrived_header" value="prihod na KT">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Points header</label>
+              <input class="form-control" name="points_header" value="Točke">
+            </div>
+          </div>
+
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="dead_time" name="dead_time" value="1" checked>
+            <label class="form-check-label" for="dead_time">Include dead time column</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Dead time header</label>
+            <input class="form-control" name="dead_time_header" value="Mrtvi čas [min]">
+          </div>
+
+          <button class="btn btn-success" type="submit">Add tab</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-body">
+    <h5 class="card-title">Build arrivals / teams / total score</h5>
+    <form method="post" action="{{ url_for('sheets_admin.build_arrivals') }}" class="row g-2 mb-2">
+      <div class="col-md-5">
+        <label class="form-label">Spreadsheet ID</label>
+        <input class="form-control" name="spreadsheet_id" placeholder="Spreadsheet ID">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Arrivals tab name</label>
+        <input class="form-control" name="tab_name" value="Prihodi">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-outline-primary w-100" type="submit">Build / Refresh</button>
+      </div>
+      <div class="col-12">
+        <small class="text-muted">Builds a matrix of groups vs checkpoint tabs, with formulas referencing each tab's arrival column.</small>
+      </div>
+    </form>
+    <form method="post" action="{{ url_for('sheets_admin.build_teams') }}" class="row g-2 mb-2">
+      <div class="col-md-5">
+        <label class="form-label">Spreadsheet ID</label>
+        <input class="form-control" name="spreadsheet_id" placeholder="Spreadsheet ID">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Teams tab name</label>
+        <input class="form-control" name="tab_name" value="Ekipe">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-outline-primary w-100" type="submit">Build / Refresh</button>
+      </div>
+    </form>
+    <form method="post" action="{{ url_for('sheets_admin.build_score') }}" class="row g-2">
+      <div class="col-md-5">
+        <label class="form-label">Spreadsheet ID</label>
+        <input class="form-control" name="spreadsheet_id" placeholder="Spreadsheet ID">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Score tab name</label>
+        <input class="form-control" name="tab_name" value="Skupni seštevek">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-outline-success w-100" type="submit">Build / Refresh</button>
+      </div>
+    </form>
+    <hr>
+    <h6 class="mt-3">Wizard: create tabs for all checkpoints</h6>
+    <form method="post" action="{{ url_for('sheets_admin.wizard_checkpoints') }}" class="row g-2">
+      <div class="col-md-4">
+        <label class="form-label">Spreadsheet ID</label>
+        <input class="form-control" name="spreadsheet_id" placeholder="Spreadsheet ID">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Arrived header</label>
+        <input class="form-control" name="arrived_header" value="prihod na KT">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Points header</label>
+        <input class="form-control" name="points_header" value="Točke">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Group order (comma-separated)</label>
+        <input class="form-control" name="group_order" placeholder="mGG,sGG,PP,RR+">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Dead time header</label>
+        <input class="form-control" name="dead_time_header" value="Mrtvi čas [min]">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="dead_time_w" name="dead_time" value="1" checked>
+          <label class="form-check-label" for="dead_time_w">Include dead time</label>
+        </div>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-outline-dark w-100" type="submit">Run wizard</button>
+      </div>
+      <div class="col-12 mt-3">
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Checkpoint</th>
+                <th>Group order (comma list)</th>
+                <th>Extra headers (comma list)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cp in checkpoints %}
+                <tr>
+                  <td>{{ cp.name }}</td>
+                  <td><input class="form-control form-control-sm" name="group_order_cp_{{ cp.id }}" placeholder="e.g. mGG,sGG,PP"></td>
+                  <td><input class="form-control form-control-sm" name="extra_fields_cp_{{ cp.id }}" placeholder="e.g. Čas starta,Čas cilja"></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-body">
+    <h5 class="card-title">Existing sheet configs</h5>
+    {% if configs %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Spreadsheet</th>
+              <th>Tab</th>
+              <th>Type</th>
+              <th>Checkpoint</th>
+              <th>Actions</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in configs %}
+              <tr>
+                <td>{{ c.id }}</td>
+                <td><code>{{ c.spreadsheet_name }}</code><br><small class="text-muted">{{ c.spreadsheet_id }}</small></td>
+                <td>{{ c.tab_name }}</td>
+                <td>{{ c.tab_type }}</td>
+                <td>{{ c.checkpoint.name if c.checkpoint else "—" }}</td>
+                <td>
+                  {% if c.config and c.config.get("groups") %}
+                    <form method="post" action="{{ url_for('sheets_admin.sync_team_numbers', config_id=c.id) }}">
+                      <button class="btn btn-sm btn-outline-primary" type="submit">Sync team numbers</button>
+                    </form>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td>{{ c.created_at }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted">No sheet configs yet.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
