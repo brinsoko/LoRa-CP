@@ -62,37 +62,46 @@ admin:
 erd:
 	$(PYTHON) scripts/render_erd.py
 
-# --- Flask-Migrate (if enabled in your app factory) ---
-# Usage: make db-migrate msg="add lora device"
-.PHONY: db-init db-migrate db-upgrade db-downgrade
+# --- Database helpers ---
+#   make db-init           # create tables if they do not exist
+#   make db-reset          # DROP and recreate ALL tables (prompts)
+#   make db-migrate msg=.. # autogenerate migration
+#   make db-upgrade        # apply migrations
+#   make db-downgrade n=1  # rollback n steps
+.PHONY: db-init db-migrate db-upgrade db-downgrade db-reset
+
 db-init:
-	$(FLASK) db init
+	@echo "Creating tables (no drop)..."
+	@printf '%s\n' "from app import create_app" \
+	               "from app.extensions import db" \
+	               "" \
+	               "app = create_app()" \
+	               "with app.app_context():" \
+	               "    db.create_all()" \
+	               "print('Done.')" | $(PYTHON) -
+
 db-migrate:
 	@test "$(msg)" != "" || (echo "Set msg=\"your message\"" && exit 2)
 	$(FLASK) db migrate -m "$(msg)"
+
 db-upgrade:
 	$(FLASK) db upgrade
+
 db-downgrade:
 	$(FLASK) db downgrade -n $(n)
 
-# --- NO-MIGRATIONS emergency reset (uses SQLAlchemy directly) ---
-# DANGER: drops and recreates ALL tables
-.PHONY: db-reset
 db-reset:
 	@echo "!!! DANGER: Dropping and recreating ALL tables !!!"
-	@read -p "Type 'yes' to continue: " ans; \
-	if [ "$$ans" = "yes" ]; then \
-		$(PYTHON) - <<-PY
-		from app import create_app
-		from app.extensions import db
-
-		app = create_app()
-		with app.app_context():
-		    db.drop_all()
-		    db.create_all()
-		print("Done.")
-		PY
-	else echo "Cancelled."; fi
+	@read -p "Type 'yes' to continue: " ans; if [ "$$ans" = "yes" ]; then \
+		printf '%s\n' "from app import create_app" \
+		               "from app.extensions import db" \
+		               "" \
+		               "app = create_app()" \
+		               "with app.app_context():" \
+		               "    db.drop_all()" \
+		               "    db.create_all()" \
+		               "print('Done.')" | $(PYTHON) - ; \
+		else echo "Cancelled."; fi
 
 # --- Docker compose helpers ---
 .PHONY: build up down logs sh

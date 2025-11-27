@@ -62,7 +62,6 @@
         {% if current_user.is_authenticated and current_user.role == 'admin' %}
           <li class="nav-item">
             <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">Users</a>
-          </li>
         {% endif %}
 
         <!-- THEME TOGGLE -->
@@ -109,6 +108,7 @@
       {% endif %}
       <a href="{{ url_for('maps.index') }}" class="btn btn-outline-primary">Map</a>
       <a href="{{ url_for('maps.lora_map') }}" class="btn btn-outline-primary">LoRa Map</a>
+      <a href="{{ url_for('sheets_admin.list_sheets') }}" class="btn btn-outline-secondary">Sheets</a>
     {% endif %}
     
   </div>
@@ -160,6 +160,8 @@
       });
     })();
   </script>
+
+  {% block scripts %}{% endblock %}
 </body>
 
 

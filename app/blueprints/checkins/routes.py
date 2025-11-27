@@ -44,11 +44,8 @@ def _parse_timestamp_from_form(fallback: datetime | None = None) -> datetime:
     except ValueError:
         return default_dt
 
-    if not tz_name:
-        return local_dt
-
     try:
-        tz = ZoneInfo(tz_name)
+        tz = ZoneInfo(tz_name) if tz_name else DEFAULT_TIMEZONE
     except Exception:
         tz = DEFAULT_TIMEZONE
 

@@ -67,6 +67,7 @@ def create_app() -> Flask:
     from app.blueprints.messages.routes import messages_bp
     from app.blueprints.docs.routes import docs_bp
     from app.blueprints.users.routes import users_bp
+    from app.blueprints.sheets.routes import sheets_bp
 
     app.register_blueprint(users_bp, url_prefix="/users")
     app.register_blueprint(docs_bp, url_prefix="/docs")
@@ -80,6 +81,7 @@ def create_app() -> Flask:
     app.register_blueprint(checkpoints_bp,  url_prefix="/checkpoints")
     app.register_blueprint(checkins_bp,     url_prefix="/checkins")
     app.register_blueprint(rfid_bp,         url_prefix="/rfid")
+    app.register_blueprint(sheets_bp,       url_prefix="/sheets")
 
     with app.app_context():
         db.create_all()

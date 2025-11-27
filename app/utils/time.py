@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 DEFAULT_TZ = ZoneInfo("Europe/Ljubljana")
@@ -6,7 +6,10 @@ DEFAULT_TZ = ZoneInfo("Europe/Ljubljana")
 def to_datetime_local(dt: datetime, tz: ZoneInfo = DEFAULT_TZ) -> str:
     if not dt:
         return ""
-    local_dt = dt.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
+    # If naive, assume UTC (DB stores UTC)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    local_dt = dt.astimezone(tz)
     return local_dt.strftime("%d-%m-%Y %H:%M:%S")
 
 def from_datetime_local(s: str | None, tz_name: str | None = None) -> datetime | None:

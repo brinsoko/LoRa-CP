@@ -1,7 +1,9 @@
 # app/blueprints/checkpoints/routes.py
 from __future__ import annotations
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+import json
+
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
@@ -180,6 +182,79 @@ def delete_checkpoint(cp_id: int):
 @checkpoints_bp.route("/import_json", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def import_checkpoints_json():
-    # TODO: reimplement using API if bulk import endpoint becomes available
-    flash("JSON import via UI is temporarily disabled; use the API directly.", "warning")
+    if request.method == "GET":
+        sample_array = {
+            "items": [
+                {"name": "CP-01", "description": "Start", "easting": 123.45, "northing": 456.78},
+                {"name": "CP-02", "location": "Forest edge"},
+            ]
+        }
+        sample_cps = {
+            "cp_size": 0.003,
+            "cps": [
+                {"e": 451226, "n": 66954, "name": ""},
+                {"e": 450952.33, "n": 66900.33, "name": "B"},
+            ],
+            "bounds": [448002, 63545, 452542, 70208],
+        }
+        return render_template("checkpoints_import_json.html", sample=sample_array, sample_cps=sample_cps)
+
+    upload = request.files.get("file")
+    payload_text = ""
+    if upload and upload.filename:
+        try:
+            payload_text = upload.read().decode("utf-8")
+        except Exception:
+            payload_text = ""
+    if not payload_text:
+        payload_text = (request.form.get("payload") or "").strip()
+    if not payload_text:
+        flash("Paste JSON payload to import.", "warning")
+        return redirect(url_for("checkpoints.import_checkpoints_json"))
+
+    try:
+        parsed = json.loads(payload_text)
+    except Exception as exc:
+        flash(f"Invalid JSON: {exc}", "warning")
+        return redirect(url_for("checkpoints.import_checkpoints_json"))
+
+    items = None
+    if isinstance(parsed, list):
+        items = parsed
+    elif isinstance(parsed, dict) and "items" in parsed:
+        items = parsed.get("items")
+    elif isinstance(parsed, dict) and "cps" in parsed:
+        cps = parsed.get("cps") or []
+        converted = []
+        for idx, cp in enumerate(cps):
+            if not isinstance(cp, dict):
+                continue
+            e = cp.get("e")
+            n = cp.get("n")
+            if e is None or n is None:
+                continue
+            name = (cp.get("name") or "").strip() or f"CP-{idx+1}"
+            converted.append({"name": name, "easting": e, "northing": n})
+        items = converted
+
+    if not items:
+        flash("JSON must be an array of checkpoints, an object with 'items', or an object with 'cps' list.", "warning")
+        return redirect(url_for("checkpoints.import_checkpoints_json"))
+
+    resp, payload = api_json("POST", "/api/checkpoints/import", json={"items": items})
+    if resp.status_code != 200:
+        detail = payload.get("detail") or payload.get("error") or "Import failed."
+        flash(f"Import failed: {detail}", "warning")
+        return redirect(url_for("checkpoints.import_checkpoints_json"))
+
+    summary = payload.get("summary") or {}
+    errors = payload.get("errors") or []
+    flash(
+        f"Imported checkpoints: created {summary.get('created',0)}, updated {summary.get('updated',0)}, skipped {summary.get('skipped',0)}.",
+        "success",
+    )
+    if errors:
+        flash(f"{len(errors)} row(s) reported errors; see logs.", "warning")
+        current_app.logger.warning("Checkpoint import errors: %s", errors)
+
     return redirect(url_for("checkpoints.list_checkpoints"))

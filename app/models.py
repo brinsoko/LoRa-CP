@@ -273,6 +273,28 @@ class LoRaMessage(db.Model):
     received_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
 
+# =========================
+# Google Sheets config
+# =========================
+class SheetConfig(db.Model):
+    __tablename__ = "sheet_configs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    spreadsheet_id = db.Column(db.String(128), nullable=False, index=True)
+    spreadsheet_name = db.Column(db.String(200), nullable=False)
+    tab_name = db.Column(db.String(200), nullable=False)
+    tab_type = db.Column(db.String(50), nullable=False, default="checkpoint")  # root|teams|arrivals|total|checkpoint
+    checkpoint_id = db.Column(db.Integer, db.ForeignKey("checkpoints.id", ondelete="SET NULL"), nullable=True)
+    config = db.Column(db.JSON, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    checkpoint = db.relationship("Checkpoint")
+
+    __table_args__ = (
+        UniqueConstraint("spreadsheet_id", "tab_name", name="uq_sheet_tab"),
+    )
+
+
 def _assign_checkpoint_link_position(link: CheckpointGroupLink) -> None:
     if link.position is not None:
         return

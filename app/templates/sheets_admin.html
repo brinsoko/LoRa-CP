@@ -5,17 +5,252 @@
   <h4 class="mb-0">Google Sheets (admin)</h4>
 </div>
 
+<div class="card mt-3">
+  <div class="card-body">
+    <h5 class="card-title">Build arrivals / teams / total score</h5>
+    <div class="mb-3">
+      <h6 class="fw-semibold">Language pack</h6>
+      <form method="post" action="{{ url_for('sheets_admin.save_lang_settings') }}" class="row g-2 mb-3">
+        <div class="col-md-3">
+          <label class="form-label">Arrived header</label>
+          <input class="form-control" name="arrived_header" value="{{ lang.arrived_header if lang else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Points header</label>
+          <input class="form-control" name="points_header" value="{{ lang.points_header if lang else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Dead time header</label>
+          <input class="form-control" name="dead_time_header" value="{{ lang.dead_time_header if lang else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Time header</label>
+          <input class="form-control" name="time_header" value="{{ lang.time_header if lang else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Teams tab</label>
+          <input class="form-control" name="teams_tab" value="{{ lang.teams_tab if lang else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Arrivals tab</label>
+          <input class="form-control" name="arrivals_tab" value="{{ lang.arrivals_tab if lang else '' }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Score tab</label>
+          <input class="form-control" name="score_tab" value="{{ lang.score_tab if lang else '' }}">
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button class="btn btn-outline-primary w-100" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Spreadsheet ID</label>
+      <input class="form-control" id="global_spreadsheet_id" placeholder="Spreadsheet ID (used below)">
+    </div>
+    <button class="btn btn-sm btn-outline-secondary mb-2" type="button" id="toggle-ordering">Show ordering ▼</button>
+    <div id="ordering-panel" class="d-none">
+      <label class="form-label">Global group order</label>
+      <input type="hidden" name="group_order" id="group_order_input" class="group-order-target">
+      <ul class="list-group mb-2" id="group_order_list">
+        {% for g in groups %}
+          <li class="list-group-item d-flex align-items-center justify-content-between py-2 drag-handle">
+            <span class="fw-semibold me-2">::</span>
+            <span class="flex-grow-1">{{ g.name }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+      <div class="form-text mb-3">Drag to reorder. This order applies to all checkpoint tabs.</div>
+
+      <label class="form-label">Global checkpoint order</label>
+      <input type="hidden" name="checkpoint_order" id="checkpoint_order_input" class="checkpoint-order-target">
+      <ul class="list-group mb-2" id="checkpoint_order_list">
+        {% for cp in checkpoints %}
+          <li class="list-group-item d-flex align-items-center justify-content-between py-2 drag-handle">
+            <span class="fw-semibold me-2">::</span>
+            <span class="flex-grow-1">{{ cp.name }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+      <div class="form-text mb-3">Drag to reorder checkpoint columns.</div>
+
+      <label class="form-label">Per-group checkpoint order (drag within each group)</label>
+      <input type="hidden" name="per_group_cp_order" id="per_group_cp_order_input" class="per-group-order-target">
+      <div id="per_group_cp_order_lists" class="mb-3">
+        {% for g in groups %}
+          <div class="mb-2 border rounded p-2">
+            <div class="d-flex align-items-center mb-1">
+              <span class="fw-semibold me-2">{{ g.name }}</span>
+              <small class="text-muted">Drag to reorder; uncheck to exclude a checkpoint for this group.</small>
+            </div>
+            <ul class="list-group list-group-sm per-group-list" data-group="{{ g.name }}">
+              {% set ordered_links = g.checkpoint_links|sort(attribute='position') %}
+              {% set linked_cp_names = ordered_links
+                | selectattr('checkpoint', 'ne', None)
+                | map(attribute='checkpoint.name')
+                | list %}
+              {% for link in ordered_links %}
+                {% if link.checkpoint %}
+                  <li class="list-group-item d-flex align-items-center justify-content-between py-1 drag-handle">
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="fw-semibold">::</span>
+                      <span class="flex-grow-1">{{ link.checkpoint.name }}</span>
+                    </div>
+                    <div class="form-check m-0">
+                      <input class="form-check-input cp-include" type="checkbox" value="{{ link.checkpoint.name }}" checked>
+                    </div>
+                  </li>
+                {% endif %}
+              {% endfor %}
+              {% for cp in checkpoints %}
+                {% if cp.name not in linked_cp_names %}
+                  <li class="list-group-item d-flex align-items-center justify-content-between py-1 drag-handle">
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="fw-semibold">::</span>
+                      <span class="flex-grow-1">{{ cp.name }}</span>
+                    </div>
+                    <div class="form-check m-0">
+                      <input class="form-check-input cp-include" type="checkbox" value="{{ cp.name }}">
+                    </div>
+                  </li>
+                {% endif %}
+              {% endfor %}
+            </ul>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    <hr>
+    <h6 class="mt-3">Wizard: create tabs for all checkpoints</h6>
+    <form method="post" action="{{ url_for('sheets_admin.wizard_checkpoints') }}" class="row g-2">
+      <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
+      <input type="hidden" name="group_order" class="group-order-target">
+      <input type="hidden" name="checkpoint_order" class="checkpoint-order-target">
+      <input type="hidden" name="per_group_cp_order" class="per-group-order-target">
+      <div class="col-md-3">
+        <label class="form-label">Arrived header</label>
+        <input class="form-control" name="arrived_header" value="{{ lang.arrived_header if lang else 'prihod na KT' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Points header</label>
+        <input class="form-control" name="points_header" value="{{ lang.points_header if lang else 'Točke' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Dead time header</label>
+        <input class="form-control" name="dead_time_header" value="{{ lang.dead_time_header if lang else 'Mrtvi čas [min]' }}">
+      </div>
+      <div class="col-12 mt-3">
+        <div class="table-responsive mt-3">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th style="width: 60px;">Create</th>
+                <th style="width: 180px;">Checkpoint</th>
+                <th style="width: 90px;">Dead time?</th>
+                <th style="width: 110px;">Record time?</th>
+                <th>Extra headers (comma list)</th>
+                <th>Groups</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cp in checkpoints %}
+                <tr>
+                  <td class="text-center">
+                    <input class="form-check-input" type="checkbox" name="create_cp_{{ cp.id }}" value="1" checked>
+                  </td>
+                  <td>
+                    <input class="form-control form-control-sm" name="tab_name_cp_{{ cp.id }}" placeholder="{{ cp.name }}">
+                  </td>
+                  <td class="text-center">
+                    <input class="form-check-input" type="checkbox" name="dead_time_cp_{{ cp.id }}" value="1" checked>
+                  </td>
+                  <td class="text-center">
+                    <input class="form-check-input" type="checkbox" name="record_time_cp_{{ cp.id }}" value="1">
+                  </td>
+                  <td><input class="form-control form-control-sm" name="extra_fields_cp_{{ cp.id }}" placeholder="e.g. Čas starta,Čas cilja"></td>
+                  <td>
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for g in groups %}
+                        <div class="form-check form-check-inline">
+                          <input class="form-check-input" type="checkbox"
+                                 id="cp{{ cp.id }}_g{{ g.id }}"
+                                 name="group_ids_cp_{{ cp.id }}"
+                                 value="{{ g.id }}"
+                                 {% if g in cp.groups %}checked{% endif %}>
+                          <label class="form-check-label" for="cp{{ cp.id }}_g{{ g.id }}">{{ g.name }}</label>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="col-12 mt-3 d-flex justify-content-end">
+        <button class="btn btn-outline-danger" type="submit">Run wizard</button>
+      </div>
+    </form>
+    <hr>
+    <form method="post" action="{{ url_for('sheets_admin.build_arrivals') }}" class="row g-2 mb-2">
+      <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
+      <input type="hidden" name="group_order" class="group-order-target">
+      <input type="hidden" name="checkpoint_order" class="checkpoint-order-target">
+      <input type="hidden" name="per_group_cp_order" class="per-group-order-target">
+      <div class="col-md-3">
+        <label class="form-label">Arrivals tab name</label>
+        <input class="form-control" name="tab_name" value="{{ lang.arrivals_tab if lang else 'Prihodi' }}">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-outline-primary w-100" type="submit">Build / Refresh</button>
+      </div>
+    </form>
+    <form method="post" action="{{ url_for('sheets_admin.build_teams') }}" class="row g-2 mb-2">
+      <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
+      <input type="hidden" name="group_order" class="group-order-target">
+      <div class="col-md-3">
+        <label class="form-label">Teams tab name</label>
+        <input class="form-control" name="tab_name" value="{{ lang.teams_tab if lang else 'Ekipe' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Teams headers (comma)</label>
+        <input class="form-control" name="teams_headers" placeholder="Številka,Ime ekipe,Rod/Org,Skupne točke">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-outline-primary w-100" type="submit">Build / Refresh</button>
+      </div>
+    </form>
+    <form method="post" action="{{ url_for('sheets_admin.build_score') }}" class="row g-2">
+      <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
+      <input type="hidden" name="group_order" class="group-order-target">
+      <input type="hidden" name="checkpoint_order" class="checkpoint-order-target">
+      <input type="hidden" name="per_group_cp_order" class="per-group-order-target">
+      <div class="col-md-3">
+        <label class="form-label">Score tab name</label>
+        <input class="form-control" name="tab_name" value="{{ lang.score_tab if lang else 'Skupni seštevek' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Include dead time sum</label>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="include_dead_time_sum" value="1" checked>
+          <label class="form-check-label">Add dead time sum column</label>
+        </div>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-outline-primary w-100" type="submit">Build / Refresh</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="row g-3">
   <div class="col-12">
     <div class="card h-100">
       <div class="card-body">
         <h5 class="card-title">Add checkpoint tab</h5>
         <form method="post" action="{{ url_for('sheets_admin.add_tab') }}">
-          <div class="mb-3">
-            <label class="form-label">Spreadsheet ID</label>
-            <input class="form-control" name="spreadsheet_id" placeholder="Existing spreadsheet ID">
-            <div class="form-text">Use an existing scoring sheet (ID is visible in the URL).</div>
-          </div>
+          <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
 
           <div class="mb-3">
             <label class="form-label">Tab title</label>
@@ -67,112 +302,12 @@
 
 <div class="card mt-3">
   <div class="card-body">
-    <h5 class="card-title">Build arrivals / teams / total score</h5>
-    <form method="post" action="{{ url_for('sheets_admin.build_arrivals') }}" class="row g-2 mb-2">
-      <div class="col-md-5">
-        <label class="form-label">Spreadsheet ID</label>
-        <input class="form-control" name="spreadsheet_id" placeholder="Spreadsheet ID">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Arrivals tab name</label>
-        <input class="form-control" name="tab_name" value="Prihodi">
-      </div>
-      <div class="col-md-2 d-flex align-items-end">
-        <button class="btn btn-outline-primary w-100" type="submit">Build / Refresh</button>
-      </div>
-      <div class="col-12">
-        <small class="text-muted">Builds a matrix of groups vs checkpoint tabs, with formulas referencing each tab's arrival column.</small>
-      </div>
-    </form>
-    <form method="post" action="{{ url_for('sheets_admin.build_teams') }}" class="row g-2 mb-2">
-      <div class="col-md-5">
-        <label class="form-label">Spreadsheet ID</label>
-        <input class="form-control" name="spreadsheet_id" placeholder="Spreadsheet ID">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Teams tab name</label>
-        <input class="form-control" name="tab_name" value="Ekipe">
-      </div>
-      <div class="col-md-2 d-flex align-items-end">
-        <button class="btn btn-outline-primary w-100" type="submit">Build / Refresh</button>
-      </div>
-    </form>
-    <form method="post" action="{{ url_for('sheets_admin.build_score') }}" class="row g-2">
-      <div class="col-md-5">
-        <label class="form-label">Spreadsheet ID</label>
-        <input class="form-control" name="spreadsheet_id" placeholder="Spreadsheet ID">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Score tab name</label>
-        <input class="form-control" name="tab_name" value="Skupni seštevek">
-      </div>
-      <div class="col-md-2 d-flex align-items-end">
-        <button class="btn btn-outline-success w-100" type="submit">Build / Refresh</button>
-      </div>
-    </form>
-    <hr>
-    <h6 class="mt-3">Wizard: create tabs for all checkpoints</h6>
-    <form method="post" action="{{ url_for('sheets_admin.wizard_checkpoints') }}" class="row g-2">
-      <div class="col-md-4">
-        <label class="form-label">Spreadsheet ID</label>
-        <input class="form-control" name="spreadsheet_id" placeholder="Spreadsheet ID">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Arrived header</label>
-        <input class="form-control" name="arrived_header" value="prihod na KT">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Points header</label>
-        <input class="form-control" name="points_header" value="Točke">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Group order (comma-separated)</label>
-        <input class="form-control" name="group_order" placeholder="mGG,sGG,PP,RR+">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Dead time header</label>
-        <input class="form-control" name="dead_time_header" value="Mrtvi čas [min]">
-      </div>
-      <div class="col-md-2 d-flex align-items-end">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="dead_time_w" name="dead_time" value="1" checked>
-          <label class="form-check-label" for="dead_time_w">Include dead time</label>
-        </div>
-      </div>
-      <div class="col-md-2 d-flex align-items-end">
-        <button class="btn btn-outline-dark w-100" type="submit">Run wizard</button>
-      </div>
-      <div class="col-12 mt-3">
-        <div class="table-responsive">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>Checkpoint</th>
-                <th>Group order (comma list)</th>
-                <th>Extra headers (comma list)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for cp in checkpoints %}
-                <tr>
-                  <td>{{ cp.name }}</td>
-                  <td><input class="form-control form-control-sm" name="group_order_cp_{{ cp.id }}" placeholder="e.g. mGG,sGG,PP"></td>
-                  <td><input class="form-control form-control-sm" name="extra_fields_cp_{{ cp.id }}" placeholder="e.g. Čas starta,Čas cilja"></td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div class="card mt-3">
-  <div class="card-body">
     <h5 class="card-title">Existing sheet configs</h5>
     {% if configs %}
       <div class="table-responsive">
+        <form method="post" action="{{ url_for('sheets_admin.prune_missing') }}" class="mb-2">
+          <button class="btn btn-sm btn-outline-danger" type="submit">Prune missing tabs</button>
+        </form>
         <table class="table table-sm align-middle">
           <thead>
             <tr>
@@ -213,4 +348,112 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+  (function() {
+    const list = document.getElementById('group_order_list');
+    const hidden = document.getElementById('group_order_input');
+    const groupTargets = document.querySelectorAll('.group-order-target');
+    const cpList = document.getElementById('checkpoint_order_list');
+    const cpHidden = document.getElementById('checkpoint_order_input');
+    const cpTargets = document.querySelectorAll('.checkpoint-order-target');
+    const perGroupContainer = document.getElementById('per_group_cp_order_lists');
+    const perGroupHidden = document.getElementById('per_group_cp_order_input');
+    const perGroupTargets = document.querySelectorAll('.per-group-order-target');
+    const toggleBtn = document.getElementById('toggle-ordering');
+    const orderingPanel = document.getElementById('ordering-panel');
+    if (!list || !hidden) return;
+
+    function updateHidden() {
+      const names = Array.from(list.querySelectorAll('li span.flex-grow-1')).map(el => el.textContent.trim());
+      hidden.value = names.join(',');
+      groupTargets.forEach(t => { t.value = hidden.value; });
+    }
+
+    function updateCpHidden() {
+      if (!cpList || !cpHidden) return;
+      const names = Array.from(cpList.querySelectorAll('li span.flex-grow-1')).map(el => el.textContent.trim());
+      cpHidden.value = names.join(',');
+      cpTargets.forEach(t => { t.value = cpHidden.value; });
+    }
+
+    function updatePerGroupHidden() {
+      if (!perGroupContainer || !perGroupHidden) return;
+      const payload = {};
+      perGroupContainer.querySelectorAll('.per-group-list').forEach(listEl => {
+        const groupName = listEl.dataset.group;
+        const entries = [];
+        listEl.querySelectorAll('li').forEach(li => {
+          const name = li.querySelector('.flex-grow-1').textContent.trim();
+          const checked = li.querySelector('.cp-include')?.checked;
+          if (checked) entries.push(name);
+        });
+        payload[groupName] = entries;
+      });
+      const jsonVal = JSON.stringify(payload);
+      perGroupHidden.value = jsonVal;
+      perGroupTargets.forEach(t => { t.value = jsonVal; });
+    }
+
+    Sortable.create(list, {
+      handle: ".drag-handle",
+      animation: 150,
+      onSort: updateHidden,
+      onEnd: updateHidden
+    });
+
+    if (cpList && cpHidden) {
+      Sortable.create(cpList, {
+        handle: ".drag-handle",
+        animation: 150,
+        onSort: updateCpHidden,
+        onEnd: updateCpHidden
+      });
+      updateCpHidden();
+    }
+
+    if (perGroupContainer && perGroupHidden) {
+      perGroupContainer.querySelectorAll('.per-group-list').forEach(listEl => {
+        Sortable.create(listEl, {
+          handle: ".drag-handle",
+          animation: 150,
+          onSort: updatePerGroupHidden,
+          onEnd: updatePerGroupHidden
+        });
+      });
+      perGroupContainer.addEventListener('change', e => {
+        if (e.target.classList.contains('cp-include')) {
+          updatePerGroupHidden();
+        }
+      });
+      updatePerGroupHidden();
+    }
+
+    updateHidden();
+
+    // Copy global spreadsheet ID into all hidden targets
+    const globalId = document.getElementById('global_spreadsheet_id');
+    const targets = document.querySelectorAll('.sheet-id-target');
+    function pushSheetId() {
+      targets.forEach(t => { t.value = globalId.value; });
+    }
+    if (globalId) {
+      globalId.addEventListener('input', pushSheetId);
+      pushSheetId();
+    }
+
+    if (toggleBtn && orderingPanel) {
+      toggleBtn.addEventListener('click', () => {
+        const isHidden = orderingPanel.classList.toggle('d-none');
+        toggleBtn.textContent = isHidden ? 'Show ordering ▼' : 'Hide ordering ▲';
+      });
+      orderingPanel.classList.add('d-none');
+      toggleBtn.textContent = 'Show ordering ▼';
+    }
+  })();
+</script>
 {% endblock %}

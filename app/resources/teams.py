@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import Team, TeamGroup, CheckpointGroup
 from app.utils.rest_auth import json_roles_required
+from app.utils.sheets_sync import sync_all_checkpoint_tabs
 
 
 def _serialize_team(team: Team) -> dict:
@@ -191,6 +192,10 @@ class TeamListResource(Resource):
         db.session.flush()
 
         db.session.commit()
+        try:
+            sync_all_checkpoint_tabs()
+        except Exception:
+            pass
         return {"ok": True, "team": _serialize_team(team)}, 201
 
 
@@ -284,6 +289,10 @@ class TeamItemResource(Resource):
                 return {"error": "validation_error", "detail": err}, 400
 
         db.session.commit()
+        try:
+            sync_all_checkpoint_tabs()
+        except Exception:
+            pass
         return {"ok": True, "team": _serialize_team(team)}, 200
 
     @json_roles_required("admin")

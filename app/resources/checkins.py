@@ -14,6 +14,7 @@ from app.models import Checkin, Team, Checkpoint
 from app.utils.time import from_datetime_local
 
 from app.utils.rest_auth import json_roles_required
+from app.utils.sheets_sync import mark_arrival_checkbox
 
 
 # -------- helpers --------
@@ -162,6 +163,10 @@ class CheckinListResource(Resource):
         c = Checkin(team_id=team_id, checkpoint_id=checkpoint_id, timestamp=ts)
         db.session.add(c)
         db.session.commit()
+        try:
+            mark_arrival_checkbox(team_id, checkpoint_id)
+        except Exception:
+            pass
         return {"ok": True, "created": True, "checkin": _serialize_checkin(c)}, 201
 
 
@@ -235,6 +240,10 @@ class CheckinItemResource(Resource):
         c.checkpoint_id = new_cp_id
         c.timestamp = new_ts
         db.session.commit()
+        try:
+            mark_arrival_checkbox(new_team_id, new_cp_id)
+        except Exception:
+            pass
         return {"ok": True, "updated": True, "checkin": _serialize_checkin(c)}, 200
 
     def put(self, checkin_id: int):

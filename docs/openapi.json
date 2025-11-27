@@ -12,6 +12,7 @@
     {"name": "teams", "description": "Teams and assignments"},
     {"name": "groups", "description": "Checkpoint groups"},
     {"name": "checkpoints", "description": "Checkpoint management"},
+    {"name": "sheets", "description": "Admin endpoints for Google Sheets sync/build"},
     {"name": "checkins", "description": "Team check-ins"},
     {"name": "rfid", "description": "RFID cards & scanning"},
     {"name": "lora", "description": "LoRa devices & messages"},
@@ -2040,6 +2041,185 @@
               }
             }
           }
+        }
+      }
+    },
+    "/sheets/": {
+      "get": {
+        "tags": ["sheets"],
+        "summary": "Sheets admin UI",
+        "security": [{"cookieAuth": []}],
+        "responses": {
+          "200": {
+            "description": "HTML page"
+          },
+          "302": {
+            "description": "Redirect to login if not authenticated"
+          }
+        }
+      }
+    },
+    "/sheets/build-arrivals": {
+      "post": {
+        "tags": ["sheets"],
+        "summary": "Build or refresh arrivals tab",
+        "security": [{"cookieAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "spreadsheet_id": {"type": "string"},
+                  "tab_name": {"type": "string", "default": "Prihodi"}
+                },
+                "required": ["spreadsheet_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "302": {"description": "Redirect back to admin page"}
+        }
+      }
+    },
+    "/sheets/build-teams": {
+      "post": {
+        "tags": ["sheets"],
+        "summary": "Build or refresh teams tab",
+        "security": [{"cookieAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "spreadsheet_id": {"type": "string"},
+                  "tab_name": {"type": "string", "default": "Ekipe"},
+                  "teams_headers": {"type": "string", "description": "Comma-separated headers"},
+                  "group_order": {"type": "string", "description": "Comma-separated group order"}
+                },
+                "required": ["spreadsheet_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "302": {"description": "Redirect back to admin page"}
+        }
+      }
+    },
+    "/sheets/build-score": {
+      "post": {
+        "tags": ["sheets"],
+        "summary": "Build or refresh total score tab",
+        "security": [{"cookieAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "spreadsheet_id": {"type": "string"},
+                  "tab_name": {"type": "string", "default": "Skupni seštevek"},
+                  "include_dead_time_sum": {"type": "boolean", "default": true},
+                  "group_order": {"type": "string"},
+                  "checkpoint_order": {"type": "string"}
+                },
+                "required": ["spreadsheet_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "302": {"description": "Redirect back to admin page"}
+        }
+      }
+    },
+    "/sheets/wizard/checkpoints": {
+      "post": {
+        "tags": ["sheets"],
+        "summary": "Run checkpoint tab wizard",
+        "security": [{"cookieAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "spreadsheet_id": {"type": "string"},
+                  "arrived_header": {"type": "string"},
+                  "points_header": {"type": "string"},
+                  "dead_time_header": {"type": "string"},
+                  "group_order": {"type": "string"},
+                  "checkpoint_order": {"type": "string"}
+                },
+                "required": ["spreadsheet_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "302": {"description": "Redirect back to admin page"}
+        }
+      }
+    },
+    "/sheets/add-tab": {
+      "post": {
+        "tags": ["sheets"],
+        "summary": "Add a single checkpoint tab",
+        "security": [{"cookieAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "spreadsheet_id": {"type": "string"},
+                  "tab_title": {"type": "string"},
+                  "checkpoint_id": {"type": "integer", "nullable": true},
+                  "groups_raw": {"type": "string", "description": "Lines Group|field1,field2"}
+                },
+                "required": ["spreadsheet_id", "tab_title", "groups_raw"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "302": {"description": "Redirect back to admin page"}
+        }
+      }
+    },
+    "/sheets/prune-missing": {
+      "post": {
+        "tags": ["sheets"],
+        "summary": "Delete stored sheet configs whose tabs are gone",
+        "security": [{"cookieAuth": []}],
+        "responses": {
+          "302": {"description": "Redirect back to admin page"}
+        }
+      }
+    },
+    "/sheets/sync-team-numbers/{config_id}": {
+      "post": {
+        "tags": ["sheets"],
+        "summary": "Sync team numbers for a checkpoint tab",
+        "security": [{"cookieAuth": []}],
+        "parameters": [
+          {
+            "name": "config_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer"}
+          }
+        ],
+        "responses": {
+          "302": {"description": "Redirect back to admin page"}
         }
       }
     }

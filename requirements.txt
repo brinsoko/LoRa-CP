@@ -32,6 +32,10 @@ openpyxl==3.1.5
 # --- For Gunicorn (production server) ---
 gunicorn==22.0.0
 
+# --- Google Sheets ---
+gspread==6.1.2
+google-auth==2.34.0
+
 # --- Dev Tools ---
 black==24.8.0
 flake8==7.1.1
