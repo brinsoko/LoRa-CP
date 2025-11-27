@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models import (
     LoRaMessage, RFIDCard, Team, Checkpoint, Checkin, LoRaDevice
 )
+from app.utils.sheets_sync import mark_arrival_checkbox
 from app.utils.payloads import parse_gps_payload
 
 def resolve_checkpoint_for_dev(dev_num: int) -> Checkpoint:
@@ -132,6 +133,11 @@ class IngestResource(Resource):
                             timestamp=received_at
                         ))
                         created_checkin = True
+                        try:
+                            mark_arrival_checkbox(team.id, cp.id)
+                        except Exception as exc:
+                            # do not fail ingest if Sheets update fails
+                            pass
 
             db.session.commit()
 

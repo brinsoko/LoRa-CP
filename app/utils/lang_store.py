@@ -12,6 +12,21 @@ DEFAULT_LANG = {
     "teams_tab": "Ekipe",
     "arrivals_tab": "Prihodi",
     "score_tab": "Skupni seštevek",
+    "teams_number_header": "Številka",
+    "teams_name_header": "Ime ekipe",
+    "teams_org_header": "Rod/Org",
+    "teams_points_header": "Skupne točke",
+    "score_group_header": "Skupina",
+    "score_number_header": "Številka",
+    "score_team_header": "Ime ekipe",
+    "score_org_header": "Rod/Org",
+    "score_dead_time_sum_header": "Mrtvi čas (sum)",
+    "score_total_header": "Skupaj točke",
+    "score_org_section_header": "Organizacija",
+    "score_org_teams_header": "Ekipe",
+    "score_org_numbers_header": "Številke",
+    "score_org_count_header": "Št ekip",
+    "score_org_total_header": "Skupaj točke (org)",
 }
 
 

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Sheets Language{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Sheets Language Pack</h4>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('sheets_admin.list_sheets') }}">Back to Sheets admin</a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title">Labels & defaults</h5>
+    <form method="post" action="{{ url_for('sheets_admin.save_lang_settings') }}" class="row g-3">
+      <div class="col-12">
+        <h6 class="mb-1">Common headers</h6>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Arrived header</label>
+        <input class="form-control" name="arrived_header" value="{{ lang.arrived_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Points header</label>
+        <input class="form-control" name="points_header" value="{{ lang.points_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Dead time header</label>
+        <input class="form-control" name="dead_time_header" value="{{ lang.dead_time_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Time header</label>
+        <input class="form-control" name="time_header" value="{{ lang.time_header if lang else '' }}">
+      </div>
+      <div class="col-12">
+        <h6 class="mb-1">Teams tab</h6>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Teams tab</label>
+        <input class="form-control" name="teams_tab" value="{{ lang.teams_tab if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Number header</label>
+        <input class="form-control" name="teams_number_header" value="{{ lang.teams_number_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Team name header</label>
+        <input class="form-control" name="teams_name_header" value="{{ lang.teams_name_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Org header</label>
+        <input class="form-control" name="teams_org_header" value="{{ lang.teams_org_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Points header</label>
+        <input class="form-control" name="teams_points_header" value="{{ lang.teams_points_header if lang else '' }}">
+      </div>
+      <div class="col-12">
+        <h6 class="mb-1">Arrivals tab</h6>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Arrivals tab</label>
+        <input class="form-control" name="arrivals_tab" value="{{ lang.arrivals_tab if lang else '' }}">
+      </div>
+      <div class="col-12">
+        <h6 class="mb-1">Score tab</h6>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Score tab</label>
+        <input class="form-control" name="score_tab" value="{{ lang.score_tab if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Group header</label>
+        <input class="form-control" name="score_group_header" value="{{ lang.score_group_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Number header</label>
+        <input class="form-control" name="score_number_header" value="{{ lang.score_number_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Team name header</label>
+        <input class="form-control" name="score_team_header" value="{{ lang.score_team_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Org header</label>
+        <input class="form-control" name="score_org_header" value="{{ lang.score_org_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Dead time sum header</label>
+        <input class="form-control" name="score_dead_time_sum_header" value="{{ lang.score_dead_time_sum_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Total header</label>
+        <input class="form-control" name="score_total_header" value="{{ lang.score_total_header if lang else '' }}">
+      </div>
+      <div class="col-12">
+        <h6 class="mb-1">Organization summary</h6>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Org name header</label>
+        <input class="form-control" name="score_org_section_header" value="{{ lang.score_org_section_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Teams list header</label>
+        <input class="form-control" name="score_org_teams_header" value="{{ lang.score_org_teams_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Team numbers header</label>
+        <input class="form-control" name="score_org_numbers_header" value="{{ lang.score_org_numbers_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Team count header</label>
+        <input class="form-control" name="score_org_count_header" value="{{ lang.score_org_count_header if lang else '' }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Org total header</label>
+        <input class="form-control" name="score_org_total_header" value="{{ lang.score_org_total_header if lang else '' }}">
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn btn-primary" type="submit">Save language pack</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

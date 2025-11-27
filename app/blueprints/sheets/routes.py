@@ -62,6 +62,13 @@ def list_sheets():
     return render_template("sheets_admin.html", configs=configs, checkpoints=checkpoints, groups=groups, lang=lang)
 
 
+@sheets_bp.route("/lang", methods=["GET"])
+@roles_required("admin")
+def lang_settings():
+    lang = load_lang()
+    return render_template("sheets_lang.html", lang=lang)
+
+
 @sheets_bp.route("/save-lang", methods=["POST"])
 @roles_required("admin")
 def save_lang_settings():
@@ -71,8 +78,23 @@ def save_lang_settings():
         "dead_time_header": (request.form.get("dead_time_header") or "").strip() or None,
         "time_header": (request.form.get("time_header") or "").strip() or None,
         "teams_tab": (request.form.get("teams_tab") or "").strip() or None,
+        "teams_number_header": (request.form.get("teams_number_header") or "").strip() or None,
+        "teams_name_header": (request.form.get("teams_name_header") or "").strip() or None,
+        "teams_org_header": (request.form.get("teams_org_header") or "").strip() or None,
+        "teams_points_header": (request.form.get("teams_points_header") or "").strip() or None,
         "arrivals_tab": (request.form.get("arrivals_tab") or "").strip() or None,
         "score_tab": (request.form.get("score_tab") or "").strip() or None,
+        "score_group_header": (request.form.get("score_group_header") or "").strip() or None,
+        "score_number_header": (request.form.get("score_number_header") or "").strip() or None,
+        "score_team_header": (request.form.get("score_team_header") or "").strip() or None,
+        "score_org_header": (request.form.get("score_org_header") or "").strip() or None,
+        "score_dead_time_sum_header": (request.form.get("score_dead_time_sum_header") or "").strip() or None,
+        "score_total_header": (request.form.get("score_total_header") or "").strip() or None,
+        "score_org_section_header": (request.form.get("score_org_section_header") or "").strip() or None,
+        "score_org_teams_header": (request.form.get("score_org_teams_header") or "").strip() or None,
+        "score_org_numbers_header": (request.form.get("score_org_numbers_header") or "").strip() or None,
+        "score_org_count_header": (request.form.get("score_org_count_header") or "").strip() or None,
+        "score_org_total_header": (request.form.get("score_org_total_header") or "").strip() or None,
     }
     save_lang({k: v for k, v in data.items() if v})
     flash("Language pack saved.", "success")
@@ -85,7 +107,7 @@ def build_arrivals():
     """Build/update an arrivals matrix tab with formulas pointing to checkpoint tabs."""
     spreadsheet_id = (request.form.get("spreadsheet_id") or "").strip()
     lang = load_lang()
-    tab_name = (request.form.get("tab_name") or lang.get("arrivals_tab") or "Prihodi").strip()
+    tab_name = (request.form.get("tab_name") or lang.get("arrivals_tab") or "Arrivals").strip()
     group_order_raw = request.form.get("group_order") or ""
     group_order = [g.strip() for g in group_order_raw.split(",") if g.strip()] if group_order_raw else None
     cp_order_raw = request.form.get("checkpoint_order") or ""
@@ -128,7 +150,7 @@ def build_arrivals():
 def build_teams():
     spreadsheet_id = (request.form.get("spreadsheet_id") or "").strip()
     lang = load_lang()
-    tab_name = (request.form.get("tab_name") or lang.get("teams_tab") or "Ekipe").strip()
+    tab_name = (request.form.get("tab_name") or lang.get("teams_tab") or "Teams").strip()
     headers_raw = (request.form.get("teams_headers") or "").strip()
     headers = [h.strip() for h in headers_raw.split(",") if h.strip()] if headers_raw else None
     if headers is not None and not headers:
@@ -153,7 +175,7 @@ def build_teams():
 def build_score():
     spreadsheet_id = (request.form.get("spreadsheet_id") or "").strip()
     lang = load_lang()
-    tab_name = (request.form.get("tab_name") or lang.get("score_tab") or "Skupni seštevek").strip()
+    tab_name = (request.form.get("tab_name") or lang.get("score_tab") or "Score").strip()
     include_dead_time_sum = bool(request.form.get("include_dead_time_sum"))
     group_order_raw = request.form.get("group_order") or ""
     group_order = [g.strip() for g in group_order_raw.split(",") if g.strip()] if group_order_raw else None
@@ -236,9 +258,10 @@ def prune_missing():
 def wizard_checkpoints():
     spreadsheet_id = (request.form.get("spreadsheet_id") or "").strip()
     lang = load_lang()
-    arrived_header = (request.form.get("arrived_header") or lang.get("arrived_header") or "prihod na KT").strip()
-    points_header = (request.form.get("points_header") or lang.get("points_header") or "Točke").strip()
-    dead_time_header = (request.form.get("dead_time_header") or lang.get("dead_time_header") or "Mrtvi čas [min]").strip()
+    arrived_header = (request.form.get("arrived_header") or lang.get("arrived_header") or "Arrived to CP").strip()
+    points_header = (request.form.get("points_header") or lang.get("points_header") or "Points").strip()
+    dead_time_header = (request.form.get("dead_time_header") or lang.get("dead_time_header") or "Dead Time [min]").strip()
+    time_header = (request.form.get("time_header") or lang.get("time_header") or "Čas").strip()
     checkpoints = Checkpoint.query.order_by(Checkpoint.name.asc()).all()
     group_order_raw = request.form.get("group_order") or ""
     checkpoint_order_raw = (request.form.get("checkpoint_order") or "").strip()
@@ -329,6 +352,7 @@ def wizard_checkpoints():
             arrived_header=arrived_header,
             points_header=points_header,
             dead_time_header=dead_time_header,
+            time_header=time_header,
             group_order=[g.strip() for g in group_order_raw.split(",") if g.strip()],
             per_checkpoint_extra_fields=per_cp_fields,
             per_checkpoint_dead_time=per_cp_dead_time or None,
@@ -376,10 +400,12 @@ def add_tab():
     tab_title = (request.form.get("tab_title") or "").strip()
     checkpoint_id = request.form.get("checkpoint_id", type=int)
     lang = load_lang()
-    arrived_header = (request.form.get("arrived_header") or lang.get("arrived_header") or "prihod na KT").strip()
-    points_header = (request.form.get("points_header") or lang.get("points_header") or "Točke").strip()
+    arrived_header = (request.form.get("arrived_header") or lang.get("arrived_header") or "Arrived to CP").strip()
+    points_header = (request.form.get("points_header") or lang.get("points_header") or "Points").strip()
     dead_time_enabled = bool(request.form.get("dead_time"))
-    dead_time_header = (request.form.get("dead_time_header") or lang.get("dead_time_header") or "Mrtvi čas [min]").strip()
+    dead_time_header = (request.form.get("dead_time_header") or lang.get("dead_time_header") or "Dead Time [min]").strip()
+    include_time = bool(request.form.get("include_time"))
+    time_header = (request.form.get("time_header") or lang.get("time_header") or "Čas").strip()
     groups_raw = request.form.get("groups_raw") or ""
     tab_type = "checkpoint"
 
@@ -402,9 +428,11 @@ def add_tab():
         headers.append(arrived_header)
         if dead_time_enabled:
             headers.append(dead_time_header)
+        if include_time:
+            headers.append(time_header)
         headers.extend(grp.get("fields", []))
         headers.append(points_header)
-        current_col += 2 + (1 if dead_time_enabled else 0) + len(grp.get("fields", [])) + 1
+        current_col += 2 + (1 if dead_time_enabled else 0) + (1 if include_time else 0) + len(grp.get("fields", [])) + 1
 
     try:
         client = _get_sheets_client()
@@ -454,6 +482,8 @@ def add_tab():
             "arrived_header": arrived_header,
             "dead_time_enabled": dead_time_enabled,
             "dead_time_header": dead_time_header,
+            "time_enabled": include_time,
+            "time_header": time_header,
             "points_header": points_header,
             "groups": groups,
         },

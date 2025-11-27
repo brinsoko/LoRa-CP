@@ -24,6 +24,7 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
   - Visualize checkpoints on Google Maps  
   - Show status per team (found, next, not found)  
   - Auto-color based on progress  
+- **Google Sheets automation:** Admin UI to build checkpoint tabs, arrivals matrix, teams roster, and scoreboards in a shared spreadsheet  
 - **Dark/Light mode:** Follows system preference or user toggle  
 - **Audit logs:** Console-based logging for debugging and traceability  
 
@@ -39,13 +40,27 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 - **Logging:** Built-in Flask logger with DEBUG output
 - **Environment:** macOS/Linux/Windows (works best with virtualenv)
 
+---
+
+##  Google Sheets admin (scoreboard)
+
+- Prereqs: enable Google Sheets API, create a service account, and share the target spreadsheet with the service account email (Editor).  
+- Config: set either `GOOGLE_SERVICE_ACCOUNT_FILE` (path to JSON) **or** `GOOGLE_SERVICE_ACCOUNT_JSON` (raw JSON).  
+- Access: log in as an Admin and open `/sheets` (navbar “Sheets” button). Paste the spreadsheet ID in the top field so all actions target the same sheet.  
+- Wizard: builds checkpoint tabs for every checkpoint with arrived/points/dead time/time columns, optional extra fields per CP, and per-group ordering/exclusions.  
+- Build buttons: regenerate Arrivals (matrix of arrivals across checkpoint tabs), Teams (grouped roster), and Score (per-group totals, optional dead time sum).  
+- Add tab: create a single checkpoint tab with custom headers/fields. “Sync team numbers” keeps team lists aligned with DB; “Prune missing tabs” removes stale configs if the tab was deleted.  
+- Language pack: `/sheets/lang` lets you override tab/column labels for non-English sheets.
+
+![Architecture](docs/architecture.svg)
+
 
 ---
 
 ## API Docs
 
-- Swagger UI: `http://localhost:5001/docs`
-- Raw spec: `http://localhost:5001/docs/openapi.yaml`
+- Swagger UI: `/docs`
+- Raw spec: `/docs/openapi.yaml`
 
 ### Auth
 Cookie-based session from `/login` (form POST). Many routes are public; judge/admin routes require login.
@@ -54,7 +69,7 @@ Cookie-based session from `/login` (form POST). Many routes are public; judge/ad
 
 Ingest a LoRa message (JSON):
 ```bash
-curl -X POST http://localhost:5001/api/ingest \
+curl -X POST /api/ingest \
   -H "Content-Type: application/json" \
   -d '{"dev_id":1,"payload":"A1B2C3D4","rssi":-62.5,"snr":9.0}'
   ```
@@ -62,7 +77,7 @@ curl -X POST http://localhost:5001/api/ingest \
 Export check-ins (CSV):
 
 ```bash
-  curl "http://localhost:5001/checkins/export.csv?sort=new"
+  curl "/checkins/export.csv?sort=new"
   ```
 
 

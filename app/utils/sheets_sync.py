@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import List
 import time
 from datetime import datetime
+from app.utils.lang_store import load_lang
 import gspread
 from gspread.exceptions import APIError
 
@@ -51,9 +52,10 @@ def _group_start_cols_from_config(cfg: dict) -> List[int]:
     cols = []
     current = 1
     dead_time_enabled = bool(cfg.get("dead_time_enabled"))
+    time_enabled = bool(cfg.get("time_enabled"))
     for grp in cfg.get("groups", []):
         cols.append(current)
-        current += 2 + (1 if dead_time_enabled else 0) + len(grp.get("fields", [])) + 1
+        current += 2 + (1 if dead_time_enabled else 0) + (1 if time_enabled else 0) + len(grp.get("fields", [])) + 1
     return cols
 
 
@@ -132,6 +134,7 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int):
     for cfg in configs:
         group_defs = (cfg.config or {}).get("groups", [])
         group_cols = _group_start_cols_from_config(cfg.config or {})
+        time_enabled = bool((cfg.config or {}).get("time_enabled"))
         for grp_def, start_col in zip(group_defs, group_cols):
             grp_name = grp_def.get("name", "").strip()
             db_group = (
@@ -165,21 +168,12 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int):
                 continue
             row = 2 + idx  # header at row 1
             arrived_col = start_col + 1
-            # find optional time column named "Čas"/"Cas"
-            fields = grp_def.get("fields", [])
-            def _norm(s: str) -> str:
-                return s.lower().strip().replace("č", "c")
             time_col = None
-            for f_idx, fname in enumerate(fields):
-                if _norm(fname) == "cas":
-                    dead_time_enabled = bool((cfg.config or {}).get("dead_time_enabled"))
-                    # columns: team | arrived | dead_time? | time | extras... | points
-                    base = start_col + 1  # arrived
-                    offset = 1  # move past arrived
-                    if dead_time_enabled:
-                        offset += 1
-                    time_col = base + offset + f_idx
-                    break
+            if time_enabled:
+                dead_time_enabled = bool((cfg.config or {}).get("dead_time_enabled"))
+                time_col = start_col + 2  # after arrived
+                if dead_time_enabled:
+                    time_col += 1  # shift if dead time sits before time
             try:
                 client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, arrived_col, True)
                 if time_col:
@@ -344,6 +338,7 @@ def build_arrivals_tab(
 
 
 def build_teams_tab(spreadsheet_id: str, tab_name: str = "Ekipe", headers: list[str] | None = None, group_order_override: list[str] | None = None):
+    lang = load_lang()
     group_order = group_order_override or _get_global_group_order(spreadsheet_id)
     groups = _sort_groups(
         db.session.query(CheckpointGroup).all(),
@@ -367,7 +362,12 @@ def build_teams_tab(spreadsheet_id: str, tab_name: str = "Ekipe", headers: list[
 
     # Build grid horizontally: each group = headers
     if not headers:
-        headers = ["Številka", "Ime ekipe", "Rod/Org", "Skupne točke"]
+        headers = [
+            lang.get("teams_number_header", "Številka"),
+            lang.get("teams_name_header", "Ime ekipe"),
+            lang.get("teams_org_header", "Rod/Org"),
+            lang.get("teams_points_header", "Skupne točke"),
+        ]
     col_count = len(headers)
     header = []
     subheader = []
@@ -407,6 +407,7 @@ def build_score_tab(
     checkpoint_order_override: list[str] | None = None,
     per_group_checkpoint_order: dict[str, list[str]] | None = None,
 ):
+    lang = load_lang()
     group_order = group_order_override or _get_global_group_order(spreadsheet_id)
     per_group_cp_order = per_group_checkpoint_order or _get_group_checkpoint_order_from_db()
     cp_configs = (
@@ -488,11 +489,16 @@ def build_score_tab(
             continue
 
         # Build header respecting group order: first global group order, then relevant checkpoint tabs in order
-        header = ["Skupina", "Številka", "Ime ekipe", "Rod/Org"]
+        header = [
+            lang.get("score_group_header", "Skupina"),
+            lang.get("score_number_header", "Številka"),
+            lang.get("score_team_header", "Ime ekipe"),
+            lang.get("score_org_header", "Rod/Org"),
+        ]
         header.extend([cfg.tab_name for cfg in relevant])
         if include_dead_time_sum:
-            header.append("Mrtvi čas (sum)")
-        header.append("Skupaj točke")
+            header.append(lang.get("score_dead_time_sum_header", "Mrtvi čas (sum)"))
+        header.append(lang.get("score_total_header", "Skupaj točke"))
         start_row = len(values) + 1  # header row index (1-based)
         values.append(header)
 
@@ -510,8 +516,11 @@ def build_score_tab(
                     start_col = cols[idx]
                     fields_len = len((cfg.config or {}).get("groups", [])[idx].get("fields", []))
                     dead_time = 1 if (cfg.config or {}).get("dead_time_enabled") else 0
-                    points_col = start_col + 1 + dead_time + fields_len + 1  # after arrived, dead time, fields
-                    dead_time_col = start_col + 2 if dead_time else None  # skip arrived checkbox column
+                    time_enabled = 1 if (cfg.config or {}).get("time_enabled") else 0
+                    points_col = start_col + 1 + time_enabled + dead_time + fields_len + 1  # arrived + time? + dead + fields + points
+                    dead_time_col = None
+                    if dead_time:
+                        dead_time_col = start_col + 2 + (time_enabled)
                     from gspread.utils import rowcol_to_a1
                     team_col_letter = rowcol_to_a1(1, start_col).rstrip("1")
                     points_col_letter = rowcol_to_a1(1, points_col).rstrip("1")
@@ -581,7 +590,13 @@ def build_score_tab(
     org_names = [o[0] for o in orgs if o[0]]
     if org_names:
         values.append([])
-        values.append(["Organizacija", "Ekipe", "Številke", "Št ekip", "Skupaj točke"])
+        values.append([
+            lang.get("score_org_section_header", "Organizacija"),
+            lang.get("score_org_teams_header", "Ekipe"),
+            lang.get("score_org_numbers_header", "Številke"),
+            lang.get("score_org_count_header", "Št ekip"),
+            lang.get("score_org_total_header", "Skupaj točke (org)"),
+        ])
         for org in org_names:
             row_idx = len(values) + 1
             def col_letter(idx: int) -> str:
@@ -636,6 +651,7 @@ def wizard_build_checkpoint_tabs(
     arrived_header: str,
     points_header: str,
     dead_time_header: str,
+    time_header: str,
     group_order: list[str],
     per_checkpoint_extra_fields: dict[int, list[str]] | None = None,
     per_checkpoint_dead_time: dict[int, bool] | None = None,
@@ -707,9 +723,8 @@ def wizard_build_checkpoint_tabs(
             return (group_order_norm.index(norm) if norm in group_order_norm else len(group_order_norm), g.name)
         ordered_groups = sorted(raw_groups, key=_sort_key)
         extra_fields = per_checkpoint_extra_fields.get(cp.id, []) if per_checkpoint_extra_fields else []
-        time_field = "Čas" if (record_time_cp and cp.id in record_time_cp) else None
-        fields_ordered = ([time_field] if time_field else []) + list(extra_fields)
-        groups_def = [{"name": g.name, "fields": fields_ordered} for g in ordered_groups]
+        time_enabled = bool(record_time_cp and cp.id in record_time_cp)
+        groups_def = [{"name": g.name, "fields": list(extra_fields)} for g in ordered_groups]
         dead_time_enabled = per_checkpoint_dead_time.get(cp.id, True) if per_checkpoint_dead_time else True
         if not groups_def:
             continue
@@ -722,12 +737,13 @@ def wizard_build_checkpoint_tabs(
             group_start_cols.append(current_col)
             headers.append(grp["name"])
             headers.append(arrived_header)
+            if time_enabled:
+                headers.append(time_header)
             if dead_time_enabled:
                 headers.append(dead_time_header)
-            # time field (if present) should be before custom extras
             headers.extend(grp.get("fields", []))
             headers.append(points_header)
-            current_col += 2 + (1 if dead_time_enabled else 0) + len(grp.get("fields", [])) + 1
+            current_col += 2 + (1 if dead_time_enabled else 0) + (1 if time_enabled else 0) + len(grp.get("fields", [])) + 1
 
         ws = _with_retry(client.add_tab, spreadsheet_id, tab_title)
         _with_retry(client.set_header_row, spreadsheet_id, tab_title, headers)
@@ -765,6 +781,8 @@ def wizard_build_checkpoint_tabs(
                 "arrived_header": arrived_header,
                 "dead_time_enabled": dead_time_enabled,
                 "dead_time_header": dead_time_header,
+                "time_enabled": time_enabled,
+                "time_header": time_header,
                 "points_header": points_header,
                 "groups": groups_def,
                 "checkpoint_order": checkpoint_order_override,
