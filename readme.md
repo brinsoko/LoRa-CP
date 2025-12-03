@@ -97,8 +97,6 @@ Export check-ins (CSV):
 
 
 To do:
-- add rfid reader
 - design a PCB
 - look into upgrading the database, to support multiple competitions
-- Look into adding a scoring system (per CP)
 - add wifi support for data transfers??

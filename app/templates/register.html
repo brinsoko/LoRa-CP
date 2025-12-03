@@ -2,26 +2,26 @@
 {% block content %}
 <div class="card" style="max-width:520px;">
   <div class="card-body">
-    <h5 class="card-title mb-3">Create User</h5>
+    <h5 class="card-title mb-3">{{ _('Create User') }}</h5>
     <form method="post">
       <div class="mb-3">
-        <label class="form-label">Username</label>
+        <label class="form-label">{{ _('Username') }}</label>
         <input name="username" class="form-control" required autofocus>
       </div>
       <div class="mb-3">
-        <label class="form-label">Password</label>
+        <label class="form-label">{{ _('Password') }}</label>
         <input name="password" type="password" class="form-control" required>
       </div>
       <div class="mb-3">
-        <label class="form-label">Role</label>
+        <label class="form-label">{{ _('Role') }}</label>
         <select name="role" class="form-select" required>
-          <option value="public">public</option>
-          <option value="judge">judge</option>
-          <option value="admin">admin</option>
+          <option value="public">{{ _('public') }}</option>
+          <option value="judge">{{ _('judge') }}</option>
+          <option value="admin">{{ _('admin') }}</option>
         </select>
       </div>
-      <button class="btn btn-primary">Create</button>
-      <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+      <button class="btn btn-primary">{{ _('Create') }}</button>
+      <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary ms-2">{{ _('Cancel') }}</a>
     </form>
   </div>
 </div>

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, Response
+from flask import Blueprint, render_template, request, Response, session, redirect, url_for, current_app, abort
 from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import Team, Checkpoint, Checkin
@@ -11,6 +11,16 @@ main_bp = Blueprint('main', __name__)
 @main_bp.route("/")
 def index():
     return render_template("base.html")
+
+
+@main_bp.route("/lang/<lang_code>", methods=["GET", "POST"])
+def set_language(lang_code: str):
+    languages = current_app.config.get("LANGUAGES", {})
+    if lang_code not in languages:
+        abort(404)
+    session["lang"] = lang_code
+    next_url = request.args.get("next") or request.referrer or url_for("main.index")
+    return redirect(next_url)
 
 
 def _parse_date_range(date_from_str, date_to_str):

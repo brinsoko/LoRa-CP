@@ -2,27 +2,27 @@
 {% block body %}
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title mb-3">Add Team</h5>
+    <h5 class="card-title mb-3">{{ _('Add Team') }}</h5>
     <form method="post">
       <div class="mb-3">
-        <label class="form-label">Name</label>
+        <label class="form-label">{{ _('Name') }}</label>
         <input name="name" class="form-control" required>
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Organizations</label>
+        <label class="form-label">{{ _('Organizations') }}</label>
         <input name="organization" class="form-control" >
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Number</label>
+        <label class="form-label">{{ _('Number') }}</label>
         <input type="number" name="number" class="form-control">
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Group</label>
+        <label class="form-label">{{ _('Group') }}</label>
         <select class="form-select" name="group_id">
-          <option value="">— No group —</option>
+          <option value="">— {{ _('No group') }} —</option>
           {% for g in groups %}
             <option value="{{ g.id }}" {% if selected_group_id == g.id %}selected{% endif %}>{{ g.name }}</option>
           {% endfor %}
@@ -30,8 +30,8 @@
       </div>
 
       <div class="d-flex gap-2">
-        <button class="btn btn-primary" type="submit">Create</button>
-        <a href="{{ url_for('teams.list_teams') }}" class="btn btn-secondary">Cancel</a>
+        <button class="btn btn-primary" type="submit">{{ _('Create') }}</button>
+        <a href="{{ url_for('teams.list_teams') }}" class="btn btn-secondary">{{ _('Cancel') }}</a>
       </div>
     </form>
   </div>

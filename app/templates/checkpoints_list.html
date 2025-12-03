@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Checkpoints{% endblock %}
+{% block title %}{{ _('Checkpoints') }}{% endblock %}
 {% block content %}
 <div class="card">
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="d-flex gap-2">Checkpoints</h5>
+      <h5 class="d-flex gap-2">{{ _('Checkpoints') }}</h5>
       {% if has_role('judge','admin') %}
         <div class="d-flex gap-2">
-          <a href="{{ url_for('checkpoints.add_checkpoint') }}" class="btn btn-sm btn-primary">Add Checkpoint</a>
-          <a href="{{ url_for('checkpoints.import_checkpoints_json') }}" class="btn btn-sm btn-outline-secondary">Import Checkpoints (JSON)</a>
+          <a href="{{ url_for('checkpoints.add_checkpoint') }}" class="btn btn-sm btn-primary">{{ _('Add Checkpoint') }}</a>
+          <a href="{{ url_for('checkpoints.import_checkpoints_json') }}" class="btn btn-sm btn-outline-secondary">{{ _('Import Checkpoints (JSON)') }}</a>
         </div>
       {% endif %}
     </div>
@@ -19,12 +19,12 @@
           <thead>
             <tr>
               <th style="width: 60px;">#</th>  {# ← Counter column #}
-              <th>Name</th>
-              <th>Location</th>
-              <th>Description</th>
-              <th>Groups</th>
+              <th>{{ _('Name') }}</th>
+              <th>{{ _('Location') }}</th>
+              <th>{{ _('Description') }}</th>
+              <th>{{ _('Groups') }}</th>
               {% if has_role('judge','admin') %}
-                <th class="text-end" style="width: 180px;">Actions</th>
+                <th class="text-end" style="width: 180px;">{{ _('Actions') }}</th>
               {% endif %}
             </tr>
           </thead>
@@ -47,13 +47,13 @@
               {% if has_role('judge','admin') %}
               <td class="text-end">
                 <a href="{{ url_for('checkpoints.edit_checkpoint', cp_id=cp.id) }}"
-                   class="btn btn-sm btn-outline-primary">Edit</a>
+                   class="btn btn-sm btn-outline-primary">{{ _('Edit') }}</a>
                 {% if has_role('admin') %}
                 <form method="post"
                       action="{{ url_for('checkpoints.delete_checkpoint', cp_id=cp.id) }}"
                       class="d-inline"
-                      onsubmit="return confirm('Delete this checkpoint?');">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                      onsubmit="return confirm('{{ _('Delete this checkpoint?') }}');">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
                 </form>
                 {% endif %}
               </td>
@@ -64,7 +64,7 @@
         </table>
       </div>
     {% else %}
-      <p class="text-muted mb-0">No checkpoints yet.</p>
+      <p class="text-muted mb-0">{{ _('No checkpoints yet.') }}</p>
     {% endif %}
   </div>
 </div>

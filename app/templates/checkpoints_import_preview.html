@@ -1,15 +1,15 @@
 {# app/templates/checkpoints_import_preview.html #}
 {% extends "base.html" %}
-{% block title %}Preview Checkpoint Import{% endblock %}
+{% block title %}{{ _('Preview Checkpoint Import') }}{% endblock %}
 {% block content %}
 <div class="card shadow-sm mt-3">
   <div class="card-body">
-    <h5 class="card-title mb-3">Preview: Checkpoint Import</h5>
+    <h5 class="card-title mb-3">{{ _('Preview: Checkpoint Import') }}</h5>
 
     <p>
-      <span class="badge bg-success">Create: {{ count_create }}</span>
-      <span class="badge bg-warning text-dark">Update: {{ count_update }}</span>
-      <span class="badge bg-secondary">Skip: {{ count_skip }}</span>
+      <span class="badge bg-success">{{ _('Create: %(count)s', count=count_create) }}</span>
+      <span class="badge bg-warning text-dark">{{ _('Update: %(count)s', count=count_update) }}</span>
+      <span class="badge bg-secondary">{{ _('Skip: %(count)s', count=count_skip) }}</span>
     </p>
 
     {% if rows %}
@@ -17,12 +17,12 @@
       <table class="table table-sm table-striped align-middle">
         <thead class="table-light">
           <tr>
-            <th>Action</th>
-            <th>Name</th>
-            <th>Easting</th>
-            <th>Northing</th>
-            <th>Description</th>
-            <th>Location</th>
+            <th>{{ _('Action') }}</th>
+            <th>{{ _('Name') }}</th>
+            <th>{{ _('Easting') }}</th>
+            <th>{{ _('Northing') }}</th>
+            <th>{{ _('Description') }}</th>
+            <th>{{ _('Location') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -30,11 +30,11 @@
           <tr>
             <td>
               {% if r.action == 'create' %}
-                <span class="badge bg-success">create</span>
+                <span class="badge bg-success">{{ _('create') }}</span>
               {% elif r.action == 'update' %}
-                <span class="badge bg-warning text-dark">update</span>
+                <span class="badge bg-warning text-dark">{{ _('update') }}</span>
               {% else %}
-                <span class="badge bg-secondary">skip</span>
+                <span class="badge bg-secondary">{{ _('skip') }}</span>
               {% endif %}
             </td>
             <td>{{ r.name }}</td>
@@ -51,11 +51,11 @@
     <form method="post" class="mt-3">
       <!-- Hidden payload (escaped so quotes don’t break HTML) -->
       <input type="hidden" name="payload" value="{{ payload_text|e }}">
-      <button type="submit" name="action" value="confirm" class="btn btn-primary">Confirm Import</button>
-      <a href="{{ url_for('checkpoints.import_checkpoints_json') }}" class="btn btn-secondary">Back</a>
+      <button type="submit" name="action" value="confirm" class="btn btn-primary">{{ _('Confirm Import') }}</button>
+      <a href="{{ url_for('checkpoints.import_checkpoints_json') }}" class="btn btn-secondary">{{ _('Back') }}</a>
     </form>
     {% else %}
-      <div class="alert alert-info">No rows to preview.</div>
+      <div class="alert alert-info">{{ _('No rows to preview.') }}</div>
     {% endif %}
   </div>
 </div>

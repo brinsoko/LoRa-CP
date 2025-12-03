@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Edit Check-in{% endblock %}
+{% block title %}{{ _('Edit Check-in') }}{% endblock %}
 {% block content %}
 
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title mb-3">Edit Check-in</h5>
+    <h5 class="card-title mb-3">{{ _('Edit Check-in') }}</h5>
 
     <form method="post">
       <div class="row g-3">
         <div class="col-md-4">
-          <label class="form-label">Team</label>
+          <label class="form-label">{{ _('Team') }}</label>
           <select name="team_id" class="form-select" required>
             {% for t in teams %}
               <option value="{{ t.id }}" {% if c.team_id == t.id %}selected{% endif %}>
@@ -20,7 +20,7 @@
         </div>
 
         <div class="col-md-4">
-          <label class="form-label">Checkpoint</label>
+          <label class="form-label">{{ _('Checkpoint') }}</label>
           <select name="checkpoint_id" class="form-select" required>
             {% for cp in checkpoints %}
               <option value="{{ cp.id }}" {% if c.checkpoint_id == cp.id %}selected{% endif %}>
@@ -31,18 +31,18 @@
         </div>
 
         <div class="col-md-4">
-          <label class="form-label">Local time</label>
+          <label class="form-label">{{ _('Local time') }}</label>
           {# 'timestamp_local' is precomputed in the route using to_datetime_local(c.timestamp) #}
           <input type="datetime-local"
                  name="timestamp_local"
                  class="form-control"
                  step="1"
                  value="{{ timestamp_local }}">
-          <div class="form-text">Edit using your local time (with seconds).</div>
+          <div class="form-text">{{ _('Edit using your local time (with seconds).') }}</div>
         </div>
 
         <div class="col-md-4">
-          <label class="form-label">Timezone</label>
+          <label class="form-label">{{ _('Timezone') }}</label>
           <select name="timezone" class="form-select">
             {# Pick whatever makes sense as your default; Ljubljana shown here #}
             {% set tz_default = 'Europe/Ljubljana' %}
@@ -53,7 +53,7 @@
             <option value="Europe/Berlin" {% if tz_current=='Europe/Berlin' %}selected{% endif %}>Europe/Berlin</option>
             <option value="Europe/Paris" {% if tz_current=='Europe/Paris' %}selected{% endif %}>Europe/Paris</option>
           </select>
-          <div class="form-text">Used to convert local time → UTC in the database.</div>
+          <div class="form-text">{{ _('Used to convert local time → UTC in the database.') }}</div>
         </div>
       </div>
 
@@ -63,13 +63,13 @@
         {% if pending_team_id %}<input type="hidden" name="team_id" value="{{ pending_team_id }}">{% endif %}
         {% if pending_cp_id %}<input type="hidden" name="checkpoint_id" value="{{ pending_cp_id }}">{% endif %}
         <div class="alert alert-warning mt-3">
-          Another check-in exists for the same team & checkpoint. Submit to replace it with this timestamp.
+          {{ _('Another check-in exists for the same team & checkpoint. Submit to replace it with this timestamp.') }}
         </div>
       {% endif %}
 
       <div class="d-flex gap-2 mt-3">
-        <button class="btn btn-primary" type="submit">Save</button>
-        <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-secondary">Cancel</a>
+        <button class="btn btn-primary" type="submit">{{ _('Save') }}</button>
+        <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-secondary">{{ _('Cancel') }}</a>
       </div>
     </form>
   </div>

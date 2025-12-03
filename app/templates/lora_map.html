@@ -1,37 +1,37 @@
 {% extends "base.html" %}
-{% block title %}Device Map{% endblock %}
+{% block title %}{{ _('Device Map') }}{% endblock %}
 {% block content %}
 
 <div class="d-flex align-items-end gap-3 mb-3">
   <div class="flex-grow-1">
-    <label class="form-label">Devices (multi-select)</label>
+    <label class="form-label">{{ _('Devices (multi-select)') }}</label>
     <select id="deviceSelect" class="form-select" multiple size="6">
       {% for d in devices %}
         <option value="{{ d.dev_num }}">{{ d.name or ("Dev " ~ d.dev_num) }}{% if d.dev_num %} (#{{ d.dev_num }}){% endif %}</option>
       {% endfor %}
     </select>
-    <div class="form-text">Leave none selected to show latest point per device.</div>
+    <div class="form-text">{{ _('Leave none selected to show latest point per device.') }}</div>
   </div>
   <div class="text-muted small">
-    Showing positions reported by devices via GPS payloads.
+    {{ _('Showing positions reported by devices via GPS payloads.') }}
   </div>
   <div class="d-flex flex-column">
-    <label class="form-label">History</label>
+    <label class="form-label">{{ _('History') }}</label>
     <select id="historyLimit" class="form-select">
-      <option value="1">Latest only</option>
-      <option value="10">Last 10</option>
-      <option value="50" selected>Last 50</option>
-      <option value="100">Last 100</option>
+      <option value="1">{{ _('Latest only') }}</option>
+      <option value="10">{{ _('Last 10') }}</option>
+      <option value="50" selected>{{ _('Last 50') }}</option>
+      <option value="100">{{ _('Last 100') }}</option>
     </select>
   </div>
   <div class="form-check mt-4">
     <input class="form-check-input" type="checkbox" id="showTrack" checked>
-    <label class="form-check-label" for="showTrack">Show track line</label>
+    <label class="form-check-label" for="showTrack">{{ _('Show track line') }}</label>
   </div>
   <div class="d-flex align-items-end gap-2">
     <div class="form-check">
       <input class="form-check-input" type="checkbox" id="autoRefresh">
-      <label class="form-check-label" for="autoRefresh">Auto refresh</label>
+      <label class="form-check-label" for="autoRefresh">{{ _('Auto refresh') }}</label>
     </div>
     <select id="autoRefreshInterval" class="form-select">
       <option value="5">5s</option>
@@ -39,7 +39,7 @@
       <option value="30">30s</option>
       <option value="60">60s</option>
     </select>
-    <button id="refreshBtn" class="btn btn-outline-secondary">Refresh</button>
+    <button id="refreshBtn" class="btn btn-outline-secondary">{{ _('Refresh') }}</button>
   </div>
   
 </div>
@@ -63,6 +63,10 @@
 <script>
   const COLOR_POINT = "#0d6efd"; // Bootstrap primary (default)
   const COLOR_TRACK = "#6c757d"; // secondary (default)
+
+  const LABEL_DEV = "{{ _('Dev') }}";
+  const LABEL_RSSI = "{{ _('RSSI') }}";
+  const LABEL_SNR = "{{ _('SNR') }}";
 
   let map, markers = [], polylines = [];
 
@@ -92,7 +96,7 @@
     points.forEach(p => {
       const latlng = [p.lat, p.lon];
       latlngs.push(latlng);
-      const label = `Dev ${p.dev_id}<br>${p.received_at || ''}<br>RSSI: ${p.rssi ?? '—'}, SNR: ${p.snr ?? '—'}`;
+      const label = `${LABEL_DEV} ${p.dev_id}<br>${p.received_at || ''}<br>${LABEL_RSSI}: ${p.rssi ?? '—'}, ${LABEL_SNR}: ${p.snr ?? '—'}`;
 
       const circle = L.circleMarker(latlng, {
         radius: 6,
@@ -124,7 +128,7 @@
     points.forEach(p => {
       const latlng = [p.lat, p.lon];
       latlngs.push(latlng);
-      const label = `Dev ${p.dev_id}<br>${p.received_at || ''}<br>RSSI: ${p.rssi ?? '—'}, SNR: ${p.snr ?? '—'}`;
+      const label = `${LABEL_DEV} ${p.dev_id}<br>${p.received_at || ''}<br>${LABEL_RSSI}: ${p.rssi ?? '—'}, ${LABEL_SNR}: ${p.snr ?? '—'}`;
       const circle = L.circleMarker(latlng, {
         radius: 6,
         color: COLOR_POINT,

@@ -1,15 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Add Check-in{% endblock %}
+{% block title %}{{ _('Add Check-in') }}{% endblock %}
 {% block content %}
 
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title mb-3">Add Check-in</h5>
+    <h5 class="card-title mb-3">{{ _('Add Check-in') }}</h5>
 
     <form method="post">
       <div class="row g-3">
         <div class="col-md-4">
-          <label class="form-label">Team</label>
+          <label class="form-label">{{ _('Team') }}</label>
           <select name="team_id" class="form-select" required>
             {% for t in teams %}
               <option value="{{ t.id }}" {% if dup_team_id and dup_team_id==t.id %}selected{% endif %}>
@@ -20,7 +20,7 @@
         </div>
 
         <div class="col-md-4">
-          <label class="form-label">Checkpoint</label>
+          <label class="form-label">{{ _('Checkpoint') }}</label>
           <select name="checkpoint_id" class="form-select" required>
             {% for cp in checkpoints %}
               <option value="{{ cp.id }}" {% if dup_checkpoint_id and dup_checkpoint_id==cp.id %}selected{% endif %}>
@@ -31,17 +31,17 @@
         </div>
 
         <div class="col-md-4">
-          <label class="form-label">Local time (optional)</label>
+          <label class="form-label">{{ _('Local time (optional)') }}</label>
           <input type="datetime-local"
                  name="timestamp_local"
                  class="form-control"
                  step="1"
                  value="{{ timestamp_prefill or (now.strftime('%Y-%m-%dT%H:%M:%S') if now else '') }}">
-          <div class="form-text">Leave blank to use current time (UTC now).</div>
+          <div class="form-text">{{ _('Leave blank to use current time (UTC now).') }}</div>
         </div>
 
         <div class="col-md-4">
-          <label class="form-label">Timezone</label>
+          <label class="form-label">{{ _('Timezone') }}</label>
           {% set tz_default = 'Europe/Ljubljana' %}
           {% set tz_current = request.form.get('timezone') or tz_default %}
           <select name="timezone" class="form-select">
@@ -57,13 +57,13 @@
       {% if suggest_override %}
         <input type="hidden" name="override" value="replace">
         <div class="alert alert-warning mt-3">
-          This team already checked in at that checkpoint. Submit again to replace the previous timestamp.
+          {{ _('This team already checked in at that checkpoint. Submit again to replace the previous timestamp.') }}
         </div>
       {% endif %}
 
       <div class="d-flex gap-2 mt-3">
-        <button class="btn btn-success" type="submit">Record Check-in</button>
-        <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-secondary">Cancel</a>
+        <button class="btn btn-success" type="submit">{{ _('Record Check-in') }}</button>
+        <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-secondary">{{ _('Cancel') }}</a>
       </div>
     </form>
   </div>

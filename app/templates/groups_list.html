@@ -1,13 +1,13 @@
 {# app/templates/groups_list.html #}
 {% extends "base.html" %}
-{% block title %}Groups{% endblock %}
+{% block title %}{{ _('Groups') }}{% endblock %}
 {% block content %}
 
 <div class="card">
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="mb-0">Groups</h5>
-      <a class="btn btn-sm btn-primary" href="{{ url_for('groups.add_group') }}">Add Group</a>
+      <h5 class="mb-0">{{ _('Groups') }}</h5>
+      <a class="btn btn-sm btn-primary" href="{{ url_for('groups.add_group') }}">{{ _('Add Group') }}</a>
     </div>
 
     {% if groups %}
@@ -16,10 +16,10 @@
           <thead>
             <tr>
               <th style="width:60px;" class="text-center">#</th>
-              <th>Name</th>
-              <th>Description</th>
-              <th class="text-center" style="width:140px;">Checkpoints</th>
-              <th class="text-end" style="width: 180px;">Actions</th>
+              <th>{{ _('Name') }}</th>
+              <th>{{ _('Description') }}</th>
+              <th class="text-center" style="width:140px;">{{ _('Checkpoints') }}</th>
+              <th class="text-end" style="width: 180px;">{{ _('Actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -33,13 +33,13 @@
               </td>
               <td class="text-end">
                 <a class="btn btn-sm btn-outline-primary"
-                   href="{{ url_for('groups.edit_group', group_id=g.id) }}">Edit</a>
+                   href="{{ url_for('groups.edit_group', group_id=g.id) }}">{{ _('Edit') }}</a>
                 {% if has_role('admin') %}
                 <form class="d-inline"
                       method="post"
                       action="{{ url_for('groups.delete_group', group_id=g.id) }}"
-                      onsubmit="return confirm('Delete group {{ g.name }}?');">
-                  <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                      onsubmit="return confirm('{{ _('Delete group %(name)s?', name=g.name) }}');">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">{{ _('Delete') }}</button>
                 </form>
                 {% endif %}
               </td>
@@ -49,7 +49,7 @@
         </table>
       </div>
     {% else %}
-      <p class="text-muted mb-0">No groups yet.</p>
+      <p class="text-muted mb-0">{{ _('No groups yet.') }}</p>
     {% endif %}
   </div>
 </div>

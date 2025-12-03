@@ -1,54 +1,54 @@
 {% extends "base.html" %}
-{% block title %}Edit Checkpoint{% endblock %}
+{% block title %}{{ _('Edit Checkpoint') }}{% endblock %}
 {% block content %}
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title mb-3">Edit Checkpoint</h5>
+    <h5 class="card-title mb-3">{{ _('Edit Checkpoint') }}</h5>
     <form method="post">
 
       <div class="mb-3">
-        <label class="form-label">Name</label>
+        <label class="form-label">{{ _('Name') }}</label>
         <input name="name" class="form-control" value="{{ cp.name }}" required>
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Location (text)</label>
+        <label class="form-label">{{ _('Location (text)') }}</label>
         <input name="location" class="form-control" value="{{ cp.location or '' }}">
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Description</label>
+        <label class="form-label">{{ _('Description') }}</label>
         <textarea name="description" rows="2" class="form-control">{{ cp.description or '' }}</textarea>
       </div>
 
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">Easting</label>
+          <label class="form-label">{{ _('Easting') }}</label>
           <input type="number" step="any" name="easting" class="form-control"
                  value="{{ cp.easting if cp.easting is not none }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Northing</label>
+          <label class="form-label">{{ _('Northing') }}</label>
           <input type="number" step="any" name="northing" class="form-control"
                  value="{{ cp.northing if cp.northing is not none }}">
         </div>
       </div>
 
       <div class="mb-3 mt-3">
-        <label class="form-label">Device (optional)</label>
+        <label class="form-label">{{ _('Device (optional)') }}</label>
         <select name="lora_device_id" class="form-select">
-          <option value="">— none —</option>
+          <option value="">— {{ _('none') }} —</option>
           {% for d in devices %}
             <option value="{{ d.id }}"
               {% if selected_device_id == d.id %}selected{% endif %}>
-              {{ d.name or 'Device' }} — #{{ d.dev_num }}
+              {{ d.name or _('Device') }} — #{{ d.dev_num }}
             </option>
           {% endfor %}
         </select>
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Groups</label>
+        <label class="form-label">{{ _('Groups') }}</label>
         <div class="row row-cols-1 row-cols-md-2 g-2">
           {% for g in groups %}
             <div class="col">
@@ -64,12 +64,12 @@
             </div>
           {% endfor %}
         </div>
-        <div class="form-text">A checkpoint can belong to many groups.</div>
+        <div class="form-text">{{ _('A checkpoint can belong to many groups.') }}</div>
       </div>
 
       <div class="d-flex gap-2">
-        <button class="btn btn-primary" type="submit">Save</button>
-        <a href="{{ url_for('checkpoints.list_checkpoints') }}" class="btn btn-secondary">Cancel</a>
+        <button class="btn btn-primary" type="submit">{{ _('Save') }}</button>
+        <a href="{{ url_for('checkpoints.list_checkpoints') }}" class="btn btn-secondary">{{ _('Cancel') }}</a>
       </div>
     </form>
   </div>

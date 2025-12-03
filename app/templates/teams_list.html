@@ -1,6 +1,6 @@
 {# app/templates/teams_list.html #}
 {% extends "base.html" %}
-{% block title %}Teams{% endblock %}
+{% block title %}{{ _('Teams') }}{% endblock %}
 {% block content %}
 
 <div class="card mb-3">
@@ -9,9 +9,9 @@
         
 
       <div class="col-12 col-md-4">
-        <label class="form-label">Group</label>
+        <label class="form-label">{{ _('Group') }}</label>
         <select name="group_id" class="form-select">
-          <option value="">— All groups —</option>
+          <option value="">— {{ _('All groups') }} —</option>
           {% for g in groups %}
             <option value="{{ g.id }}" {% if selected_group_id == g.id %}selected{% endif %}>
               {{ g.name }}
@@ -21,42 +21,42 @@
       </div>
 
       <div class="col-12 col-md-4">
-        <label class="form-label">Sort</label>
+        <label class="form-label">{{ _('Sort') }}</label>
         <select name="sort" class="form-select">
-          <option value="name_asc"   {% if selected_sort == 'name_asc' %}selected{% endif %}>Name (A→Z)</option>
-          <option value="name_desc"  {% if selected_sort == 'name_desc' %}selected{% endif %}>Name (Z→A)</option>
-          <option value="number_asc" {% if selected_sort == 'number_asc' %}selected{% endif %}>Number (↑)</option>
-          <option value="number_desc"{% if selected_sort == 'number_desc' %}selected{% endif %}>Number (↓)</option>
+          <option value="name_asc"   {% if selected_sort == 'name_asc' %}selected{% endif %}>{{ _('Name (A→Z)') }}</option>
+          <option value="name_desc"  {% if selected_sort == 'name_desc' %}selected{% endif %}>{{ _('Name (Z→A)') }}</option>
+          <option value="number_asc" {% if selected_sort == 'number_asc' %}selected{% endif %}>{{ _('Number (↑)') }}</option>
+          <option value="number_desc"{% if selected_sort == 'number_desc' %}selected{% endif %}>{{ _('Number (↓)') }}</option>
         </select>
       </div>
 
       <div class="col-12 d-flex gap-2 justify-content-md-end mt-2">
-        <button class="btn btn-primary" type="submit">Apply</button>
-        <a class="btn btn-outline-secondary" href="{{ url_for('teams.list_teams') }}">Reset</a>
+        <button class="btn btn-primary" type="submit">{{ _('Apply') }}</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('teams.list_teams') }}">{{ _('Reset') }}</a>
         {% if has_role('judge','admin') %}
-          <a class="btn btn-success" href="{{ url_for('teams.add_team') }}">Add Team</a>
+          <a class="btn btn-success" href="{{ url_for('teams.add_team') }}">{{ _('Add Team') }}</a>
         {% endif %}
       </div>
     </form>
   </div>
 </div>
 
-<div class="text-muted mb-2">Total: {{ teams|length }}</div>
+<div class="text-muted mb-2">{{ _('Total: %(count)s', count=teams|length) }}</div>
 
 {% if teams|length == 0 %}
-  <div class="alert alert-info">No teams found.</div>
+  <div class="alert alert-info">{{ _('No teams found.') }}</div>
 {% else %}
   <div class="table-responsive">
     <table class="table table-bordered table-striped align-middle">
       <thead>
         <tr>
           <th style="width:60px;">#</th>
-          <th>Name</th>
-          <th>Rod / Org</th>
-          <th style="width:120px;">Number</th>
-          <th>Groups</th>
+          <th>{{ _('Name') }}</th>
+          <th>{{ _('Rod / Org') }}</th>
+          <th style="width:120px;">{{ _('Number') }}</th>
+          <th>{{ _('Groups') }}</th>
           {% if has_role('judge','admin') %}
-            <th class="text-end" style="width:180px;">Actions</th>
+            <th class="text-end" style="width:180px;">{{ _('Actions') }}</th>
           {% endif %}
         </tr>
       </thead>
@@ -73,19 +73,19 @@
               {% if assignment and assignment.group %}
                 <span class="badge bg-success">{{ assignment.group.name }}</span>
               {% else %}
-                <span class="text-muted">No group</span>
+                <span class="text-muted">{{ _('No group') }}</span>
               {% endif %}
             </td>
 
             {% if has_role('judge','admin') %}
               <td class="text-end">
                 <a href="{{ url_for('teams.edit_team', team_id=team.id) }}"
-                   class="btn btn-sm btn-outline-primary">Edit</a>
+                   class="btn btn-sm btn-outline-primary">{{ _('Edit') }}</a>
                 {% if has_role('admin') %}
                 <form action="{{ url_for('teams.delete_team', team_id=team.id) }}"
                       method="post" class="d-inline"
-                      onsubmit="return confirm('Delete this team?')">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                      onsubmit="return confirm('{{ _('Delete this team?') }}')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
                 </form>
                 {% endif %}
               </td>

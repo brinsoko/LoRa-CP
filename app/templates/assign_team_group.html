@@ -1,8 +1,8 @@
-{% extends "base.html" %}{% block title %}Assign Team → Group{% endblock %}{% block content %}
+{% extends "base.html" %}{% block title %}{{ _('Assign Team → Group') }}{% endblock %}{% block content %}
 <form method="post" class="card p-3">
   <div class="row g-3">
     <div class="col-md-5">
-      <label class="form-label">Team</label>
+      <label class="form-label">{{ _('Team') }}</label>
       <select name="team_id" class="form-select" required>
         {% for t in teams %}
           <option value="{{ t.id }}">{{ t.name }}{% if t.number %} ({{ t.number }}){% endif %}</option>
@@ -10,7 +10,7 @@
       </select>
     </div>
     <div class="col-md-5">
-      <label class="form-label">Group</label>
+      <label class="form-label">{{ _('Group') }}</label>
       <select name="group_id" class="form-select" required>
         {% for g in groups %}
           <option value="{{ g.id }}">{{ g.name }}</option>
@@ -18,7 +18,7 @@
       </select>
     </div>
     <div class="col-md-2 d-flex align-items-end">
-      <button class="btn btn-primary w-100">Assign</button>
+      <button class="btn btn-primary w-100">{{ _('Assign') }}</button>
     </div>
   </div>
 </form>

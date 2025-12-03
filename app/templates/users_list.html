@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Users{% endblock %}
+{% block title %}{{ _('Users') }}{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h5>Users</h5>
-  <a class="btn btn-sm btn-primary" href="{{ url_for('users.add_user') }}">Add User</a>
+  <h5>{{ _('Users') }}</h5>
+  <a class="btn btn-sm btn-primary" href="{{ url_for('users.add_user') }}">{{ _('Add User') }}</a>
 </div>
 
 {% if users %}
@@ -12,9 +12,9 @@
     <thead>
       <tr>
         <th>#</th>
-        <th>Username</th>
-        <th>Role</th>
-        <th class="text-end" style="width: 200px;">Actions</th>
+        <th>{{ _('Username') }}</th>
+        <th>{{ _('Role') }}</th>
+        <th class="text-end" style="width: 200px;">{{ _('Actions') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -24,14 +24,14 @@
         <td>{{ u.username }}</td>
         <td>{{ u.role }}</td>
         <td class="text-end">
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('users.edit_user', user_id=u.id) }}">Edit</a>
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('users.edit_user', user_id=u.id) }}">{{ _('Edit') }}</a>
           {% if current_user.id != u.id %}
           <form class="d-inline" method="post" action="{{ url_for('users.delete_user', user_id=u.id) }}"
-                onsubmit="return confirm('Delete user {{ u.username }}?');">
-            <button class="btn btn-sm btn-outline-danger">Delete</button>
+                onsubmit="return confirm('{{ _('Delete user %(user)s?', user=u.username) }}');">
+            <button class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
           </form>
           {% else %}
-          <button class="btn btn-sm btn-outline-secondary" disabled title="Cannot delete yourself">Delete</button>
+          <button class="btn btn-sm btn-outline-secondary" disabled title="{{ _('Cannot delete yourself') }}">{{ _('Delete') }}</button>
           {% endif %}
         </td>
       </tr>
@@ -40,6 +40,6 @@
   </table>
 </div>
 {% else %}
-<p class="text-muted">No users yet.</p>
+<p class="text-muted">{{ _('No users yet.') }}</p>
 {% endif %}
 {% endblock %}

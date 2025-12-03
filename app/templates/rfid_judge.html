@@ -1,42 +1,42 @@
 {% extends "base.html" %}
-{% block title %}Judge RFID Console{% endblock %}
+{% block title %}{{ _('Judge RFID Console') }}{% endblock %}
 
 {% block content %}
 <div class="row g-3">
   <div class="col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h5 class="card-title mb-3">Web NFC: Read → Ingest → Append</h5>
+        <h5 class="card-title mb-3">{{ _('Web NFC: Read → Ingest → Append') }}</h5>
         <p class="text-body-secondary small">
-          Tap a tag with your phone to read its UID, call ingest for the selected device/checkpoint, then append the signed payload back onto the tag.
+          {{ _('Tap a tag with your phone to read its UID, call ingest for the selected device/checkpoint, then append the signed payload back onto the tag.') }}
         </p>
 
         <form id="judgeForm" class="row g-3">
           <div class="col-12">
-            <label class="form-label">Device / Checkpoint</label>
+            <label class="form-label">{{ _('Device / Checkpoint') }}</label>
             <select class="form-select" id="deviceSelect" required {% if not devices %}disabled{% endif %}>
               {% for d in devices %}
                 <option value="{{ d.dev_num }}">
-                  {{ d.name or ("Device " ~ d.dev_num) }}{% if d.dev_num %} (#{{ d.dev_num }}){% endif %}
+                  {{ d.name or (_('Device') ~ ' ' ~ d.dev_num) }}{% if d.dev_num %} (#{{ d.dev_num }}){% endif %}
                   {% if d.checkpoint %} - {{ d.checkpoint.name }}{% endif %}
                 </option>
               {% endfor %}
             </select>
-            <div class="form-text">Uses the device ID sent to /api/ingest.</div>
+            <div class="form-text">{{ _('Uses the device ID sent to /api/ingest.') }}</div>
             {% if not devices %}
-              <div class="alert alert-warning mt-2 mb-0 small">No devices configured yet.</div>
+              <div class="alert alert-warning mt-2 mb-0 small">{{ _('No devices configured yet.') }}</div>
             {% endif %}
           </div>
 
           <div class="col-12">
-            <label class="form-label">Last UID read</label>
+            <label class="form-label">{{ _('Last UID read') }}</label>
             <input type="text" class="form-control" id="cardUid" readonly>
-            <div class="form-text">Filled when you tap a tag with Web NFC.</div>
+            <div class="form-text">{{ _('Filled when you tap a tag with Web NFC.') }}</div>
           </div>
 
           <div class="col-12 d-flex gap-2">
             <button class="btn btn-primary" type="submit" id="submitBtn" {% if not devices %}disabled{% endif %}>
-              Tap tag: read → ingest → append write
+              {{ _('Tap tag: read → ingest → append write') }}
             </button>
           </div>
         </form>
@@ -47,27 +47,27 @@
   <div class="col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h6 class="card-title mb-3">Result</h6>
-        <div id="resultBox" class="alert alert-secondary">Awaiting input…</div>
+        <h6 class="card-title mb-3">{{ _('Result') }}</h6>
+        <div id="resultBox" class="alert alert-secondary">{{ _('Awaiting input…') }}</div>
 
         <div class="mb-3">
-          <label class="form-label">Write-back payload</label>
+          <label class="form-label">{{ _('Write-back payload') }}</label>
           <div class="input-group">
             <input type="text" class="form-control" id="writePayload" readonly>
-            <button class="btn btn-outline-secondary" type="button" id="copyBtn">Copy</button>
+            <button class="btn btn-outline-secondary" type="button" id="copyBtn">{{ _('Copy') }}</button>
           </div>
           <div class="form-text">
-            Appended to the tag as a text record. We only store the truncated HMAC (device ID + card UID) to save space.
+            {{ _('Appended to the tag as a text record. We only store the truncated HMAC (device ID + card UID) to save space.') }}
           </div>
         </div>
 
         <div class="border rounded-3 p-3">
           <div class="d-flex align-items-center gap-2 mb-2">
-            <strong>Web NFC</strong>
-            <span class="badge text-bg-secondary" id="webNfcStatus">Checking…</span>
+            <strong>{{ _('Web NFC') }}</strong>
+            <span class="badge text-bg-secondary" id="webNfcStatus">{{ _('Checking…') }}</span>
           </div>
           <p class="small text-body-secondary mb-0">
-            Supported on Android Chrome 89+. We read existing text records, call ingest, then write them back with the new payload appended. Keep the tag in place until you see success.
+            {{ _('Supported on Android Chrome 89+. We read existing text records, call ingest, then write them back with the new payload appended. Keep the tag in place until you see success.') }}
           </p>
         </div>
 
@@ -89,6 +89,26 @@
   const webNfcStatus = document.getElementById("webNfcStatus");
   const hasWebNfc = typeof NDEFReader !== "undefined";
 
+  const I18N = {
+    team: "{{ _('Team') }}",
+    checkpoint: "{{ _('Checkpoint') }}",
+    checkinCreated: "{{ _('Check-in created') }}",
+    cardNotMapped: "{{ _('Card not mapped to a team') }}",
+    ingestCompleted: "{{ _('Ingest completed.') }}",
+    pickDevice: "{{ _('Pick a device/checkpoint first.') }}",
+    noWebNfc: "{{ _('Web NFC not available in this browser.') }}",
+    tapToRead: "{{ _('Tap a tag to read…') }}",
+    noWriteback: "{{ _('Ingest did not return a write-back payload.') }}",
+    readIngestAppend: "{{ _('Read, ingested, and appended payload to tag.') }}",
+    webNfcFailed: "{{ _('Web NFC flow failed.') }}",
+    webNfcError: "{{ _('Web NFC read error.') }}",
+    webNfcNA: "{{ _('Web NFC not available.') }}",
+    copied: "{{ _('Write-back payload copied.') }}",
+    copyFailed: "{{ _('Could not copy payload.') }}",
+    supported: "{{ _('Supported') }}",
+    notAvailable: "{{ _('Not available') }}",
+  };
+
   function setBusy(busy) {
     submitBtn.disabled = busy;
   }
@@ -100,11 +120,11 @@
 
   function renderResult(data) {
     const parts = [];
-    if (data.team) parts.push(`Team: ${data.team}`);
-    if (data.checkpoint) parts.push(`Checkpoint: ${data.checkpoint}`);
-    if (data.checkin_created) parts.push("Check-in created");
-    if (data.uid_seen === false) parts.push("Card not mapped to a team");
-    showMessage(parts.join(" · ") || "Ingest completed.", "success");
+    if (data.team) parts.push(`${I18N.team}: ${data.team}`);
+    if (data.checkpoint) parts.push(`${I18N.checkpoint}: ${data.checkpoint}`);
+    if (data.checkin_created) parts.push(I18N.checkinCreated);
+    if (data.uid_seen === false) parts.push(I18N.cardNotMapped);
+    showMessage(parts.join(" · ") || I18N.ingestCompleted, "success");
 
     if (data.card_writeback && data.card_writeback.payload) {
       writePayload.value = data.card_writeback.payload;
@@ -134,11 +154,11 @@
     event.preventDefault();
     const devId = parseInt(deviceSelect.value || "0", 10);
     if (!devId) {
-      showMessage("Pick a device/checkpoint first.", "warning");
+      showMessage(I18N.pickDevice, "warning");
       return;
     }
     if (!hasWebNfc) {
-      showMessage("Web NFC not available in this browser.", "danger");
+      showMessage(I18N.noWebNfc, "danger");
       return;
     }
 
@@ -146,7 +166,7 @@
     try {
       const reader = new NDEFReader();
       await reader.scan();
-      showMessage("Tap a tag to read…", "info");
+      showMessage(I18N.tapToRead, "info");
 
       const onRead = async (event) => {
         reader.removeEventListener("reading", onRead);
@@ -173,7 +193,7 @@
 
           const payload = ingestJson?.card_writeback?.payload || "";
           if (!payload) {
-            throw new Error("Ingest did not return a write-back payload.");
+            throw new Error(I18N.noWriteback);
           }
 
           const combined = prevText ? `${prevText}\n${payload}` : payload;
@@ -182,9 +202,9 @@
 
           writePayload.value = payload;
           renderResult(ingestJson);
-          showMessage("Read, ingested, and appended payload to tag.", "success");
+          showMessage(I18N.readIngestAppend, "success");
         } catch (err) {
-          showMessage(err.message || "Web NFC flow failed.", "danger");
+          showMessage(err.message || I18N.webNfcFailed, "danger");
         } finally {
           setBusy(false);
         }
@@ -192,14 +212,14 @@
 
       const onError = () => {
         reader.removeEventListener("reading", onRead);
-        showMessage("Web NFC read error.", "danger");
+        showMessage(I18N.webNfcError, "danger");
         setBusy(false);
       };
 
       reader.addEventListener("reading", onRead);
       reader.addEventListener("readingerror", onError, { once: true });
     } catch (err) {
-      showMessage(err.message || "Web NFC not available.", "danger");
+      showMessage(err.message || I18N.webNfcNA, "danger");
       setBusy(false);
     }
   }
@@ -207,8 +227,8 @@
   function handleCopy() {
     if (!writePayload.value) return;
     navigator.clipboard.writeText(writePayload.value).then(
-      () => showMessage("Write-back payload copied.", "info"),
-      () => showMessage("Could not copy payload.", "warning")
+      () => showMessage(I18N.copied, "info"),
+      () => showMessage(I18N.copyFailed, "warning")
     );
   }
 
@@ -216,10 +236,10 @@
   form?.addEventListener("submit", handleSubmit);
 
   if (hasWebNfc) {
-    webNfcStatus.textContent = "Supported";
+    webNfcStatus.textContent = I18N.supported;
     webNfcStatus.className = "badge text-bg-success";
   } else {
-    webNfcStatus.textContent = "Not available";
+    webNfcStatus.textContent = I18N.notAvailable;
     webNfcStatus.className = "badge text-bg-secondary";
   }
 </script>

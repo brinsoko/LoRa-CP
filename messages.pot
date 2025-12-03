@@ -1,0 +1,1088 @@
+# Translations template for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-12-03 23:37+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.13.0\n"
+
+#: app/templates/403.html:3
+msgid "Forbidden: you don’t have access to this page."
+msgstr ""
+
+#: app/templates/add_checkin.html:2 app/templates/add_checkin.html:7
+#: app/templates/base.html:113 app/templates/view_checkins.html:70
+msgid "Add Check-in"
+msgstr ""
+
+#: app/templates/add_checkin.html:12 app/templates/assign_team_group.html:5
+#: app/templates/checkin_edit.html:12 app/templates/map.html:7
+#: app/templates/rfid_finish.html:91 app/templates/rfid_judge.html:93
+#: app/templates/rfid_list.html:25 app/templates/view_checkins.html:9
+#: app/templates/view_checkins.html:87
+msgid "Team"
+msgstr ""
+
+#: app/templates/add_checkin.html:23 app/templates/checkin_edit.html:23
+#: app/templates/group_members.html:23 app/templates/lora_list.html:13
+#: app/templates/rfid_judge.html:94 app/templates/view_checkins.html:22
+#: app/templates/view_checkins.html:89
+msgid "Checkpoint"
+msgstr ""
+
+#: app/templates/add_checkin.html:34
+msgid "Local time (optional)"
+msgstr ""
+
+#: app/templates/add_checkin.html:40
+msgid "Leave blank to use current time (UTC now)."
+msgstr ""
+
+#: app/templates/add_checkin.html:44 app/templates/checkin_edit.html:45
+msgid "Timezone"
+msgstr ""
+
+#: app/templates/add_checkin.html:60
+msgid ""
+"This team already checked in at that checkpoint. Submit again to replace "
+"the previous timestamp."
+msgstr ""
+
+#: app/templates/add_checkin.html:65
+msgid "Record Check-in"
+msgstr ""
+
+#: app/templates/add_checkin.html:66 app/templates/add_checkpoint.html:70
+#: app/templates/add_team.html:34 app/templates/change_password.html:21
+#: app/templates/checkin_edit.html:72 app/templates/checkpoint_edit.html:72
+#: app/templates/checkpoints_import.html:19
+#: app/templates/checkpoints_import_json.html:31
+#: app/templates/group_add.html:17 app/templates/group_edit.html:64
+#: app/templates/login.html:16 app/templates/lora_add.html:21
+#: app/templates/lora_edit.html:25 app/templates/register.html:24
+#: app/templates/team_edit.html:34 app/templates/user_edit.html:42
+msgid "Cancel"
+msgstr ""
+
+#: app/templates/add_checkpoint.html:2 app/templates/add_checkpoint.html:6
+#: app/templates/checkpoints_list.html:10
+msgid "Add Checkpoint"
+msgstr ""
+
+#: app/templates/add_checkpoint.html:10 app/templates/add_team.html:8
+#: app/templates/checkpoint_edit.html:10
+#: app/templates/checkpoints_import_preview.html:21
+#: app/templates/checkpoints_list.html:22 app/templates/group_add.html:8
+#: app/templates/group_edit.html:13 app/templates/groups_list.html:19
+#: app/templates/lora_edit.html:12 app/templates/lora_list.html:13
+#: app/templates/team_edit.html:8 app/templates/teams_list.html:54
+msgid "Name"
+msgstr ""
+
+#: app/templates/add_checkpoint.html:15 app/templates/checkpoint_edit.html:15
+msgid "Location (text)"
+msgstr ""
+
+#: app/templates/add_checkpoint.html:20 app/templates/checkpoint_edit.html:20
+#: app/templates/checkpoints_import_preview.html:24
+#: app/templates/checkpoints_list.html:24 app/templates/group_add.html:12
+#: app/templates/group_edit.html:17 app/templates/groups_list.html:20
+msgid "Description"
+msgstr ""
+
+#: app/templates/add_checkpoint.html:26 app/templates/checkpoint_edit.html:26
+#: app/templates/checkpoints_import_preview.html:22
+msgid "Easting"
+msgstr ""
+
+#: app/templates/add_checkpoint.html:30 app/templates/checkpoint_edit.html:31
+#: app/templates/checkpoints_import_preview.html:23
+msgid "Northing"
+msgstr ""
+
+#: app/templates/add_checkpoint.html:36 app/templates/checkpoint_edit.html:38
+msgid "Device (optional)"
+msgstr ""
+
+#: app/templates/add_checkpoint.html:38 app/templates/checkpoint_edit.html:40
+msgid "none"
+msgstr ""
+
+#: app/templates/add_checkpoint.html:42 app/templates/checkpoint_edit.html:44
+#: app/templates/rfid_finish.html:20 app/templates/rfid_judge.html:20
+msgid "Device"
+msgstr ""
+
+#: app/templates/add_checkpoint.html:49 app/templates/base.html:119
+#: app/templates/checkpoint_edit.html:51 app/templates/checkpoints_list.html:25
+#: app/templates/groups_list.html:3 app/templates/groups_list.html:9
+#: app/templates/teams_list.html:57
+msgid "Groups"
+msgstr ""
+
+#: app/templates/add_checkpoint.html:65 app/templates/checkpoint_edit.html:67
+msgid "A checkpoint can belong to many groups."
+msgstr ""
+
+#: app/templates/add_checkpoint.html:69 app/templates/add_team.html:33
+#: app/templates/group_add.html:16 app/templates/register.html:23
+#: app/templates/user_edit.html:41
+msgid "Create"
+msgstr ""
+
+#: app/templates/add_team.html:5 app/templates/teams_list.html:37
+msgid "Add Team"
+msgstr ""
+
+#: app/templates/add_team.html:13
+msgid "Organizations"
+msgstr ""
+
+#: app/templates/add_team.html:18 app/templates/team_edit.html:18
+#: app/templates/teams_list.html:56
+msgid "Number"
+msgstr ""
+
+#: app/templates/add_team.html:23 app/templates/assign_team_group.html:13
+#: app/templates/team_edit.html:23 app/templates/teams_list.html:12
+msgid "Group"
+msgstr ""
+
+#: app/templates/add_team.html:25 app/templates/team_edit.html:25
+#: app/templates/teams_list.html:76
+msgid "No group"
+msgstr ""
+
+#: app/templates/assign_team_group.html:1 app/templates/base.html:123
+msgid "Assign Team → Group"
+msgstr ""
+
+#: app/templates/assign_team_group.html:21
+msgid "Assign"
+msgstr ""
+
+#: app/templates/base.html:6 app/templates/base.html:42
+msgid "RFID Checkpoint System"
+msgstr ""
+
+#: app/templates/base.html:48
+#, python-format
+msgid "Signed in as %(user)s (%(role)s)"
+msgstr ""
+
+#: app/templates/base.html:51
+msgid "Logout"
+msgstr ""
+
+#: app/templates/base.html:54 app/templates/change_password.html:5
+#: app/templates/change_password.html:20
+msgid "Change Password"
+msgstr ""
+
+#: app/templates/base.html:57
+msgid "Login"
+msgstr ""
+
+#: app/templates/base.html:60 app/templates/register.html:5
+msgid "Create User"
+msgstr ""
+
+#: app/templates/base.html:64 app/templates/users_list.html:2
+#: app/templates/users_list.html:5
+msgid "Users"
+msgstr ""
+
+#: app/templates/base.html:69
+msgid "Dark mode"
+msgstr ""
+
+#: app/templates/base.html:104 app/templates/teams_list.html:3
+msgid "Teams"
+msgstr ""
+
+#: app/templates/base.html:108 app/templates/checkpoints_list.html:2
+#: app/templates/checkpoints_list.html:7 app/templates/group_edit.html:22
+#: app/templates/groups_list.html:21
+msgid "Checkpoints"
+msgstr ""
+
+#: app/templates/base.html:112
+msgid "View Check-ins"
+msgstr ""
+
+#: app/templates/base.html:115
+msgid "Map RFID ↔ Team"
+msgstr ""
+
+#: app/templates/base.html:116
+msgid "Judge RFID"
+msgstr ""
+
+#: app/templates/base.html:117 app/templates/rfid_finish.html:2
+msgid "Finish Check"
+msgstr ""
+
+#: app/templates/base.html:120 app/templates/lora_list.html:2
+#: app/templates/lora_list.html:5
+msgid "Devices"
+msgstr ""
+
+#: app/templates/base.html:127
+msgid "Messages"
+msgstr ""
+
+#: app/templates/base.html:130
+msgid "Map"
+msgstr ""
+
+#: app/templates/base.html:131 app/templates/lora_map.html:2
+msgid "Device Map"
+msgstr ""
+
+#: app/templates/base.html:133
+msgid "Sheets"
+msgstr ""
+
+#: app/templates/change_password.html:8
+msgid "Current password"
+msgstr ""
+
+#: app/templates/change_password.html:12
+msgid "New password"
+msgstr ""
+
+#: app/templates/change_password.html:14
+msgid "At least 8 characters; avoid using your username."
+msgstr ""
+
+#: app/templates/change_password.html:17
+msgid "Confirm new password"
+msgstr ""
+
+#: app/templates/checkin_edit.html:2 app/templates/checkin_edit.html:7
+msgid "Edit Check-in"
+msgstr ""
+
+#: app/templates/checkin_edit.html:34
+msgid "Local time"
+msgstr ""
+
+#: app/templates/checkin_edit.html:41
+msgid "Edit using your local time (with seconds)."
+msgstr ""
+
+#: app/templates/checkin_edit.html:56
+msgid "Used to convert local time → UTC in the database."
+msgstr ""
+
+#: app/templates/checkin_edit.html:66
+msgid ""
+"Another check-in exists for the same team & checkpoint. Submit to replace"
+" it with this timestamp."
+msgstr ""
+
+#: app/templates/checkin_edit.html:71 app/templates/checkpoint_edit.html:71
+#: app/templates/group_edit.html:63 app/templates/lora_add.html:20
+#: app/templates/lora_edit.html:24 app/templates/team_edit.html:33
+#: app/templates/user_edit.html:41
+msgid "Save"
+msgstr ""
+
+#: app/templates/checkpoint_edit.html:2 app/templates/checkpoint_edit.html:6
+msgid "Edit Checkpoint"
+msgstr ""
+
+#: app/templates/checkpoints_import.html:2
+#: app/templates/checkpoints_import.html:6
+#: app/templates/checkpoints_import_json.html:2
+#: app/templates/checkpoints_import_json.html:7
+#: app/templates/checkpoints_list.html:11
+msgid "Import Checkpoints (JSON)"
+msgstr ""
+
+#: app/templates/checkpoints_import.html:8
+msgid ""
+"Upload a .json file with either an array of checkpoints, or an object "
+"containing checkpoints or cps. Keys: name (auto-generated if missing), e,"
+" n, description, location."
+msgstr ""
+
+#: app/templates/checkpoints_import.html:13
+msgid "Select JSON file"
+msgstr ""
+
+#: app/templates/checkpoints_import.html:18
+msgid "Preview"
+msgstr ""
+
+#: app/templates/checkpoints_import_json.html:8
+#: app/templates/checkpoints_import_preview.html:55
+msgid "Back"
+msgstr ""
+
+#: app/templates/checkpoints_import_json.html:10
+msgid ""
+"Paste JSON or upload a file. Accepted: an array of checkpoints, an object"
+" with items, or a mapping with cps (e/n/name) like the map export."
+msgstr ""
+
+#: app/templates/checkpoints_import_json.html:13
+msgid "API format (items)"
+msgstr ""
+
+#: app/templates/checkpoints_import_json.html:17
+msgid "Map export format (cps)"
+msgstr ""
+
+#: app/templates/checkpoints_import_json.html:23
+msgid "Upload JSON file (optional)"
+msgstr ""
+
+#: app/templates/checkpoints_import_json.html:27
+msgid "JSON payload"
+msgstr ""
+
+#: app/templates/checkpoints_import_json.html:30
+msgid "Import"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:3
+msgid "Preview Checkpoint Import"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:7
+msgid "Preview: Checkpoint Import"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:10
+#, python-format
+msgid "Create: %(count)s"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:11
+#, python-format
+msgid "Update: %(count)s"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:12
+#, python-format
+msgid "Skip: %(count)s"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:20
+msgid "Action"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:25
+#: app/templates/checkpoints_list.html:23
+msgid "Location"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:33
+msgid "create"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:35
+msgid "update"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:37
+msgid "skip"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:54
+msgid "Confirm Import"
+msgstr ""
+
+#: app/templates/checkpoints_import_preview.html:58
+msgid "No rows to preview."
+msgstr ""
+
+#: app/templates/checkpoints_list.html:27 app/templates/group_members.html:23
+#: app/templates/groups_list.html:22 app/templates/lora_list.html:13
+#: app/templates/rfid_list.html:28 app/templates/teams_list.html:59
+#: app/templates/users_list.html:17 app/templates/view_checkins.html:91
+msgid "Actions"
+msgstr ""
+
+#: app/templates/checkpoints_list.html:50 app/templates/groups_list.html:36
+#: app/templates/lora_list.html:26 app/templates/rfid_list.html:41
+#: app/templates/teams_list.html:83 app/templates/users_list.html:27
+#: app/templates/view_checkins.html:106
+msgid "Edit"
+msgstr ""
+
+#: app/templates/checkpoints_list.html:55
+msgid "Delete this checkpoint?"
+msgstr ""
+
+#: app/templates/checkpoints_list.html:56 app/templates/groups_list.html:42
+#: app/templates/lora_list.html:30 app/templates/rfid_list.html:46
+#: app/templates/teams_list.html:88 app/templates/users_list.html:31
+#: app/templates/users_list.html:34 app/templates/view_checkins.html:111
+msgid "Delete"
+msgstr ""
+
+#: app/templates/checkpoints_list.html:67
+msgid "No checkpoints yet."
+msgstr ""
+
+#: app/templates/group_add.html:5 app/templates/group_edit.html:2
+#: app/templates/group_edit.html:9 app/templates/groups_list.html:10
+msgid "Add Group"
+msgstr ""
+
+#: app/templates/group_edit.html:2 app/templates/group_edit.html:9
+msgid "Edit Group"
+msgstr ""
+
+#: app/templates/group_edit.html:27
+msgid "Selected order"
+msgstr ""
+
+#: app/templates/group_edit.html:28
+msgid "Drag the handle to reorder"
+msgstr ""
+
+#: app/templates/group_edit.html:30 app/templates/group_edit.html:39
+msgid "No checkpoints selected yet."
+msgstr ""
+
+#: app/templates/group_edit.html:35 app/templates/group_edit.html:155
+#: app/templates/group_members.html:43
+msgid "Remove"
+msgstr ""
+
+#: app/templates/group_edit.html:44 app/templates/group_members.html:8
+msgid "Add checkpoint"
+msgstr ""
+
+#: app/templates/group_edit.html:47 app/templates/group_edit.html:112
+msgid "Select checkpoint"
+msgstr ""
+
+#: app/templates/group_edit.html:52 app/templates/group_members.html:16
+msgid "Add"
+msgstr ""
+
+#: app/templates/group_edit.html:54
+msgid ""
+"Add checkpoints to include them in the group. Use drag-and-drop to "
+"arrange the visit order."
+msgstr ""
+
+#: app/templates/group_members.html:1
+msgid "Group Members"
+msgstr ""
+
+#: app/templates/group_members.html:2
+#, python-format
+msgid "Group: %(name)s"
+msgstr ""
+
+#: app/templates/group_members.html:23
+msgid "Order"
+msgstr ""
+
+#: app/templates/group_members.html:40
+msgid "Remove from group?"
+msgstr ""
+
+#: app/templates/group_members.html:50
+msgid "No checkpoints in this group yet."
+msgstr ""
+
+#: app/templates/groups_list.html:41
+#, python-format
+msgid "Delete group %(name)s?"
+msgstr ""
+
+#: app/templates/groups_list.html:52
+msgid "No groups yet."
+msgstr ""
+
+#: app/templates/login.html:5
+msgid "Sign In"
+msgstr ""
+
+#: app/templates/login.html:8 app/templates/register.html:8
+#: app/templates/user_edit.html:8 app/templates/users_list.html:15
+msgid "Username"
+msgstr ""
+
+#: app/templates/login.html:12 app/templates/register.html:12
+#: app/templates/user_edit.html:15
+msgid "Password"
+msgstr ""
+
+#: app/templates/login.html:15
+msgid "Sign in"
+msgstr ""
+
+#: app/templates/lora_add.html:2 app/templates/lora_add.html:5
+#: app/templates/lora_list.html:6
+msgid "Add Device"
+msgstr ""
+
+#: app/templates/lora_add.html:8 app/templates/lora_edit.html:8
+msgid "Device Number"
+msgstr ""
+
+#: app/templates/lora_add.html:12
+msgid "Name (optional)"
+msgstr ""
+
+#: app/templates/lora_add.html:13
+msgid "North Gate"
+msgstr ""
+
+#: app/templates/lora_add.html:16 app/templates/lora_edit.html:16
+msgid "Note"
+msgstr ""
+
+#: app/templates/lora_edit.html:2 app/templates/lora_edit.html:5
+msgid "Edit Device"
+msgstr ""
+
+#: app/templates/lora_edit.html:21 app/templates/lora_list.html:13
+msgid "Active"
+msgstr ""
+
+#: app/templates/lora_list.html:13
+msgid "DevNum"
+msgstr ""
+
+#: app/templates/lora_list.html:13
+msgid "Checkpoint Description"
+msgstr ""
+
+#: app/templates/lora_list.html:13
+msgid "Last Seen (UTC)"
+msgstr ""
+
+#: app/templates/lora_list.html:21
+msgid "Yes"
+msgstr ""
+
+#: app/templates/lora_list.html:21
+msgid "No"
+msgstr ""
+
+#: app/templates/lora_list.html:29
+msgid "Delete this device?"
+msgstr ""
+
+#: app/templates/lora_list.html:40
+msgid "No devices yet."
+msgstr ""
+
+#: app/templates/lora_map.html:7
+msgid "Devices (multi-select)"
+msgstr ""
+
+#: app/templates/lora_map.html:13
+msgid "Leave none selected to show latest point per device."
+msgstr ""
+
+#: app/templates/lora_map.html:16
+msgid "Showing positions reported by devices via GPS payloads."
+msgstr ""
+
+#: app/templates/lora_map.html:19
+msgid "History"
+msgstr ""
+
+#: app/templates/lora_map.html:21
+msgid "Latest only"
+msgstr ""
+
+#: app/templates/lora_map.html:22
+msgid "Last 10"
+msgstr ""
+
+#: app/templates/lora_map.html:23
+msgid "Last 50"
+msgstr ""
+
+#: app/templates/lora_map.html:24
+msgid "Last 100"
+msgstr ""
+
+#: app/templates/lora_map.html:29
+msgid "Show track line"
+msgstr ""
+
+#: app/templates/lora_map.html:34
+msgid "Auto refresh"
+msgstr ""
+
+#: app/templates/lora_map.html:42
+msgid "Refresh"
+msgstr ""
+
+#: app/templates/lora_map.html:67
+msgid "Dev"
+msgstr ""
+
+#: app/templates/lora_map.html:68
+msgid "RSSI"
+msgstr ""
+
+#: app/templates/lora_map.html:69
+msgid "SNR"
+msgstr ""
+
+#: app/templates/map.html:2
+msgid "Checkpoint Map"
+msgstr ""
+
+#: app/templates/map.html:9
+msgid "Select a team"
+msgstr ""
+
+#: app/templates/map.html:16
+msgid "Legend:"
+msgstr ""
+
+#: app/templates/map.html:17 app/templates/map.html:45
+msgid "found"
+msgstr ""
+
+#: app/templates/map.html:18 app/templates/map.html:46
+msgid "next"
+msgstr ""
+
+#: app/templates/map.html:19 app/templates/map.html:47
+msgid "not found"
+msgstr ""
+
+#: app/templates/map.html:43
+msgid "Status"
+msgstr ""
+
+#: app/templates/register.html:16 app/templates/user_edit.html:31
+#: app/templates/users_list.html:16
+msgid "Role"
+msgstr ""
+
+#: app/templates/register.html:18
+msgid "public"
+msgstr ""
+
+#: app/templates/register.html:19
+msgid "judge"
+msgstr ""
+
+#: app/templates/register.html:20
+msgid "admin"
+msgstr ""
+
+#: app/templates/rfid_finish.html:9
+msgid "Finish-line Check"
+msgstr ""
+
+#: app/templates/rfid_finish.html:11
+msgid ""
+"Tap the tag to read its UID and stored digests. We will verify which "
+"devices/checkpoints match the truncated HMACs."
+msgstr ""
+
+#: app/templates/rfid_finish.html:16
+msgid "Limit to devices (optional)"
+msgstr ""
+
+#: app/templates/rfid_finish.html:25
+msgid "Leave empty to check against all devices."
+msgstr ""
+
+#: app/templates/rfid_finish.html:30
+msgid "Tap tag: read + verify"
+msgstr ""
+
+#: app/templates/rfid_finish.html:35
+msgid "Last UID"
+msgstr ""
+
+#: app/templates/rfid_finish.html:39
+msgid "Digests read"
+msgstr ""
+
+#: app/templates/rfid_finish.html:41
+msgid "From text records on the tag (one per line)."
+msgstr ""
+
+#: app/templates/rfid_finish.html:51
+msgid "Results"
+msgstr ""
+
+#: app/templates/rfid_finish.html:52
+msgid "Awaiting scan..."
+msgstr ""
+
+#: app/templates/rfid_finish.html:55 app/templates/rfid_judge.html:66
+msgid "Web NFC"
+msgstr ""
+
+#: app/templates/rfid_finish.html:56 app/templates/rfid_judge.html:67
+msgid "Checking…"
+msgstr ""
+
+#: app/templates/rfid_finish.html:59
+msgid ""
+"Needs Android Chrome 89+. We read text records, split by lines, and "
+"compare to all device IDs (or your selection)."
+msgstr ""
+
+#: app/templates/rfid_finish.html:89
+msgid "Mismatch: tag digests include checkpoints the team has not checked into."
+msgstr ""
+
+#: app/templates/rfid_finish.html:90
+msgid "Verification complete."
+msgstr ""
+
+#: app/templates/rfid_finish.html:92
+msgid "checked"
+msgstr ""
+
+#: app/templates/rfid_finish.html:93
+msgid "missing check-in"
+msgstr ""
+
+#: app/templates/rfid_finish.html:94
+msgid "No match"
+msgstr ""
+
+#: app/templates/rfid_finish.html:95
+msgid "collision"
+msgstr ""
+
+#: app/templates/rfid_finish.html:96
+msgid "Unknown"
+msgstr ""
+
+#: app/templates/rfid_finish.html:97
+msgid "No digests found."
+msgstr ""
+
+#: app/templates/rfid_finish.html:98 app/templates/rfid_judge.html:99
+msgid "Web NFC not available in this browser."
+msgstr ""
+
+#: app/templates/rfid_finish.html:99 app/templates/rfid_judge.html:100
+msgid "Tap a tag to read…"
+msgstr ""
+
+#: app/templates/rfid_finish.html:100
+msgid "Verification failed."
+msgstr ""
+
+#: app/templates/rfid_finish.html:101 app/templates/rfid_judge.html:104
+msgid "Web NFC read error."
+msgstr ""
+
+#: app/templates/rfid_finish.html:102 app/templates/rfid_judge.html:105
+msgid "Web NFC not available."
+msgstr ""
+
+#: app/templates/rfid_finish.html:103 app/templates/rfid_judge.html:108
+msgid "Supported"
+msgstr ""
+
+#: app/templates/rfid_finish.html:104 app/templates/rfid_judge.html:109
+msgid "Not available"
+msgstr ""
+
+#: app/templates/rfid_judge.html:2
+msgid "Judge RFID Console"
+msgstr ""
+
+#: app/templates/rfid_judge.html:9
+msgid "Web NFC: Read → Ingest → Append"
+msgstr ""
+
+#: app/templates/rfid_judge.html:11
+msgid ""
+"Tap a tag with your phone to read its UID, call ingest for the selected "
+"device/checkpoint, then append the signed payload back onto the tag."
+msgstr ""
+
+#: app/templates/rfid_judge.html:16
+msgid "Device / Checkpoint"
+msgstr ""
+
+#: app/templates/rfid_judge.html:25
+msgid "Uses the device ID sent to /api/ingest."
+msgstr ""
+
+#: app/templates/rfid_judge.html:27
+msgid "No devices configured yet."
+msgstr ""
+
+#: app/templates/rfid_judge.html:32
+msgid "Last UID read"
+msgstr ""
+
+#: app/templates/rfid_judge.html:34
+msgid "Filled when you tap a tag with Web NFC."
+msgstr ""
+
+#: app/templates/rfid_judge.html:39
+msgid "Tap tag: read → ingest → append write"
+msgstr ""
+
+#: app/templates/rfid_judge.html:50
+msgid "Result"
+msgstr ""
+
+#: app/templates/rfid_judge.html:51
+msgid "Awaiting input…"
+msgstr ""
+
+#: app/templates/rfid_judge.html:54
+msgid "Write-back payload"
+msgstr ""
+
+#: app/templates/rfid_judge.html:57
+msgid "Copy"
+msgstr ""
+
+#: app/templates/rfid_judge.html:60
+msgid ""
+"Appended to the tag as a text record. We only store the truncated HMAC "
+"(device ID + card UID) to save space."
+msgstr ""
+
+#: app/templates/rfid_judge.html:70
+msgid ""
+"Supported on Android Chrome 89+. We read existing text records, call "
+"ingest, then write them back with the new payload appended. Keep the tag "
+"in place until you see success."
+msgstr ""
+
+#: app/templates/rfid_judge.html:95
+msgid "Check-in created"
+msgstr ""
+
+#: app/templates/rfid_judge.html:96
+msgid "Card not mapped to a team"
+msgstr ""
+
+#: app/templates/rfid_judge.html:97
+msgid "Ingest completed."
+msgstr ""
+
+#: app/templates/rfid_judge.html:98
+msgid "Pick a device/checkpoint first."
+msgstr ""
+
+#: app/templates/rfid_judge.html:101
+msgid "Ingest did not return a write-back payload."
+msgstr ""
+
+#: app/templates/rfid_judge.html:102
+msgid "Read, ingested, and appended payload to tag."
+msgstr ""
+
+#: app/templates/rfid_judge.html:103
+msgid "Web NFC flow failed."
+msgstr ""
+
+#: app/templates/rfid_judge.html:106
+msgid "Write-back payload copied."
+msgstr ""
+
+#: app/templates/rfid_judge.html:107
+msgid "Could not copy payload."
+msgstr ""
+
+#: app/templates/rfid_list.html:2 app/templates/rfid_list.html:7
+msgid "RFID ↔ Team Mappings"
+msgstr ""
+
+#: app/templates/rfid_list.html:12
+msgid "Add Mapping"
+msgstr ""
+
+#: app/templates/rfid_list.html:13
+msgid "Upload CSV"
+msgstr ""
+
+#: app/templates/rfid_list.html:23
+msgid "Card #"
+msgstr ""
+
+#: app/templates/rfid_list.html:24
+msgid "UID"
+msgstr ""
+
+#: app/templates/rfid_list.html:26 app/templates/view_checkins.html:88
+msgid "Team #"
+msgstr ""
+
+#: app/templates/rfid_list.html:45
+msgid "Delete this mapping?"
+msgstr ""
+
+#: app/templates/rfid_list.html:57
+msgid "No RFID mappings yet."
+msgstr ""
+
+#: app/templates/success.html:6
+msgid "Back to Home"
+msgstr ""
+
+#: app/templates/team_edit.html:5
+msgid "Edit Team"
+msgstr ""
+
+#: app/templates/team_edit.html:13 app/templates/teams_list.html:55
+msgid "Rod / Org"
+msgstr ""
+
+#: app/templates/team_edit.html:14
+msgid "e.g. mGG / local org"
+msgstr ""
+
+#: app/templates/teams_list.html:14
+msgid "All groups"
+msgstr ""
+
+#: app/templates/teams_list.html:24 app/templates/view_checkins.html:47
+msgid "Sort"
+msgstr ""
+
+#: app/templates/teams_list.html:26
+msgid "Name (A→Z)"
+msgstr ""
+
+#: app/templates/teams_list.html:27
+msgid "Name (Z→A)"
+msgstr ""
+
+#: app/templates/teams_list.html:28
+msgid "Number (↑)"
+msgstr ""
+
+#: app/templates/teams_list.html:29
+msgid "Number (↓)"
+msgstr ""
+
+#: app/templates/teams_list.html:34
+msgid "Apply"
+msgstr ""
+
+#: app/templates/teams_list.html:35 app/templates/view_checkins.html:57
+msgid "Reset"
+msgstr ""
+
+#: app/templates/teams_list.html:44
+#, python-format
+msgid "Total: %(count)s"
+msgstr ""
+
+#: app/templates/teams_list.html:47
+msgid "No teams found."
+msgstr ""
+
+#: app/templates/teams_list.html:87
+msgid "Delete this team?"
+msgstr ""
+
+#: app/templates/user_edit.html:2 app/templates/user_edit.html:4
+#: app/templates/users_list.html:6
+msgid "Add User"
+msgstr ""
+
+#: app/templates/user_edit.html:2 app/templates/user_edit.html:4
+msgid "Edit User"
+msgstr ""
+
+#: app/templates/user_edit.html:17
+msgid "At least 8 characters; should not contain the username."
+msgstr ""
+
+#: app/templates/user_edit.html:21
+msgid "New Password (optional)"
+msgstr ""
+
+#: app/templates/user_edit.html:25
+msgid "Confirm New Password"
+msgstr ""
+
+#: app/templates/users_list.html:30
+#, python-format
+msgid "Delete user %(user)s?"
+msgstr ""
+
+#: app/templates/users_list.html:34
+msgid "Cannot delete yourself"
+msgstr ""
+
+#: app/templates/users_list.html:43
+msgid "No users yet."
+msgstr ""
+
+#: app/templates/view_checkins.html:2
+msgid "Check-ins"
+msgstr ""
+
+#: app/templates/view_checkins.html:11
+msgid "All teams"
+msgstr ""
+
+#: app/templates/view_checkins.html:24
+msgid "All checkpoints"
+msgstr ""
+
+#: app/templates/view_checkins.html:35
+msgid "From"
+msgstr ""
+
+#: app/templates/view_checkins.html:41
+msgid "To"
+msgstr ""
+
+#: app/templates/view_checkins.html:49
+msgid "Newest first"
+msgstr ""
+
+#: app/templates/view_checkins.html:50
+msgid "Oldest first"
+msgstr ""
+
+#: app/templates/view_checkins.html:51
+msgid "Team (name, number)"
+msgstr ""
+
+#: app/templates/view_checkins.html:56
+msgid "Apply Filters"
+msgstr ""
+
+#: app/templates/view_checkins.html:66
+msgid "Export CSV"
+msgstr ""
+
+#: app/templates/view_checkins.html:86
+msgid "Time (local)"
+msgstr ""
+
+#: app/templates/view_checkins.html:110
+msgid "Delete this check-in?"
+msgstr ""
+
+#: app/templates/view_checkins.html:123
+msgid "No check-ins match your filters."
+msgstr ""
+

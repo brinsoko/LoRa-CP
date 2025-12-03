@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}RFID ↔ Team Mappings{% endblock %}
+{% block title %}{{ _('RFID ↔ Team Mappings') }}{% endblock %}
 {% block content %}
 <div class="card">
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="card-title mb-0">RFID ↔ Team Mappings</h5>
+      <h5 class="card-title mb-0">{{ _('RFID ↔ Team Mappings') }}</h5>
 
       {# Management buttons visible only to judges/admins and only when not read-only #}
       {% if (read_only is not defined or not read_only) and has_role('judge','admin') %}
         <div class="d-flex gap-2">
-          <a class="btn btn-sm btn-primary" href="{{ url_for('rfid.add_rfid') }}">Add Mapping</a>
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('rfid.rfid_upload_csv_form') }}">Upload CSV</a>
+          <a class="btn btn-sm btn-primary" href="{{ url_for('rfid.add_rfid') }}">{{ _('Add Mapping') }}</a>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('rfid.rfid_upload_csv_form') }}">{{ _('Upload CSV') }}</a>
         </div>
       {% endif %}
     </div>
@@ -20,12 +20,12 @@
         <table class="table table-striped align-middle">
           <thead>
             <tr>
-              <th>Card #</th>
-              <th>UID</th>
-              <th>Team</th>
-              <th>Team #</th>
+              <th>{{ _('Card #') }}</th>
+              <th>{{ _('UID') }}</th>
+              <th>{{ _('Team') }}</th>
+              <th>{{ _('Team #') }}</th>
               {% if (read_only is not defined or not read_only) and has_role('judge','admin') %}
-                <th class="text-end" style="width: 180px;">Actions</th>
+                <th class="text-end" style="width: 180px;">{{ _('Actions') }}</th>
               {% endif %}
             </tr>
           </thead>
@@ -38,12 +38,12 @@
               <td>{{ c.team.number if c.team else '—' }}</td>
               {% if (read_only is not defined or not read_only) and has_role('judge','admin') %}
               <td class="text-end">
-                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('rfid.edit_rfid', card_id=c.id) }}">Edit</a>
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('rfid.edit_rfid', card_id=c.id) }}">{{ _('Edit') }}</a>
                 {% if has_role('admin') %}
                   <form method="post" class="d-inline"
                         action="{{ url_for('rfid.delete_rfid', card_id=c.id) }}"
-                        onsubmit="return confirm('Delete this mapping?');">
-                    <button class="btn btn-sm btn-outline-danger">Delete</button>
+                        onsubmit="return confirm('{{ _('Delete this mapping?') }}');">
+                    <button class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
                   </form>
                 {% endif %}
               </td>
@@ -54,7 +54,7 @@
         </table>
       </div>
     {% else %}
-      <p class="text-muted mb-0">No RFID mappings yet.</p>
+      <p class="text-muted mb-0">{{ _('No RFID mappings yet.') }}</p>
     {% endif %}
   </div>
 </div>

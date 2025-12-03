@@ -8,6 +8,14 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # i18n
+    LANGUAGES = {"en": "English", "sl": "Slovenščina"}
+    BABEL_DEFAULT_LOCALE = "en"
+    # Use an absolute path so translations load no matter the CWD (gunicorn, wsgi)
+    BABEL_TRANSLATION_DIRECTORIES = os.path.join(
+        os.path.dirname(__file__), "app", "translations"
+    )
+
     # App settings
     LORA_WEBHOOK_SECRET = os.getenv("LORA_WEBHOOK_SECRET", "CHANGE_LATER")
 

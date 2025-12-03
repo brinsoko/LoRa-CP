@@ -1,8 +1,9 @@
 # app/__init__.py
-from flask import Flask, request, current_app, render_template
+from flask import Flask, request, current_app, render_template, session, g
+from flask_babel import get_locale
 from flask_restful import Api
 from flask_login import current_user
-from .extensions import db, login_manager
+from .extensions import db, login_manager, babel
 from .resources import register_resources
 from app.utils.time import to_datetime_local
 from .utils.perms import inject_perms
@@ -48,6 +49,14 @@ def create_app() -> Flask:
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
     login_manager.login_message_category = "warning"
+
+    def _select_locale() -> str:
+        lang = session.get("lang")
+        if lang and lang in app.config.get("LANGUAGES", {}):
+            return lang
+        return request.accept_languages.best_match(app.config.get("LANGUAGES", {}).keys()) or app.config.get("BABEL_DEFAULT_LOCALE", "en")
+
+    babel.init_app(app, locale_selector=_select_locale)
 
     app.context_processor(inject_perms)
 
@@ -110,8 +119,17 @@ def create_app() -> Flask:
             "docs": "/api/docs/openapi.json",
         }, 200
 
+    @app.before_request
+    def _set_locale_on_g():
+        # Babel determines the locale via locale_selector; store it for templates
+        g.locale = str(get_locale() or _select_locale())
+
     @app.context_processor
     def inject_current_app():
-        return dict(current_app=current_app)
+        return dict(
+            current_app=current_app,
+            languages=current_app.config.get("LANGUAGES", {}),
+            current_locale=getattr(g, "locale", None) or str(get_locale() or _select_locale()),
+        )
 
     return app

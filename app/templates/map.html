@@ -1,22 +1,22 @@
 {% extends "base.html" %}
-{% block title %}Checkpoint Map{% endblock %}
+{% block title %}{{ _('Checkpoint Map') }}{% endblock %}
 {% block content %}
 
 <div class="d-flex align-items-end gap-3 mb-3">
   <div class="flex-grow-1">
-    <label class="form-label">Team</label>
+    <label class="form-label">{{ _('Team') }}</label>
     <select id="teamSelect" class="form-select">
-      <option value="">— Select a team —</option>
+      <option value="">— {{ _('Select a team') }} —</option>
       {% for t in teams %}
         <option value="{{ t.id }}">{{ t.name }}{% if t.number %} ({{ t.number }}){% endif %}</option>
       {% endfor %}
     </select>
   </div>
   <div class="text-muted small">
-    Legend:&nbsp;
-    <span class="badge bg-success">found</span>
-    <span class="badge bg-primary">next</span>
-    <span class="badge bg-secondary">not found</span>
+    {{ _('Legend:') }}&nbsp;
+    <span class="badge bg-success">{{ _('found') }}</span>
+    <span class="badge bg-primary">{{ _('next') }}</span>
+    <span class="badge bg-secondary">{{ _('not found') }}</span>
   </div>
 </div>
 
@@ -39,6 +39,13 @@
   const COLOR_FOUND     = "#198754"; // success
   const COLOR_NEXT      = "#0d6efd"; // primary
   const COLOR_NOT_FOUND = "#6c757d"; // secondary
+
+  const LABEL_STATUS = "{{ _('Status') }}";
+  const STATUS_LABELS = {
+    found: "{{ _('found') }}",
+    next: "{{ _('next') }}",
+    not_found: "{{ _('not found') }}",
+  };
 
   let map, markers = [];
   let checkpoints = [];
@@ -145,7 +152,7 @@
       }).bindPopup(
         `<strong>${cp.name}</strong><br>` +
         `E: ${cp.easting ?? "—"}, N: ${cp.northing ?? "—"}<br>` +
-        `Status: ${status.replace("_"," ")}`
+        `${LABEL_STATUS}: ${STATUS_LABELS[status] || status.replace("_"," ")}`
       );
 
       circle.addTo(map);

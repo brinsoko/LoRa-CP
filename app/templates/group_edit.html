@@ -1,57 +1,57 @@
 {% extends "base.html" %}
-{% block title %}{{ "Add Group" if mode == "add" else "Edit Group" }}{% endblock %}
+{% block title %}{{ _('Add Group') if mode == 'add' else _('Edit Group') }}{% endblock %}
 {% block body %}
 {% set selected_items = (selected_checkpoints or []) %}
 {% set available_items = (available_checkpoints or []) %}
 {% set group_obj = g if g is defined else None %}
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title mb-3">{{ "Add Group" if mode == "add" else "Edit Group" }}</h5>
+    <h5 class="card-title mb-3">{{ _('Add Group') if mode == 'add' else _('Edit Group') }}</h5>
     <form method="post">
       <input type="hidden" name="checkpoint_ids_present" id="checkpointIdsPresent" value="0">
       <div class="mb-3">
-        <label class="form-label">Name</label>
+        <label class="form-label">{{ _('Name') }}</label>
         <input class="form-control" name="name" value="{{ group_obj.name if group_obj else request.form.get('name', '') }}" required>
       </div>
       <div class="mb-4">
-        <label class="form-label">Description</label>
+        <label class="form-label">{{ _('Description') }}</label>
         <textarea class="form-control" name="description" rows="2">{{ group_obj.description if group_obj else request.form.get('description', '') }}</textarea>
       </div>
 
       <div class="mb-4">
-        <label class="form-label">Checkpoints</label>
+        <label class="form-label">{{ _('Checkpoints') }}</label>
         <div class="row g-3">
           <div class="col-lg-6">
             <div class="border rounded p-3 h-100">
               <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="fw-semibold">Selected order</span>
-                <small class="text-muted">Drag the handle to reorder</small>
+                <span class="fw-semibold">{{ _('Selected order') }}</span>
+                <small class="text-muted">{{ _('Drag the handle to reorder') }}</small>
               </div>
-              <ul id="selectedCheckpoints" class="list-group" data-empty-text="No checkpoints selected yet.">
+              <ul id="selectedCheckpoints" class="list-group" data-empty-text="{{ _('No checkpoints selected yet.') }}">
                 {% for cp in selected_items %}
                   <li class="list-group-item d-flex align-items-center gap-2" data-cp-id="{{ cp.id }}" data-cp-name="{{ cp.name }}">
                     <span class="drag-handle text-muted">::</span>
                     <span class="flex-grow-1">{{ cp.name }}</span>
-                    <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove">Remove</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove">{{ _('Remove') }}</button>
                   </li>
                 {% endfor %}
               </ul>
-              <div id="selectedEmptyNotice" class="text-muted small {% if selected_items %}d-none{% endif %} mt-2">No checkpoints selected yet.</div>
+              <div id="selectedEmptyNotice" class="text-muted small {% if selected_items %}d-none{% endif %} mt-2">{{ _('No checkpoints selected yet.') }}</div>
             </div>
           </div>
           <div class="col-lg-6">
             <div class="border rounded p-3 h-100">
-              <label class="form-label">Add checkpoint</label>
+              <label class="form-label">{{ _('Add checkpoint') }}</label>
               <div class="d-flex gap-2">
                 <select id="availableCheckpoints" class="form-select">
-                  <option value="" disabled {% if not available_items %}selected{% endif %}>Select checkpoint</option>
+                  <option value="" disabled {% if not available_items %}selected{% endif %}>{{ _('Select checkpoint') }}</option>
                   {% for cp in available_items %}
                     <option value="{{ cp.id }}">{{ cp.name }}</option>
                   {% endfor %}
                 </select>
-                <button id="addCheckpointBtn" class="btn btn-outline-primary" type="button">Add</button>
+                <button id="addCheckpointBtn" class="btn btn-outline-primary" type="button">{{ _('Add') }}</button>
               </div>
-              <div class="form-text mt-2">Add checkpoints to include them in the group. Use drag-and-drop to arrange the visit order.</div>
+              <div class="form-text mt-2">{{ _('Add checkpoints to include them in the group. Use drag-and-drop to arrange the visit order.') }}</div>
             </div>
           </div>
         </div>
@@ -60,8 +60,8 @@
       <div id="checkpointHiddenInputs"></div>
 
       <div class="d-flex gap-2">
-        <button class="btn btn-primary" type="submit">Save</button>
-        <a class="btn btn-secondary" href="{{ url_for('groups.list_groups') }}">Cancel</a>
+        <button class="btn btn-primary" type="submit">{{ _('Save') }}</button>
+        <a class="btn btn-secondary" href="{{ url_for('groups.list_groups') }}">{{ _('Cancel') }}</a>
       </div>
     </form>
   </div>
@@ -109,7 +109,7 @@ document.addEventListener("DOMContentLoaded", function() {
       defaultOption.value = "";
       defaultOption.disabled = true;
       defaultOption.selected = !options.length;
-      defaultOption.textContent = "Select checkpoint";
+      defaultOption.textContent = "{{ _('Select checkpoint') }}";
       availableSelect.appendChild(defaultOption);
     }
     options.forEach((opt) => availableSelect.appendChild(opt));
@@ -152,7 +152,7 @@ document.addEventListener("DOMContentLoaded", function() {
     removeBtn.type = "button";
     removeBtn.className = "btn btn-sm btn-outline-danger";
     removeBtn.dataset.action = "remove";
-    removeBtn.textContent = "Remove";
+    removeBtn.textContent = "{{ _('Remove') }}";
 
     li.appendChild(handle);
     li.appendChild(label);

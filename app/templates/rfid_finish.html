@@ -1,44 +1,44 @@
 {% extends "base.html" %}
-{% block title %}Finish Check{% endblock %}
+{% block title %}{{ _('Finish Check') }}{% endblock %}
 
 {% block content %}
 <div class="row g-3">
   <div class="col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h5 class="card-title mb-3">Finish-line Check</h5>
+        <h5 class="card-title mb-3">{{ _('Finish-line Check') }}</h5>
         <p class="text-body-secondary small mb-3">
-          Tap the tag to read its UID and stored digests. We will verify which devices/checkpoints match the truncated HMACs.
+          {{ _('Tap the tag to read its UID and stored digests. We will verify which devices/checkpoints match the truncated HMACs.') }}
         </p>
 
         <form id="finishForm" class="row g-3">
           <div class="col-12">
-            <label class="form-label">Limit to devices (optional)</label>
+            <label class="form-label">{{ _('Limit to devices (optional)') }}</label>
             <select id="deviceFilter" class="form-select" multiple size="6">
               {% for d in devices %}
                 <option value="{{ d.dev_num }}">
-                  {{ d.name or ("Device " ~ d.dev_num) }}{% if d.dev_num %} (#{{ d.dev_num }}){% endif %}
+                  {{ d.name or (_('Device') ~ ' ' ~ d.dev_num) }}{% if d.dev_num %} (#{{ d.dev_num }}){% endif %}
                   {% if d.checkpoint %} - {{ d.checkpoint.name }}{% endif %}
                 </option>
               {% endfor %}
             </select>
-            <div class="form-text">Leave empty to check against all devices.</div>
+            <div class="form-text">{{ _('Leave empty to check against all devices.') }}</div>
           </div>
 
           <div class="col-12 d-flex gap-2">
             <button class="btn btn-primary" type="submit" id="scanBtn" {% if not devices %}disabled{% endif %}>
-              Tap tag: read + verify
+              {{ _('Tap tag: read + verify') }}
             </button>
           </div>
 
           <div class="col-12">
-            <label class="form-label">Last UID</label>
+            <label class="form-label">{{ _('Last UID') }}</label>
             <input class="form-control" id="uidField" readonly>
           </div>
           <div class="col-12">
-            <label class="form-label">Digests read</label>
+            <label class="form-label">{{ _('Digests read') }}</label>
             <textarea class="form-control" id="digestsField" rows="4" readonly></textarea>
-            <div class="form-text">From text records on the tag (one per line).</div>
+            <div class="form-text">{{ _('From text records on the tag (one per line).') }}</div>
           </div>
         </form>
       </div>
@@ -48,15 +48,15 @@
   <div class="col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h6 class="card-title mb-3">Results</h6>
-        <div id="resultBox" class="alert alert-secondary">Awaiting scan...</div>
+        <h6 class="card-title mb-3">{{ _('Results') }}</h6>
+        <div id="resultBox" class="alert alert-secondary">{{ _('Awaiting scan...') }}</div>
         <div class="border rounded-3 p-3 mb-3">
           <div class="d-flex align-items-center gap-2">
-            <strong>Web NFC</strong>
-            <span class="badge text-bg-secondary" id="webNfcStatus">Checking…</span>
+            <strong>{{ _('Web NFC') }}</strong>
+            <span class="badge text-bg-secondary" id="webNfcStatus">{{ _('Checking…') }}</span>
           </div>
           <p class="small text-body-secondary mb-0">
-            Needs Android Chrome 89+. We read text records, split by lines, and compare to all device IDs (or your selection).
+            {{ _('Needs Android Chrome 89+. We read text records, split by lines, and compare to all device IDs (or your selection).') }}
           </p>
         </div>
         <div id="resultsList" class="small"></div>
@@ -85,6 +85,25 @@
     resultBox.textContent = text;
   }
 
+  const I18N = {
+    mismatch: "{{ _('Mismatch: tag digests include checkpoints the team has not checked into.') }}",
+    verified: "{{ _('Verification complete.') }}",
+    team: "{{ _('Team') }}",
+    checked: "{{ _('checked') }}",
+    missing: "{{ _('missing check-in') }}",
+    noMatch: "{{ _('No match') }}",
+    collision: "{{ _('collision') }}",
+    unknown: "{{ _('Unknown') }}",
+    noDigests: "{{ _('No digests found.') }}",
+    nfcNotAvailable: "{{ _('Web NFC not available in this browser.') }}",
+    tapToRead: "{{ _('Tap a tag to read…') }}",
+    verificationFailed: "{{ _('Verification failed.') }}",
+    nfcReadError: "{{ _('Web NFC read error.') }}",
+    nfcNotAvailableShort: "{{ _('Web NFC not available.') }}",
+    supported: "{{ _('Supported') }}",
+    notAvailable: "{{ _('Not available') }}",
+  };
+
   function extractDigests(records) {
     const decoder = new TextDecoder();
     const texts = [];
@@ -104,17 +123,16 @@
     const hasMismatch = !!data.has_mismatch;
     const team = data.team;
     if (hasMismatch) {
-      showMessage("Mismatch: tag digests include checkpoints the team has not checked into.", "warning");
+      showMessage(I18N.mismatch, "warning");
     } else {
-      showMessage("Verification complete.", "success");
+      showMessage(I18N.verified, "success");
     }
-
-    const header = team ? `<div class="mb-2">Team: <strong>${team.name}</strong></div>` : "";
+    const header = team ? `<div class="mb-2">${I18N.team}: <strong>${team.name}</strong></div>` : "";
 
     const html = [];
     const results = data.results || [];
     if (!results.length) {
-      html.push("<p class='text-muted mb-0'>No digests found.</p>");
+      html.push(`<p class='text-muted mb-0'>${I18N.noDigests}</p>`);
     } else {
       results.forEach(r => {
         const matches = r.matches || [];
@@ -122,20 +140,20 @@
           ? matches.map(m => {
               const base = `${m.device_id}${m.checkpoint ? " (" + m.checkpoint + ")" : ""}`;
               if (m.checked_in === true) {
-                return `${base} <span class="badge text-bg-success">checked</span>`;
+                return `${base} <span class="badge text-bg-success">${I18N.checked}</span>`;
               } else if (m.checked_in === false && m.checkpoint_id) {
-                return `${base} <span class="badge text-bg-warning">missing check-in</span>`;
+                return `${base} <span class="badge text-bg-warning">${I18N.missing}</span>`;
               }
               return base;
             }).join(", ")
-          : "No match";
-        const badge = r.collision ? `<span class="badge text-bg-warning ms-2">collision</span>` : "";
+          : I18N.noMatch;
+        const badge = r.collision ? `<span class="badge text-bg-warning ms-2">${I18N.collision}</span>` : "";
         html.push(
           `<div class="mb-2"><code>${r.digest}</code> → ${matchText}${badge}</div>`
         );
       });
       if ((data.unknown || []).length) {
-        html.push(`<div class="text-warning mt-2">Unknown: ${data.unknown.join(", ")}</div>`);
+        html.push(`<div class="text-warning mt-2">${I18N.unknown}: ${data.unknown.join(", ")}</div>`);
       }
     }
     resultsList.innerHTML = header + html.join("");
@@ -144,14 +162,14 @@
   async function handleScan(event) {
     event.preventDefault();
     if (!hasWebNfc) {
-      showMessage("Web NFC not available in this browser.", "danger");
+      showMessage(I18N.nfcNotAvailable, "danger");
       return;
     }
     setBusy(true);
     try {
       const reader = new NDEFReader();
       await reader.scan();
-      showMessage("Tap a tag to read…", "info");
+      showMessage(I18N.tapToRead, "info");
 
       const onRead = async (evt) => {
         reader.removeEventListener("reading", onRead);
@@ -178,7 +196,7 @@
           }
           renderResults(data);
         } catch (err) {
-          showMessage(err.message || "Verification failed.", "danger");
+          showMessage(err.message || I18N.verificationFailed, "danger");
           resultsList.innerHTML = "";
         } finally {
           setBusy(false);
@@ -187,14 +205,14 @@
 
       const onError = () => {
         reader.removeEventListener("reading", onRead);
-        showMessage("Web NFC read error.", "danger");
+        showMessage(I18N.nfcReadError, "danger");
         setBusy(false);
       };
 
       reader.addEventListener("reading", onRead);
       reader.addEventListener("readingerror", onError, { once: true });
     } catch (err) {
-      showMessage(err.message || "Web NFC not available.", "danger");
+      showMessage(err.message || I18N.nfcNotAvailableShort, "danger");
       setBusy(false);
     }
   }
@@ -202,10 +220,10 @@
   form?.addEventListener("submit", handleScan);
 
   if (hasWebNfc) {
-    webNfcStatus.textContent = "Supported";
+    webNfcStatus.textContent = I18N.supported;
     webNfcStatus.className = "badge text-bg-success";
   } else {
-    webNfcStatus.textContent = "Not available";
+    webNfcStatus.textContent = I18N.notAvailable;
     webNfcStatus.className = "badge text-bg-secondary";
   }
 </script>

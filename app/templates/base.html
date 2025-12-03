@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en" data-bs-theme="light">
+<html lang="{{ current_locale }}" data-bs-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{% block title %}RFID Checkpoint System{% endblock %}</title>
+  <title>{% block title %}{{ _('RFID Checkpoint System') }}{% endblock %}</title>
 
   <!-- Bootstrap CSS -->
   <link rel="stylesheet"
@@ -39,38 +39,57 @@
   <nav class="navbar navbar-expand-lg bg-body-tertiary mb-4 rounded-3 px-3">
     <div class="container-fluid">
       <a class="navbar-brand fw-bold" href="{{ url_for('main.index') }}">
-        RFID Checkpoint System
+        {{ _('RFID Checkpoint System') }}
       </a>
 
       <div class="ms-auto d-flex align-items-center gap-2">
         {% if current_user.is_authenticated %}
           <span class="text-body-secondary">
-            Signed in as <strong>{{ current_user.username }}</strong> ({{ current_user.role }})
+            {{ _('Signed in as %(user)s (%(role)s)', user=current_user.username, role=current_user.role) }}
           </span>
           <form method="post" action="{{ url_for('auth.logout') }}" class="d-inline">
-            <button class="btn btn-sm btn-outline-danger">Logout</button>
+            <button class="btn btn-sm btn-outline-danger">{{ _('Logout') }}</button>
           </form>
           <a href="{{ url_for('auth.change_password') }}" class="btn btn-sm btn-outline-secondary">
-            Change Password
+            {{ _('Change Password') }}
           </a>
         {% else %}
-          <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-outline-primary">Login</a>
+          <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-outline-primary">{{ _('Login') }}</a>
         {% endif %}
         {% if current_user.is_authenticated and current_user.role == 'admin' %}
-          <a href="{{ url_for('auth.register') }}" class="btn btn-sm btn-outline-success">Create User</a>
+          <a href="{{ url_for('auth.register') }}" class="btn btn-sm btn-outline-success">{{ _('Create User') }}</a>
         {% endif %}
         {% if current_user.is_authenticated and current_user.role == 'admin' %}
           <li class="nav-item">
-            <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">Users</a>
+            <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">{{ _('Users') }}</a>
         {% endif %}
 
         <!-- THEME TOGGLE -->
          <div class="theme-toggle bg-body-tertiary border rounded-3 px-3 py-2 shadow">
-          <label class="form-check-label" for="themeSwitch">Dark mode</label>
+          <label class="form-check-label" for="themeSwitch">{{ _('Dark mode') }}</label>
             <div class="form-check form-switch m-0">
               <input class="form-check-input" type="checkbox" role="switch" id="themeSwitch" />
             </div>
           </div>
+
+        <!-- LANGUAGE PICKER -->
+        {% if languages %}
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              {{ languages.get(current_locale, current_locale) }}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              {% for code, label in languages.items() %}
+                <li>
+                  <a class="dropdown-item {% if code == current_locale %}active{% endif %}"
+                     href="{{ url_for('main.set_language', lang_code=code, next=request.full_path) }}">
+                    {{ label }}
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
         
 
    
@@ -82,36 +101,36 @@
   <div class="mb-3 d-flex flex-wrap gap-2">
 
 
-    <a href="{{ url_for('teams.list_teams') }}" class="btn btn-outline-primary">Teams</a>
+    <a href="{{ url_for('teams.list_teams') }}" class="btn btn-outline-primary">{{ _('Teams') }}</a>
     
 
     {% if current_user.is_authenticated and current_user.role in ['judge','admin'] %}
-      <a href="{{ url_for('checkpoints.list_checkpoints') }}" class="btn btn-outline-secondary">Checkpoints</a>
+      <a href="{{ url_for('checkpoints.list_checkpoints') }}" class="btn btn-outline-secondary">{{ _('Checkpoints') }}</a>
       
 
       
-      <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-outline-info">View Check-ins</a>
-      <a href="{{ url_for('checkins.add_checkin') }}" class="btn btn-success">Add Check-in</a>
+      <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-outline-info">{{ _('View Check-ins') }}</a>
+      <a href="{{ url_for('checkins.add_checkin') }}" class="btn btn-success">{{ _('Add Check-in') }}</a>
 
-      <a href="{{ url_for('rfid.list_rfid') }}" class="btn btn-outline-info">Map RFID ↔ Team</a>
-      <a href="{{ url_for('rfid.judge_console') }}" class="btn btn-outline-primary">Judge RFID</a>
-      <a href="{{ url_for('rfid.finish_console') }}" class="btn btn-outline-success">Finish Check</a>
+      <a href="{{ url_for('rfid.list_rfid') }}" class="btn btn-outline-info">{{ _('Map RFID ↔ Team') }}</a>
+      <a href="{{ url_for('rfid.judge_console') }}" class="btn btn-outline-primary">{{ _('Judge RFID') }}</a>
+      <a href="{{ url_for('rfid.finish_console') }}" class="btn btn-outline-success">{{ _('Finish Check') }}</a>
 
-      <a href="{{ url_for('groups.list_groups') }}" class="btn btn-outline-secondary">Groups</a>
-      <a href="{{ url_for('lora.lora_list') }}" class="btn btn-outline-secondary">Devices</a>
+      <a href="{{ url_for('groups.list_groups') }}" class="btn btn-outline-secondary">{{ _('Groups') }}</a>
+      <a href="{{ url_for('lora.lora_list') }}" class="btn btn-outline-secondary">{{ _('Devices') }}</a>
       {# Only show if the endpoint exists in your blueprint #}
       {% if 'groups.assign_team_group' in current_app.view_functions %}
-        <a href="{{ url_for('groups.assign_team_group') }}" class="btn btn-outline-secondary">Assign Team → Group</a>
+        <a href="{{ url_for('groups.assign_team_group') }}" class="btn btn-outline-secondary">{{ _('Assign Team → Group') }}</a>
       {% endif %}
       {% if current_user.is_authenticated and current_user.role == 'admin' %}
 
-          <a class="btn btn-outline-secondary" href="{{ url_for('messages.list_messages') }}">Messages</a>
+          <a class="btn btn-outline-secondary" href="{{ url_for('messages.list_messages') }}">{{ _('Messages') }}</a>
 
       {% endif %}
-      <a href="{{ url_for('maps.index') }}" class="btn btn-outline-primary">Map</a>
-      <a href="{{ url_for('maps.lora_map') }}" class="btn btn-outline-primary">Device Map</a>
+      <a href="{{ url_for('maps.index') }}" class="btn btn-outline-primary">{{ _('Map') }}</a>
+      <a href="{{ url_for('maps.lora_map') }}" class="btn btn-outline-primary">{{ _('Device Map') }}</a>
       {% if current_user.is_authenticated and current_user.role == 'admin' %}
-      <a href="{{ url_for('sheets_admin.list_sheets') }}" class="btn btn-outline-secondary">Sheets</a>
+      <a href="{{ url_for('sheets_admin.list_sheets') }}" class="btn btn-outline-secondary">{{ _('Sheets') }}</a>
       {% endif %}
     {% endif %}
     

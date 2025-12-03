@@ -1,0 +1,1165 @@
+
+msgid ""
+msgstr ""
+"Project-Id-Version: LoRa KT\n"
+"Report-Msgid-Bugs-To: brin.soko@gmail.com\n"
+"POT-Creation-Date: 2025-12-03 23:37+0100\n"
+"PO-Revision-Date: 2025-12-04 00:00+0100\n"
+"Last-Translator: Brin Soko <brin.soko@gmail.com>\n"
+"Language: sl\n"
+"Language-Team: sl \n"
+"Plural-Forms: nplurals=4; plural=(n%100==1 ? 0 : n%100==2 ? 1 : n%100==3 "
+"|| n%100==4 ? 2 : 3);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.13.0\n"
+
+#: app/templates/403.html:3
+msgid "Forbidden: you don’t have access to this page."
+msgstr "Prepovedano: nimate dostopa do te strani."
+
+#: app/templates/add_checkin.html:2 app/templates/add_checkin.html:7
+#: app/templates/base.html:113 app/templates/view_checkins.html:70
+msgid "Add Check-in"
+msgstr "Dodaj prijavo"
+
+#: app/templates/add_checkin.html:12 app/templates/assign_team_group.html:5
+#: app/templates/checkin_edit.html:12 app/templates/map.html:7
+#: app/templates/rfid_finish.html:91 app/templates/rfid_judge.html:93
+#: app/templates/rfid_list.html:25 app/templates/view_checkins.html:9
+#: app/templates/view_checkins.html:87
+msgid "Team"
+msgstr "Ekipa"
+
+#: app/templates/add_checkin.html:23 app/templates/checkin_edit.html:23
+#: app/templates/group_members.html:23 app/templates/lora_list.html:13
+#: app/templates/rfid_judge.html:94 app/templates/view_checkins.html:22
+#: app/templates/view_checkins.html:89
+msgid "Checkpoint"
+msgstr "Kontrolna točka"
+
+#: app/templates/add_checkin.html:34
+msgid "Local time (optional)"
+msgstr "Lokalni čas (neobvezno)"
+
+#: app/templates/add_checkin.html:40
+msgid "Leave blank to use current time (UTC now)."
+msgstr "Pusti prazno za trenutni čas (UTC)."
+
+#: app/templates/add_checkin.html:44 app/templates/checkin_edit.html:45
+msgid "Timezone"
+msgstr "Časovni pas"
+
+#: app/templates/add_checkin.html:60
+msgid ""
+"This team already checked in at that checkpoint. Submit again to replace "
+"the previous timestamp."
+msgstr ""
+"Ta ekipa je na tej točki že prijavljena. Pošlji znova za zamenjavo "
+"prejšnjega časa."
+
+#: app/templates/add_checkin.html:65
+msgid "Record Check-in"
+msgstr "Zabeleži prihod"
+
+#: app/templates/add_checkin.html:66 app/templates/add_checkpoint.html:70
+#: app/templates/add_team.html:34 app/templates/change_password.html:21
+#: app/templates/checkin_edit.html:72 app/templates/checkpoint_edit.html:72
+#: app/templates/checkpoints_import.html:19
+#: app/templates/checkpoints_import_json.html:31
+#: app/templates/group_add.html:17 app/templates/group_edit.html:64
+#: app/templates/login.html:16 app/templates/lora_add.html:21
+#: app/templates/lora_edit.html:25 app/templates/register.html:24
+#: app/templates/team_edit.html:34 app/templates/user_edit.html:42
+msgid "Cancel"
+msgstr "Prekliči"
+
+#: app/templates/add_checkpoint.html:2 app/templates/add_checkpoint.html:6
+#: app/templates/checkpoints_list.html:10
+msgid "Add Checkpoint"
+msgstr "Dodaj kontrolno točko"
+
+#: app/templates/add_checkpoint.html:10 app/templates/add_team.html:8
+#: app/templates/checkpoint_edit.html:10
+#: app/templates/checkpoints_import_preview.html:21
+#: app/templates/checkpoints_list.html:22 app/templates/group_add.html:8
+#: app/templates/group_edit.html:13 app/templates/groups_list.html:19
+#: app/templates/lora_edit.html:12 app/templates/lora_list.html:13
+#: app/templates/team_edit.html:8 app/templates/teams_list.html:54
+msgid "Name"
+msgstr "Ime"
+
+#: app/templates/add_checkpoint.html:15 app/templates/checkpoint_edit.html:15
+msgid "Location (text)"
+msgstr "Lokacija (opis)"
+
+#: app/templates/add_checkpoint.html:20 app/templates/checkpoint_edit.html:20
+#: app/templates/checkpoints_import_preview.html:24
+#: app/templates/checkpoints_list.html:24 app/templates/group_add.html:12
+#: app/templates/group_edit.html:17 app/templates/groups_list.html:20
+msgid "Description"
+msgstr "Opis"
+
+#: app/templates/add_checkpoint.html:26 app/templates/checkpoint_edit.html:26
+#: app/templates/checkpoints_import_preview.html:22
+msgid "Easting"
+msgstr "Vzhodna koordinata"
+
+#: app/templates/add_checkpoint.html:30 app/templates/checkpoint_edit.html:31
+#: app/templates/checkpoints_import_preview.html:23
+msgid "Northing"
+msgstr "Severna koordinata"
+
+#: app/templates/add_checkpoint.html:36 app/templates/checkpoint_edit.html:38
+msgid "Device (optional)"
+msgstr "Naprava (neobvezno)"
+
+#: app/templates/add_checkpoint.html:38 app/templates/checkpoint_edit.html:40
+msgid "none"
+msgstr "brez"
+
+#: app/templates/add_checkpoint.html:42 app/templates/checkpoint_edit.html:44
+#: app/templates/rfid_finish.html:20 app/templates/rfid_judge.html:20
+msgid "Device"
+msgstr "Naprava"
+
+#: app/templates/add_checkpoint.html:49 app/templates/base.html:119
+#: app/templates/checkpoint_edit.html:51 app/templates/checkpoints_list.html:25
+#: app/templates/groups_list.html:3 app/templates/groups_list.html:9
+#: app/templates/teams_list.html:57
+msgid "Groups"
+msgstr "Skupine"
+
+#: app/templates/add_checkpoint.html:65 app/templates/checkpoint_edit.html:67
+msgid "A checkpoint can belong to many groups."
+msgstr "Kontrolna točka je lahko v več skupinah."
+
+#: app/templates/add_checkpoint.html:69 app/templates/add_team.html:33
+#: app/templates/group_add.html:16 app/templates/register.html:23
+#: app/templates/user_edit.html:41
+msgid "Create"
+msgstr "Ustvari"
+
+#: app/templates/add_team.html:5 app/templates/teams_list.html:37
+msgid "Add Team"
+msgstr "Dodaj ekipo"
+
+#: app/templates/add_team.html:13
+msgid "Organizations"
+msgstr "Organizacije"
+
+#: app/templates/add_team.html:18 app/templates/team_edit.html:18
+#: app/templates/teams_list.html:56
+msgid "Number"
+msgstr "Številka"
+
+#: app/templates/add_team.html:23 app/templates/assign_team_group.html:13
+#: app/templates/team_edit.html:23 app/templates/teams_list.html:12
+msgid "Group"
+msgstr "Skupina"
+
+#: app/templates/add_team.html:25 app/templates/team_edit.html:25
+#: app/templates/teams_list.html:76
+msgid "No group"
+msgstr "Brez skupine"
+
+#: app/templates/assign_team_group.html:1 app/templates/base.html:123
+msgid "Assign Team → Group"
+msgstr "Dodeli ekipo → skupini"
+
+#: app/templates/assign_team_group.html:21
+msgid "Assign"
+msgstr "Dodeli"
+
+#: app/templates/base.html:6 app/templates/base.html:42
+msgid "RFID Checkpoint System"
+msgstr "RFID nadzorni sistem"
+
+#: app/templates/base.html:48
+#, python-format
+msgid "Signed in as %(user)s (%(role)s)"
+msgstr "Prijavljen: %(user)s (%(role)s)"
+
+#: app/templates/base.html:51
+msgid "Logout"
+msgstr "Odjava"
+
+#: app/templates/base.html:54 app/templates/change_password.html:5
+#: app/templates/change_password.html:20
+msgid "Change Password"
+msgstr "Spremeni geslo"
+
+#: app/templates/base.html:57
+msgid "Login"
+msgstr "Prijava"
+
+#: app/templates/base.html:60 app/templates/register.html:5
+msgid "Create User"
+msgstr "Ustvari uporabnika"
+
+#: app/templates/base.html:64 app/templates/users_list.html:2
+#: app/templates/users_list.html:5
+msgid "Users"
+msgstr "Uporabniki"
+
+#: app/templates/base.html:69
+msgid "Dark mode"
+msgstr "Temni način"
+
+#: app/templates/base.html:104 app/templates/teams_list.html:3
+msgid "Teams"
+msgstr "Ekipe"
+
+#: app/templates/base.html:108 app/templates/checkpoints_list.html:2
+#: app/templates/checkpoints_list.html:7 app/templates/group_edit.html:22
+#: app/templates/groups_list.html:21
+msgid "Checkpoints"
+msgstr "Kontrolne točke"
+
+#: app/templates/base.html:112
+msgid "View Check-ins"
+msgstr "Pregled prijav"
+
+#: app/templates/base.html:115
+msgid "Map RFID ↔ Team"
+msgstr "Poveži RFID ↔ ekipa"
+
+#: app/templates/base.html:116
+msgid "Judge RFID"
+msgstr "Sodnik RFID"
+
+#: app/templates/base.html:117 app/templates/rfid_finish.html:2
+msgid "Finish Check"
+msgstr "Zaključni pregled"
+
+#: app/templates/base.html:120 app/templates/lora_list.html:2
+#: app/templates/lora_list.html:5
+msgid "Devices"
+msgstr "Naprave"
+
+#: app/templates/base.html:127
+msgid "Messages"
+msgstr "Sporočila"
+
+#: app/templates/base.html:130
+msgid "Map"
+msgstr "Zemljevid"
+
+#: app/templates/base.html:131 app/templates/lora_map.html:2
+msgid "Device Map"
+msgstr "Zemljevid naprav"
+
+#: app/templates/base.html:133
+msgid "Sheets"
+msgstr "Preglednice"
+
+#: app/templates/change_password.html:8
+msgid "Current password"
+msgstr "Trenutno geslo"
+
+#: app/templates/change_password.html:12
+msgid "New password"
+msgstr "Novo geslo"
+
+#: app/templates/change_password.html:14
+msgid "At least 8 characters; avoid using your username."
+msgstr "Vsaj 8 znakov; izogibaj se uporabniškemu imenu."
+
+#: app/templates/change_password.html:17
+msgid "Confirm new password"
+msgstr "Potrdi novo geslo"
+
+#: app/templates/checkin_edit.html:2 app/templates/checkin_edit.html:7
+msgid "Edit Check-in"
+msgstr "Uredi prijavo"
+
+#: app/templates/checkin_edit.html:34
+msgid "Local time"
+msgstr "Lokalni čas"
+
+#: app/templates/checkin_edit.html:41
+msgid "Edit using your local time (with seconds)."
+msgstr "Uredi z lokalnim časom (s sekundami)."
+
+#: app/templates/checkin_edit.html:56
+msgid "Used to convert local time → UTC in the database."
+msgstr "Za pretvorbo lokalnega časa v UTC v bazi."
+
+#: app/templates/checkin_edit.html:66
+msgid ""
+"Another check-in exists for the same team & checkpoint. Submit to replace"
+" it with this timestamp."
+msgstr "Za isto ekipo in točko že obstaja prijava. Pošlji za zamenjavo časa."
+
+#: app/templates/checkin_edit.html:71 app/templates/checkpoint_edit.html:71
+#: app/templates/group_edit.html:63 app/templates/lora_add.html:20
+#: app/templates/lora_edit.html:24 app/templates/team_edit.html:33
+#: app/templates/user_edit.html:41
+msgid "Save"
+msgstr "Shrani"
+
+#: app/templates/checkpoint_edit.html:2 app/templates/checkpoint_edit.html:6
+msgid "Edit Checkpoint"
+msgstr "Uredi kontrolno točko"
+
+#: app/templates/checkpoints_import.html:2
+#: app/templates/checkpoints_import.html:6
+#: app/templates/checkpoints_import_json.html:2
+#: app/templates/checkpoints_import_json.html:7
+#: app/templates/checkpoints_list.html:11
+msgid "Import Checkpoints (JSON)"
+msgstr "Uvozi kontrolne točke (JSON)"
+
+#: app/templates/checkpoints_import.html:8
+msgid ""
+"Upload a .json file with either an array of checkpoints, or an object "
+"containing checkpoints or cps. Keys: name (auto-generated if missing), e,"
+" n, description, location."
+msgstr ""
+"Naloži .json s seznamom točk ali objektom s checkpoints/cps. Ključi: name"
+" (ustvari se, če manjka), e, n, description, location."
+
+#: app/templates/checkpoints_import.html:13
+msgid "Select JSON file"
+msgstr "Izberi JSON datoteko"
+
+#: app/templates/checkpoints_import.html:18
+msgid "Preview"
+msgstr "Predogled"
+
+#: app/templates/checkpoints_import_json.html:8
+#: app/templates/checkpoints_import_preview.html:55
+msgid "Back"
+msgstr "Nazaj"
+
+#: app/templates/checkpoints_import_json.html:10
+msgid ""
+"Paste JSON or upload a file. Accepted: an array of checkpoints, an object"
+" with items, or a mapping with cps (e/n/name) like the map export."
+msgstr ""
+"Prilepi JSON ali naloži datoteko. Sprejemljivo: seznam točk, objekt z "
+"items ali mapa s cps (e/n/name) kot pri izvozu zemljevida."
+
+#: app/templates/checkpoints_import_json.html:13
+msgid "API format (items)"
+msgstr "API format (items)"
+
+#: app/templates/checkpoints_import_json.html:17
+msgid "Map export format (cps)"
+msgstr "Format izvoza zemljevida (cps)"
+
+#: app/templates/checkpoints_import_json.html:23
+msgid "Upload JSON file (optional)"
+msgstr "Naloži JSON datoteko (neobvezno)"
+
+#: app/templates/checkpoints_import_json.html:27
+msgid "JSON payload"
+msgstr "JSON vsebina"
+
+#: app/templates/checkpoints_import_json.html:30
+msgid "Import"
+msgstr "Uvozi"
+
+#: app/templates/checkpoints_import_preview.html:3
+msgid "Preview Checkpoint Import"
+msgstr "Predogled uvoza točk"
+
+#: app/templates/checkpoints_import_preview.html:7
+msgid "Preview: Checkpoint Import"
+msgstr "Predogled: uvoz točk"
+
+#: app/templates/checkpoints_import_preview.html:10
+#, python-format
+msgid "Create: %(count)s"
+msgstr "Ustvari: %(count)s"
+
+#: app/templates/checkpoints_import_preview.html:11
+#, python-format
+msgid "Update: %(count)s"
+msgstr "Posodobi: %(count)s"
+
+#: app/templates/checkpoints_import_preview.html:12
+#, python-format
+msgid "Skip: %(count)s"
+msgstr "Preskoči: %(count)s"
+
+#: app/templates/checkpoints_import_preview.html:20
+msgid "Action"
+msgstr "Dejanje"
+
+#: app/templates/checkpoints_import_preview.html:25
+#: app/templates/checkpoints_list.html:23
+msgid "Location"
+msgstr "Lokacija"
+
+#: app/templates/checkpoints_import_preview.html:33
+msgid "create"
+msgstr "ustvari"
+
+#: app/templates/checkpoints_import_preview.html:35
+msgid "update"
+msgstr "posodobi"
+
+#: app/templates/checkpoints_import_preview.html:37
+msgid "skip"
+msgstr "preskoči"
+
+#: app/templates/checkpoints_import_preview.html:54
+msgid "Confirm Import"
+msgstr "Potrdi uvoz"
+
+#: app/templates/checkpoints_import_preview.html:58
+msgid "No rows to preview."
+msgstr "Ni vrstic za predogled."
+
+#: app/templates/checkpoints_list.html:27 app/templates/group_members.html:23
+#: app/templates/groups_list.html:22 app/templates/lora_list.html:13
+#: app/templates/rfid_list.html:28 app/templates/teams_list.html:59
+#: app/templates/users_list.html:17 app/templates/view_checkins.html:91
+msgid "Actions"
+msgstr "Dejanja"
+
+#: app/templates/checkpoints_list.html:50 app/templates/groups_list.html:36
+#: app/templates/lora_list.html:26 app/templates/rfid_list.html:41
+#: app/templates/teams_list.html:83 app/templates/users_list.html:27
+#: app/templates/view_checkins.html:106
+msgid "Edit"
+msgstr "Uredi"
+
+#: app/templates/checkpoints_list.html:55
+msgid "Delete this checkpoint?"
+msgstr "Izbrišem to kontrolno točko?"
+
+#: app/templates/checkpoints_list.html:56 app/templates/groups_list.html:42
+#: app/templates/lora_list.html:30 app/templates/rfid_list.html:46
+#: app/templates/teams_list.html:88 app/templates/users_list.html:31
+#: app/templates/users_list.html:34 app/templates/view_checkins.html:111
+msgid "Delete"
+msgstr "Izbriši"
+
+#: app/templates/checkpoints_list.html:67
+msgid "No checkpoints yet."
+msgstr "Še ni kontrolnih točk."
+
+#: app/templates/group_add.html:5 app/templates/group_edit.html:2
+#: app/templates/group_edit.html:9 app/templates/groups_list.html:10
+msgid "Add Group"
+msgstr "Dodaj skupino"
+
+#: app/templates/group_edit.html:2 app/templates/group_edit.html:9
+msgid "Edit Group"
+msgstr "Uredi skupino"
+
+#: app/templates/group_edit.html:27
+msgid "Selected order"
+msgstr "Izbran vrstni red"
+
+#: app/templates/group_edit.html:28
+msgid "Drag the handle to reorder"
+msgstr "Povleci ročaj za spremembo vrstnega reda"
+
+#: app/templates/group_edit.html:30 app/templates/group_edit.html:39
+msgid "No checkpoints selected yet."
+msgstr "Ni izbranih kontrolnih točk."
+
+#: app/templates/group_edit.html:35 app/templates/group_edit.html:155
+#: app/templates/group_members.html:43
+msgid "Remove"
+msgstr "Odstrani"
+
+#: app/templates/group_edit.html:44 app/templates/group_members.html:8
+msgid "Add checkpoint"
+msgstr "Dodaj kontrolno točko"
+
+#: app/templates/group_edit.html:47 app/templates/group_edit.html:112
+msgid "Select checkpoint"
+msgstr "Izberi kontrolno točko"
+
+#: app/templates/group_edit.html:52 app/templates/group_members.html:16
+msgid "Add"
+msgstr "Dodaj"
+
+#: app/templates/group_edit.html:54
+msgid ""
+"Add checkpoints to include them in the group. Use drag-and-drop to "
+"arrange the visit order."
+msgstr "Dodaj točke, ki bodo v skupini. Z vlečenjem uredi vrstni red obiskov."
+
+#: app/templates/group_members.html:1
+msgid "Group Members"
+msgstr "Člani skupine"
+
+#: app/templates/group_members.html:2
+#, python-format
+msgid "Group: %(name)s"
+msgstr "Skupina: %(name)s"
+
+#: app/templates/group_members.html:23
+msgid "Order"
+msgstr "Vrstni red"
+
+#: app/templates/group_members.html:40
+msgid "Remove from group?"
+msgstr "Odstranim iz skupine?"
+
+#: app/templates/group_members.html:50
+msgid "No checkpoints in this group yet."
+msgstr "V tej skupini še ni kontrolnih točk."
+
+#: app/templates/groups_list.html:41
+#, python-format
+msgid "Delete group %(name)s?"
+msgstr "Izbrišem skupino %(name)s?"
+
+#: app/templates/groups_list.html:52
+msgid "No groups yet."
+msgstr "Še ni skupin."
+
+#: app/templates/login.html:5
+msgid "Sign In"
+msgstr "Prijava"
+
+#: app/templates/login.html:8 app/templates/register.html:8
+#: app/templates/user_edit.html:8 app/templates/users_list.html:15
+msgid "Username"
+msgstr "Uporabniško ime"
+
+#: app/templates/login.html:12 app/templates/register.html:12
+#: app/templates/user_edit.html:15
+msgid "Password"
+msgstr "Geslo"
+
+#: app/templates/login.html:15
+msgid "Sign in"
+msgstr "Prijavi se"
+
+#: app/templates/lora_add.html:2 app/templates/lora_add.html:5
+#: app/templates/lora_list.html:6
+msgid "Add Device"
+msgstr "Dodaj napravo"
+
+#: app/templates/lora_add.html:8 app/templates/lora_edit.html:8
+msgid "Device Number"
+msgstr "Številka naprave"
+
+#: app/templates/lora_add.html:12
+msgid "Name (optional)"
+msgstr "Ime (neobvezno)"
+
+#: app/templates/lora_add.html:13
+msgid "North Gate"
+msgstr "Severni vhod"
+
+#: app/templates/lora_add.html:16 app/templates/lora_edit.html:16
+msgid "Note"
+msgstr "Opomba"
+
+#: app/templates/lora_edit.html:2 app/templates/lora_edit.html:5
+msgid "Edit Device"
+msgstr "Uredi napravo"
+
+#: app/templates/lora_edit.html:21 app/templates/lora_list.html:13
+msgid "Active"
+msgstr "Aktivna"
+
+#: app/templates/lora_list.html:13
+msgid "DevNum"
+msgstr "ID naprave"
+
+#: app/templates/lora_list.html:13
+msgid "Checkpoint Description"
+msgstr "Opis kontrolne točke"
+
+#: app/templates/lora_list.html:13
+msgid "Last Seen (UTC)"
+msgstr "Zadnjič viden (UTC)"
+
+#: app/templates/lora_list.html:21
+msgid "Yes"
+msgstr "Da"
+
+#: app/templates/lora_list.html:21
+msgid "No"
+msgstr "Ne"
+
+#: app/templates/lora_list.html:29
+msgid "Delete this device?"
+msgstr "Izbrišem to napravo?"
+
+#: app/templates/lora_list.html:40
+msgid "No devices yet."
+msgstr "Še ni naprav."
+
+#: app/templates/lora_map.html:7
+msgid "Devices (multi-select)"
+msgstr "Naprave (več izborov)"
+
+#: app/templates/lora_map.html:13
+msgid "Leave none selected to show latest point per device."
+msgstr "Če ni izbrano nič, se pokaže zadnja točka vsake naprave."
+
+#: app/templates/lora_map.html:16
+msgid "Showing positions reported by devices via GPS payloads."
+msgstr "Prikaz položajev, ki so jih poslale naprave z GPS."
+
+#: app/templates/lora_map.html:19
+msgid "History"
+msgstr "Zgodovina"
+
+#: app/templates/lora_map.html:21
+msgid "Latest only"
+msgstr "Samo zadnja"
+
+#: app/templates/lora_map.html:22
+msgid "Last 10"
+msgstr "Zadnjih 10"
+
+#: app/templates/lora_map.html:23
+msgid "Last 50"
+msgstr "Zadnjih 50"
+
+#: app/templates/lora_map.html:24
+msgid "Last 100"
+msgstr "Zadnjih 100"
+
+#: app/templates/lora_map.html:29
+msgid "Show track line"
+msgstr "Pokaži sled"
+
+#: app/templates/lora_map.html:34
+msgid "Auto refresh"
+msgstr "Samodejna osvežitev"
+
+#: app/templates/lora_map.html:42
+msgid "Refresh"
+msgstr "Osveži"
+
+#: app/templates/lora_map.html:67
+msgid "Dev"
+msgstr "Naprava"
+
+#: app/templates/lora_map.html:68
+msgid "RSSI"
+msgstr "RSSI"
+
+#: app/templates/lora_map.html:69
+msgid "SNR"
+msgstr "SNR"
+
+#: app/templates/map.html:2
+msgid "Checkpoint Map"
+msgstr "Zemljevid kontrolnih točk"
+
+#: app/templates/map.html:9
+msgid "Select a team"
+msgstr "Izberi ekipo"
+
+#: app/templates/map.html:16
+msgid "Legend:"
+msgstr "Legenda:"
+
+#: app/templates/map.html:17 app/templates/map.html:45
+msgid "found"
+msgstr "najdeno"
+
+#: app/templates/map.html:18 app/templates/map.html:46
+msgid "next"
+msgstr "naslednja"
+
+#: app/templates/map.html:19 app/templates/map.html:47
+msgid "not found"
+msgstr "ni najdeno"
+
+#: app/templates/map.html:43
+msgid "Status"
+msgstr "Status"
+
+#: app/templates/register.html:16 app/templates/user_edit.html:31
+#: app/templates/users_list.html:16
+msgid "Role"
+msgstr "Vloga"
+
+#: app/templates/register.html:18
+msgid "public"
+msgstr "javni"
+
+#: app/templates/register.html:19
+msgid "judge"
+msgstr "sodnik"
+
+#: app/templates/register.html:20
+msgid "admin"
+msgstr "admin"
+
+#: app/templates/rfid_finish.html:9
+msgid "Finish-line Check"
+msgstr "Zaključni pregled"
+
+#: app/templates/rfid_finish.html:11
+msgid ""
+"Tap the tag to read its UID and stored digests. We will verify which "
+"devices/checkpoints match the truncated HMACs."
+msgstr "Prisloni kartico, preberemo UID in digeste ter preverimo ujemanje skrajšanih HMAC-ov z napravami/kontrolnimi točkami."
+
+#: app/templates/rfid_finish.html:16
+msgid "Limit to devices (optional)"
+msgstr "Omeji na naprave (neobvezno)"
+
+#: app/templates/rfid_finish.html:25
+msgid "Leave empty to check against all devices."
+msgstr "Pusti prazno za preverjanje vseh naprav."
+
+#: app/templates/rfid_finish.html:30
+msgid "Tap tag: read + verify"
+msgstr "Prisloni kartico: preberi + preveri"
+
+#: app/templates/rfid_finish.html:35
+msgid "Last UID"
+msgstr "Zadnji UID"
+
+#: app/templates/rfid_finish.html:39
+msgid "Digests read"
+msgstr "Prebrani digesti"
+
+#: app/templates/rfid_finish.html:41
+msgid "From text records on the tag (one per line)."
+msgstr "Iz tekstovnih zapisov na kartici (vsaka vrstica en digest)."
+
+#: app/templates/rfid_finish.html:51
+msgid "Results"
+msgstr "Rezultati"
+
+#: app/templates/rfid_finish.html:52
+msgid "Awaiting scan..."
+msgstr "Čakam na skeniranje…"
+
+#: app/templates/rfid_finish.html:55 app/templates/rfid_judge.html:66
+msgid "Web NFC"
+msgstr "Web NFC"
+
+#: app/templates/rfid_finish.html:56 app/templates/rfid_judge.html:67
+msgid "Checking…"
+msgstr "Preverjam…"
+
+#: app/templates/rfid_finish.html:59
+msgid ""
+"Needs Android Chrome 89+. We read text records, split by lines, and "
+"compare to all device IDs (or your selection)."
+msgstr "Potrebujete Android Chrome 89+. Preberemo tekstovne zapise, jih razdelimo po vrsticah in primerjamo z ID-ji naprav (ali izbranimi)."
+
+#: app/templates/rfid_finish.html:89
+msgid "Mismatch: tag digests include checkpoints the team has not checked into."
+msgstr "Neskladje: digesti vključujejo točke, na katere ekipa ni prijavljena."
+
+#: app/templates/rfid_finish.html:90
+msgid "Verification complete."
+msgstr "Preverjanje zaključeno."
+
+#: app/templates/rfid_finish.html:92
+msgid "checked"
+msgstr "zabeleženo"
+
+#: app/templates/rfid_finish.html:93
+msgid "missing check-in"
+msgstr "manjka prijava"
+
+#: app/templates/rfid_finish.html:94
+msgid "No match"
+msgstr "Ni ujemanja"
+
+#: app/templates/rfid_finish.html:95
+msgid "collision"
+msgstr "trčenje"
+
+#: app/templates/rfid_finish.html:96
+msgid "Unknown"
+msgstr "Neznano"
+
+#: app/templates/rfid_finish.html:97
+msgid "No digests found."
+msgstr "Ni najdenih digestov."
+
+#: app/templates/rfid_finish.html:98 app/templates/rfid_judge.html:99
+msgid "Web NFC not available in this browser."
+msgstr "Web NFC ni na voljo v tem brskalniku."
+
+#: app/templates/rfid_finish.html:99 app/templates/rfid_judge.html:100
+msgid "Tap a tag to read…"
+msgstr "Prisloni kartico za branje…"
+
+#: app/templates/rfid_finish.html:100
+msgid "Verification failed."
+msgstr "Preverjanje ni uspelo."
+
+#: app/templates/rfid_finish.html:101 app/templates/rfid_judge.html:104
+msgid "Web NFC read error."
+msgstr "Napaka pri branju Web NFC."
+
+#: app/templates/rfid_finish.html:102 app/templates/rfid_judge.html:105
+msgid "Web NFC not available."
+msgstr "Web NFC ni na voljo."
+
+#: app/templates/rfid_finish.html:103 app/templates/rfid_judge.html:108
+msgid "Supported"
+msgstr "Podprto"
+
+#: app/templates/rfid_finish.html:104 app/templates/rfid_judge.html:109
+msgid "Not available"
+msgstr "Ni na voljo"
+
+#: app/templates/rfid_judge.html:2
+msgid "Judge RFID Console"
+msgstr "Konzola sodnika RFID"
+
+#: app/templates/rfid_judge.html:9
+msgid "Web NFC: Read → Ingest → Append"
+msgstr "Web NFC: branje → ingest → dodaj"
+
+#: app/templates/rfid_judge.html:11
+msgid ""
+"Tap a tag with your phone to read its UID, call ingest for the selected "
+"device/checkpoint, then append the signed payload back onto the tag."
+msgstr ""
+"Prisloni kartico, da prebereš UID, pošlješ ingest za izbrano "
+"napravo/točko in dodaš podpisan payload na kartico."
+
+#: app/templates/rfid_judge.html:16
+msgid "Device / Checkpoint"
+msgstr "Naprava / kontrolna točka"
+
+#: app/templates/rfid_judge.html:25
+msgid "Uses the device ID sent to /api/ingest."
+msgstr "Uporabi ID naprave, ki se pošlje na /api/ingest."
+
+#: app/templates/rfid_judge.html:27
+msgid "No devices configured yet."
+msgstr "Naprave še niso nastavljene."
+
+#: app/templates/rfid_judge.html:32
+msgid "Last UID read"
+msgstr "Zadnji prebrani UID"
+
+#: app/templates/rfid_judge.html:34
+msgid "Filled when you tap a tag with Web NFC."
+msgstr "Izpolni se ob dotiku kartice z Web NFC."
+
+#: app/templates/rfid_judge.html:39
+msgid "Tap tag: read → ingest → append write"
+msgstr "Prisloni kartico: preberi → ingest → zapiši"
+
+#: app/templates/rfid_judge.html:50
+msgid "Result"
+msgstr "Rezultat"
+
+#: app/templates/rfid_judge.html:51
+msgid "Awaiting input…"
+msgstr "Čakam na vnos…"
+
+#: app/templates/rfid_judge.html:54
+msgid "Write-back payload"
+msgstr "Payload za zapis"
+
+#: app/templates/rfid_judge.html:57
+msgid "Copy"
+msgstr "Kopiraj"
+
+#: app/templates/rfid_judge.html:60
+msgid ""
+"Appended to the tag as a text record. We only store the truncated HMAC "
+"(device ID + card UID) to save space."
+msgstr ""
+"Dodan na kartico kot tekstovni zapis. Shranimo le skrajšan HMAC (ID "
+"naprave + UID kartice), da prihranimo prostor."
+
+#: app/templates/rfid_judge.html:70
+msgid ""
+"Supported on Android Chrome 89+. We read existing text records, call "
+"ingest, then write them back with the new payload appended. Keep the tag "
+"in place until you see success."
+msgstr ""
+"Podprto v Android Chrome 89+. Preberemo obstoječe zapise, pokličemo "
+"ingest in jih z novim payloadom zapišemo nazaj. Kartico drži, dokler ne "
+"vidiš uspeha."
+
+#: app/templates/rfid_judge.html:95
+msgid "Check-in created"
+msgstr "Prijava ustvarjena"
+
+#: app/templates/rfid_judge.html:96
+msgid "Card not mapped to a team"
+msgstr "Kartica ni povezana z ekipo"
+
+#: app/templates/rfid_judge.html:97
+msgid "Ingest completed."
+msgstr "Ingest zaključen."
+
+#: app/templates/rfid_judge.html:98
+msgid "Pick a device/checkpoint first."
+msgstr "Najprej izberi napravo/kontrolno točko."
+
+#: app/templates/rfid_judge.html:101
+msgid "Ingest did not return a write-back payload."
+msgstr "Ingest ni vrnil podatka za zapis na kartico."
+
+#: app/templates/rfid_judge.html:102
+msgid "Read, ingested, and appended payload to tag."
+msgstr "Prebrano, poslano in zapisano na kartico."
+
+#: app/templates/rfid_judge.html:103
+msgid "Web NFC flow failed."
+msgstr "Postopek Web NFC ni uspel."
+
+#: app/templates/rfid_judge.html:106
+msgid "Write-back payload copied."
+msgstr "Payload za zapis je kopiran."
+
+#: app/templates/rfid_judge.html:107
+msgid "Could not copy payload."
+msgstr "Ni mogoče kopirati payloada."
+
+#: app/templates/rfid_list.html:2 app/templates/rfid_list.html:7
+msgid "RFID ↔ Team Mappings"
+msgstr "RFID ↔ povezave z ekipami"
+
+#: app/templates/rfid_list.html:12
+msgid "Add Mapping"
+msgstr "Dodaj povezavo"
+
+#: app/templates/rfid_list.html:13
+msgid "Upload CSV"
+msgstr "Naloži CSV"
+
+#: app/templates/rfid_list.html:23
+msgid "Card #"
+msgstr "Št. kartice"
+
+#: app/templates/rfid_list.html:24
+msgid "UID"
+msgstr "UID"
+
+#: app/templates/rfid_list.html:26 app/templates/view_checkins.html:88
+msgid "Team #"
+msgstr "Št. ekipe"
+
+#: app/templates/rfid_list.html:45
+msgid "Delete this mapping?"
+msgstr "Izbrišem to povezavo?"
+
+#: app/templates/rfid_list.html:57
+msgid "No RFID mappings yet."
+msgstr "Ni še povezav RFID."
+
+#: app/templates/success.html:6
+msgid "Back to Home"
+msgstr "Nazaj na prvo stran"
+
+#: app/templates/team_edit.html:5
+msgid "Edit Team"
+msgstr "Uredi ekipo"
+
+#: app/templates/team_edit.html:13 app/templates/teams_list.html:55
+msgid "Rod / Org"
+msgstr "Rod / org"
+
+#: app/templates/team_edit.html:14
+msgid "e.g. mGG / local org"
+msgstr "npr. mGG / lokalna org"
+
+#: app/templates/teams_list.html:14
+msgid "All groups"
+msgstr "Vse skupine"
+
+#: app/templates/teams_list.html:24 app/templates/view_checkins.html:47
+msgid "Sort"
+msgstr "Razvrsti"
+
+#: app/templates/teams_list.html:26
+msgid "Name (A→Z)"
+msgstr "Ime (A→Ž)"
+
+#: app/templates/teams_list.html:27
+msgid "Name (Z→A)"
+msgstr "Ime (Ž→A)"
+
+#: app/templates/teams_list.html:28
+msgid "Number (↑)"
+msgstr "Številka (↑)"
+
+#: app/templates/teams_list.html:29
+msgid "Number (↓)"
+msgstr "Številka (↓)"
+
+#: app/templates/teams_list.html:34
+msgid "Apply"
+msgstr "Uporabi"
+
+#: app/templates/teams_list.html:35 app/templates/view_checkins.html:57
+msgid "Reset"
+msgstr "Ponastavi"
+
+#: app/templates/teams_list.html:44
+#, python-format
+msgid "Total: %(count)s"
+msgstr "Skupaj: %(count)s"
+
+#: app/templates/teams_list.html:47
+msgid "No teams found."
+msgstr "Ni najdenih ekip."
+
+#: app/templates/teams_list.html:87
+msgid "Delete this team?"
+msgstr "Izbrišem to ekipo?"
+
+#: app/templates/user_edit.html:2 app/templates/user_edit.html:4
+#: app/templates/users_list.html:6
+msgid "Add User"
+msgstr "Dodaj uporabnika"
+
+#: app/templates/user_edit.html:2 app/templates/user_edit.html:4
+msgid "Edit User"
+msgstr "Uredi uporabnika"
+
+#: app/templates/user_edit.html:17
+msgid "At least 8 characters; should not contain the username."
+msgstr "Vsaj 8 znakov; ne sme vsebovati uporabniškega imena."
+
+#: app/templates/user_edit.html:21
+msgid "New Password (optional)"
+msgstr "Novo geslo (neobvezno)"
+
+#: app/templates/user_edit.html:25
+msgid "Confirm New Password"
+msgstr "Potrdi novo geslo"
+
+#: app/templates/users_list.html:30
+#, python-format
+msgid "Delete user %(user)s?"
+msgstr "Izbrišem uporabnika %(user)s?"
+
+#: app/templates/users_list.html:34
+msgid "Cannot delete yourself"
+msgstr "Sebe ne moreš izbrisati"
+
+#: app/templates/users_list.html:43
+msgid "No users yet."
+msgstr "Še ni uporabnikov."
+
+#: app/templates/view_checkins.html:2
+msgid "Check-ins"
+msgstr "Prijave"
+
+#: app/templates/view_checkins.html:11
+msgid "All teams"
+msgstr "Vse ekipe"
+
+#: app/templates/view_checkins.html:24
+msgid "All checkpoints"
+msgstr "Vse točke"
+
+#: app/templates/view_checkins.html:35
+msgid "From"
+msgstr "Od"
+
+#: app/templates/view_checkins.html:41
+msgid "To"
+msgstr "Do"
+
+#: app/templates/view_checkins.html:49
+msgid "Newest first"
+msgstr "Najnovejše najprej"
+
+#: app/templates/view_checkins.html:50
+msgid "Oldest first"
+msgstr "Najstarejše najprej"
+
+#: app/templates/view_checkins.html:51
+msgid "Team (name, number)"
+msgstr "Ekipa (ime, številka)"
+
+#: app/templates/view_checkins.html:56
+msgid "Apply Filters"
+msgstr "Uporabi filtre"
+
+#: app/templates/view_checkins.html:66
+msgid "Export CSV"
+msgstr "Izvozi CSV"
+
+#: app/templates/view_checkins.html:86
+msgid "Time (local)"
+msgstr "Čas (lokalni)"
+
+#: app/templates/view_checkins.html:110
+msgid "Delete this check-in?"
+msgstr "Izbrišem to prijavo?"
+
+#: app/templates/view_checkins.html:123
+msgid "No check-ins match your filters."
+msgstr "Nobena prijava ne ustreza filtrom."
+
+# Base layout / navbar
+#~ msgid "RFID Checkpoint System"
+#~ msgstr "RFID nadzorni sistem"
+
+#~ msgid "Signed in as %(user)s (%(role)s)"
+#~ msgstr "Prijavljen: %(user)s (%(role)s)"
+
+#~ msgid "Logout"
+#~ msgstr "Odjava"
+
+#~ msgid "Change Password"
+#~ msgstr "Spremeni geslo"
+
+#~ msgid "Login"
+#~ msgstr "Prijava"
+
+#~ msgid "Create User"
+#~ msgstr "Ustvari uporabnika"
+
+#~ msgid "Users"
+#~ msgstr "Uporabniki"
+
+#~ msgid "Dark mode"
+#~ msgstr "Temni način"
+
+#~ msgid "Teams"
+#~ msgstr "Ekipe"
+
+#~ msgid "Checkpoints"
+#~ msgstr "Kontrolne točke"
+
+#~ msgid "View Check-ins"
+#~ msgstr "Pregled prijav"
+
+#~ msgid "Add Check-in"
+#~ msgstr "Dodaj prijavo"
+
+#~ msgid "Map RFID ↔ Team"
+#~ msgstr "Poveži RFID ↔ ekipa"
+
+#~ msgid "Judge RFID"
+#~ msgstr "Sodnik RFID"
+
+#~ msgid "Finish Check"
+#~ msgstr "Zaključni pregled"
+
+#~ msgid "Groups"
+#~ msgstr "Skupine"
+
+#~ msgid "Devices"
+#~ msgstr "Naprave"
+
+#~ msgid "Assign Team → Group"
+#~ msgstr "Dodeli ekipo → skupina"
+
+#~ msgid "Messages"
+#~ msgstr "Sporočila"
+
+#~ msgid "Map"
+#~ msgstr "Zemljevid"
+
+#~ msgid "Device Map"
+#~ msgstr "Zemljevid naprav"
+
+#~ msgid "Sheets"
+#~ msgstr "Preglednice"
