@@ -105,7 +105,7 @@ def sync_all_checkpoint_tabs():
                 client.set_checkbox_validation(cfg.spreadsheet_id, cfg.tab_name, arrived_col, 2, end_row)
 
 
-def mark_arrival_checkbox(team_id: int, checkpoint_id: int):
+def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime | None = None):
     """Set arrived checkbox TRUE for the given team/checkpoint in any linked checkpoint tab."""
     team = Team.query.get(team_id)
     checkpoint = Checkpoint.query.get(checkpoint_id)
@@ -177,8 +177,9 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int):
             try:
                 client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, arrived_col, True)
                 if time_col:
-                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, time_col, now_str)
+                    ts = arrived_at or datetime.now()
+                    ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
+                    client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, time_col, ts_str)
             except Exception as exc:
                 current_app.logger.warning("Could not update arrival checkbox: %s", exc)
 

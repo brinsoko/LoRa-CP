@@ -39,11 +39,13 @@
               {% if (read_only is not defined or not read_only) and has_role('judge','admin') %}
               <td class="text-end">
                 <a class="btn btn-sm btn-outline-primary" href="{{ url_for('rfid.edit_rfid', card_id=c.id) }}">Edit</a>
-                <form method="post" class="d-inline"
-                      action="{{ url_for('rfid.delete_rfid', card_id=c.id) }}"
-                      onsubmit="return confirm('Delete this mapping?');">
-                  <button class="btn btn-sm btn-outline-danger">Delete</button>
-                </form>
+                {% if has_role('admin') %}
+                  <form method="post" class="d-inline"
+                        action="{{ url_for('rfid.delete_rfid', card_id=c.id) }}"
+                        onsubmit="return confirm('Delete this mapping?');">
+                    <button class="btn btn-sm btn-outline-danger">Delete</button>
+                  </form>
+                {% endif %}
               </td>
               {% endif %}
             </tr>

@@ -42,3 +42,4 @@ flake8==7.1.1
 
 # --- Security / CORS (if needed later) ---
 Flask-Cors==4.0.1
+cryptography==43.0.1

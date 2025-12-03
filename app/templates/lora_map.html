@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}LoRa Map{% endblock %}
+{% block title %}Device Map{% endblock %}
 {% block content %}
 
 <div class="d-flex align-items-end gap-3 mb-3">
   <div class="flex-grow-1">
-    <label class="form-label">LoRa Devices (multi-select)</label>
+    <label class="form-label">Devices (multi-select)</label>
     <select id="deviceSelect" class="form-select" multiple size="6">
       {% for d in devices %}
         <option value="{{ d.dev_num }}">{{ d.name or ("Dev " ~ d.dev_num) }}{% if d.dev_num %} (#{{ d.dev_num }}){% endif %}</option>
@@ -145,7 +145,7 @@
   }
 
   async function loadPoints(devId, limit) {
-    const base = "/api/map/lora-points";
+    const base = "/api/map/device-points";
     const url = devId ? `${base}?dev_id=${encodeURIComponent(devId)}&limit=${encodeURIComponent(limit)}` : base;
     return await getJSON(url);
   }

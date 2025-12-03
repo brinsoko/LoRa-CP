@@ -34,6 +34,132 @@
         "name": "session"
       }
     },
+    "/api/devices": {
+      "get": {
+        "tags": ["lora"],
+        "summary": "List devices (LoRa gateways or phones)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Devices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "devices": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LoRaDevice"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["lora"],
+        "summary": "Create device (alias of /api/lora/devices)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoRaDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created device"
+          }
+        }
+      }
+    },
+    "/api/devices/{device_id}": {
+      "parameters": [
+        {
+          "name": "device_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "tags": ["lora"],
+        "summary": "Device detail (alias of /api/lora/devices/{device_id})",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoRaDevice"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["lora"],
+        "summary": "Update device (alias)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoRaDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated device"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["lora"],
+        "summary": "Delete device (alias)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
     "schemas": {
       "ApiMessage": {
         "type": "object",
@@ -290,12 +416,6 @@
           "id": {
             "type": "integer"
           },
-          "dev_eui": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "dev_num": {
             "type": "integer"
           },
@@ -387,25 +507,55 @@
       },
       "IngestRequest": {
         "type": "object",
-        "required": ["dev_id", "payload"],
+        "required": ["dev_id"],
         "properties": {
-          "dev_id": { "type": "integer", "description": "Numeric identifier of the LoRa device/gateway." },
-          "payload": { "type": "string", "description": "Payload string (expected to be RFID UID)." },
+          "dev_id": { "type": "integer", "description": "Numeric identifier of the device/gateway/phone." },
+          "payload": { "type": "string", "description": "Payload string (RFID UID or GPS payload). Required unless gps_lat/gps_lon are provided." },
           "rssi": { "type": ["number", "null"], "format": "float", "description": "Received signal strength (dBm)." },
           "snr": { "type": ["number", "null"], "format": "float", "description": "Signal-to-noise ratio (dB)." },
-          "ts": { "type": ["integer", "null"], "format": "int64", "description": "Unix timestamp (seconds); if omitted, server uses current UTC." }
-        }
+          "ts": { "type": ["integer", "null"], "format": "int64", "description": "Unix timestamp (seconds); if omitted, server uses current UTC." },
+          "source": { "type": ["string", "null"], "description": "Optional client hint (e.g., judge_web_nfc)." },
+          "gps_lat": { "type": ["number", "null"], "format": "float" },
+          "gps_lon": { "type": ["number", "null"], "format": "float" },
+          "gps_alt": { "type": ["number", "null"], "format": "float" },
+          "gps_age_ms": { "type": ["integer", "null"], "format": "int64" }
+        },
+        "description": "Provide either payload (string) or gps_lat/gps_lon (structured GPS)."
       },
       "IngestResponse": {
         "type": "object",
         "properties": {
           "ok": { "type": "boolean" },
-          "message_id": { "type": "integer", "description": "Primary key of the stored LoRaMessage." },
+          "message_id": { "type": "integer", "description": "Primary key of the stored message." },
           "dev_id": { "type": "integer" },
           "uid_seen": { "type": "boolean", "description": "Whether payload matched a known RFID card UID." },
           "team": { "type": ["string", "null"], "description": "Team name if UID matched." },
           "checkpoint": { "type": ["string", "null"], "description": "Resolved checkpoint name for the device." },
-          "checkin_created": { "type": "boolean", "description": "True if a new Checkin row was inserted." }
+          "checkin_created": { "type": "boolean", "description": "True if a new Checkin row was inserted." },
+          "gps": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "lat": { "type": "number" },
+              "lon": { "type": "number" },
+              "alt": { "type": "number" },
+              "age_ms": { "type": "integer" }
+            }
+          },
+          "card_writeback": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "payload": { "type": "string", "description": "Truncated HMAC written to card/tag." },
+              "hmac": { "type": "string" },
+              "device_id": { "type": "integer" },
+              "card_uid": { "type": "string" },
+              "checkpoint_id": { "type": ["integer", "null"] },
+              "checkpoint": { "type": ["string", "null"] },
+              "team_id": { "type": ["integer", "null"] },
+              "team": { "type": ["string", "null"] }
+            }
+          }
         },
         "required": ["ok", "message_id", "dev_id", "uid_seen", "checkin_created"]
       },
@@ -1736,6 +1886,97 @@
         }
       }
     },
+    "/api/rfid/verify": {
+      "post": {
+        "tags": ["rfid"],
+        "summary": "Verify tag digests against devices and team check-ins",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "uid": { "type": "string", "description": "Card UID" },
+                  "digests": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "List of truncated HMAC strings read from the tag"
+                  },
+                  "device_ids": {
+                    "type": "array",
+                    "items": { "type": "integer" },
+                    "description": "Optional: limit verification to these device IDs"
+                  }
+                },
+                "required": ["uid", "digests"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "uid": { "type": "string" },
+                    "device_ids": {
+                      "type": "array",
+                      "items": { "type": "integer" }
+                    },
+                    "team": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": { "type": "integer" },
+                        "name": { "type": "string" }
+                      }
+                    },
+                    "has_mismatch": { "type": "boolean", "description": "True if any digest matched a checkpoint the team has not checked in at" },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "digest": { "type": "string" },
+                          "collision": { "type": "boolean" },
+                          "matches": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "device_id": { "type": "integer" },
+                                "device_name": { "type": "string", "nullable": true },
+                                "checkpoint": { "type": "string", "nullable": true },
+                                "checkpoint_id": { "type": "integer", "nullable": true },
+                                "checked_in": { "type": "boolean", "nullable": true }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "unknown": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/lora/devices": {
       "get": {
         "tags": ["lora"],
@@ -1919,8 +2160,8 @@
     "/api/ingest": {
       "post": {
         "tags": ["ingest"],
-        "summary": "Ingest a LoRa message and optionally create a Check-in",
-        "description": "Stores the raw LoRa message, updates LoRaDevice telemetry, ensures a Checkpoint is linked to the device (dev_num), and if payload matches a known RFID UID, creates a Checkin for that team at the device's checkpoint (only if one doesn't already exist).",
+        "summary": "Ingest a device message (LoRa or phone) and optionally create a Check-in",
+        "description": "Stores the raw message, updates device telemetry, ensures a Checkpoint is linked to the device (dev_num), and if payload matches a known RFID UID, creates a Checkin for that team at the device's checkpoint (only if one doesn't already exist). Returns optional GPS parse and a truncated HMAC payload suitable for writing back to a tag.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1929,6 +2170,9 @@
               "examples": {
                 "basic": {
                   "value": { "dev_id": 1, "payload": "A1B2C3D4", "rssi": -62.5, "snr": 9.0, "ts": 1730200000 }
+                },
+                "gpsFields": {
+                  "value": { "dev_id": 2, "gps_lat": 46.051, "gps_lon": 14.505, "gps_alt": 320.5, "gps_age_ms": 5000 }
                 }
               }
             },
@@ -1951,7 +2195,21 @@
                 "schema": { "$ref": "#/components/schemas/IngestResponse" },
                 "examples": {
                   "createdCheckin": {
-                    "value": { "ok": true, "message_id": 123, "dev_id": 1, "uid_seen": true, "team": "Wolves", "checkpoint": "LoRa Gateway 1", "checkin_created": true }
+                    "value": {
+                      "ok": true,
+                      "message_id": 123,
+                      "dev_id": 1,
+                      "uid_seen": true,
+                      "team": "Wolves",
+                      "checkpoint": "LoRa Gateway 1",
+                      "checkin_created": true,
+                      "card_writeback": {
+                        "payload": "abcd1234ef56",
+                        "hmac": "abcd1234ef56",
+                        "device_id": 1,
+                        "card_uid": "A1B2C3D4"
+                      }
+                    }
                   },
                   "noCheckin": {
                     "value": { "ok": true, "message_id": 124, "dev_id": 2, "uid_seen": false, "team": null, "checkpoint": "LoRa Gateway 2", "checkin_created": false }

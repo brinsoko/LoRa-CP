@@ -14,8 +14,9 @@
                  placeholder="Enter RFID UID" required>
           <!-- Optional: scan button (works if serial reader is connected & endpoint enabled) -->
           <button class="btn btn-outline-secondary" type="button" id="scanBtn">Scan UID</button>
+          <button class="btn btn-outline-primary" type="button" id="webNfcBtn">Web NFC</button>
         </div>
-        <div class="form-text">UID is case-insensitive; colons/dashes are OK.</div>
+        <div class="form-text">UID is case-insensitive; colons/dashes are OK. Web NFC works on Android Chrome.</div>
       </div>
 
       <div class="mb-3">
@@ -66,6 +67,41 @@
       } finally {
         btn.disabled = false;
         btn.textContent = 'Scan UID';
+      }
+    });
+  })();
+
+  // Web NFC UID read (Android Chrome)
+  (function () {
+    const btn = document.getElementById('webNfcBtn');
+    const uidInput = document.getElementById('uidInput');
+    if (!btn || typeof NDEFReader === 'undefined') {
+      if (btn) btn.disabled = true;
+      return;
+    }
+    btn.addEventListener('click', async function () {
+      btn.disabled = true;
+      btn.textContent = 'Tap tag...';
+      try {
+        const reader = new NDEFReader();
+        await reader.scan();
+        reader.onreading = (event) => {
+          const serial = (event.serialNumber || '').toUpperCase();
+          if (serial) {
+            uidInput.value = serial;
+          }
+          btn.textContent = 'Web NFC';
+          btn.disabled = false;
+        };
+        reader.onreadingerror = () => {
+          alert('Web NFC read error.');
+          btn.textContent = 'Web NFC';
+          btn.disabled = false;
+        };
+      } catch (err) {
+        alert(err && err.message ? err.message : 'Web NFC not available.');
+        btn.textContent = 'Web NFC';
+        btn.disabled = false;
       }
     });
   })();

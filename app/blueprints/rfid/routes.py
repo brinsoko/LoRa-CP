@@ -25,6 +25,19 @@ def _fetch_teams():
     return payload.get("teams", [])
 
 
+def _fetch_devices():
+    resp, payload = api_json("GET", "/api/devices")
+    if resp.status_code != 200:
+        flash("Could not load devices.", "warning")
+        return []
+    devices = payload.get("devices", [])
+    try:
+        devices = sorted(devices, key=lambda d: (d.get("dev_num") is None, d.get("dev_num")))
+    except Exception:
+        pass
+    return devices
+
+
 @rfid_bp.route("/", methods=["GET"])
 @roles_required("judge", "admin")
 def list_rfid():
@@ -105,6 +118,20 @@ def edit_rfid(card_id: int):
         teams=teams,
         selected_team_id=selected_team_id,
     )
+
+
+@rfid_bp.route("/judge-console", methods=["GET"])
+@roles_required("judge", "admin")
+def judge_console():
+    devices = _fetch_devices()
+    return render_template("rfid_judge.html", devices=devices)
+
+
+@rfid_bp.route("/finish", methods=["GET"])
+@roles_required("judge", "admin")
+def finish_console():
+    devices = _fetch_devices()
+    return render_template("rfid_finish.html", devices=devices)
 
 
 @rfid_bp.route("/<int:card_id>/delete", methods=["POST"])

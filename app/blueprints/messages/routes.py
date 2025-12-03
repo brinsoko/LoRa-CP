@@ -64,7 +64,7 @@ def list_messages():
     if dev_id:
         params["dev_id"] = dev_id
 
-    resp, payload = api_json("GET", "/api/lora/messages", params=params)
+    resp, payload = api_json("GET", "/api/devices/messages", params=params)
     if resp.status_code != 200:
         flash_msg = payload.get("detail") or payload.get("error") or "Could not load messages."
         flash(flash_msg, "warning")

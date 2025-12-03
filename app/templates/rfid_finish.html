@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}Finish Check{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Finish-line Check</h5>
+        <p class="text-body-secondary small mb-3">
+          Tap the tag to read its UID and stored digests. We will verify which devices/checkpoints match the truncated HMACs.
+        </p>
+
+        <form id="finishForm" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Limit to devices (optional)</label>
+            <select id="deviceFilter" class="form-select" multiple size="6">
+              {% for d in devices %}
+                <option value="{{ d.dev_num }}">
+                  {{ d.name or ("Device " ~ d.dev_num) }}{% if d.dev_num %} (#{{ d.dev_num }}){% endif %}
+                  {% if d.checkpoint %} - {{ d.checkpoint.name }}{% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Leave empty to check against all devices.</div>
+          </div>
+
+          <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary" type="submit" id="scanBtn" {% if not devices %}disabled{% endif %}>
+              Tap tag: read + verify
+            </button>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Last UID</label>
+            <input class="form-control" id="uidField" readonly>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Digests read</label>
+            <textarea class="form-control" id="digestsField" rows="4" readonly></textarea>
+            <div class="form-text">From text records on the tag (one per line).</div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-3">Results</h6>
+        <div id="resultBox" class="alert alert-secondary">Awaiting scan...</div>
+        <div class="border rounded-3 p-3 mb-3">
+          <div class="d-flex align-items-center gap-2">
+            <strong>Web NFC</strong>
+            <span class="badge text-bg-secondary" id="webNfcStatus">Checking…</span>
+          </div>
+          <p class="small text-body-secondary mb-0">
+            Needs Android Chrome 89+. We read text records, split by lines, and compare to all device IDs (or your selection).
+          </p>
+        </div>
+        <div id="resultsList" class="small"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById("finishForm");
+  const scanBtn = document.getElementById("scanBtn");
+  const deviceFilter = document.getElementById("deviceFilter");
+  const uidField = document.getElementById("uidField");
+  const digestsField = document.getElementById("digestsField");
+  const resultBox = document.getElementById("resultBox");
+  const resultsList = document.getElementById("resultsList");
+  const webNfcStatus = document.getElementById("webNfcStatus");
+  const hasWebNfc = typeof NDEFReader !== "undefined";
+
+  function setBusy(busy) {
+    scanBtn.disabled = busy;
+  }
+
+  function showMessage(text, variant) {
+    resultBox.className = `alert alert-${variant}`;
+    resultBox.textContent = text;
+  }
+
+  function extractDigests(records) {
+    const decoder = new TextDecoder();
+    const texts = [];
+    (records || []).forEach((rec) => {
+      if (rec.recordType === "text") {
+        if (typeof rec.data === "string") {
+          texts.push(rec.data);
+        } else if (rec.data instanceof DataView) {
+          texts.push(decoder.decode(rec.data));
+        }
+      }
+    });
+    return texts.join("\n").split(/\r?\n/).map(t => t.trim()).filter(Boolean);
+  }
+
+  function renderResults(data) {
+    const hasMismatch = !!data.has_mismatch;
+    const team = data.team;
+    if (hasMismatch) {
+      showMessage("Mismatch: tag digests include checkpoints the team has not checked into.", "warning");
+    } else {
+      showMessage("Verification complete.", "success");
+    }
+
+    const header = team ? `<div class="mb-2">Team: <strong>${team.name}</strong></div>` : "";
+
+    const html = [];
+    const results = data.results || [];
+    if (!results.length) {
+      html.push("<p class='text-muted mb-0'>No digests found.</p>");
+    } else {
+      results.forEach(r => {
+        const matches = r.matches || [];
+        const matchText = matches.length
+          ? matches.map(m => {
+              const base = `${m.device_id}${m.checkpoint ? " (" + m.checkpoint + ")" : ""}`;
+              if (m.checked_in === true) {
+                return `${base} <span class="badge text-bg-success">checked</span>`;
+              } else if (m.checked_in === false && m.checkpoint_id) {
+                return `${base} <span class="badge text-bg-warning">missing check-in</span>`;
+              }
+              return base;
+            }).join(", ")
+          : "No match";
+        const badge = r.collision ? `<span class="badge text-bg-warning ms-2">collision</span>` : "";
+        html.push(
+          `<div class="mb-2"><code>${r.digest}</code> → ${matchText}${badge}</div>`
+        );
+      });
+      if ((data.unknown || []).length) {
+        html.push(`<div class="text-warning mt-2">Unknown: ${data.unknown.join(", ")}</div>`);
+      }
+    }
+    resultsList.innerHTML = header + html.join("");
+  }
+
+  async function handleScan(event) {
+    event.preventDefault();
+    if (!hasWebNfc) {
+      showMessage("Web NFC not available in this browser.", "danger");
+      return;
+    }
+    setBusy(true);
+    try {
+      const reader = new NDEFReader();
+      await reader.scan();
+      showMessage("Tap a tag to read…", "info");
+
+      const onRead = async (evt) => {
+        reader.removeEventListener("reading", onRead);
+        try {
+          const uid = (evt.serialNumber || "").toUpperCase();
+          const digests = extractDigests(evt.message?.records || []);
+          uidField.value = uid;
+          digestsField.value = digests.join("\n");
+
+          const selectedDevices = Array.from(deviceFilter.selectedOptions || []).map(o => o.value).filter(Boolean);
+          const resp = await fetch("/api/rfid/verify", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              uid: uid,
+              digests: digests,
+              device_ids: selectedDevices,
+            }),
+          });
+          const data = await resp.json();
+          if (!resp.ok) {
+            throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
+          }
+          renderResults(data);
+        } catch (err) {
+          showMessage(err.message || "Verification failed.", "danger");
+          resultsList.innerHTML = "";
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      const onError = () => {
+        reader.removeEventListener("reading", onRead);
+        showMessage("Web NFC read error.", "danger");
+        setBusy(false);
+      };
+
+      reader.addEventListener("reading", onRead);
+      reader.addEventListener("readingerror", onError, { once: true });
+    } catch (err) {
+      showMessage(err.message || "Web NFC not available.", "danger");
+      setBusy(false);
+    }
+  }
+
+  form?.addEventListener("submit", handleScan);
+
+  if (hasWebNfc) {
+    webNfcStatus.textContent = "Supported";
+    webNfcStatus.className = "badge text-bg-success";
+  } else {
+    webNfcStatus.textContent = "Not available";
+    webNfcStatus.className = "badge text-bg-secondary";
+  }
+</script>
+{% endblock %}

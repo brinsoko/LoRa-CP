@@ -34,12 +34,14 @@
               <td class="text-end">
                 <a class="btn btn-sm btn-outline-primary"
                    href="{{ url_for('groups.edit_group', group_id=g.id) }}">Edit</a>
+                {% if has_role('admin') %}
                 <form class="d-inline"
                       method="post"
                       action="{{ url_for('groups.delete_group', group_id=g.id) }}"
                       onsubmit="return confirm('Delete group {{ g.name }}?');">
                   <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
                 </form>
+                {% endif %}
               </td>
             </tr>
             {% endfor %}

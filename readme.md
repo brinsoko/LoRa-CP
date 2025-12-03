@@ -9,6 +9,9 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 - **User roles:** Admin, Judge, and Public views with role-based permissions  
 - **Teams:** Create, edit, and manage teams with unique numbers  
 - **RFID cards:** Map RFID chips to teams, with optional numeric identifiers  
+- **Devices (LoRa or phones):** Manage device IDs and link each to a checkpoint; ingest accepts `/api/devices` (alias of legacy LoRa endpoints)  
+- **Web NFC judge tools:** Android Chrome can read a tag UID, call ingest, and append a truncated HMAC payload to the tag for offline proof  
+- **Finish-line verifier:** Web NFC page reads tag digests, recomputes HMACs for known devices, and highlights mismatches vs the team’s recorded check-ins  
 - **Checkpoints:**  
   - Import from JSON files  
   - Assign to multiple groups  
@@ -67,12 +70,23 @@ Cookie-based session from `/login` (form POST). Many routes are public; judge/ad
 
 ### Quick Calls
 
-Ingest a LoRa message (JSON):
+Ingest a device message (JSON):
 ```bash
 curl -X POST /api/ingest \
   -H "Content-Type: application/json" \
   -d '{"dev_id":1,"payload":"A1B2C3D4","rssi":-62.5,"snr":9.0}'
-  ```
+```
+
+Verify tag digests at finish (server-side recompute):
+```bash
+curl -X POST /api/rfid/verify \
+  -H "Content-Type: application/json" \
+  -d '{"uid":"A1B2C3D4","digests":["abcd1234"],"device_ids":[1,2,3]}'
+```
+
+### Judge/Finish Web NFC flows
+- `/rfid/judge-console`: tap a tag with Android Chrome Web NFC; reads UID, calls ingest for the selected device, and appends the truncated HMAC to the tag as text.
+- `/rfid/finish`: tap a tag; reads UID + all text records (digests), recomputes truncated HMACs for known devices, shows matches, collisions, and warns if a digest refers to a checkpoint the team hasn’t checked in at.
 
 Export check-ins (CSV):
 

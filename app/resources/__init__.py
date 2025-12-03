@@ -23,6 +23,7 @@ from .rfid import (
     RFIDCardItemResource,
     RFIDScanResource,
     RFIDBulkImportResource,
+    RFIDVerifyResource,
 )
 from .lora import LoRaDeviceListResource, LoRaDeviceItemResource
 from .messages import LoRaMessageListResource
@@ -62,11 +63,27 @@ def register_resources(api: Api) -> None:
     api.add_resource(RFIDCardItemResource, "/api/rfid/cards/<int:card_id>")
     api.add_resource(RFIDScanResource, "/api/rfid/scan")
     api.add_resource(RFIDBulkImportResource, "/api/rfid/import")
+    api.add_resource(RFIDVerifyResource, "/api/rfid/verify")
 
-    # LoRa
-    api.add_resource(LoRaDeviceListResource, "/api/lora/devices")
-    api.add_resource(LoRaDeviceItemResource, "/api/lora/devices/<int:device_id>")
-    api.add_resource(LoRaMessageListResource, "/api/lora/messages")
+    # Devices (LoRa gateways or phones)
+    api.add_resource(
+        LoRaDeviceListResource,
+        "/api/lora/devices",
+        "/api/devices",
+        endpoint="devices",
+    )
+    api.add_resource(
+        LoRaDeviceItemResource,
+        "/api/lora/devices/<int:device_id>",
+        "/api/devices/<int:device_id>",
+        endpoint="device_item",
+    )
+    api.add_resource(
+        LoRaMessageListResource,
+        "/api/lora/messages",
+        "/api/devices/messages",
+        endpoint="device_messages",
+    )
 
     # Checkins
     api.add_resource(CheckinListResource,   "/api/checkins")
@@ -75,7 +92,12 @@ def register_resources(api: Api) -> None:
 
     # Map
     api.add_resource(MapCheckpoints, "/api/map/checkpoints")
-    api.add_resource(LoRaMapPoints, "/api/map/lora-points")
+    api.add_resource(
+        LoRaMapPoints,
+        "/api/map/lora-points",
+        "/api/map/device-points",
+        endpoint="device_map_points",
+    )
 
     # Documentation
     api.add_resource(ApiDocsListResource, "/api/docs")

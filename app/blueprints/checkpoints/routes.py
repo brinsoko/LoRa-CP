@@ -21,9 +21,9 @@ def _fetch_groups():
 
 
 def _fetch_devices():
-    resp, payload = api_json("GET", "/api/lora/devices")
+    resp, payload = api_json("GET", "/api/devices")
     if resp.status_code != 200:
-        flash("Could not load LoRa devices.", "warning")
+        flash("Could not load devices.", "warning")
         return []
     return payload.get("devices", [])
 

@@ -10,6 +10,7 @@ def index():
     return render_template("map.html", teams=teams)
 
 
+@maps_bp.route("/devices", methods=["GET"])
 @maps_bp.route("/lora", methods=["GET"])
 def lora_map():
     devices = LoRaDevice.query.order_by(LoRaDevice.dev_num.asc()).all()

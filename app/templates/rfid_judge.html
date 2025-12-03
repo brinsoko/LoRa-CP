@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}Judge RFID Console{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Web NFC: Read → Ingest → Append</h5>
+        <p class="text-body-secondary small">
+          Tap a tag with your phone to read its UID, call ingest for the selected device/checkpoint, then append the signed payload back onto the tag.
+        </p>
+
+        <form id="judgeForm" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Device / Checkpoint</label>
+            <select class="form-select" id="deviceSelect" required {% if not devices %}disabled{% endif %}>
+              {% for d in devices %}
+                <option value="{{ d.dev_num }}">
+                  {{ d.name or ("Device " ~ d.dev_num) }}{% if d.dev_num %} (#{{ d.dev_num }}){% endif %}
+                  {% if d.checkpoint %} - {{ d.checkpoint.name }}{% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Uses the device ID sent to /api/ingest.</div>
+            {% if not devices %}
+              <div class="alert alert-warning mt-2 mb-0 small">No devices configured yet.</div>
+            {% endif %}
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Last UID read</label>
+            <input type="text" class="form-control" id="cardUid" readonly>
+            <div class="form-text">Filled when you tap a tag with Web NFC.</div>
+          </div>
+
+          <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary" type="submit" id="submitBtn" {% if not devices %}disabled{% endif %}>
+              Tap tag: read → ingest → append write
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-3">Result</h6>
+        <div id="resultBox" class="alert alert-secondary">Awaiting input…</div>
+
+        <div class="mb-3">
+          <label class="form-label">Write-back payload</label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="writePayload" readonly>
+            <button class="btn btn-outline-secondary" type="button" id="copyBtn">Copy</button>
+          </div>
+          <div class="form-text">
+            Appended to the tag as a text record. We only store the truncated HMAC (device ID + card UID) to save space.
+          </div>
+        </div>
+
+        <div class="border rounded-3 p-3">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <strong>Web NFC</strong>
+            <span class="badge text-bg-secondary" id="webNfcStatus">Checking…</span>
+          </div>
+          <p class="small text-body-secondary mb-0">
+            Supported on Android Chrome 89+. We read existing text records, call ingest, then write them back with the new payload appended. Keep the tag in place until you see success.
+          </p>
+        </div>
+
+        <pre class="bg-body-tertiary rounded p-2 small" id="rawJson" style="min-height: 160px;">{}</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById("judgeForm");
+  const resultBox = document.getElementById("resultBox");
+  const cardUid = document.getElementById("cardUid");
+  const deviceSelect = document.getElementById("deviceSelect");
+  const submitBtn = document.getElementById("submitBtn");
+  const copyBtn = document.getElementById("copyBtn");
+  const writePayload = document.getElementById("writePayload");
+  const rawJson = document.getElementById("rawJson");
+  const webNfcStatus = document.getElementById("webNfcStatus");
+  const hasWebNfc = typeof NDEFReader !== "undefined";
+
+  function setBusy(busy) {
+    submitBtn.disabled = busy;
+  }
+
+  function showMessage(text, variant) {
+    resultBox.className = `alert alert-${variant}`;
+    resultBox.textContent = text;
+  }
+
+  function renderResult(data) {
+    const parts = [];
+    if (data.team) parts.push(`Team: ${data.team}`);
+    if (data.checkpoint) parts.push(`Checkpoint: ${data.checkpoint}`);
+    if (data.checkin_created) parts.push("Check-in created");
+    if (data.uid_seen === false) parts.push("Card not mapped to a team");
+    showMessage(parts.join(" · ") || "Ingest completed.", "success");
+
+    if (data.card_writeback && data.card_writeback.payload) {
+      writePayload.value = data.card_writeback.payload;
+    } else {
+      writePayload.value = "";
+    }
+
+    rawJson.textContent = JSON.stringify(data, null, 2);
+  }
+
+  function extractText(records) {
+    const decoder = new TextDecoder();
+    const texts = [];
+    (records || []).forEach((rec) => {
+      if (rec.recordType === "text") {
+        if (typeof rec.data === "string") {
+          texts.push(rec.data);
+        } else if (rec.data instanceof DataView) {
+          texts.push(decoder.decode(rec.data));
+        }
+      }
+    });
+    return texts.join("\n").trim();
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const devId = parseInt(deviceSelect.value || "0", 10);
+    if (!devId) {
+      showMessage("Pick a device/checkpoint first.", "warning");
+      return;
+    }
+    if (!hasWebNfc) {
+      showMessage("Web NFC not available in this browser.", "danger");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const reader = new NDEFReader();
+      await reader.scan();
+      showMessage("Tap a tag to read…", "info");
+
+      const onRead = async (event) => {
+        reader.removeEventListener("reading", onRead);
+        try {
+          const uid = (event.serialNumber || "").toUpperCase();
+          cardUid.value = uid;
+          const prevText = extractText(event.message?.records || []);
+
+          const ingestResp = await fetch("/api/ingest", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              dev_id: devId,
+              payload: uid,
+              ts: Math.floor(Date.now() / 1000),
+              source: "judge_web_nfc",
+            }),
+          });
+          const ingestJson = await ingestResp.json();
+          if (!ingestResp.ok) {
+            throw new Error(ingestJson.detail || ingestJson.error || `HTTP ${ingestResp.status}`);
+          }
+
+          const payload = ingestJson?.card_writeback?.payload || "";
+          if (!payload) {
+            throw new Error("Ingest did not return a write-back payload.");
+          }
+
+          const combined = prevText ? `${prevText}\n${payload}` : payload;
+          const writer = new NDEFReader();
+          await writer.write({ records: [{ recordType: "text", data: combined }] });
+
+          writePayload.value = payload;
+          renderResult(ingestJson);
+          showMessage("Read, ingested, and appended payload to tag.", "success");
+        } catch (err) {
+          showMessage(err.message || "Web NFC flow failed.", "danger");
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      const onError = () => {
+        reader.removeEventListener("reading", onRead);
+        showMessage("Web NFC read error.", "danger");
+        setBusy(false);
+      };
+
+      reader.addEventListener("reading", onRead);
+      reader.addEventListener("readingerror", onError, { once: true });
+    } catch (err) {
+      showMessage(err.message || "Web NFC not available.", "danger");
+      setBusy(false);
+    }
+  }
+
+  function handleCopy() {
+    if (!writePayload.value) return;
+    navigator.clipboard.writeText(writePayload.value).then(
+      () => showMessage("Write-back payload copied.", "info"),
+      () => showMessage("Could not copy payload.", "warning")
+    );
+  }
+
+  copyBtn?.addEventListener("click", handleCopy);
+  form?.addEventListener("submit", handleSubmit);
+
+  if (hasWebNfc) {
+    webNfcStatus.textContent = "Supported";
+    webNfcStatus.className = "badge text-bg-success";
+  } else {
+    webNfcStatus.textContent = "Not available";
+    webNfcStatus.className = "badge text-bg-secondary";
+  }
+</script>
+{% endblock %}

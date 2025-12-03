@@ -1,6 +1,9 @@
 # app/resources/ingest.py
 from __future__ import annotations
 from datetime import datetime
+import hashlib, hmac
+
+from flask import current_app
 
 from flask_restful import Resource, reqparse
 from sqlalchemy.exc import SQLAlchemyError
@@ -11,6 +14,7 @@ from app.models import (
 )
 from app.utils.sheets_sync import mark_arrival_checkbox
 from app.utils.payloads import parse_gps_payload
+from app.utils.card_tokens import compute_card_digest
 
 def resolve_checkpoint_for_dev(dev_num: int) -> Checkpoint:
     device = LoRaDevice.query.filter_by(dev_num=dev_num).first()
@@ -24,21 +28,21 @@ def resolve_checkpoint_for_dev(dev_num: int) -> Checkpoint:
             return cp
 
         cp = Checkpoint(
-            name=f"LoRa Gateway {dev_num}",
-            description="Auto-created from LoRa ingest",
+            name=f"Device {dev_num}",
+            description="Auto-created from device ingest",
             lora_device_id=device.id,
         )
         db.session.add(cp)
         db.session.flush()
         return cp
 
-    device = LoRaDevice(dev_num=dev_num, name=f"GW-{dev_num}", active=True)
+    device = LoRaDevice(dev_num=dev_num, name=f"DEV-{dev_num}", active=True)
     db.session.add(device)
     db.session.flush()
 
     cp = Checkpoint(
-        name=f"LoRa Gateway {dev_num}",
-        description="Auto-created from LoRa ingest",
+        name=f"Device {dev_num}",
+        description="Auto-created from device ingest",
         lora_device_id=device.id,
     )
     db.session.add(cp)
@@ -52,12 +56,41 @@ _parser.add_argument("payload", type=str, required=False)  # optional if gps_* p
 _parser.add_argument("rssi", type=float)
 _parser.add_argument("snr", type=float)
 _parser.add_argument("ts", type=int)  # unix seconds
+_parser.add_argument("source", type=str)  # optional client hint (e.g., mobile)
 
 # Optional GPS fields (allow posting structured GPS instead of string payload)
 _parser.add_argument("gps_lat", type=float)
 _parser.add_argument("gps_lon", type=float)
 _parser.add_argument("gps_alt", type=float)
 _parser.add_argument("gps_age_ms", type=int)
+
+
+def _card_writeback(uid: str,
+                    dev_id: int,
+                    checkpoint: Checkpoint | None,
+                    team: Team | None,
+                    received_at: datetime) -> dict | None:
+    """
+    Build a short, signed payload that an Android phone can write to the RFID card.
+    Format: "<dev_id>|<uid>|<ts>|<hmac>" so clients can verify offline.
+    """
+    if not uid:
+        return None
+
+    digest_short = compute_card_digest(uid, dev_id)
+    if not digest_short:
+        return None
+    payload = digest_short  # we only write the truncated HMAC to the tag
+    return {
+        "payload": payload,
+        "hmac": digest_short,
+        "device_id": dev_id,
+        "card_uid": uid,
+        "checkpoint_id": checkpoint.id if checkpoint else None,
+        "checkpoint": checkpoint.name if checkpoint else None,
+        "team_id": team.id if team else None,
+        "team": team.name if team else None,
+    }
 
 class IngestResource(Resource):
     def post(self):
@@ -91,6 +124,8 @@ class IngestResource(Resource):
                 "detail": "Provide either 'payload' or ('gps_lat' and 'gps_lon').",
             }, 400
 
+        card_writeback = None
+
         try:
             # 1) Store raw message
             msg = LoRaMessage(
@@ -118,10 +153,12 @@ class IngestResource(Resource):
             created_checkin = False
             team_name = None
             checkpoint_name = cp.name if cp else None
+            team_obj = None
 
             if card:
                 team = db.session.get(Team, card.team_id)
                 if team and cp:
+                    team_obj = team
                     team_name = team.name
                     exists = Checkin.query.filter_by(
                         team_id=team.id, checkpoint_id=cp.id
@@ -134,10 +171,14 @@ class IngestResource(Resource):
                         ))
                         created_checkin = True
                         try:
-                            mark_arrival_checkbox(team.id, cp.id)
+                            mark_arrival_checkbox(team.id, cp.id, received_at)
                         except Exception as exc:
                             # do not fail ingest if Sheets update fails
                             pass
+
+            looks_like_uid = gps_lat is None and gps_lon is None and (payload is not None) and ("," not in str(payload))
+            if looks_like_uid:
+                card_writeback = _card_writeback(uid, int(dev_id), cp, team_obj, received_at)
 
             db.session.commit()
 
@@ -163,6 +204,8 @@ class IngestResource(Resource):
         gps = parse_gps_payload(msg.payload)
         if gps is not None:
             resp["gps"] = gps
+        if card_writeback:
+            resp["card_writeback"] = card_writeback
 
         headers = {"Location": f"/api/messages/{msg.id}"}  # optional future resource
         return resp, 201, headers

@@ -48,12 +48,14 @@
               <td class="text-end">
                 <a href="{{ url_for('checkpoints.edit_checkpoint', cp_id=cp.id) }}"
                    class="btn btn-sm btn-outline-primary">Edit</a>
+                {% if has_role('admin') %}
                 <form method="post"
                       action="{{ url_for('checkpoints.delete_checkpoint', cp_id=cp.id) }}"
                       class="d-inline"
                       onsubmit="return confirm('Delete this checkpoint?');">
                   <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                 </form>
+                {% endif %}
               </td>
               {% endif %}
             </tr>

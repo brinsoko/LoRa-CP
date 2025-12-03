@@ -164,7 +164,7 @@ class CheckinListResource(Resource):
         db.session.add(c)
         db.session.commit()
         try:
-            mark_arrival_checkbox(team_id, checkpoint_id)
+            mark_arrival_checkbox(team_id, checkpoint_id, ts)
         except Exception:
             pass
         return {"ok": True, "created": True, "checkin": _serialize_checkin(c)}, 201

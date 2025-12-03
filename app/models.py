@@ -133,7 +133,7 @@ class Checkpoint(db.Model):
     easting = db.Column(db.Float)
     northing = db.Column(db.Float)
 
-    # LoRa device mapping (one device ↔ one checkpoint)
+    # Device mapping (one device ↔ one checkpoint)
     lora_device_id = db.Column(
         db.Integer,
         db.ForeignKey("lora_devices.id", ondelete="SET NULL"),
@@ -240,13 +240,12 @@ class TeamGroup(db.Model):
 
 
 # =========================
-# LoRa device
+# Device (LoRa gateway or phone)
 # =========================
 class LoRaDevice(db.Model):
     __tablename__ = "lora_devices"
 
     id = db.Column(db.Integer, primary_key=True)
-    dev_eui = db.Column(db.String(32), unique=True, nullable=True)  # e.g., 16-byte hex string
     dev_num = db.Column(db.Integer, unique=True, index=True, nullable=False)
     name = db.Column(db.String(120), nullable=True)                  # friendly label
     note = db.Column(db.Text, nullable=True)

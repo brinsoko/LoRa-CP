@@ -7,14 +7,16 @@ from typing import Optional
 
 from flask import request
 from flask_restful import Resource
+from flask import current_app
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import RFIDCard, Team
+from app.models import RFIDCard, Team, LoRaDevice, Checkpoint, Checkin
 from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.serial_helpers import normalize_uid, read_uid_once
 from config import Config
+from app.utils.card_tokens import match_digests
 
 BAUD = Config.SERIAL_BAUDRATE
 HINT = Config.SERIAL_HINT
@@ -305,4 +307,88 @@ class RFIDBulkImportResource(Resource):
                 "skipped": skipped,
             },
             "errors": errors,
+        }, 200
+
+
+class RFIDVerifyResource(Resource):
+    method_decorators = [json_roles_required("judge", "admin")]
+
+    def post(self):
+        payload = request.get_json(silent=True) or {}
+        uid = (payload.get("uid") or "").strip()
+        digests = payload.get("digests") or []
+        device_ids = payload.get("device_ids")
+
+        if not uid:
+            return {"error": "validation_error", "detail": "uid is required"}, 400
+        if not isinstance(digests, list):
+            return {"error": "validation_error", "detail": "digests must be a list"}, 400
+
+        devices_q = LoRaDevice.query
+        if device_ids is not None:
+            try:
+                device_ids = [int(x) for x in device_ids if str(x).strip() != ""]
+            except Exception:
+                return {"error": "validation_error", "detail": "device_ids must be integers"}, 400
+            devices_q = devices_q.filter(LoRaDevice.dev_num.in_(device_ids))
+        devices = devices_q.all()
+        if not devices:
+            return {"error": "not_found", "detail": "No devices found for verification"}, 404
+
+        device_lookup = {d.dev_num: d for d in devices if d.dev_num is not None}
+        match_rows = match_digests(uid, digests, device_lookup.keys())
+
+        team = (
+            db.session.query(Team)
+            .join(RFIDCard, RFIDCard.team_id == Team.id)
+            .filter(RFIDCard.uid == uid)
+            .first()
+        )
+        team_checkpoint_ids = set()
+        if team:
+            team_checkpoint_ids = {
+                c.checkpoint_id
+                for c in Checkin.query.filter_by(team_id=team.id).all()
+                if c.checkpoint_id is not None
+            }
+
+        results = []
+        has_mismatch = False
+        for row in match_rows:
+            digest = row["digest"]
+            matches = row["matches"]
+            entries = []
+            for dev_num in matches:
+                d = device_lookup.get(dev_num)
+                cp_name = d.checkpoint.name if d and d.checkpoint else None
+                cp_id = d.checkpoint.id if d and d.checkpoint else None
+                checked_in = (cp_id in team_checkpoint_ids) if cp_id else False
+                if matches and cp_id and not checked_in:
+                    has_mismatch = True
+                entries.append({
+                    "device_id": dev_num,
+                    "device_name": d.name if d else None,
+                    "checkpoint": cp_name,
+                    "checkpoint_id": cp_id,
+                    "checked_in": checked_in,
+                })
+            results.append({
+                "digest": digest,
+                "matches": entries,
+                "collision": len(entries) > 1,
+            })
+
+        unknown = [r["digest"] for r in results if not r["matches"]]
+
+        return {
+            "ok": True,
+            "uid": uid,
+            "device_ids": list(device_lookup.keys()),
+            "results": results,
+            "unknown": unknown,
+            "team": {
+                "id": team.id,
+                "name": team.name,
+            } if team else None,
+            "has_mismatch": has_mismatch,
         }, 200

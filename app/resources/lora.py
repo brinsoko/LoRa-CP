@@ -13,7 +13,6 @@ from app.utils.rest_auth import json_login_required, json_roles_required
 def _serialize_device(device: LoRaDevice) -> dict:
     return {
         "id": device.id,
-        "dev_eui": device.dev_eui,
         "dev_num": device.dev_num,
         "name": device.name,
         "note": device.note,
@@ -25,6 +24,7 @@ def _serialize_device(device: LoRaDevice) -> dict:
         "checkpoint": {
             "id": device.checkpoint.id,
             "name": device.checkpoint.name,
+            "description": device.checkpoint.description,
         } if device.checkpoint else None,
     }
 
@@ -32,11 +32,6 @@ def _serialize_device(device: LoRaDevice) -> dict:
 def _parse_device_payload(payload: dict, *, for_update: bool = False) -> tuple[dict, list[str]]:
     errors = []
     data = {}
-
-    dev_eui = payload.get("dev_eui")
-    if dev_eui is not None:
-        dev_eui = dev_eui.strip() or None
-    data["dev_eui"] = dev_eui
 
     dev_num = payload.get("dev_num")
     if dev_num is None and not for_update:
@@ -89,11 +84,8 @@ class LoRaDeviceListResource(Resource):
         dev_num = data.get("dev_num")
         if LoRaDevice.query.filter_by(dev_num=dev_num).first():
             return {"error": "conflict", "detail": "Device number already exists."}, 409
-        if data.get("dev_eui") and LoRaDevice.query.filter_by(dev_eui=data["dev_eui"]).first():
-            return {"error": "conflict", "detail": "Device EUI already exists."}, 409
 
         device = LoRaDevice(
-            dev_eui=data.get("dev_eui"),
             dev_num=data.get("dev_num"),
             name=data.get("name"),
             note=data.get("note"),
@@ -144,14 +136,6 @@ class LoRaDeviceItemResource(Resource):
             if exists:
                 return {"error": "conflict", "detail": "Device number already exists."}, 409
             device.dev_num = dev_num
-
-        if "dev_eui" in data:
-            dev_eui = data["dev_eui"]
-            if dev_eui:
-                exists = LoRaDevice.query.filter(LoRaDevice.dev_eui == dev_eui, LoRaDevice.id != device.id).first()
-                if exists:
-                    return {"error": "conflict", "detail": "Device EUI already exists."}, 409
-            device.dev_eui = dev_eui
 
         for field in ("name", "note", "model", "active"):
             if field in data:

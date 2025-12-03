@@ -97,14 +97,14 @@ def _assign_lora_device(cp: Checkpoint, device_id: Optional[int]) -> Optional[st
 
     device = LoRaDevice.query.get(device_id)
     if not device:
-        return "Invalid LoRa device."
+        return "Invalid device."
 
     existing = Checkpoint.query.filter(
         Checkpoint.lora_device_id == device.id,
         Checkpoint.id != cp.id,
     ).first()
     if existing:
-        return f"LoRa device already attached to checkpoint '{existing.name}'."
+        return f"Device already attached to checkpoint '{existing.name}'."
 
     cp.lora_device = device
     return None

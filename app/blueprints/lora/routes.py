@@ -27,21 +27,23 @@ def _decorate_devices(devices):
 
         checkpoint = device.get("checkpoint") or {}
         checkpoint_name = checkpoint.get("name") if isinstance(checkpoint, dict) else None
+        checkpoint_description = checkpoint.get("description") if isinstance(checkpoint, dict) else None
 
         decorated.append(
             {
                 **device,
                 "display_last_seen": display_last_seen,
                 "checkpoint_name": checkpoint_name,
+                "checkpoint_description": checkpoint_description,
             }
         )
     return decorated
 
 
 def _fetch_devices():
-    resp, payload = api_json("GET", "/api/lora/devices")
+    resp, payload = api_json("GET", "/api/devices")
     if resp.status_code != 200:
-        flash("Could not load LoRa devices.", "warning")
+        flash("Could not load devices.", "warning")
         return []
     return _decorate_devices(payload.get("devices", []))
 
@@ -57,7 +59,6 @@ def lora_list():
 @roles_required("judge", "admin")
 def add_device():
     if request.method == "POST":
-        dev_eui = (request.form.get("dev_eui") or "").strip() or None
         dev_num = (request.form.get("dev_num") or "").strip()
         name = (request.form.get("name") or "").strip() or None
         note = (request.form.get("note") or "").strip() or None
@@ -70,9 +71,8 @@ def add_device():
 
         resp, payload = api_json(
             "POST",
-            "/api/lora/devices",
+            "/api/devices",
             json={
-                "dev_eui": dev_eui,
                 "dev_num": dev_num,
                 "name": name,
                 "note": note,
@@ -82,7 +82,7 @@ def add_device():
         )
 
         if resp.status_code == 201:
-            flash("LoRa device added.", "success")
+            flash("Device added.", "success")
             return redirect(url_for("lora.lora_list"))
 
         flash(payload.get("detail") or payload.get("error") or "Could not add device.", "warning")
@@ -93,7 +93,7 @@ def add_device():
 @lora_bp.route("/<int:device_id>/edit", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def edit_device(device_id: int):
-    device_resp, device_payload = api_json("GET", f"/api/lora/devices/{device_id}")
+    device_resp, device_payload = api_json("GET", f"/api/devices/{device_id}")
     if device_resp.status_code != 200:
         flash("Device not found.", "warning")
         return redirect(url_for("lora.lora_list"))
@@ -101,7 +101,6 @@ def edit_device(device_id: int):
     device = _decorate_devices([device_payload])[0] if device_payload else {}
 
     if request.method == "POST":
-        dev_eui = (request.form.get("dev_eui") or "").strip() or None
         dev_num = (request.form.get("dev_num") or "").strip()
         name = (request.form.get("name") or "").strip() or None
         note = (request.form.get("note") or "").strip() or None
@@ -111,7 +110,6 @@ def edit_device(device_id: int):
         if not dev_num:
             flash("Device number is required.", "warning")
             device.update({
-                "dev_eui": dev_eui,
                 "dev_num": dev_num,
                 "name": name,
                 "note": note,
@@ -122,9 +120,8 @@ def edit_device(device_id: int):
 
         resp, payload = api_json(
             "PATCH",
-            f"/api/lora/devices/{device_id}",
+            f"/api/devices/{device_id}",
             json={
-                "dev_eui": dev_eui,
                 "dev_num": dev_num,
                 "name": name,
                 "note": note,
@@ -134,12 +131,11 @@ def edit_device(device_id: int):
         )
 
         if resp.status_code == 200:
-            flash("LoRa device updated.", "success")
+            flash("Device updated.", "success")
             return redirect(url_for("lora.lora_list"))
 
         flash(payload.get("detail") or payload.get("error") or "Could not update device.", "warning")
         device.update({
-            "dev_eui": dev_eui,
             "dev_num": dev_num,
             "name": name,
             "note": note,
@@ -154,10 +150,10 @@ def edit_device(device_id: int):
 @lora_bp.route("/<int:device_id>/delete", methods=["POST"])
 @roles_required("admin")
 def delete_device(device_id: int):
-    resp, payload = api_json("DELETE", f"/api/lora/devices/{device_id}")
+    resp, payload = api_json("DELETE", f"/api/devices/{device_id}")
 
     if resp.status_code == 200:
-        flash("LoRa device deleted.", "success")
+        flash("Device deleted.", "success")
     else:
         flash(payload.get("detail") or payload.get("error") or "Could not delete device.", "warning")
 

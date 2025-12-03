@@ -33,13 +33,13 @@
       </div>
 
       <div class="mb-3 mt-3">
-        <label class="form-label">LoRa device (optional)</label>
+        <label class="form-label">Device (optional)</label>
         <select name="lora_device_id" class="form-select">
           <option value="">— none —</option>
           {% for d in devices %}
             <option value="{{ d.id }}"
               {% if selected_device_id == d.id %}selected{% endif %}>
-              {{ d.name or 'Device' }} — {{ d.dev_eui }}
+              {{ d.name or 'Device' }} — #{{ d.dev_num }}
             </option>
           {% endfor %}
         </select>

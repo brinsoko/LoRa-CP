@@ -2,6 +2,8 @@ import os
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
+    DEVICE_CARD_SECRET = os.getenv("DEVICE_CARD_SECRET") or SECRET_KEY
+    DEVICE_CARD_HMAC_LEN = int(os.getenv("DEVICE_CARD_HMAC_LEN", "12"))
     # Only read DATABASE_URL from env; if missing, app factory will set a proper sqlite path
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
