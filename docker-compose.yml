@@ -23,6 +23,8 @@ services:
       - INGEST_URL=http://web:5000/api/ingest
       - SERIAL_TIMEOUT=0.2
       - DEBUG=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - web
     restart: unless-stopped

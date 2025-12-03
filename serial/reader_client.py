@@ -3,8 +3,8 @@ import os, sys, time, socket, re, signal
 import requests
 
 # ----------------- Config (via env) -----------------
-TCP_URL     = os.getenv("SERIAL_URL", "socket://host.docker.internal:2001")
-API_URL     = os.getenv("INGEST_URL", "http://web:5001/api/ingest")
+TCP_URL     = os.getenv("SERIAL_URL", "socket://127.0.0.1:2001")
+API_URL     = os.getenv("INGEST_URL", "http://127.0.0.1:5001/api/ingest")
 TIMEOUT_S   = float(os.getenv("SERIAL_TIMEOUT", "0.2"))      # socket read timeout
 BACKOFF_0   = float(os.getenv("BACKOFF_START", "0.5"))       # initial backoff when POST fails / socket drops
 BACKOFF_MAX = float(os.getenv("BACKOFF_MAX", "10"))          # max backoff cap

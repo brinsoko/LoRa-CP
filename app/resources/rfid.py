@@ -36,7 +36,7 @@ def _serialize_card(card: RFIDCard) -> dict:
 
 def _parse_card_payload(payload: dict, require_team: bool = True) -> tuple[Optional[str], Optional[int], Optional[int], Optional[str]]:
     uid_raw = (payload.get("uid") or "").strip()
-    uid = normalize_uid(uid_raw)
+    uid = uid_raw
     if not uid:
         return None, None, None, "uid is required"
 
