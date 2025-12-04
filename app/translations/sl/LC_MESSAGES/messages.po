@@ -219,7 +219,7 @@ msgstr "Kontrolne točke"
 
 #: app/templates/base.html:112
 msgid "View Check-ins"
-msgstr "Pregled prijav"
+msgstr "Pregled prihodov"
 
 #: app/templates/base.html:115
 msgid "Map RFID ↔ Team"
@@ -272,7 +272,7 @@ msgstr "Potrdi novo geslo"
 
 #: app/templates/checkin_edit.html:2 app/templates/checkin_edit.html:7
 msgid "Edit Check-in"
-msgstr "Uredi prijavo"
+msgstr "Uredi prihod"
 
 #: app/templates/checkin_edit.html:34
 msgid "Local time"
@@ -290,7 +290,7 @@ msgstr "Za pretvorbo lokalnega časa v UTC v bazi."
 msgid ""
 "Another check-in exists for the same team & checkpoint. Submit to replace"
 " it with this timestamp."
-msgstr "Za isto ekipo in točko že obstaja prijava. Pošlji za zamenjavo časa."
+msgstr "Za isto ekipo in točko že obstaja prihod. Pošlji za zamenjavo časa."
 
 #: app/templates/checkin_edit.html:71 app/templates/checkpoint_edit.html:71
 #: app/templates/group_edit.html:63 app/templates/lora_add.html:20
@@ -762,7 +762,7 @@ msgstr "zabeleženo"
 
 #: app/templates/rfid_finish.html:93
 msgid "missing check-in"
-msgstr "manjka prijava"
+msgstr "manjka prihod"
 
 #: app/templates/rfid_finish.html:94
 msgid "No match"
@@ -884,7 +884,7 @@ msgstr ""
 
 #: app/templates/rfid_judge.html:95
 msgid "Check-in created"
-msgstr "Prijava ustvarjena"
+msgstr "Prihod ustvarjen"
 
 #: app/templates/rfid_judge.html:96
 msgid "Card not mapped to a team"
@@ -1047,7 +1047,7 @@ msgstr "Še ni uporabnikov."
 
 #: app/templates/view_checkins.html:2
 msgid "Check-ins"
-msgstr "Prijave"
+msgstr "Prihodi"
 
 #: app/templates/view_checkins.html:11
 msgid "All teams"
@@ -1091,11 +1091,11 @@ msgstr "Čas (lokalni)"
 
 #: app/templates/view_checkins.html:110
 msgid "Delete this check-in?"
-msgstr "Izbrišem to prijavo?"
+msgstr "Izbrišem ta prihod?"
 
 #: app/templates/view_checkins.html:123
 msgid "No check-ins match your filters."
-msgstr "Nobena prijava ne ustreza filtrom."
+msgstr "Nobena prihod ne ustreza filtrom."
 
 # Base layout / navbar
 #~ msgid "RFID Checkpoint System"
@@ -1129,10 +1129,10 @@ msgstr "Nobena prijava ne ustreza filtrom."
 #~ msgstr "Kontrolne točke"
 
 #~ msgid "View Check-ins"
-#~ msgstr "Pregled prijav"
+#~ msgstr "Pregled prihdov"
 
 #~ msgid "Add Check-in"
-#~ msgstr "Dodaj prijavo"
+#~ msgstr "Dodaj prihod"
 
 #~ msgid "Map RFID ↔ Team"
 #~ msgstr "Poveži RFID ↔ ekipa"

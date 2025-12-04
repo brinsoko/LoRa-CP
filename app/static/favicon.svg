@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <style>
+      .bg{fill:#14532D}
+      .st{fill:none;stroke:#F5F1E6;stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round}
+      .fg{fill:#F5F1E6}
+    </style>
+  </defs>
+  <rect class="bg" width="64" height="64" rx="14"/>
+  <!-- shield -->
+  <path class="st" d="M32 10 L48 16 V30 C48 40 41 49 32 54 C23 49 16 40 16 30 V16 Z"/>
+  <!-- pin -->
+  <path class="st" d="M32 46 C32 46 40 37 40 30 A8 8 0 1 0 24 30 C24 37 32 46 32 46 Z"/>
+  <circle class="fg" cx="32" cy="30" r="2.7"/>
+</svg>
