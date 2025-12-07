@@ -1,4 +1,10 @@
 # HTTPS Caddyfile (uses DOMAIN/ACME_EMAIL env vars)
+# Force Let’s Encrypt (avoids ZeroSSL/EAB requirement) and set contact email.
+{
+	email {$ACME_EMAIL}
+	acme_ca https://acme-v02.api.letsencrypt.org/directory
+}
+
 {$DOMAIN} {
 	encode zstd gzip
 	tls {$ACME_EMAIL}
