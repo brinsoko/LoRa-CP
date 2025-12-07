@@ -17,7 +17,7 @@ services:
       - .env
     environment:
       - DOMAIN=${DOMAIN}
-      - ACME_EMAIL=${ACME_EMAIL}
+      - ACME_EMAIL=$brin.soko@gmail.com
     ports:
       - "80:80"
       - "443:443"

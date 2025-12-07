@@ -1,6 +1,10 @@
-{$DOMAIN} {
+# HTTP-only Caddyfile for IP testing (no TLS). Replace with a domain + tls when ready.
+{
+	auto_https off
+}
+
+:80 {
 	encode zstd gzip
-	tls {$ACME_EMAIL}
 
 	@static {
 		path /static/* /favicon.ico
