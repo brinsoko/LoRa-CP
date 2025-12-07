@@ -29,6 +29,22 @@
         </select>
       </div>
 
+      <div class="mb-3">
+        <label class="form-label">{{ _('RFID UID') }}</label>
+        <input name="rfid_uid" class="form-control" placeholder="{{ _('Tap tag or paste UID') }}">
+        <div class="form-text">{{ _('Optional; creates an RFID mapping for this team.') }}</div>
+        <div class="d-flex align-items-center gap-2 mt-2">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="nfcReadBtn">{{ _('Read via Web NFC') }}</button>
+          <span class="badge text-bg-secondary" id="nfcStatus">{{ _('Not checked') }}</span>
+        </div>
+        <div class="small text-body-secondary mt-2" id="nfcMessage"></div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">{{ _('RFID Card Number') }}</label>
+        <input type="number" name="rfid_number" class="form-control" placeholder="{{ _('Optional friendly number') }}">
+      </div>
+
       <div class="d-flex gap-2">
         <button class="btn btn-primary" type="submit">{{ _('Create') }}</button>
         <a href="{{ url_for('teams.list_teams') }}" class="btn btn-secondary">{{ _('Cancel') }}</a>
@@ -36,4 +52,66 @@
     </form>
   </div>
 </div>
+
+<script>
+  const nfcBtn = document.getElementById("nfcReadBtn");
+  const nfcStatus = document.getElementById("nfcStatus");
+  const nfcMessage = document.getElementById("nfcMessage");
+  const uidInput = document.querySelector('input[name="rfid_uid"]');
+  const hasWebNfc = typeof NDEFReader !== "undefined";
+
+  function setStatus(text, variant) {
+    nfcStatus.textContent = text;
+    nfcStatus.className = `badge text-bg-${variant}`;
+  }
+
+  function setMessage(text) {
+    nfcMessage.textContent = text || "";
+  }
+
+  async function handleNfcRead() {
+    setMessage("");
+    if (!hasWebNfc) {
+      setStatus("Unavailable", "secondary");
+      setMessage("Web NFC not available in this browser.");
+      return;
+    }
+    setStatus("Ready", "info");
+    try {
+      const reader = new NDEFReader();
+      await reader.scan();
+      setMessage("Hold the tag near your device to read.");
+
+      const onRead = (event) => {
+        reader.removeEventListener("reading", onRead);
+        const uid = (event.serialNumber || "").toUpperCase();
+        if (uid) {
+          uidInput.value = uid;
+          setStatus("Read", "success");
+          setMessage(`UID read: ${uid}`);
+        } else {
+          setStatus("Failed", "danger");
+          setMessage("Could not read UID from tag.");
+        }
+      };
+
+      const onError = () => {
+        reader.removeEventListener("reading", onRead);
+        setStatus("Failed", "danger");
+        setMessage("Web NFC read error.");
+      };
+
+      reader.addEventListener("reading", onRead, { once: true });
+      reader.addEventListener("readingerror", onError, { once: true });
+    } catch (err) {
+      setStatus("Failed", "danger");
+      setMessage(err?.message || "Web NFC not available.");
+    }
+  }
+
+  if (hasWebNfc) {
+    setStatus("Supported", "success");
+  }
+  nfcBtn?.addEventListener("click", handleNfcRead);
+</script>
 {% endblock %}

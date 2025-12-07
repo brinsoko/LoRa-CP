@@ -100,6 +100,7 @@
     tapToRead: "{{ _('Tap a tag to read…') }}",
     noWriteback: "{{ _('Ingest did not return a write-back payload.') }}",
     readIngestAppend: "{{ _('Read, ingested, and appended payload to tag.') }}",
+    alreadyPresent: "{{ _('HMAC already on tag; skipped writing.') }}",
     webNfcFailed: "{{ _('Web NFC flow failed.') }}",
     webNfcError: "{{ _('Web NFC read error.') }}",
     webNfcNA: "{{ _('Web NFC not available.') }}",
@@ -150,6 +151,15 @@
     return texts.join("\n").trim();
   }
 
+  function hasExistingPayload(prevText, payload) {
+    if (!payload) return false;
+    return prevText
+      .split(/\r?\n/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .includes(payload);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     const devId = parseInt(deviceSelect.value || "0", 10);
@@ -194,6 +204,13 @@
           const payload = ingestJson?.card_writeback?.payload || "";
           if (!payload) {
             throw new Error(I18N.noWriteback);
+          }
+
+          if (hasExistingPayload(prevText, payload)) {
+            writePayload.value = payload;
+            renderResult(ingestJson);
+            showMessage(I18N.alreadyPresent, "info");
+            return;
           }
 
           const combined = prevText ? `${prevText}\n${payload}` : payload;

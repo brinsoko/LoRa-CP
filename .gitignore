@@ -25,3 +25,8 @@ ESP_TEST/
 #
 2025_data/
 google_sa.json
+
+# Deployment artifacts
+deploy/.env
+deploy/caddy_data/
+deploy/caddy_config/

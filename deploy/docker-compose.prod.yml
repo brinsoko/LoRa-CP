@@ -1,0 +1,40 @@
+services:
+  web:
+    image: ghcr.io/brinsoko/lora-cp/lora-kt-web:latest # replace OWNER/REPO with your GitHub org/repo
+    env_file:
+      - .env
+    volumes:
+      - ../instance:/app/instance
+      - ../data:/app/data
+    networks:
+      - app
+    restart: unless-stopped
+
+
+  caddy:
+    image: caddy:2-alpine
+    env_file:
+      - .env
+    environment:
+      - DOMAIN=${DOMAIN}
+      - ACME_EMAIL=${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - app
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  app:
+    driver: bridge

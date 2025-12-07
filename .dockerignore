@@ -27,3 +27,8 @@ google_sa.json
 .idea/
 
 *.log
+
+deploy/
+deploy/.env
+deploy/caddy_data/
+deploy/caddy_config/

@@ -324,26 +324,44 @@ class RFIDVerifyResource(Resource):
         if not isinstance(digests, list):
             return {"error": "validation_error", "detail": "digests must be a list"}, 400
 
-        devices_q = LoRaDevice.query
-        if device_ids is not None:
-            try:
-                device_ids = [int(x) for x in device_ids if str(x).strip() != ""]
-            except Exception:
-                return {"error": "validation_error", "detail": "device_ids must be integers"}, 400
-            devices_q = devices_q.filter(LoRaDevice.dev_num.in_(device_ids))
-        devices = devices_q.all()
-        if not devices:
-            return {"error": "not_found", "detail": "No devices found for verification"}, 404
-
-        device_lookup = {d.dev_num: d for d in devices if d.dev_num is not None}
-        match_rows = match_digests(uid, digests, device_lookup.keys())
-
         team = (
             db.session.query(Team)
             .join(RFIDCard, RFIDCard.team_id == Team.id)
             .filter(RFIDCard.uid == uid)
             .first()
         )
+
+        # When no explicit device filter is provided, scope to checkpoints
+        # assigned to the team's active group(s) if available.
+        allowed_checkpoint_ids: set[int] = set()
+        if team:
+            for tg in (team.group_assignments or []):
+                if tg.active and tg.group:
+                    for link in tg.group.checkpoint_links:
+                        if link.checkpoint_id:
+                            allowed_checkpoint_ids.add(link.checkpoint_id)
+
+        devices_q = LoRaDevice.query
+        if device_ids is not None:
+            try:
+                device_ids = [int(x) for x in device_ids if str(x).strip() != ""]
+            except Exception:
+                return {"error": "validation_error", "detail": "device_ids must be integers"}, 400
+            if device_ids:
+                devices_q = devices_q.filter(LoRaDevice.dev_num.in_(device_ids))
+            else:
+                device_ids = None  # treat empty selection same as not provided
+        if device_ids is None and allowed_checkpoint_ids:
+            devices_q = (
+                devices_q.join(Checkpoint, Checkpoint.lora_device_id == LoRaDevice.id)
+                .filter(Checkpoint.id.in_(allowed_checkpoint_ids))
+            )
+        devices = devices_q.all()
+        if not devices:
+            return {"error": "not_found", "detail": "No devices found for verification"}, 404
+
+        device_lookup = {d.dev_num: d for d in devices if d.dev_num is not None}
+        match_rows = match_digests(uid, digests, device_lookup.keys())
         team_checkpoint_ids = set()
         if team:
             team_checkpoint_ids = {

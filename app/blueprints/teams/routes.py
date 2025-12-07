@@ -68,6 +68,9 @@ def add_team():
         number = int(number_raw) if number_raw else None
         organization = (request.form.get("organization") or "").strip() or None
         selected_group_id = request.form.get("group_id", type=int)
+        rfid_uid = (request.form.get("rfid_uid") or "").strip().upper()
+        rfid_number_raw = request.form.get("rfid_number")
+        rfid_number = int(rfid_number_raw) if rfid_number_raw else None
 
         if not name:
             flash("Team name is required.", "warning")
@@ -85,6 +88,17 @@ def add_team():
         )
 
         if resp.status_code == 201:
+            team_id = payload.get("team", {}).get("id")
+            if rfid_uid and team_id:
+                rfid_resp, rfid_payload = api_json(
+                    "POST",
+                    "/api/rfid/cards",
+                    json={"uid": rfid_uid, "team_id": team_id, "number": rfid_number},
+                )
+                if rfid_resp.status_code == 201:
+                    flash("RFID mapping created.", "success")
+                else:
+                    flash(rfid_payload.get("detail") or rfid_payload.get("error") or "Could not create RFID mapping.", "warning")
             flash("Team created.", "success")
             return redirect(url_for("teams.list_teams"))
 
@@ -106,6 +120,17 @@ def edit_team(team_id: int):
     _, groups_payload = api_json("GET", "/api/groups")
     groups = groups_payload.get("groups", [])
 
+    rfid_card = None
+    cards_resp, cards_payload = api_json("GET", "/api/rfid/cards")
+    if cards_resp.status_code == 200:
+        for c in cards_payload.get("cards", []):
+            t = c.get("team") or {}
+            if t.get("id") == team.get("id"):
+                rfid_card = c
+                break
+    else:
+        flash("Could not load RFID mappings.", "warning")
+
     selected_group_id = next((g.get("group", {}).get("id") for g in team.get("group_assignments", []) if g.get("group")), None)
 
     if request.method == "POST":
@@ -114,6 +139,9 @@ def edit_team(team_id: int):
         number = int(number_raw) if number_raw else None
         organization = (request.form.get("organization") or "").strip() or None
         selected_group_id = request.form.get("group_id", type=int)
+        rfid_uid = (request.form.get("rfid_uid") or "").strip().upper()
+        rfid_number_raw = request.form.get("rfid_number")
+        rfid_number = int(rfid_number_raw) if rfid_number_raw else None
 
         if not name:
             flash("Team name is required.", "warning")
@@ -139,6 +167,33 @@ def edit_team(team_id: int):
         )
 
         if resp.status_code == 200:
+            if rfid_uid or rfid_number is not None or rfid_card:
+                # Update existing mapping or create a new one
+                if rfid_card:
+                    rfid_resp, rfid_payload = api_json(
+                        "PATCH",
+                        f"/api/rfid/cards/{rfid_card.get('id')}",
+                        json={
+                            "uid": rfid_uid or rfid_card.get("uid"),
+                            "team_id": team_id,
+                            "number": rfid_number,
+                        },
+                    )
+                elif rfid_uid:
+                    rfid_resp, rfid_payload = api_json(
+                        "POST",
+                        "/api/rfid/cards",
+                        json={"uid": rfid_uid, "team_id": team_id, "number": rfid_number},
+                    )
+                else:
+                    rfid_resp, rfid_payload = None, {}
+
+                if rfid_resp:
+                    if rfid_resp.status_code in (200, 201):
+                        flash("RFID mapping saved.", "success")
+                    else:
+                        flash(rfid_payload.get("detail") or rfid_payload.get("error") or "Could not save RFID mapping.", "warning")
+
             flash("Team updated.", "success")
             return redirect(url_for("teams.list_teams"))
 
@@ -158,6 +213,7 @@ def edit_team(team_id: int):
         "team_edit.html",
         team=team,
         groups=groups,
+        rfid_card=rfid_card,
         selected_group_id=selected_group_id,
     )
 

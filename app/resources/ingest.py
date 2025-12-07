@@ -160,21 +160,25 @@ class IngestResource(Resource):
                 if team and cp:
                     team_obj = team
                     team_name = team.name
-                    exists = Checkin.query.filter_by(
-                        team_id=team.id, checkpoint_id=cp.id
-                    ).first()
+                    exists = Checkin.query.filter_by(team_id=team.id, checkpoint_id=cp.id).first()
+                    arrived_at = received_at
                     if not exists:
-                        db.session.add(Checkin(
-                            team_id=team.id,
-                            checkpoint_id=cp.id,
-                            timestamp=received_at
-                        ))
+                        db.session.add(
+                            Checkin(
+                                team_id=team.id,
+                                checkpoint_id=cp.id,
+                                timestamp=received_at,
+                            )
+                        )
                         created_checkin = True
-                        try:
-                            mark_arrival_checkbox(team.id, cp.id, received_at)
-                        except Exception as exc:
-                            # do not fail ingest if Sheets update fails
-                            pass
+                    else:
+                        arrived_at = exists.timestamp or received_at
+
+                    try:
+                        mark_arrival_checkbox(team.id, cp.id, arrived_at)
+                    except Exception:
+                        # do not fail ingest if Sheets update fails
+                        pass
 
             looks_like_uid = gps_lat is None and gps_lon is None and (payload is not None) and ("," not in str(payload))
             if looks_like_uid:

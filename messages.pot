@@ -21,6 +21,64 @@ msgstr ""
 msgid "Forbidden: you don’t have access to this page."
 msgstr ""
 
+#: app/templates/rfid_judge.html:101
+msgid "HMAC already on tag; skipped writing."
+msgstr ""
+
+#: app/templates/rfid_edit.html:21 app/templates/add_team.html:42
+#: app/templates/team_edit.html:43
+msgid "RFID UID"
+msgstr ""
+
+#: app/templates/rfid_edit.html:23
+msgid "Paste or scan with Web NFC on supported devices."
+msgstr ""
+
+#: app/templates/rfid_edit.html:26 app/templates/add_team.html:45
+#: app/templates/team_edit.html:50
+msgid "Read via Web NFC"
+msgstr ""
+
+#: app/templates/rfid_edit.html:27 app/templates/add_team.html:46
+#: app/templates/team_edit.html:51
+msgid "Not checked"
+msgstr ""
+
+#: app/templates/rfid_edit.html:46 app/templates/add_team.html:75
+#: app/templates/team_edit.html:80
+msgid "Hold the tag near your device to read."
+msgstr ""
+
+#: app/templates/rfid_edit.html:51 app/templates/add_team.html:80
+#: app/templates/team_edit.html:85
+msgid "Could not read UID from tag."
+msgstr ""
+
+#: app/templates/rfid_edit.html:63 app/templates/add_team.html:59
+#: app/templates/team_edit.html:64
+msgid "RFID Card Number"
+msgstr ""
+
+#: app/templates/rfid_edit.html:64
+msgid "Optional friendly number"
+msgstr ""
+
+#: app/templates/add_team.html:22 app/templates/team_edit.html:23
+msgid "Tap tag or paste UID"
+msgstr ""
+
+#: app/templates/add_team.html:24
+msgid "Optional; creates an RFID mapping for this team."
+msgstr ""
+
+#: app/templates/team_edit.html:26
+msgid "Optional; saves an RFID mapping for this team."
+msgstr ""
+
+#: app/templates/team_edit.html:28
+msgid "Current mapping ID"
+msgstr ""
+
 #: app/templates/add_checkin.html:2 app/templates/add_checkin.html:7
 #: app/templates/base.html:113 app/templates/view_checkins.html:70
 msgid "Add Check-in"
@@ -1085,4 +1143,3 @@ msgstr ""
 #: app/templates/view_checkins.html:123
 msgid "No check-ins match your filters."
 msgstr ""
-

@@ -1,6 +1,64 @@
 
 msgid ""
 msgstr ""
+
+#: app/templates/rfid_judge.html:101
+msgid "HMAC already on tag; skipped writing."
+msgstr "HMAC je že na znački; pisanje preskočeno."
+
+#: app/templates/rfid_edit.html:21 app/templates/add_team.html:42
+#: app/templates/team_edit.html:43
+msgid "RFID UID"
+msgstr "RFID UID"
+
+#: app/templates/rfid_edit.html:23
+msgid "Paste or scan with Web NFC on supported devices."
+msgstr "Prilepi ali skeniraj z Web NFC na podprtih napravah."
+
+#: app/templates/rfid_edit.html:26 app/templates/add_team.html:45
+#: app/templates/team_edit.html:50
+msgid "Read via Web NFC"
+msgstr "Preberi z Web NFC"
+
+#: app/templates/rfid_edit.html:27 app/templates/add_team.html:46
+#: app/templates/team_edit.html:51
+msgid "Not checked"
+msgstr "Ni preverjeno"
+
+#: app/templates/rfid_edit.html:46 app/templates/add_team.html:75
+#: app/templates/team_edit.html:80
+msgid "Hold the tag near your device to read."
+msgstr "Približaj značko napravi za branje."
+
+#: app/templates/rfid_edit.html:51 app/templates/add_team.html:80
+#: app/templates/team_edit.html:85
+msgid "Could not read UID from tag."
+msgstr "UID-ja ni bilo mogoče prebrati s značke."
+
+#: app/templates/rfid_edit.html:63 app/templates/add_team.html:59
+#: app/templates/team_edit.html:64
+msgid "RFID Card Number"
+msgstr "RFID številka kartice"
+
+#: app/templates/rfid_edit.html:64
+msgid "Optional friendly number"
+msgstr "Neobvezna prijazna številka"
+
+#: app/templates/add_team.html:22 app/templates/team_edit.html:23
+msgid "Tap tag or paste UID"
+msgstr "Prisloni značko ali prilepi UID"
+
+#: app/templates/add_team.html:24
+msgid "Optional; creates an RFID mapping for this team."
+msgstr "Neobvezno; ustvari RFID povezavo za to ekipo."
+
+#: app/templates/team_edit.html:26
+msgid "Optional; saves an RFID mapping for this team."
+msgstr "Neobvezno; shrani RFID povezavo za to ekipo."
+
+#: app/templates/team_edit.html:28
+msgid "Current mapping ID"
+msgstr "ID trenutne povezave"
 "Project-Id-Version: LoRa KT\n"
 "Report-Msgid-Bugs-To: brin.soko@gmail.com\n"
 "POT-Creation-Date: 2025-12-03 23:37+0100\n"
