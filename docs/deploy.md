@@ -23,7 +23,7 @@ sudo systemctl enable --now docker
 
 ## 3) Pull repo + configure env
 ```bash
-git clone https://github.com/OWNER/REPO.git lora-kt
+git clone https://github.com/brinsoko/LoRa-CP.git lora-kt
 cd lora-kt/deploy
 cp .env.example .env
 ```
@@ -42,7 +42,7 @@ docker compose -f docker-compose.prod.yml up -d
 Caddy will request/renew certificates automatically for `DOMAIN` and reverse-proxy to `web`.
 
 ## 5) CI: publish images to GHCR
-- The workflow `.github/workflows/publish.yml` builds `lora-kt-web` and `lora-kt-serial` and pushes to GHCR on every push to `main`.
+- The workflow `.github/workflows/publish.yml` builds `lora-kt-web` and `lora-kt-serial` and pushes to GHCR on every push to `main` (images: `ghcr.io/brinsoko/lora-cp/...`).
 - Make the repo public **or** create a `GHCR_TOKEN` with `packages:read` on the server and log in once:  
   `echo "$GHCR_TOKEN" | docker login ghcr.io -u USERNAME --password-stdin`
 

@@ -1,6 +1,6 @@
 services:
   web:
-    image: ghcr.io/brinsoko/lora-cp/lora-kt-web:latest # replace OWNER/REPO with your GitHub org/repo
+    image: ghcr.io/brinsoko/lora-cp/lora-kt-web:latest
     env_file:
       - .env
     volumes:
