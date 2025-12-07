@@ -37,13 +37,3 @@ jobs:
           tags: |
             ghcr.io/${{ env.IMAGE_NAME }}/lora-kt-web:latest
             ghcr.io/${{ env.IMAGE_NAME }}/lora-kt-web:${{ github.sha }}
-
-      - name: Build and push serial-reader image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: serial/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ env.IMAGE_NAME }}/lora-kt-serial:latest
-            ghcr.io/${{ env.IMAGE_NAME }}/lora-kt-serial:${{ github.sha }}
