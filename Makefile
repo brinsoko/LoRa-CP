@@ -11,6 +11,8 @@ PORT            ?= 5001
 FLASK_APP       ?= app:create_app          # app factory
 export FLASK_APP
 export FLASK_ENV=development
+SEED_SKIP_DEMO  ?= 0
+SEED_TEAMS_CSV  ?=
 
 # Default target
 .PHONY: help
@@ -27,6 +29,7 @@ help:
 	@echo "  make db-upgrade      - apply migrations"
 	@echo "  make db-downgrade n=1- revert n steps (default 1)"
 	@echo "  make db-reset        - DANGER: drop+create ALL tables"
+	@echo "  make i18n-compile    - compile translations (.po -> .mo)"
 	@echo "  make up              - docker compose up"
 	@echo "  make down            - docker compose down"
 	@echo "  make logs            - docker compose logs -f web"
@@ -44,11 +47,11 @@ run:
 
 .PHONY: seed
 seed:
-	$(PYTHON) scripts/seed_db.py
+	$(PYTHON) scripts/seed_db.py $(if $(filter 1 true yes,$(SEED_SKIP_DEMO)),--skip-demo,) $(if $(SEED_TEAMS_CSV),--teams-csv $(SEED_TEAMS_CSV),)
 
 .PHONY: seed-fresh
 seed-fresh:
-	$(PYTHON) scripts/seed_db.py --fresh
+	$(PYTHON) scripts/seed_db.py --fresh $(if $(filter 1 true yes,$(SEED_SKIP_DEMO)),--skip-demo,) $(if $(SEED_TEAMS_CSV),--teams-csv $(SEED_TEAMS_CSV),)
 
 .PHONY: admin
 # Usage:
@@ -118,5 +121,10 @@ sh:
 
 # --- Cleanup ---
 .PHONY: clean
+
+# --- i18n ---
+.PHONY: i18n-compile
+i18n-compile:
+	pybabel compile -d app/translations
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

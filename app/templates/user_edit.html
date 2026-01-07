@@ -28,13 +28,14 @@
   {% endif %}
 
   <div class="mb-3">
-    <label class="form-label">{{ _('Role') }}</label>
+    <label class="form-label">{{ _('Competition Role') }}</label>
     <select class="form-select" name="role" required>
-      {% set cur = (None if mode=='add' else u.role) %}
-      {% for r in ['public','judge','admin'] %}
+      {% set cur = ('viewer' if mode=='add' else (membership.role if membership else 'viewer')) %}
+      {% for r in ['viewer','judge','admin'] %}
       <option value="{{ r }}" {% if r == cur %}selected{% endif %}>{{ _(r) }}</option>
       {% endfor %}
     </select>
+    <div class="form-text">{{ _('Roles apply per competition.') }}</div>
   </div>
 
   <div class="d-flex gap-2">

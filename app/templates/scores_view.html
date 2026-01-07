@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Scores') }}{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+      <h5 class="card-title mb-0">
+        {{ _('Scores') }}
+        {% if public_competition %}
+          <span class="text-muted small ms-2">{{ public_competition.name }}</span>
+        {% endif %}
+      </h5>
+      <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-outline-secondary" type="button" id="toggleExtended">
+          {{ _('Show per-checkpoint') }}
+        </button>
+        <form method="get" class="d-flex gap-2">
+          <select class="form-select" name="group_id">
+            <option value="">{{ _('All groups') }}</option>
+            {% for g in groups %}
+              <option value="{{ g.id }}" {% if g.id == selected_group_id %}selected{% endif %}>{{ g.name }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-outline-secondary">{{ _('Filter') }}</button>
+        </form>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>{{ _('Place') }}</th>
+            <th>{{ _('Group') }}</th>
+            <th>{{ _('Number') }}</th>
+            <th>{{ _('Team') }}</th>
+            <th>{{ _('Finished') }}</th>
+            <th class="text-end">{{ _('Dead time (sum)') }}</th>
+            <th class="text-end">{{ _('Total points') }}</th>
+            {% if show_actions %}
+              <th>{{ _('Actions') }}</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% set ns = namespace(prev_group=None) %}
+          {% for row in rows %}
+            {% set is_new_group = ns.prev_group is not none and row.group != ns.prev_group %}
+            <tr class="{% if is_new_group %}group-separator{% endif %}">
+              <td>{{ row.place }}</td>
+              <td>{{ row.group }}</td>
+              <td>{{ row.number or '' }}</td>
+              <td>{{ row.name }}</td>
+              <td>
+                {% if row.dnf %}
+                  <span class="badge text-bg-danger">{{ _('DNF') }}</span>
+                {% elif row.finished %}
+                  <span class="badge text-bg-success">{{ _('Yes') }}</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">{{ _('No') }}</span>
+                {% endif %}
+              </td>
+              <td class="text-end">{{ (row.dead_time or 0)|round(0)|int }}</td>
+              <td class="text-end">
+                {% if row.dnf %}
+                  {{ _('DNF') }}
+                {% else %}
+                  {{ (row.total or 0)|round(0)|int }}
+                {% endif %}
+                {% if row.organization %}
+                  <span class="text-muted small ms-1">({{ row.organization }})</span>
+                {% endif %}
+              </td>
+              {% if show_actions %}
+                <td>
+                  <a class="btn btn-sm btn-outline-secondary"
+                     href="{{ url_for('scores.score_submissions', team_id=row.id) }}">
+                    {{ _('View submissions') }}
+                  </a>
+                </td>
+              {% endif %}
+            </tr>
+            {% set ns.prev_group = row.group %}
+          {% else %}
+            <tr>
+              <td colspan="{{ 8 if show_actions else 7 }}" class="text-muted text-center py-4">{{ _('No scores yet.') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="text-muted small mb-0">{{ _('Dead time is summed from the latest score per checkpoint.') }}</p>
+    <div class="mt-3">
+      <h6 class="mb-2">{{ _('Group ranking') }}</h6>
+      <div class="table-responsive">
+        <table class="table table-striped align-middle">
+          <thead>
+            <tr>
+              <th>{{ _('Place') }}</th>
+              <th>{{ _('Group') }}</th>
+              <th class="text-end">{{ _('Total points') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for grp in group_totals %}
+              <tr>
+                <td>{{ grp.rank }}</td>
+                <td>{{ grp.name }}</td>
+                <td class="text-end">{{ (grp.total or 0)|round(0)|int }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="3" class="text-muted text-center py-3">{{ _('No group totals yet.') }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="mt-3">
+      <h6 class="mb-2">{{ _('Organization totals') }}</h6>
+      <div class="table-responsive">
+        <table class="table table-striped align-middle">
+          <thead>
+            <tr>
+              <th>{{ _('Organization') }}</th>
+              <th class="text-end">{{ _('Total points') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for org in org_totals %}
+              <tr>
+                <td>{{ org.name }}</td>
+                <td class="text-end">{{ '%.2f'|format(org.total or 0) }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="2" class="text-muted text-center py-3">{{ _('No organization totals yet.') }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-muted small mb-0">{{ _('DNF teams do not count toward organization totals.') }}</p>
+    </div>
+    <div class="table-responsive mt-3 d-none" id="extendedScores">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>{{ _('Place') }}</th>
+            <th>{{ _('Group') }}</th>
+            <th>{{ _('Number') }}</th>
+            <th>{{ _('Team') }}</th>
+            <th>{{ _('Finished') }}</th>
+            {% for cp in checkpoints %}
+              <th class="text-end">{{ cp.name }}</th>
+            {% endfor %}
+            <th class="text-end">{{ _('Time points') }}</th>
+            <th class="text-end">{{ _('Found points') }}</th>
+            <th class="text-end">{{ _('Dead time (sum)') }}</th>
+            <th class="text-end">{{ _('Total points') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set ns = namespace(prev_group=None) %}
+          {% for row in rows %}
+            {% set is_new_group = ns.prev_group is not none and row.group != ns.prev_group %}
+            <tr class="{% if is_new_group %}group-separator{% endif %}">
+              <td>{{ row.place }}</td>
+              <td>{{ row.group }}</td>
+              <td>{{ row.number or '' }}</td>
+              <td>{{ row.name }}</td>
+              <td>
+                {% if row.dnf %}
+                  <span class="badge text-bg-danger">{{ _('DNF') }}</span>
+                {% elif row.finished %}
+                  <span class="badge text-bg-success">{{ _('Yes') }}</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">{{ _('No') }}</span>
+                {% endif %}
+              </td>
+              {% for cp in checkpoints %}
+                {% set val = per_team_points.get(row.id, {}).get(cp.id) %}
+                <td class="text-end">
+                  {% if row.dnf %}
+                    {{ _('DNF') }}
+                  {% elif val is not none %}
+                    {{ (val|round(0))|int }}
+                  {% elif cp.id in (row.allowed_checkpoints or []) %}
+                    0
+                  {% endif %}
+                </td>
+              {% endfor %}
+              <td class="text-end">
+                {% if row.dnf %}
+                  {{ _('DNF') }}
+                {% else %}
+                  {{ (row.global_time or 0)|round(0)|int }}
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if row.dnf %}
+                  {{ _('DNF') }}
+                {% else %}
+                  {{ (row.global_found or 0)|round(0)|int }}
+                {% endif %}
+              </td>
+              <td class="text-end">{{ (row.dead_time or 0)|round(0)|int }}</td>
+              <td class="text-end">
+                {% if row.dnf %}
+                  {{ _('DNF') }}
+                {% else %}
+                  {{ (row.total or 0)|round(0)|int }}
+                {% endif %}
+                {% if row.organization %}
+                  <span class="text-muted small ms-1">({{ row.organization }})</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% set ns.prev_group = row.group %}
+          {% else %}
+            <tr>
+              <td colspan="{{ 9 + (checkpoints|length) }}" class="text-muted text-center py-4">{{ _('No scores yet.') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<style>
+  .group-separator > * {
+    border-top: 3px solid #9ec5fe;
+  }
+</style>
+<script>
+  const toggleBtn = document.getElementById("toggleExtended");
+  const extended = document.getElementById("extendedScores");
+  const showLabel = "{{ _('Show per-checkpoint') }}";
+  const hideLabel = "{{ _('Hide per-checkpoint') }}";
+  toggleBtn.addEventListener("click", () => {
+    extended.classList.toggle("d-none");
+    toggleBtn.textContent = extended.classList.contains("d-none") ? showLabel : hideLabel;
+  });
+</script>
+{% endblock %}

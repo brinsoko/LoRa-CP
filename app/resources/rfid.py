@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from app.extensions import db
 from app.models import RFIDCard, Team, LoRaDevice, Checkpoint, Checkin
 from app.utils.rest_auth import json_login_required, json_roles_required
+from app.utils.competition import require_current_competition_id
 from app.utils.serial_helpers import normalize_uid, read_uid_once
 from config import Config
 from app.utils.card_tokens import match_digests
@@ -69,8 +70,13 @@ class RFIDCardListResource(Resource):
     method_decorators = [json_login_required]
 
     def get(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         cards = (
             RFIDCard.query
+            .join(Team, RFIDCard.team_id == Team.id)
+            .filter(Team.competition_id == comp_id)
             .options(joinedload(RFIDCard.team))
             .order_by(RFIDCard.number.asc().nulls_last(), RFIDCard.uid.asc())
             .all()
@@ -79,12 +85,21 @@ class RFIDCardListResource(Resource):
 
     @json_roles_required("judge", "admin")
     def post(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         payload = request.get_json(silent=True) or {}
         uid, team_id, number, error = _parse_card_payload(payload)
         if error:
             return {"error": "validation_error", "detail": error}, 400
 
-        team = Team.query.get(team_id) if team_id is not None else None
+        team = (
+            Team.query
+            .filter(Team.competition_id == comp_id, Team.id == team_id)
+            .first()
+            if team_id is not None
+            else None
+        )
         if not team and team_id is not None:
             return {"error": "validation_error", "detail": "Invalid team_id"}, 400
 
@@ -109,10 +124,15 @@ class RFIDCardItemResource(Resource):
     method_decorators = [json_login_required]
 
     def get(self, card_id: int):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         card = (
             RFIDCard.query
+            .join(Team, RFIDCard.team_id == Team.id)
+            .filter(Team.competition_id == comp_id, RFIDCard.id == card_id)
             .options(joinedload(RFIDCard.team))
-            .get(card_id)
+            .first()
         )
         if not card:
             return {"error": "not_found"}, 404
@@ -127,7 +147,15 @@ class RFIDCardItemResource(Resource):
         return self._update(card_id, partial=False)
 
     def _update(self, card_id: int, partial: bool):
-        card = RFIDCard.query.get(card_id)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        card = (
+            RFIDCard.query
+            .join(Team, RFIDCard.team_id == Team.id)
+            .filter(Team.competition_id == comp_id, RFIDCard.id == card_id)
+            .first()
+        )
         if not card:
             return {"error": "not_found"}, 404
 
@@ -143,7 +171,9 @@ class RFIDCardItemResource(Resource):
         if error:
             return {"error": "validation_error", "detail": error}, 400
 
-        if team_id is not None and not Team.query.get(team_id):
+        if team_id is not None and not Team.query.filter(
+            Team.competition_id == comp_id, Team.id == team_id
+        ).first():
             return {"error": "validation_error", "detail": "Invalid team_id"}, 400
 
         if team_id is not None:
@@ -172,7 +202,15 @@ class RFIDCardItemResource(Resource):
 
     @json_roles_required("admin")
     def delete(self, card_id: int):
-        card = RFIDCard.query.get(card_id)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        card = (
+            RFIDCard.query
+            .join(Team, RFIDCard.team_id == Team.id)
+            .filter(Team.competition_id == comp_id, RFIDCard.id == card_id)
+            .first()
+        )
         if not card:
             return {"error": "not_found"}, 404
         db.session.delete(card)
@@ -201,6 +239,9 @@ class RFIDBulkImportResource(Resource):
         Accepts multipart/form-data with 'file' (CSV) or JSON body with 'rows'.
         CSV columns: uid, team_id (or team_name), number (optional)
         """
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         rows = []
         if request.files.get("file"):
             file = request.files["file"]
@@ -243,10 +284,16 @@ class RFIDBulkImportResource(Resource):
                     skipped += 1
                     continue
             elif team_name:
-                team = Team.query.filter(Team.name.ilike(team_name)).first()
+                team = (
+                    Team.query
+                    .filter(Team.competition_id == comp_id, Team.name.ilike(team_name))
+                    .first()
+                )
                 if team:
                     team_id = team.id
-            if team_id and not Team.query.get(team_id):
+            if team_id and not Team.query.filter(
+                Team.competition_id == comp_id, Team.id == team_id
+            ).first():
                 skipped += 1
                 errors.append({"row": idx, "detail": "Unknown team"})
                 continue
@@ -318,20 +365,24 @@ class RFIDVerifyResource(Resource):
         uid = (payload.get("uid") or "").strip()
         digests = payload.get("digests") or []
         device_ids = payload.get("device_ids")
+        checkpoint_ids = payload.get("checkpoint_ids")
 
         if not uid:
             return {"error": "validation_error", "detail": "uid is required"}, 400
         if not isinstance(digests, list):
             return {"error": "validation_error", "detail": "digests must be a list"}, 400
 
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         team = (
             db.session.query(Team)
             .join(RFIDCard, RFIDCard.team_id == Team.id)
-            .filter(RFIDCard.uid == uid)
+            .filter(Team.competition_id == comp_id, RFIDCard.uid == uid)
             .first()
         )
 
-        # When no explicit device filter is provided, scope to checkpoints
+        # When no explicit filter is provided, scope to checkpoints
         # assigned to the team's active group(s) if available.
         allowed_checkpoint_ids: set[int] = set()
         if team:
@@ -341,32 +392,85 @@ class RFIDVerifyResource(Resource):
                         if link.checkpoint_id:
                             allowed_checkpoint_ids.add(link.checkpoint_id)
 
-        devices_q = LoRaDevice.query
         if device_ids is not None:
             try:
                 device_ids = [int(x) for x in device_ids if str(x).strip() != ""]
             except Exception:
                 return {"error": "validation_error", "detail": "device_ids must be integers"}, 400
-            if device_ids:
-                devices_q = devices_q.filter(LoRaDevice.dev_num.in_(device_ids))
-            else:
-                device_ids = None  # treat empty selection same as not provided
-        if device_ids is None and allowed_checkpoint_ids:
-            devices_q = (
-                devices_q.join(Checkpoint, Checkpoint.lora_device_id == LoRaDevice.id)
-                .filter(Checkpoint.id.in_(allowed_checkpoint_ids))
-            )
-        devices = devices_q.all()
-        if not devices:
-            return {"error": "not_found", "detail": "No devices found for verification"}, 404
+            if not device_ids:
+                device_ids = None
 
-        device_lookup = {d.dev_num: d for d in devices if d.dev_num is not None}
-        match_rows = match_digests(uid, digests, device_lookup.keys())
+        if checkpoint_ids is not None:
+            try:
+                checkpoint_ids = [int(x) for x in checkpoint_ids if str(x).strip() != ""]
+            except Exception:
+                return {"error": "validation_error", "detail": "checkpoint_ids must be integers"}, 400
+            if not checkpoint_ids:
+                checkpoint_ids = None
+
+        checkpoint_lookup: dict[int, Checkpoint] = {}
+        device_lookup: dict[int, LoRaDevice] = {}
+
+        if checkpoint_ids is not None:
+            checkpoints = (
+                Checkpoint.query
+                .filter(Checkpoint.competition_id == comp_id, Checkpoint.id.in_(checkpoint_ids))
+                .all()
+            )
+            checkpoint_lookup = {c.id: c for c in checkpoints}
+            for cp in checkpoints:
+                if cp.lora_device and cp.lora_device.dev_num is not None:
+                    device_lookup[cp.lora_device.dev_num] = cp.lora_device
+        elif device_ids is not None:
+            device_lookup = {
+                d.dev_num: d
+                for d in LoRaDevice.query
+                .filter(LoRaDevice.competition_id == comp_id, LoRaDevice.dev_num.in_(device_ids))
+                .all()
+                if d.dev_num is not None
+            }
+            device_ids_for_cp = [d.id for d in device_lookup.values()]
+            checkpoint_lookup = {
+                c.id: c
+                for c in Checkpoint.query
+                .filter(Checkpoint.competition_id == comp_id, Checkpoint.lora_device_id.in_(device_ids_for_cp))
+                .all()
+            }
+        elif allowed_checkpoint_ids:
+            checkpoints = (
+                Checkpoint.query
+                .filter(Checkpoint.competition_id == comp_id, Checkpoint.id.in_(allowed_checkpoint_ids))
+                .all()
+            )
+            checkpoint_lookup = {c.id: c for c in checkpoints}
+            for cp in checkpoints:
+                if cp.lora_device and cp.lora_device.dev_num is not None:
+                    device_lookup[cp.lora_device.dev_num] = cp.lora_device
+        else:
+            checkpoints = (
+                Checkpoint.query
+                .filter(Checkpoint.competition_id == comp_id)
+                .all()
+            )
+            checkpoint_lookup = {c.id: c for c in checkpoints}
+            device_lookup = {
+                d.dev_num: d
+                for d in LoRaDevice.query
+                .filter(LoRaDevice.competition_id == comp_id)
+                .all()
+                if d.dev_num is not None
+            }
+
+        if not checkpoint_lookup and not device_lookup:
+            return {"error": "not_found", "detail": "No checkpoints found for verification"}, 404
+
+        candidate_ids = set(checkpoint_lookup.keys()) | set(device_lookup.keys())
+        match_rows = match_digests(uid, digests, candidate_ids)
         team_checkpoint_ids = set()
         if team:
             team_checkpoint_ids = {
                 c.checkpoint_id
-                for c in Checkin.query.filter_by(team_id=team.id).all()
+                for c in Checkin.query.filter_by(team_id=team.id, competition_id=comp_id).all()
                 if c.checkpoint_id is not None
             }
 
@@ -378,13 +482,18 @@ class RFIDVerifyResource(Resource):
             entries = []
             for dev_num in matches:
                 d = device_lookup.get(dev_num)
-                cp_name = d.checkpoint.name if d and d.checkpoint else None
-                cp_id = d.checkpoint.id if d and d.checkpoint else None
+                cp = None
+                if d and d.checkpoint_id:
+                    cp = checkpoint_lookup.get(d.checkpoint_id)
+                if not cp:
+                    cp = checkpoint_lookup.get(dev_num)
+                cp_name = cp.name if cp else None
+                cp_id = cp.id if cp else None
                 checked_in = (cp_id in team_checkpoint_ids) if cp_id else False
                 if matches and cp_id and not checked_in:
                     has_mismatch = True
                 entries.append({
-                    "device_id": dev_num,
+                    "device_id": d.dev_num if d else None,
                     "device_name": d.name if d else None,
                     "checkpoint": cp_name,
                     "checkpoint_id": cp_id,
@@ -401,6 +510,7 @@ class RFIDVerifyResource(Resource):
         return {
             "ok": True,
             "uid": uid,
+            "checkpoint_ids": list(checkpoint_lookup.keys()),
             "device_ids": list(device_lookup.keys()),
             "results": results,
             "unknown": unknown,

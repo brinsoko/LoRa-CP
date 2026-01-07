@@ -5,6 +5,9 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
+from flask_login import current_user
+from app.utils.competition import get_current_competition_id, get_current_competition_role
+from app.models import JudgeCheckpoint, Checkpoint
 
 rfid_bp = Blueprint("rfid", __name__, template_folder="../../templates")
 
@@ -36,6 +39,31 @@ def _fetch_devices():
     except Exception:
         pass
     return devices
+
+
+def _fetch_checkpoints_for_user():
+    comp_id = get_current_competition_id()
+    if not comp_id:
+        return []
+    role = get_current_competition_role()
+    if role == "admin":
+        return (
+            Checkpoint.query
+            .filter(Checkpoint.competition_id == comp_id)
+            .order_by(Checkpoint.name.asc())
+            .all()
+        )
+    assigned = (
+        JudgeCheckpoint.query
+        .join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
+        .filter(
+            JudgeCheckpoint.user_id == current_user.id,
+            Checkpoint.competition_id == comp_id,
+        )
+        .order_by(Checkpoint.name.asc())
+        .all()
+    )
+    return [jc.checkpoint for jc in assigned if jc.checkpoint]
 
 
 @rfid_bp.route("/", methods=["GET"])
@@ -123,15 +151,46 @@ def edit_rfid(card_id: int):
 @rfid_bp.route("/judge-console", methods=["GET"])
 @roles_required("judge", "admin")
 def judge_console():
-    devices = _fetch_devices()
-    return render_template("rfid_judge.html", devices=devices)
+    comp_id = get_current_competition_id()
+    assigned = []
+    default_checkpoint_id = None
+    checkpoints = []
+    if comp_id:
+        role = get_current_competition_role()
+        if role == "admin":
+            checkpoints = (
+                Checkpoint.query
+                .filter(Checkpoint.competition_id == comp_id)
+                .order_by(Checkpoint.name.asc())
+                .all()
+            )
+            default_checkpoint_id = checkpoints[0].id if checkpoints else None
+        else:
+            assigned = (
+                JudgeCheckpoint.query
+                .join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
+                .filter(
+                    JudgeCheckpoint.user_id == current_user.id,
+                    Checkpoint.competition_id == comp_id,
+                )
+                .order_by(Checkpoint.name.asc())
+                .all()
+            )
+            default_row = next((jc for jc in assigned if jc.is_default), None)
+            default_checkpoint_id = default_row.checkpoint_id if default_row else None
+            checkpoints = [jc.checkpoint for jc in assigned if jc.checkpoint]
+    return render_template(
+        "rfid_judge.html",
+        checkpoints=checkpoints,
+        default_checkpoint_id=default_checkpoint_id,
+    )
 
 
 @rfid_bp.route("/finish", methods=["GET"])
 @roles_required("judge", "admin")
 def finish_console():
-    devices = _fetch_devices()
-    return render_template("rfid_finish.html", devices=devices)
+    checkpoints = _fetch_checkpoints_for_user()
+    return render_template("rfid_finish.html", checkpoints=checkpoints)
 
 
 @rfid_bp.route("/<int:card_id>/delete", methods=["POST"])

@@ -9,16 +9,22 @@
         <input name="username" class="form-control" required autofocus>
       </div>
       <div class="mb-3">
+        <label class="form-label">{{ _('Email (Google login)') }}</label>
+        <input name="email" type="email" class="form-control" placeholder="{{ _('Optional') }}">
+        <div class="form-text">{{ _('Optional; used to link Google OAuth accounts.') }}</div>
+      </div>
+      <div class="mb-3">
         <label class="form-label">{{ _('Password') }}</label>
         <input name="password" type="password" class="form-control" required>
       </div>
       <div class="mb-3">
-        <label class="form-label">{{ _('Role') }}</label>
+        <label class="form-label">{{ _('Competition Role') }}</label>
         <select name="role" class="form-select" required>
-          <option value="public">{{ _('public') }}</option>
+          <option value="viewer">{{ _('viewer') }}</option>
           <option value="judge">{{ _('judge') }}</option>
           <option value="admin">{{ _('admin') }}</option>
         </select>
+        <div class="form-text">{{ _('Roles apply per competition.') }}</div>
       </div>
       <button class="btn btn-primary">{{ _('Create') }}</button>
       <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary ms-2">{{ _('Cancel') }}</a>

@@ -33,13 +33,13 @@
 
       <div class="col-6 col-md-2">
         <label class="form-label">{{ _('From') }}</label>
-        <input type="date" class="form-control" name="date_from"
+        <input type="datetime-local" step="1" class="form-control" name="date_from"
                value="{{ selected_date_from }}">
       </div>
 
       <div class="col-6 col-md-2">
         <label class="form-label">{{ _('To') }}</label>
-        <input type="date" class="form-control" name="date_to"
+        <input type="datetime-local" step="1" class="form-control" name="date_to"
                value="{{ selected_date_to }}">
       </div>
 

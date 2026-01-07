@@ -5,6 +5,7 @@ import requests
 # ----------------- Config (via env) -----------------
 TCP_URL     = os.getenv("SERIAL_URL", "socket://127.0.0.1:2001")
 API_URL     = os.getenv("INGEST_URL", "http://127.0.0.1:5001/api/ingest")
+COMPETITION_ID = os.getenv("COMPETITION_ID")
 TIMEOUT_S   = float(os.getenv("SERIAL_TIMEOUT", "0.2"))      # socket read timeout
 BACKOFF_0   = float(os.getenv("BACKOFF_START", "0.5"))       # initial backoff when POST fails / socket drops
 BACKOFF_MAX = float(os.getenv("BACKOFF_MAX", "10"))          # max backoff cap
@@ -99,11 +100,13 @@ def run():
 
                         # POST to API
                         try:
-                            resp = session.post(
-                                API_URL,
-                                json={"dev_id": dev, "payload": payload, "rssi": rssi, "snr": snr},
-                                timeout=POST_TIMEOUT,
-                            )
+                            body = {"dev_id": dev, "payload": payload, "rssi": rssi, "snr": snr}
+                            if COMPETITION_ID:
+                                try:
+                                    body["competition_id"] = int(COMPETITION_ID)
+                                except Exception:
+                                    body["competition_id"] = COMPETITION_ID
+                            resp = session.post(API_URL, json=body, timeout=POST_TIMEOUT)
                             resp.raise_for_status()
                             print(f"[reader] OK dev={dev} payload={payload} -> {resp.json()}", flush=True)
                             backoff = BACKOFF_0  # reset backoff on success

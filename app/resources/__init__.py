@@ -12,7 +12,7 @@ from .auth import (
 )
 from .checkins import CheckinListResource, CheckinItemResource, CheckinExportResource
 from .teams import TeamListResource, TeamItemResource, TeamActiveGroupResource
-from .groups import GroupListResource, GroupItemResource
+from .groups import GroupListResource, GroupItemResource, GroupOrderResource
 from .checkpoints_rest import (
     CheckpointListResource,
     CheckpointItemResource,
@@ -29,6 +29,8 @@ from .lora import LoRaDeviceListResource, LoRaDeviceItemResource
 from .messages import LoRaMessageListResource
 from .map import MapCheckpoints, LoRaMapPoints
 from .docs_resource import ApiDocsListResource, ApiSpecResource
+from .scores import ScoreResolve, ScoreSubmit
+from .score_rules import ScoreRuleList, ScoreRuleItem, ScoreRuleFields
 
 
 def register_resources(api: Api) -> None:
@@ -53,6 +55,7 @@ def register_resources(api: Api) -> None:
     # Groups & Checkpoints
     api.add_resource(GroupListResource, "/api/groups")
     api.add_resource(GroupItemResource, "/api/groups/<int:group_id>")
+    api.add_resource(GroupOrderResource, "/api/groups/order")
 
     api.add_resource(CheckpointListResource, "/api/checkpoints")
     api.add_resource(CheckpointItemResource, "/api/checkpoints/<int:checkpoint_id>")
@@ -98,6 +101,13 @@ def register_resources(api: Api) -> None:
         "/api/map/device-points",
         endpoint="device_map_points",
     )
+
+    # Scores
+    api.add_resource(ScoreResolve, "/api/scores/resolve")
+    api.add_resource(ScoreSubmit, "/api/scores/submit")
+    api.add_resource(ScoreRuleList, "/api/score-rules")
+    api.add_resource(ScoreRuleItem, "/api/score-rules/<int:rule_id>")
+    api.add_resource(ScoreRuleFields, "/api/score-rules/fields")
 
     # Documentation
     api.add_resource(ApiDocsListResource, "/api/docs")

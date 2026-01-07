@@ -11,7 +11,12 @@
 
       <div class="mb-3">
         <label class="form-label">{{ _('Rod / Org') }}</label>
-        <input name="organization" class="form-control" value="{{ team.organization or '' }}" placeholder="{{ _('e.g. mGG / local org') }}">
+        <input name="organization" class="form-control" value="{{ team.organization or '' }}" placeholder="{{ _('e.g. mGG / local org') }}" list="organizationList">
+        <datalist id="organizationList">
+          {% for org in organizations or [] %}
+            <option value="{{ org }}"></option>
+          {% endfor %}
+        </datalist>
       </div>
 
       <div class="mb-3">
@@ -28,6 +33,15 @@
           {% endfor %}
         </select>
       </div>
+
+      {% if current_competition_role == 'admin' %}
+      <div class="mb-3">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="dnf" name="dnf" value="1" {% if team.dnf %}checked{% endif %}>
+          <label class="form-check-label" for="dnf">{{ _('DNF (Did Not Finish)') }}</label>
+        </div>
+      </div>
+      {% endif %}
 
       <div class="mb-3">
         <label class="form-label">{{ _('RFID UID') }}</label>

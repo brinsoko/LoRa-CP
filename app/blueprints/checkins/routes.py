@@ -5,6 +5,9 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
+from flask_login import current_user
+from app.models import JudgeCheckpoint, Checkpoint
+from app.utils.competition import get_current_competition_id, get_current_competition_role
 
 from app.utils.frontend_api import api_json, api_request
 from app.utils.perms import roles_required
@@ -29,6 +32,35 @@ def _fetch_checkpoints():
         flash("Could not load checkpoints.", "warning")
         return []
     return payload.get("checkpoints", [])
+
+
+def _fetch_assigned_checkpoints():
+    comp_id = get_current_competition_id()
+    if not comp_id:
+        return []
+    assigned = (
+        JudgeCheckpoint.query
+        .join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
+        .filter(
+            JudgeCheckpoint.user_id == current_user.id,
+            Checkpoint.competition_id == comp_id,
+        )
+        .order_by(Checkpoint.name.asc())
+        .all()
+    )
+    return [jc.checkpoint for jc in assigned if jc.checkpoint]
+
+
+def _fetch_checkpoints_for_user(include_checkpoint_id: int | None = None):
+    role = get_current_competition_role()
+    if role == "judge":
+        checkpoints = _fetch_assigned_checkpoints()
+        if include_checkpoint_id and all(cp.id != include_checkpoint_id for cp in checkpoints):
+            extra = Checkpoint.query.filter(Checkpoint.id == include_checkpoint_id).first()
+            if extra:
+                checkpoints.append(extra)
+        return checkpoints
+    return _fetch_checkpoints()
 
 
 def _parse_timestamp_from_form(fallback: datetime | None = None) -> datetime:
@@ -101,7 +133,7 @@ def list_checkins():
         checkins = _decorate_checkins(payload.get("checkins", []))
 
     teams = _fetch_teams()
-    checkpoints = _fetch_checkpoints()
+    checkpoints = _fetch_checkpoints_for_user(include_checkpoint_id=checkpoint_id)
 
     return render_template(
         "view_checkins.html",
@@ -139,8 +171,16 @@ def export_checkins_csv():
 @roles_required("judge", "admin")
 def add_checkin():
     teams = _fetch_teams()
-    checkpoints = _fetch_checkpoints()
+    checkpoints = _fetch_checkpoints_for_user()
     now = datetime.utcnow()
+    default_checkpoint_id = None
+    if get_current_competition_role() == "judge":
+        default_row = (
+            JudgeCheckpoint.query
+            .filter(JudgeCheckpoint.user_id == current_user.id, JudgeCheckpoint.is_default.is_(True))
+            .first()
+        )
+        default_checkpoint_id = default_row.checkpoint_id if default_row else None
 
     context = {
         "teams": teams,
@@ -148,6 +188,7 @@ def add_checkin():
         "now": now,
         "dup_team_id": None,
         "dup_checkpoint_id": None,
+        "selected_checkpoint_id": default_checkpoint_id,
         "timestamp_prefill": request.form.get("timestamp_local") if request.method == "POST" else now.astimezone(DEFAULT_TIMEZONE).strftime("%Y-%m-%dT%H:%M:%S"),
         "suggest_override": request.form.get("override") == "replace",
     }
@@ -178,6 +219,7 @@ def add_checkin():
                 {
                     "dup_team_id": team_id,
                     "dup_checkpoint_id": checkpoint_id,
+                    "selected_checkpoint_id": checkpoint_id,
                     "suggest_override": True,
                 }
             )
@@ -228,6 +270,14 @@ def edit_checkin(checkin_id: int):
         "pending_team_id": None,
         "pending_cp_id": None,
     }
+    if request.method == "GET" and get_current_competition_role() == "judge":
+        default_row = (
+            JudgeCheckpoint.query
+            .filter(JudgeCheckpoint.user_id == current_user.id, JudgeCheckpoint.is_default.is_(True))
+            .first()
+        )
+        if default_row and not context["c"].get("checkpoint_id"):
+            context["c"]["checkpoint_id"] = default_row.checkpoint_id
 
     if request.method == "POST":
         team_id = request.form.get("team_id", type=int)

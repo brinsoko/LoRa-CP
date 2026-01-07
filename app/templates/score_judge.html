@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Judge Scoring') }}{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">{{ _('Score via RFID') }}</h5>
+        <p class="text-body-secondary small">
+          {{ _('Scan a team RFID tag to load scoring fields for the selected checkpoint.') }}
+        </p>
+
+        <form id="scoreForm" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">{{ _('Checkpoint') }}</label>
+            <select class="form-select" id="checkpointSelect" required {% if not checkpoints %}disabled{% endif %}>
+              {% for cp in checkpoints %}
+                <option value="{{ cp.id }}" {% if cp.id == default_checkpoint_id %}selected{% endif %}>
+                  {{ cp.name }}
+                </option>
+              {% endfor %}
+            </select>
+            {% if not checkpoints %}
+              <div class="alert alert-warning mt-2 mb-0 small">
+                {{ _('No checkpoints assigned yet.') }}
+                {% if current_competition_role == 'admin' %}
+                  <div class="mt-2">
+                    <a href="{{ url_for('judges.assign_checkpoints') }}" class="link-primary">
+                      {{ _('Assign checkpoints to judges') }}
+                    </a>
+                  </div>
+                {% else %}
+                  <div class="mt-2">{{ _('Ask an admin to assign checkpoints.') }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">{{ _('Last UID read') }}</label>
+            <input type="text" class="form-control" id="cardUid" readonly>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">{{ _('Or select team') }}</label>
+            <select class="form-select" id="teamSelect">
+              <option value="">{{ _('Choose...') }}</option>
+              {% for t in teams %}
+                <option value="{{ t.id }}">{{ t.name }}{% if t.number is not none %} ({{ t.number }}){% endif %}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">{{ _('Use this when the team has no RFID card.') }}</div>
+          </div>
+
+          <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary" type="button" id="scanBtn" {% if not checkpoints %}disabled{% endif %}>
+              {{ _('Tap tag to load fields') }}
+            </button>
+            <button class="btn btn-outline-primary" type="button" id="manualBtn" {% if not checkpoints %}disabled{% endif %}>
+              {{ _('Load fields') }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-3">{{ _('Score Input') }}</h6>
+        <div id="teamInfo" class="text-body-secondary small mb-2">{{ _('Waiting for scan…') }}</div>
+        <div id="checkinNotice" class="alert alert-info d-none"></div>
+
+        <form id="fieldsForm">
+          <input type="hidden" id="teamId" value="">
+          <input type="hidden" id="checkpointId" value="">
+          <div id="fieldsContainer" class="row g-3"></div>
+          <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-success" type="submit" id="submitBtn" disabled>
+              {{ _('Submit Score') }}
+            </button>
+          </div>
+        </form>
+        <div class="bg-body-tertiary rounded p-3 small mt-3" id="scoreSummary">
+          <div id="scoreSummaryEmpty" class="text-body-secondary">{{ _('Waiting for scan…') }}</div>
+          <dl class="row mb-0 d-none" id="scoreSummaryList"></dl>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const scanBtn = document.getElementById("scanBtn");
+  const submitBtn = document.getElementById("submitBtn");
+  const checkpointSelect = document.getElementById("checkpointSelect");
+  const cardUid = document.getElementById("cardUid");
+  const teamSelect = document.getElementById("teamSelect");
+  const teamInfo = document.getElementById("teamInfo");
+  const fieldsContainer = document.getElementById("fieldsContainer");
+  const fieldsForm = document.getElementById("fieldsForm");
+  const teamId = document.getElementById("teamId");
+  const checkpointId = document.getElementById("checkpointId");
+  const checkinNotice = document.getElementById("checkinNotice");
+  const scoreSummaryList = document.getElementById("scoreSummaryList");
+  const scoreSummaryEmpty = document.getElementById("scoreSummaryEmpty");
+  const hasWebNfc = typeof NDEFReader !== "undefined";
+  let currentContext = null;
+
+  const I18N = {
+    webNfcUnavailable: "{{ _('Web NFC not available in this browser.') }}",
+    pickCheckpoint: "{{ _('Pick a checkpoint first.') }}",
+    pickTeam: "{{ _('Pick a team first.') }}",
+    waiting: "{{ _('Waiting for scan…') }}",
+    checkinCreated: "{{ _('Check-in created for this team at this checkpoint.') }}",
+    resolveFailed: "{{ _('Failed to resolve tag.') }}",
+    scoreSaved: "{{ _('Score saved.') }}",
+    scoreSaveFailed: "{{ _('Failed to save score.') }}",
+    teamLabel: "{{ _('Team') }}",
+    checkpointLabel: "{{ _('Checkpoint') }}",
+    groupLabel: "{{ _('Group') }}",
+    scoreLabel: "{{ _('Score') }}",
+  };
+
+  function setNotice(text) {
+    if (!text) {
+      checkinNotice.classList.add("d-none");
+      checkinNotice.textContent = "";
+      return;
+    }
+    checkinNotice.textContent = text;
+    checkinNotice.classList.remove("d-none");
+  }
+
+  function renderFields(fields, latestValues) {
+    fieldsContainer.innerHTML = "";
+    fields.forEach((field) => {
+      const col = document.createElement("div");
+      col.className = "col-md-6";
+      const label = document.createElement("label");
+      label.className = "form-label";
+      if (field.key === "points" || field.key === "score") {
+        label.textContent = I18N.scoreLabel;
+      } else {
+        label.textContent = field.label;
+      }
+      const input = document.createElement("input");
+      input.className = "form-control";
+      input.dataset.key = field.key;
+      input.type = field.type === "text" ? "text" : "number";
+      input.step = field.type === "text" ? "1" : "any";
+      if (latestValues && latestValues[field.key] !== undefined) {
+        input.value = latestValues[field.key];
+      }
+      col.appendChild(label);
+      col.appendChild(input);
+      fieldsContainer.appendChild(col);
+    });
+  }
+
+  function isScoreField(field) {
+    const key = (field.key || "").toLowerCase().trim();
+    const label = (field.label || "").toLowerCase().trim();
+    return key === "score" || key === "points" || label === "score" || label === "points";
+  }
+
+  function setSummaryRows(rows) {
+    if (!rows.length) {
+      scoreSummaryList.classList.add("d-none");
+      scoreSummaryEmpty.classList.remove("d-none");
+      return;
+    }
+    scoreSummaryEmpty.classList.add("d-none");
+    scoreSummaryList.classList.remove("d-none");
+    scoreSummaryList.innerHTML = "";
+    rows.forEach(([label, value]) => {
+      const dt = document.createElement("dt");
+      dt.className = "col-4 text-body-secondary";
+      dt.textContent = label;
+      const dd = document.createElement("dd");
+      dd.className = "col-8 mb-1";
+      dd.textContent = value;
+      scoreSummaryList.appendChild(dt);
+      scoreSummaryList.appendChild(dd);
+    });
+  }
+
+  function renderSummary(data, values, total) {
+    if (!data || !data.team || !data.checkpoint) {
+      setSummaryRows([]);
+      return;
+    }
+    const rows = [];
+    const teamNumber = data.team.number || data.team.number === 0 ? ` (${data.team.number})` : "";
+    rows.push([I18N.teamLabel, `${data.team.name}${teamNumber}`]);
+    rows.push([I18N.checkpointLabel, data.checkpoint.name]);
+    if (data.group && data.group.name) {
+      rows.push([I18N.groupLabel, data.group.name]);
+    }
+
+    const fields = data.fields || [];
+    const onlyScoreField = fields.length === 1 && isScoreField(fields[0]);
+    const showScore = true;
+    const visibleFields = fields.filter((field) => !isScoreField(field));
+    const onlyFieldKey = fields[0]?.key;
+    const fallbackScore = onlyScoreField && (values?.[onlyFieldKey] ?? total ?? data.latest_total);
+    visibleFields.forEach((field) => {
+      const key = field.key || "";
+      let value = values && values[key] !== undefined ? values[key] : "";
+      if (onlyScoreField && value === "" && fallbackScore !== undefined && fallbackScore !== null) {
+        value = fallbackScore;
+      }
+      rows.push([field.label || field.key, value === "" ? "-" : String(value)]);
+    });
+    if (showScore) {
+      const scoreValue = values?.score ?? values?.points ?? fallbackScore ?? total ?? data.latest_total;
+      rows.push([I18N.scoreLabel, scoreValue === undefined || scoreValue === null || scoreValue === "" ? "-" : String(scoreValue)]);
+    }
+
+    setSummaryRows(rows);
+  }
+
+  function formatTeamLine(team) {
+    const num = team.number || team.number === 0 ? ` (${team.number})` : "";
+    return `${team.name}${num}`;
+  }
+
+  function formatSummaryLine(data) {
+    const parts = [formatTeamLine(data.team), data.checkpoint.name];
+    if (data.group?.name) {
+      parts.push(data.group.name);
+    }
+    return parts.join(" · ");
+  }
+
+  async function resolveScore(payload) {
+    const resp = await fetch("/api/scores/resolve", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
+    }
+    return data;
+  }
+
+  async function submitScore(payload) {
+    const resp = await fetch("/api/scores/submit", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
+    }
+    return data;
+  }
+
+  scanBtn.addEventListener("click", async () => {
+    if (!hasWebNfc) {
+      alert(I18N.webNfcUnavailable);
+      return;
+    }
+    const cpId = parseInt(checkpointSelect.value || "0", 10);
+    if (!cpId) {
+      alert(I18N.pickCheckpoint);
+      return;
+    }
+    const reader = new NDEFReader();
+    await reader.scan();
+    const handleRead = async (event) => {
+      const uid = (event.serialNumber || "").toUpperCase();
+      cardUid.value = uid;
+      try {
+        const data = await resolveScore({ uid: uid, checkpoint_id: cpId });
+        teamId.value = data.team.id;
+        checkpointId.value = data.checkpoint.id;
+        teamSelect.value = String(data.team.id);
+        teamInfo.textContent = formatSummaryLine(data);
+        renderFields(data.fields, data.latest_score || {});
+        submitBtn.disabled = false;
+        setNotice(data.checkin_created ? I18N.checkinCreated : "");
+        currentContext = data;
+        renderSummary(currentContext, data.latest_score || {}, null);
+      } catch (err) {
+        alert(err.message || I18N.resolveFailed);
+      }
+    };
+    reader.addEventListener("reading", handleRead, { once: true });
+  });
+
+  document.getElementById("manualBtn").addEventListener("click", async () => {
+    const cpId = parseInt(checkpointSelect.value || "0", 10);
+    if (!cpId) {
+      alert(I18N.pickCheckpoint);
+      return;
+    }
+    const tId = parseInt(teamSelect.value || "0", 10);
+    if (!tId) {
+      alert(I18N.pickTeam);
+      return;
+    }
+    try {
+      const data = await resolveScore({ team_id: tId, checkpoint_id: cpId });
+      teamId.value = data.team.id;
+      checkpointId.value = data.checkpoint.id;
+      teamInfo.textContent = formatSummaryLine(data);
+      renderFields(data.fields, data.latest_score || {});
+      submitBtn.disabled = false;
+      setNotice(data.checkin_created ? I18N.checkinCreated : "");
+      currentContext = data;
+      renderSummary(currentContext, data.latest_score || {}, null);
+    } catch (err) {
+      alert(err.message || I18N.resolveFailed);
+    }
+  });
+
+  fieldsForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const fields = {};
+    fieldsContainer.querySelectorAll("input").forEach((input) => {
+      fields[input.dataset.key] = input.value;
+    });
+    try {
+      const data = await submitScore({
+        team_id: teamId.value,
+        checkpoint_id: checkpointId.value,
+        fields: fields,
+      });
+      renderSummary(currentContext, fields, data.total);
+      alert(I18N.scoreSaved);
+    } catch (err) {
+      alert(err.message || I18N.scoreSaveFailed);
+    }
+  });
+</script>
+{% endblock %}

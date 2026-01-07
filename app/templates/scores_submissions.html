@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Score Submissions') }}{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+      <h5 class="card-title mb-0">{{ _('Score Submissions') }}</h5>
+      <form method="get" class="d-flex flex-wrap gap-2">
+        <select class="form-select" name="group_id">
+          <option value="">{{ _('All groups') }}</option>
+          {% for g in groups %}
+            <option value="{{ g.id }}" {% if g.id == selected_group_id %}selected{% endif %}>{{ g.name }}</option>
+          {% endfor %}
+        </select>
+        <select class="form-select" name="team_id">
+          <option value="">{{ _('All teams') }}</option>
+          {% for t in teams %}
+            <option value="{{ t.id }}" {% if t.id == selected_team_id %}selected{% endif %}>
+              {{ t.name }}{% if t.number is not none %} ({{ t.number }}){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+        <select class="form-select" name="checkpoint_id">
+          <option value="">{{ _('All checkpoints') }}</option>
+          {% for cp in checkpoints %}
+            <option value="{{ cp.id }}" {% if cp.id == selected_checkpoint_id %}selected{% endif %}>{{ cp.name }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-outline-secondary">{{ _('Filter') }}</button>
+      </form>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>{{ _('Submitted') }}</th>
+            <th>{{ _('Team') }}</th>
+            <th>{{ _('Checkpoint') }}</th>
+            <th class="text-end">{{ _('Dead time') }}</th>
+            <th class="text-end">{{ _('Total points') }}</th>
+            <th>{{ _('Fields') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '' }}</td>
+              <td>{{ row.team }}</td>
+              <td>{{ row.checkpoint }}</td>
+              <td class="text-end">{{ '%.2f'|format(row.dead_time or 0) }}</td>
+              <td class="text-end">{{ '%.2f'|format(row.total or 0) }}</td>
+              <td style="min-width: 240px;">
+                <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ row.raw_fields | tojson(indent=2) }}</pre>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" class="text-muted text-center py-4">{{ _('No submissions yet.') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

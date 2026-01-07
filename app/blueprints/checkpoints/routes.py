@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask_babel import gettext as _
 
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
@@ -11,11 +12,28 @@ from app.utils.perms import roles_required
 
 checkpoints_bp = Blueprint("checkpoints", __name__, template_folder="../../templates")
 
+def _checkpoint_error_message(payload: dict, default_msg: str) -> str:
+    error = payload.get("error")
+    if error == "device_in_use":
+        cp_name = payload.get("checkpoint_name") or payload.get("checkpoint")
+        if cp_name:
+            return _("Device is already assigned to %(checkpoint)s.", checkpoint=cp_name)
+        return _("Device is already assigned to another checkpoint.")
+    if error == "invalid_device":
+        return _("Selected device does not exist.")
+    if error == "invalid_device_competition":
+        return _("Selected device is not available for this competition.")
+    if error == "duplicate":
+        return _("Checkpoint name already exists.")
+    if payload.get("detail"):
+        return payload.get("detail")
+    return _(default_msg)
+
 
 def _fetch_groups():
     resp, payload = api_json("GET", "/api/groups")
     if resp.status_code != 200:
-        flash("Could not load groups.", "warning")
+        flash(_("Could not load groups."), "warning")
         return []
     return payload.get("groups", [])
 
@@ -23,7 +41,7 @@ def _fetch_groups():
 def _fetch_devices():
     resp, payload = api_json("GET", "/api/devices")
     if resp.status_code != 200:
-        flash("Could not load devices.", "warning")
+        flash(_("Could not load devices."), "warning")
         return []
     return payload.get("devices", [])
 
@@ -31,7 +49,7 @@ def _fetch_devices():
 def _fetch_checkpoints():
     resp, payload = api_json("GET", "/api/checkpoints")
     if resp.status_code != 200:
-        flash("Could not load checkpoints.", "warning")
+        flash(_("Could not load checkpoints."), "warning")
         return []
     return payload.get("checkpoints", [])
 
@@ -76,7 +94,7 @@ def add_checkpoint():
 
     if request.method == "POST":
         if not form_data["name"]:
-            flash("Name is required.", "warning")
+            flash(_("Name is required."), "warning")
             return render_template(
                 "add_checkpoint.html",
                 groups=groups,
@@ -87,10 +105,10 @@ def add_checkpoint():
 
         resp, payload = api_json("POST", "/api/checkpoints", json=form_data)
         if resp.status_code == 201:
-            flash("Checkpoint added.", "success")
+            flash(_("Checkpoint added."), "success")
             return redirect(url_for("checkpoints.list_checkpoints"))
 
-        flash(payload.get("error") or payload.get("detail") or "Could not add checkpoint.", "warning")
+        flash(_checkpoint_error_message(payload, "Could not add checkpoint."), "warning")
 
     return render_template(
         "add_checkpoint.html",
@@ -106,7 +124,7 @@ def add_checkpoint():
 def edit_checkpoint(cp_id: int):
     cp_resp, cp_payload = api_json("GET", f"/api/checkpoints/{cp_id}")
     if cp_resp.status_code != 200:
-        flash("Checkpoint not found.", "warning")
+        flash(_("Checkpoint not found."), "warning")
         return redirect(url_for("checkpoints.list_checkpoints"))
 
     checkpoint = cp_payload or {}
@@ -121,7 +139,7 @@ def edit_checkpoint(cp_id: int):
         form_data = _normalize_checkpoint_form(request.form)
 
         if not form_data["name"]:
-            flash("Name is required.", "warning")
+            flash(_("Name is required."), "warning")
             checkpoint.update({k: v for k, v in form_data.items() if k != "group_ids"})
             checkpoint["groups"] = [
                 next((g for g in groups if g.get("id") == gid), {"id": gid, "name": "Unknown"})
@@ -138,10 +156,10 @@ def edit_checkpoint(cp_id: int):
 
         resp, payload = api_json("PATCH", f"/api/checkpoints/{cp_id}", json=form_data)
         if resp.status_code == 200:
-            flash("Checkpoint updated.", "success")
+            flash(_("Checkpoint updated."), "success")
             return redirect(url_for("checkpoints.list_checkpoints"))
 
-        flash(payload.get("error") or payload.get("detail") or "Could not update checkpoint.", "warning")
+        flash(_checkpoint_error_message(payload, "Could not update checkpoint."), "warning")
         checkpoint.update({k: v for k, v in form_data.items() if k != "group_ids"})
         checkpoint["groups"] = [
             next((g for g in groups if g.get("id") == gid), {"id": gid, "name": "Unknown"})
@@ -172,9 +190,13 @@ def delete_checkpoint(cp_id: int):
     resp, payload = api_json("DELETE", f"/api/checkpoints/{cp_id}")
 
     if resp.status_code == 200:
-        flash("Checkpoint deleted.", "success")
+        flash(_("Checkpoint deleted."), "success")
     else:
-        flash(payload.get("detail") or payload.get("error") or "Could not delete checkpoint.", "warning")
+        message = payload.get("detail") or payload.get("error") or _("Could not delete checkpoint.")
+        if isinstance(message, str):
+            flash(message, "warning")
+        else:
+            flash(_("Could not delete checkpoint."), "warning")
 
     return redirect(url_for("checkpoints.list_checkpoints"))
 

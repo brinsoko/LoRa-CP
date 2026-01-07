@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Competition Settings') }}{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title mb-3">{{ _('Competition Settings') }}</h5>
+    <form method="post" class="d-flex flex-column gap-3">
+      <input type="hidden" name="action" value="settings">
+      <div>
+        <label class="form-label">{{ _('Competition Name') }}</label>
+        <input class="form-control" name="name" value="{{ competition.name }}" required>
+      </div>
+
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="publicResults" name="public_results" value="1"
+               {% if competition.public_results %}checked{% endif %}>
+        <label class="form-check-label" for="publicResults">{{ _('Public results') }}</label>
+        <div class="form-text">{{ _('Allow anyone with the link to view results.') }}</div>
+      </div>
+
+      <div>
+        <label class="form-label">{{ _('Public results link') }}</label>
+        <div class="input-group">
+          <input type="text" class="form-control" value="{{ public_url }}" readonly>
+          <button class="btn btn-outline-secondary" type="button" id="copyPublicLink">{{ _('Copy') }}</button>
+        </div>
+      </div>
+
+      <div>
+        <button class="btn btn-primary" type="submit">{{ _('Save') }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <h5 class="card-title mb-3">{{ _('Invite by email') }}</h5>
+    <form method="post" class="row g-3">
+      <input type="hidden" name="action" value="invite">
+      <div class="col-md-5">
+        <label class="form-label">{{ _('Email') }}</label>
+        <input class="form-control" type="email" name="invite_email" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">{{ _('Role') }}</label>
+        <select class="form-select" name="invite_role">
+          <option value="viewer">{{ _('viewer') }}</option>
+          <option value="judge" selected>{{ _('judge') }}</option>
+          <option value="admin">{{ _('admin') }}</option>
+        </select>
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <button class="btn btn-primary w-100" type="submit">{{ _('Save invite') }}</button>
+      </div>
+    </form>
+    <div class="mt-3">
+      <h6 class="mb-2">{{ _('Invites') }}</h6>
+      {% if invites %}
+        <div class="table-responsive">
+          <table class="table table-striped align-middle">
+            <thead>
+              <tr>
+                <th>{{ _('Email') }}</th>
+                <th>{{ _('Role') }}</th>
+                <th>{{ _('Status') }}</th>
+                <th>{{ _('Expires') }}</th>
+                <th class="text-end">{{ _('Actions') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for inv in invites %}
+                <tr>
+                  <td>{{ inv.email or '—' }}</td>
+                  <td>{{ inv.role }}</td>
+                  <td>
+                    {% if inv.status == 'used' %}
+                      <span class="badge text-bg-success">{{ _('Used') }}</span>
+                    {% elif inv.status == 'expired' %}
+                      <span class="badge text-bg-secondary">{{ _('Expired') }}</span>
+                    {% else %}
+                      <span class="badge text-bg-warning">{{ _('Pending') }}</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ inv.expires_at.strftime('%Y-%m-%d %H:%M') if inv.expires_at else '—' }}</td>
+                  <td class="text-end">
+                    <form method="post"
+                          action="{{ url_for('main.revoke_invite', invite_id=inv.id) }}"
+                          onsubmit="return confirm('{{ _('Revoke this invite?') }}');">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">{{ _('Revoke') }}</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">{{ _('No invites yet.') }}</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  const copyBtn = document.getElementById("copyPublicLink");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+      const input = copyBtn.closest(".input-group").querySelector("input");
+      try {
+        await navigator.clipboard.writeText(input.value);
+        copyBtn.textContent = "{{ _('Copied') }}";
+        setTimeout(() => {
+          copyBtn.textContent = "{{ _('Copy') }}";
+        }, 1500);
+      } catch (err) {
+        input.select();
+        document.execCommand("copy");
+      }
+    });
+  }
+</script>
+{% endblock %}

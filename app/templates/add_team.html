@@ -11,7 +11,12 @@
 
       <div class="mb-3">
         <label class="form-label">{{ _('Organizations') }}</label>
-        <input name="organization" class="form-control" >
+        <input name="organization" class="form-control" list="organizationList">
+        <datalist id="organizationList">
+          {% for org in organizations or [] %}
+            <option value="{{ org }}"></option>
+          {% endfor %}
+        </datalist>
       </div>
 
       <div class="mb-3">

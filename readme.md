@@ -6,7 +6,9 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 
 ##  Features
 
-- **User roles:** Admin, Judge, and Public views with role-based permissions  
+- **Multi-competition support:** Create multiple competitions and switch via the competition selector  
+- **Per-competition roles:** Admin, Judge, Viewer roles scoped to each competition  
+- **Judge checkpoint assignment:** Admins assign one or more checkpoints per judge with a default  
 - **Teams:** Create, edit, and manage teams with unique numbers  
 - **RFID cards:** Map RFID chips to teams, with optional numeric identifiers  
 - **Devices (LoRa or phones):** Manage device IDs and link each to a checkpoint; ingest accepts `/api/devices` (alias of legacy LoRa endpoints)  
@@ -27,7 +29,7 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
   - Visualize checkpoints on Google Maps  
   - Show status per team (found, next, not found)  
   - Auto-color based on progress  
-- **Google Sheets automation:** Admin UI to build checkpoint tabs, arrivals matrix, teams roster, and scoreboards in a shared spreadsheet  
+- **Google Sheets automation:** Admin UI to build checkpoint tabs, arrivals matrix, teams roster, and scoreboards in a shared spreadsheet (per competition)  
 - **Dark/Light mode:** Follows system preference or user toggle  
 - **Audit logs:** Console-based logging for debugging and traceability  
 
@@ -66,7 +68,7 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 - Raw spec: `/docs/openapi.yaml`
 
 ### Auth
-Cookie-based session from `/login` (form POST). Many routes are public; judge/admin routes require login.
+Cookie-based session from `/login` (form POST). Many routes are public; judge/admin routes require login. Roles are per competition, and the current competition is selected after login.
 
 ### Quick Calls
 
@@ -74,7 +76,7 @@ Ingest a device message (JSON):
 ```bash
 curl -X POST /api/ingest \
   -H "Content-Type: application/json" \
-  -d '{"dev_id":1,"payload":"A1B2C3D4","rssi":-62.5,"snr":9.0}'
+  -d '{"competition_id":1,"dev_id":1,"payload":"A1B2C3D4","rssi":-62.5,"snr":9.0}'
 ```
 
 Verify tag digests at finish (server-side recompute):
@@ -88,6 +90,9 @@ curl -X POST /api/rfid/verify \
 - `/rfid/judge-console`: tap a tag with Android Chrome Web NFC; reads UID, calls ingest for the selected device, and appends the truncated HMAC to the tag as text.
 - `/rfid/finish`: tap a tag; reads UID + all text records (digests), recomputes truncated HMACs for known devices, shows matches, collisions, and warns if a digest refers to a checkpoint the team hasn’t checked in at.
 
+### Admin: judge checkpoint assignment
+- `/judges/assign`: select a judge, choose allowed checkpoints, and set a default checkpoint.
+
 Export check-ins (CSV):
 
 ```bash
@@ -98,5 +103,4 @@ Export check-ins (CSV):
 
 To do:
 - design a PCB
-- look into upgrading the database, to support multiple competitions
 - add wifi support for data transfers??

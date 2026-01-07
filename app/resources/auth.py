@@ -6,7 +6,8 @@ from flask_login import login_user, logout_user, current_user
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import User
+from app.models import User, CompetitionMember
+from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_login_required, json_roles_required
 
 # ---------- helpers ----------
@@ -90,40 +91,74 @@ class UserList(Resource):
     method_decorators = [json_roles_required("admin")]
 
     def get(self):
-        users = User.query.order_by(User.username.asc()).all()
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        rows = (
+            db.session.query(User, CompetitionMember)
+            .join(CompetitionMember, CompetitionMember.user_id == User.id)
+            .filter(
+                CompetitionMember.competition_id == comp_id,
+                CompetitionMember.active.is_(True),
+            )
+            .order_by(User.username.asc())
+            .all()
+        )
         return {
             "users": [
-                {"id": u.id, "username": u.username, "role": u.role}
-                for u in users
+                {
+                    "id": u.id,
+                    "username": u.username,
+                    "role": u.role,
+                    "membership_role": m.role,
+                }
+                for u, m in rows
             ]
         }, 200
 
     def post(self):
         """
         Create a user (admin).
-        Body: { "username": "...", "password": "...", "role": "public|judge|admin" }
+        Body: { "username": "...", "password": "...", "role": "public|judge|admin", "email": "..." }
         """
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         data, err_resp, err_code = _json()
         if err_resp:
             return err_resp, err_code
 
         username = (data.get("username") or "").strip()
         password = data.get("password") or ""
-        role = (data.get("role") or "public").strip()
+        role = (data.get("role") or "viewer").strip()
+        email = (data.get("email") or "").strip().lower() or None
 
-        if not username or not password or role not in ("public", "judge", "admin"):
+        if not username or not password or role not in ("viewer", "judge", "admin"):
             return {"error": "Invalid form data"}, 400
         if User.query.filter_by(username=username).first():
             return {"error": "Username already exists"}, 409
+        if email and User.query.filter_by(email=email).first():
+            return {"error": "Email already exists"}, 409
 
         # reuse same password rules
         err = _validate_new_password(username, password, password)
         if err:
             return {"error": err}, 400
 
-        u = User(username=username, role=role)
+        user_role = "public" if role == "viewer" else role
+        u = User(username=username, role=user_role, email=email)
         u.set_password(password)
         db.session.add(u)
+        db.session.flush()
+        membership_role = role
+        db.session.add(
+            CompetitionMember(
+                competition_id=comp_id,
+                user_id=u.id,
+                role=membership_role,
+                active=True,
+            )
+        )
         try:
             db.session.commit()
         except IntegrityError:
@@ -141,7 +176,20 @@ class UserItem(Resource):
     method_decorators = [json_roles_required("admin")]
 
     def get(self, user_id: int):
-        u = User.query.get_or_404(user_id)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        u = (
+            User.query
+            .join(CompetitionMember, CompetitionMember.user_id == User.id)
+            .filter(
+                User.id == user_id,
+                CompetitionMember.competition_id == comp_id,
+            )
+            .first()
+        )
+        if not u:
+            return {"error": "not_found"}, 404
         return {"id": u.id, "username": u.username, "role": u.role}, 200
 
     def patch(self, user_id: int):
@@ -150,15 +198,37 @@ class UserItem(Resource):
         Body can include: username, role (public|judge|admin),
         new_password, confirm_password
         """
-        u = User.query.get_or_404(user_id)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        u = (
+            User.query
+            .join(CompetitionMember, CompetitionMember.user_id == User.id)
+            .filter(
+                User.id == user_id,
+                CompetitionMember.competition_id == comp_id,
+            )
+            .first()
+        )
+        if not u:
+            return {"error": "not_found"}, 404
         data, err_resp, err_code = _json()
         if err_resp:
             return err_resp, err_code
 
         new_username = (data.get("username") or u.username).strip()
-        new_role = (data.get("role") or u.role).strip()
+        membership = (
+            CompetitionMember.query
+            .filter(
+                CompetitionMember.user_id == u.id,
+                CompetitionMember.competition_id == comp_id,
+            )
+            .first()
+        )
+        current_role = membership.role if membership else "viewer"
+        new_role = (data.get("role") or current_role).strip()
 
-        if new_role not in ("public", "judge", "admin"):
+        if new_role not in ("viewer", "judge", "admin"):
             return {"error": "Invalid role"}, 400
 
         # enforce unique username if changed
@@ -166,7 +236,9 @@ class UserItem(Resource):
             return {"error": "Username already exists"}, 409
 
         u.username = new_username
-        u.role = new_role
+        u.role = "public" if new_role == "viewer" else new_role
+        if membership:
+            membership.role = new_role
 
         npw = data.get("new_password")
         cpw = data.get("confirm_password")
@@ -180,8 +252,29 @@ class UserItem(Resource):
         return {"ok": True, "user": {"id": u.id, "username": u.username, "role": u.role}}, 200
 
     def delete(self, user_id: int):
-        u = User.query.get_or_404(user_id)
-        db.session.delete(u)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        membership = (
+            CompetitionMember.query
+            .filter(
+                CompetitionMember.user_id == user_id,
+                CompetitionMember.competition_id == comp_id,
+            )
+            .first()
+        )
+        if not membership:
+            return {"error": "not_found"}, 404
+
+        db.session.delete(membership)
+        db.session.flush()
+        remaining = CompetitionMember.query.filter(
+            CompetitionMember.user_id == user_id
+        ).count()
+        if remaining == 0:
+            u = User.query.get(user_id)
+            if u:
+                db.session.delete(u)
         db.session.commit()
         return {"ok": True}, 200
 

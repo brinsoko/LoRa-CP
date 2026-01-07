@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _('Select Competition') }}{% endblock %}
+
+{% block content %}
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-3">{{ _('Your Competitions') }}</h5>
+          {% if memberships %}
+            <div class="list-group">
+              {% for membership in memberships %}
+                {% set comp = membership.competition %}
+                <div class="list-group-item d-flex align-items-center justify-content-between">
+                  <div>
+                    <div class="fw-semibold">{{ comp.name }}</div>
+                    <div class="text-muted small">
+                      {{ _('Role') }}: {{ membership.role }}
+                      {% if current_competition and current_competition.id == comp.id %}
+                        · {{ _('Current') }}
+                      {% endif %}
+                    </div>
+                  </div>
+                  <form method="post" action="{{ url_for('main.set_competition', competition_id=comp.id) }}">
+                    <button class="btn btn-sm btn-outline-primary">
+                      {{ _('Select') }}
+                    </button>
+                  </form>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-muted mb-0">
+              {{ _('No competitions yet. Ask an admin for an invite link, or create a new one below.') }}
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-3">{{ _('Create a Competition') }}</h5>
+          <form method="post" action="{{ url_for('main.create_competition') }}">
+            <div class="mb-3">
+              <label class="form-label">{{ _('Competition Name') }}</label>
+              <input type="text" name="name" class="form-control" placeholder="{{ _('e.g. Spring Orienteering 2025') }}" required>
+            </div>
+            <button class="btn btn-primary w-100">{{ _('Create Competition') }}</button>
+          </form>
+          <p class="text-muted small mt-3 mb-0">
+            {{ _('After you create a competition, you will be the admin and can invite judges.') }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

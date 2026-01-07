@@ -15,6 +15,13 @@
       <button class="btn btn-primary">{{ _('Sign in') }}</button>
       <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary ms-2">{{ _('Cancel') }}</a>
     </form>
+    {% if google_enabled %}
+      <hr>
+      <a class="btn btn-outline-danger w-100"
+         href="{{ url_for('auth.login_google', next=request.args.get('next')) }}">
+        {{ _('Sign in with Google') }}
+      </a>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

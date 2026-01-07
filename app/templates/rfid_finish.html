@@ -8,25 +8,22 @@
       <div class="card-body">
         <h5 class="card-title mb-3">{{ _('Finish-line Check') }}</h5>
         <p class="text-body-secondary small mb-3">
-          {{ _('Tap the tag to read its UID and stored digests. We will verify which devices/checkpoints match the truncated HMACs.') }}
+          {{ _('Tap the tag to read its UID and stored digests. We will verify which checkpoints match the truncated HMACs.') }}
         </p>
 
         <form id="finishForm" class="row g-3">
           <div class="col-12">
-            <label class="form-label">{{ _('Limit to devices (optional)') }}</label>
-            <select id="deviceFilter" class="form-select" multiple size="6">
-              {% for d in devices %}
-                <option value="{{ d.dev_num }}">
-                  {{ d.name or (_('Device') ~ ' ' ~ d.dev_num) }}{% if d.dev_num %} (#{{ d.dev_num }}){% endif %}
-                  {% if d.checkpoint %} - {{ d.checkpoint.name }}{% endif %}
-                </option>
+            <label class="form-label">{{ _('Limit to checkpoints (optional)') }}</label>
+            <select id="checkpointFilter" class="form-select" multiple size="6">
+              {% for cp in checkpoints %}
+                <option value="{{ cp.id }}">{{ cp.name }}</option>
               {% endfor %}
             </select>
-            <div class="form-text">{{ _('Leave empty to check against all devices.') }}</div>
+            <div class="form-text">{{ _('Leave empty to check against all checkpoints.') }}</div>
           </div>
 
           <div class="col-12 d-flex gap-2">
-            <button class="btn btn-primary" type="submit" id="scanBtn" {% if not devices %}disabled{% endif %}>
+            <button class="btn btn-primary" type="submit" id="scanBtn" {% if not checkpoints %}disabled{% endif %}>
               {{ _('Tap tag: read + verify') }}
             </button>
           </div>
@@ -56,7 +53,7 @@
             <span class="badge text-bg-secondary" id="webNfcStatus">{{ _('Checking…') }}</span>
           </div>
           <p class="small text-body-secondary mb-0">
-            {{ _('Needs Android Chrome 89+. We read text records, split by lines, and compare to all device IDs (or your selection).') }}
+            {{ _('Needs Android Chrome 89+. We read text records, split by lines, and compare to all checkpoints (or your selection).') }}
           </p>
         </div>
         <div id="resultsList" class="small"></div>
@@ -68,7 +65,7 @@
 <script>
   const form = document.getElementById("finishForm");
   const scanBtn = document.getElementById("scanBtn");
-  const deviceFilter = document.getElementById("deviceFilter");
+  const checkpointFilter = document.getElementById("checkpointFilter");
   const uidField = document.getElementById("uidField");
   const digestsField = document.getElementById("digestsField");
   const resultBox = document.getElementById("resultBox");
@@ -138,7 +135,8 @@
         const matches = r.matches || [];
         const matchText = matches.length
           ? matches.map(m => {
-              const base = `${m.device_id}${m.checkpoint ? " (" + m.checkpoint + ")" : ""}`;
+              const idLabel = m.checkpoint_id || m.device_id || "";
+              const base = `${idLabel}${m.checkpoint ? " (" + m.checkpoint + ")" : ""}`;
               if (m.checked_in === true) {
                 return `${base} <span class="badge text-bg-success">${I18N.checked}</span>`;
               } else if (m.checked_in === false && m.checkpoint_id) {
@@ -179,7 +177,7 @@
           uidField.value = uid;
           digestsField.value = digests.join("\n");
 
-          const selectedDevices = Array.from(deviceFilter.selectedOptions || []).map(o => o.value).filter(Boolean);
+          const selectedCheckpoints = Array.from(checkpointFilter.selectedOptions || []).map(o => o.value).filter(Boolean);
           const resp = await fetch("/api/rfid/verify", {
             method: "POST",
             credentials: "same-origin",
@@ -187,7 +185,7 @@
             body: JSON.stringify({
               uid: uid,
               digests: digests,
-              device_ids: selectedDevices,
+              checkpoint_ids: selectedCheckpoints,
             }),
           });
           const data = await resp.json();

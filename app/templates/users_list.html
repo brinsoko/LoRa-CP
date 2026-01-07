@@ -3,7 +3,10 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h5>{{ _('Users') }}</h5>
-  <a class="btn btn-sm btn-primary" href="{{ url_for('users.add_user') }}">{{ _('Add User') }}</a>
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('judges.assign_checkpoints') }}">{{ _('Judges') }}</a>
+    <a class="btn btn-sm btn-primary" href="{{ url_for('users.add_user') }}">{{ _('Add User') }}</a>
+  </div>
 </div>
 
 {% if users %}
@@ -22,12 +25,12 @@
       <tr>
         <td>{{ loop.index }}</td>
         <td>{{ u.username }}</td>
-        <td>{{ u.role }}</td>
+        <td>{{ u.membership_role or u.role }}</td>
         <td class="text-end">
           <a class="btn btn-sm btn-outline-primary" href="{{ url_for('users.edit_user', user_id=u.id) }}">{{ _('Edit') }}</a>
           {% if current_user.id != u.id %}
           <form class="d-inline" method="post" action="{{ url_for('users.delete_user', user_id=u.id) }}"
-                onsubmit="return confirm('{{ _('Delete user %(user)s?', user=u.username) }}');">
+                onsubmit="return confirm('{{ _('Remove %(user)s from this competition? This will not affect other competitions.', user=u.username) }}');">
             <button class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
           </form>
           {% else %}

@@ -4,9 +4,25 @@ from __future__ import annotations
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 
 from app.utils.frontend_api import api_json
+from app.utils.competition import get_current_competition_role
 from app.utils.perms import roles_required
 
 teams_bp = Blueprint("teams", __name__, template_folder="../../templates")
+
+
+def _load_organizations() -> list[str]:
+    resp, payload = api_json("GET", "/api/teams")
+    if resp.status_code != 200:
+        return []
+    orgs = []
+    seen = set()
+    for team in payload.get("teams", []):
+        org = (team.get("organization") or "").strip()
+        if not org or org in seen:
+            continue
+        seen.add(org)
+        orgs.append(org)
+    return sorted(orgs)
 
 
 def _transform_team_payload(team: dict) -> dict:
@@ -61,6 +77,7 @@ def add_team():
     _, groups_payload = api_json("GET", "/api/groups")
     groups = groups_payload.get("groups", [])
     selected_group_id = None
+    organizations = _load_organizations()
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
@@ -74,7 +91,12 @@ def add_team():
 
         if not name:
             flash("Team name is required.", "warning")
-            return render_template("add_team.html", groups=groups, selected_group_id=selected_group_id)
+            return render_template(
+                "add_team.html",
+                groups=groups,
+                selected_group_id=selected_group_id,
+                organizations=organizations,
+            )
 
         resp, payload = api_json(
             "POST",
@@ -104,7 +126,12 @@ def add_team():
 
         flash(payload.get("error") or "Could not create team.", "warning")
 
-    return render_template("add_team.html", groups=groups, selected_group_id=selected_group_id)
+    return render_template(
+        "add_team.html",
+        groups=groups,
+        selected_group_id=selected_group_id,
+        organizations=organizations,
+    )
 
 
 @teams_bp.route("/<int:team_id>/edit", methods=["GET", "POST"])
@@ -132,6 +159,7 @@ def edit_team(team_id: int):
         flash("Could not load RFID mappings.", "warning")
 
     selected_group_id = next((g.get("group", {}).get("id") for g in team.get("group_assignments", []) if g.get("group")), None)
+    organizations = _load_organizations()
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
@@ -153,17 +181,22 @@ def edit_team(team_id: int):
                 team=team,
                 groups=groups,
                 selected_group_id=selected_group_id,
+                organizations=organizations,
             )
+
+        update_payload = {
+            "name": name,
+            "number": number,
+            "organization": organization,
+            "group_id": selected_group_id,
+        }
+        if (get_current_competition_role() or "") == "admin":
+            update_payload["dnf"] = bool(request.form.get("dnf"))
 
         resp, payload = api_json(
             "PATCH",
             f"/api/teams/{team_id}",
-            json={
-                "name": name,
-                "number": number,
-                "organization": organization,
-                "group_id": selected_group_id,
-            },
+            json=update_payload,
         )
 
         if resp.status_code == 200:
@@ -208,6 +241,7 @@ def edit_team(team_id: int):
             }]
         else:
             team["group_assignments"] = []
+        team["dnf"] = bool(request.form.get("dnf"))
 
     return render_template(
         "team_edit.html",
@@ -215,6 +249,7 @@ def edit_team(team_id: int):
         groups=groups,
         rfid_card=rfid_card,
         selected_group_id=selected_group_id,
+        organizations=organizations,
     )
 
 

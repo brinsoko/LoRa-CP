@@ -10,6 +10,7 @@
       <div class="row g-3">
         <div class="col-md-4">
           <label class="form-label">{{ _('Team') }}</label>
+          <input type="text" class="form-control mb-2" id="teamSearch" placeholder="{{ _('Search teams...') }}">
           <select name="team_id" class="form-select" required>
             {% for t in teams %}
               <option value="{{ t.id }}" {% if dup_team_id and dup_team_id==t.id %}selected{% endif %}>
@@ -21,13 +22,17 @@
 
         <div class="col-md-4">
           <label class="form-label">{{ _('Checkpoint') }}</label>
-          <select name="checkpoint_id" class="form-select" required>
+          <select name="checkpoint_id" class="form-select" required {% if not checkpoints %}disabled{% endif %}>
             {% for cp in checkpoints %}
-              <option value="{{ cp.id }}" {% if dup_checkpoint_id and dup_checkpoint_id==cp.id %}selected{% endif %}>
+              <option value="{{ cp.id }}"
+                      {% if selected_checkpoint_id and selected_checkpoint_id==cp.id %}selected{% endif %}>
                 {{ cp.name }}
               </option>
             {% endfor %}
           </select>
+          {% if not checkpoints %}
+            <div class="form-text text-warning">{{ _('No checkpoints assigned yet.') }}</div>
+          {% endif %}
         </div>
 
         <div class="col-md-4">
@@ -69,4 +74,17 @@
   </div>
 </div>
 
+<script>
+  const teamSearch = document.getElementById("teamSearch");
+  const teamSelect = document.querySelector('select[name="team_id"]');
+  if (teamSearch && teamSelect) {
+    teamSearch.addEventListener("input", () => {
+      const term = teamSearch.value.toLowerCase().trim();
+      Array.from(teamSelect.options).forEach((opt) => {
+        const text = (opt.textContent || "").toLowerCase();
+        opt.hidden = term && !text.includes(term);
+      });
+    });
+  }
+</script>
 {% endblock %}

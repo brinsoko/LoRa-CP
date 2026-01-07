@@ -2,6 +2,7 @@
 from functools import wraps
 from flask import request, redirect, url_for, abort, current_app
 from flask_login import current_user
+from app.utils.competition import get_current_competition_role
 
 def roles_required(*roles):
     """
@@ -21,7 +22,10 @@ def roles_required(*roles):
                 )
                 return redirect(url_for("auth.login", next=request.url))
 
-            user_role = (getattr(current_user, "role", "") or "").strip().lower()
+            comp_role = get_current_competition_role()
+            user_role = (comp_role or "").strip().lower()
+            if allowed and not comp_role:
+                return redirect(url_for("main.select_competition"))
             ok = (not allowed) or (user_role in allowed)
 
             current_app.logger.debug(
@@ -41,7 +45,7 @@ def inject_perms():
     def has_role(*roles):
         if not current_user.is_authenticated:
             return False
-        user_role = (getattr(current_user, "role", "") or "").strip().lower()
+        user_role = (get_current_competition_role() or "").strip().lower()
         allowed = {(r or "").strip().lower() for r in roles}
         return (not allowed) or (user_role in allowed)
     return dict(has_role=has_role)

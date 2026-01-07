@@ -18,7 +18,8 @@
     {"name": "lora", "description": "LoRa devices & messages"},
     {"name": "map", "description": "Map data endpoints"},
     {"name": "docs", "description": "Documentation endpoints"},
-    {"name": "ingest", "description": "LoRa message ingestion"}
+    {"name": "ingest", "description": "LoRa message ingestion"},
+    {"name": "scores", "description": "Judge scoring and score rules"}
   ],
   "servers": [
     {
@@ -181,6 +182,12 @@
           "username": {
             "type": "string"
           },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "role": {
             "type": "string",
             "enum": [
@@ -236,6 +243,10 @@
               "null"
             ],
             "description": "Rod / organization the team belongs to"
+          },
+          "dnf": {
+            "type": "boolean",
+            "description": "Did not finish; excluded from organization totals."
           },
           "groups": {
             "type": "array",
@@ -507,8 +518,9 @@
       },
       "IngestRequest": {
         "type": "object",
-        "required": ["dev_id"],
+        "required": ["competition_id", "dev_id"],
         "properties": {
+          "competition_id": { "type": "integer", "description": "Competition identifier for multi-competition scoping." },
           "dev_id": { "type": "integer", "description": "Numeric identifier of the device/gateway/phone." },
           "payload": { "type": "string", "description": "Payload string (RFID UID or GPS payload). Required unless gps_lat/gps_lon are provided." },
           "rssi": { "type": ["number", "null"], "format": "float", "description": "Received signal strength (dBm)." },
@@ -520,7 +532,7 @@
           "gps_alt": { "type": ["number", "null"], "format": "float" },
           "gps_age_ms": { "type": ["integer", "null"], "format": "int64" }
         },
-        "description": "Provide either payload (string) or gps_lat/gps_lon (structured GPS)."
+        "description": "Provide either payload (string) or gps_lat/gps_lon (structured GPS). competition_id is required."
       },
       "IngestResponse": {
         "type": "object",
@@ -814,6 +826,9 @@
                       "judge",
                       "admin"
                     ]
+                  },
+                  "email": {
+                    "type": "string"
                   }
                 }
               }
@@ -919,6 +934,40 @@
         }
       }
     },
+    "/api/groups/order": {
+      "post": {
+        "tags": ["groups"],
+        "summary": "Update group order",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["group_ids"],
+                "properties": {
+                  "group_ids": {
+                    "type": "array",
+                    "items": { "type": "integer" },
+                    "description": "Ordered list of all group IDs."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order updated"
+          }
+        }
+      }
+    },
     "/api/teams": {
       "get": {
         "tags": ["teams"],
@@ -1002,6 +1051,10 @@
                   "organization": {
                     "type": "string",
                     "description": "Rod / organization the team belongs to"
+                  },
+                  "dnf": {
+                    "type": "boolean",
+                    "description": "Did not finish; admin-only."
                   },
                   "number": {
                     "type": "integer"
@@ -1889,7 +1942,7 @@
     "/api/rfid/verify": {
       "post": {
         "tags": ["rfid"],
-        "summary": "Verify tag digests against devices and team check-ins",
+        "summary": "Verify tag digests against checkpoints/devices and team check-ins",
         "security": [
           {
             "cookieAuth": []
@@ -1912,6 +1965,11 @@
                     "type": "array",
                     "items": { "type": "integer" },
                     "description": "Optional: limit verification to these device IDs"
+                  },
+                  "checkpoint_ids": {
+                    "type": "array",
+                    "items": { "type": "integer" },
+                    "description": "Optional: limit verification to these checkpoint IDs"
                   }
                 },
                 "required": ["uid", "digests"]
@@ -1930,6 +1988,10 @@
                     "ok": { "type": "boolean" },
                     "uid": { "type": "string" },
                     "device_ids": {
+                      "type": "array",
+                      "items": { "type": "integer" }
+                    },
+                    "checkpoint_ids": {
                       "type": "array",
                       "items": { "type": "integer" }
                     },
@@ -2169,10 +2231,10 @@
               "schema": { "$ref": "#/components/schemas/IngestRequest" },
               "examples": {
                 "basic": {
-                  "value": { "dev_id": 1, "payload": "A1B2C3D4", "rssi": -62.5, "snr": 9.0, "ts": 1730200000 }
+                  "value": { "competition_id": 1, "dev_id": 1, "payload": "A1B2C3D4", "rssi": -62.5, "snr": 9.0, "ts": 1730200000 }
                 },
                 "gpsFields": {
-                  "value": { "dev_id": 2, "gps_lat": 46.051, "gps_lon": 14.505, "gps_alt": 320.5, "gps_age_ms": 5000 }
+                  "value": { "competition_id": 1, "dev_id": 2, "gps_lat": 46.051, "gps_lon": 14.505, "gps_alt": 320.5, "gps_age_ms": 5000 }
                 }
               }
             },
@@ -2478,6 +2540,140 @@
         ],
         "responses": {
           "302": {"description": "Redirect back to admin page"}
+        }
+      }
+    },
+    "/api/scores/resolve": {
+      "post": {
+        "tags": ["scores"],
+        "summary": "Resolve RFID tag to scoring fields",
+        "security": [{ "cookieAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["uid", "checkpoint_id"],
+                "properties": {
+                  "uid": { "type": "string" },
+                  "checkpoint_id": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolved scoring fields"
+          }
+        }
+      }
+    },
+    "/api/scores/submit": {
+      "post": {
+        "tags": ["scores"],
+        "summary": "Submit a score entry",
+        "security": [{ "cookieAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["team_id", "checkpoint_id", "fields"],
+                "properties": {
+                  "team_id": { "type": "integer" },
+                  "checkpoint_id": { "type": "integer" },
+                  "fields": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Score created"
+          }
+        }
+      }
+    },
+    "/api/score-rules": {
+      "get": {
+        "tags": ["scores"],
+        "summary": "List score rules",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "name": "checkpoint_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "group_id", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Rules" }
+        }
+      },
+      "post": {
+        "tags": ["scores"],
+        "summary": "Create or update a score rule",
+        "security": [{ "cookieAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["checkpoint_id", "group_id", "rules"],
+                "properties": {
+                  "checkpoint_id": { "type": "integer" },
+                  "group_id": { "type": "integer" },
+                  "rules": {
+                    "type": "object",
+                    "description": "Rule object with optional field_rules and time_race. field_rules maps field keys to a rule or list of rules: mapping {type:'mapping', map:{input:output}}, interpolate {type:'interpolate', points:[[x,y],...]}, multiplier {type:'multiplier', factor}, found {type:'found', checkpoint_ids:[int], points_per:number}, deviation {type:'deviation', target, max_points, penalty_points, penalty_distance, min_points}. time_race uses checkin times between checkpoints: {start_checkpoint_id, end_checkpoint_id, min_points, max_points}.",
+                    "example": {
+                      "field_rules": {
+                        "Distance": [
+                          { "type": "deviation", "target": 0, "max_points": 100, "penalty_points": 1, "penalty_distance": 1, "min_points": 0 }
+                        ],
+                        "Found": { "type": "found", "checkpoint_ids": [12, 14], "points_per": 5 }
+                      },
+                      "total_fields": ["Distance", "Found"],
+                      "time_race": { "start_checkpoint_id": 3, "end_checkpoint_id": 7, "min_points": 10, "max_points": 100 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated rule" },
+          "201": { "description": "Created rule" }
+        }
+      }
+    },
+    "/api/score-rules/fields": {
+      "get": {
+        "tags": ["scores"],
+        "summary": "Get score rule fields",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "name": "checkpoint_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "group_id", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Available scoring fields" }
+        }
+      }
+    },
+    "/api/score-rules/{rule_id}": {
+      "parameters": [
+        { "name": "rule_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+      ],
+      "delete": {
+        "tags": ["scores"],
+        "summary": "Delete a score rule",
+        "security": [{ "cookieAuth": [] }],
+        "responses": {
+          "200": { "description": "Deleted" }
         }
       }
     }

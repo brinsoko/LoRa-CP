@@ -8,23 +8,22 @@
       <div class="card-body">
         <h5 class="card-title mb-3">{{ _('Web NFC: Read → Ingest → Append') }}</h5>
         <p class="text-body-secondary small">
-          {{ _('Tap a tag with your phone to read its UID, call ingest for the selected device/checkpoint, then append the signed payload back onto the tag.') }}
+          {{ _('Tap a tag with your phone to read its UID, call ingest for the selected checkpoint, then append the signed payload back onto the tag.') }}
         </p>
 
         <form id="judgeForm" class="row g-3">
           <div class="col-12">
-            <label class="form-label">{{ _('Device / Checkpoint') }}</label>
-            <select class="form-select" id="deviceSelect" required {% if not devices %}disabled{% endif %}>
-              {% for d in devices %}
-                <option value="{{ d.dev_num }}">
-                  {{ d.name or (_('Device') ~ ' ' ~ d.dev_num) }}{% if d.dev_num %} (#{{ d.dev_num }}){% endif %}
-                  {% if d.checkpoint %} - {{ d.checkpoint.name }}{% endif %}
+            <label class="form-label">{{ _('Checkpoint') }}</label>
+            <select class="form-select" id="checkpointSelect" required {% if not checkpoints %}disabled{% endif %}>
+              {% for cp in checkpoints %}
+                <option value="{{ cp.id }}" {% if cp.id == default_checkpoint_id %}selected{% endif %}>
+                  {{ cp.name }}
                 </option>
               {% endfor %}
             </select>
-            <div class="form-text">{{ _('Uses the device ID sent to /api/ingest.') }}</div>
-            {% if not devices %}
-              <div class="alert alert-warning mt-2 mb-0 small">{{ _('No devices configured yet.') }}</div>
+            <div class="form-text">{{ _('Uses the checkpoint ID sent to /api/ingest.') }}</div>
+            {% if not checkpoints %}
+              <div class="alert alert-warning mt-2 mb-0 small">{{ _('No checkpoints assigned yet.') }}</div>
             {% endif %}
           </div>
 
@@ -35,7 +34,7 @@
           </div>
 
           <div class="col-12 d-flex gap-2">
-            <button class="btn btn-primary" type="submit" id="submitBtn" {% if not devices %}disabled{% endif %}>
+            <button class="btn btn-primary" type="submit" id="submitBtn" {% if not checkpoints %}disabled{% endif %}>
               {{ _('Tap tag: read → ingest → append write') }}
             </button>
           </div>
@@ -57,7 +56,7 @@
             <button class="btn btn-outline-secondary" type="button" id="copyBtn">{{ _('Copy') }}</button>
           </div>
           <div class="form-text">
-            {{ _('Appended to the tag as a text record. We only store the truncated HMAC (device ID + card UID) to save space.') }}
+            {{ _('Appended to the tag as a text record. We only store the truncated HMAC (checkpoint ID + card UID) to save space.') }}
           </div>
         </div>
 
@@ -81,7 +80,7 @@
   const form = document.getElementById("judgeForm");
   const resultBox = document.getElementById("resultBox");
   const cardUid = document.getElementById("cardUid");
-  const deviceSelect = document.getElementById("deviceSelect");
+  const checkpointSelect = document.getElementById("checkpointSelect");
   const submitBtn = document.getElementById("submitBtn");
   const copyBtn = document.getElementById("copyBtn");
   const writePayload = document.getElementById("writePayload");
@@ -95,7 +94,7 @@
     checkinCreated: "{{ _('Check-in created') }}",
     cardNotMapped: "{{ _('Card not mapped to a team') }}",
     ingestCompleted: "{{ _('Ingest completed.') }}",
-    pickDevice: "{{ _('Pick a device/checkpoint first.') }}",
+    pickCheckpoint: "{{ _('Pick a checkpoint first.') }}",
     noWebNfc: "{{ _('Web NFC not available in this browser.') }}",
     tapToRead: "{{ _('Tap a tag to read…') }}",
     noWriteback: "{{ _('Ingest did not return a write-back payload.') }}",
@@ -162,9 +161,9 @@
 
   async function handleSubmit(event) {
     event.preventDefault();
-    const devId = parseInt(deviceSelect.value || "0", 10);
-    if (!devId) {
-      showMessage(I18N.pickDevice, "warning");
+    const checkpointId = parseInt(checkpointSelect.value || "0", 10);
+    if (!checkpointId) {
+      showMessage(I18N.pickCheckpoint, "warning");
       return;
     }
     if (!hasWebNfc) {
@@ -185,12 +184,14 @@
           cardUid.value = uid;
           const prevText = extractText(event.message?.records || []);
 
+          const competitionId = {{ current_competition.id if current_competition else "null" }};
           const ingestResp = await fetch("/api/ingest", {
             method: "POST",
             credentials: "same-origin",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              dev_id: devId,
+              competition_id: competitionId,
+              checkpoint_id: checkpointId,
               payload: uid,
               ts: Math.floor(Date.now() / 1000),
               source: "judge_web_nfc",

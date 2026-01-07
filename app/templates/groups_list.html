@@ -7,14 +7,27 @@
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h5 class="mb-0">{{ _('Groups') }}</h5>
-      <a class="btn btn-sm btn-primary" href="{{ url_for('groups.add_group') }}">{{ _('Add Group') }}</a>
+      <div class="d-flex align-items-center gap-2">
+        {% if has_role('admin') %}
+          <button class="btn btn-sm btn-outline-primary" type="button" id="saveOrderBtn" disabled>
+            {{ _('Save order') }}
+          </button>
+        {% endif %}
+        <a class="btn btn-sm btn-primary" href="{{ url_for('groups.add_group') }}">{{ _('Add Group') }}</a>
+      </div>
     </div>
 
     {% if groups %}
+      {% if has_role('admin') %}
+        <p class="text-muted small mb-2">{{ _('Drag rows to reorder groups.') }}</p>
+      {% endif %}
       <div class="table-responsive">
         <table class="table table-striped table-bordered align-middle">
           <thead>
             <tr>
+              {% if has_role('admin') %}
+                <th style="width:70px;" class="text-center">{{ _('Order') }}</th>
+              {% endif %}
               <th style="width:60px;" class="text-center">#</th>
               <th>{{ _('Name') }}</th>
               <th>{{ _('Description') }}</th>
@@ -22,10 +35,15 @@
               <th class="text-end" style="width: 180px;">{{ _('Actions') }}</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="groupTableBody">
             {% for g in groups %}
-            <tr>
-              <td class="text-center">{{ loop.index }}</td>
+            <tr data-group-id="{{ g.id }}" {% if has_role('admin') %}draggable="true"{% endif %}>
+              {% if has_role('admin') %}
+                <td class="text-center">
+                  <button type="button" class="btn btn-sm btn-outline-secondary drag-handle">{{ _('Drag') }}</button>
+                </td>
+              {% endif %}
+              <td class="text-center order-index">{{ loop.index }}</td>
               <td>{{ g.name }}</td>
               <td class="text-break" style="max-width: 420px;">{{ g.description or '—' }}</td>
               <td class="text-center">
@@ -53,5 +71,74 @@
     {% endif %}
   </div>
 </div>
+
+{% if has_role('admin') %}
+<script>
+  const tbody = document.getElementById("groupTableBody");
+  const saveBtn = document.getElementById("saveOrderBtn");
+  let draggingRow = null;
+  let isDirty = false;
+
+  function updateOrderNumbers() {
+    const rows = [...tbody.querySelectorAll("tr")];
+    rows.forEach((row, idx) => {
+      const cell = row.querySelector(".order-index");
+      if (cell) cell.textContent = `${idx + 1}`;
+    });
+  }
+
+  function markDirty() {
+    isDirty = true;
+    saveBtn.disabled = false;
+  }
+
+  tbody.addEventListener("dragstart", (event) => {
+    const row = event.target.closest("tr");
+    if (!row) return;
+    draggingRow = row;
+    row.classList.add("table-active");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", "");
+  });
+
+  tbody.addEventListener("dragend", () => {
+    if (draggingRow) {
+      draggingRow.classList.remove("table-active");
+      draggingRow = null;
+    }
+  });
+
+  tbody.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    const row = event.target.closest("tr");
+    if (!row || row === draggingRow) return;
+    const rect = row.getBoundingClientRect();
+    const next = (event.clientY - rect.top) > rect.height / 2;
+    tbody.insertBefore(draggingRow, next ? row.nextSibling : row);
+  });
+
+  tbody.addEventListener("drop", (event) => {
+    event.preventDefault();
+    updateOrderNumbers();
+    markDirty();
+  });
+
+  saveBtn.addEventListener("click", async () => {
+    if (!isDirty) return;
+    const orderedIds = [...tbody.querySelectorAll("tr")].map((row) => row.dataset.groupId);
+    const resp = await fetch("/api/groups/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ group_ids: orderedIds }),
+    });
+    if (resp.ok) {
+      location.reload();
+      return;
+    }
+    alert("{{ _('Could not save order.') }}");
+  });
+</script>
+{% endif %}
 
 {% endblock %}

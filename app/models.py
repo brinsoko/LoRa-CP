@@ -20,6 +20,22 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(50), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default="public")  # public|judge|admin
+    google_sub = db.Column(db.String(255), unique=True, nullable=True)
+    email = db.Column(db.String(255), unique=True, nullable=True)
+
+    competition_memberships = db.relationship(
+        "CompetitionMember",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    competition_invites = db.relationship(
+        "CompetitionInvite",
+        back_populates="invited_user",
+        foreign_keys="CompetitionInvite.invited_user_id",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def set_password(self, raw: str) -> None:
         self.password_hash = generate_password_hash(raw)
@@ -28,6 +44,146 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, raw)
 
 
+# =================
+# Competition
+# =================
+class Competition(db.Model):
+    __tablename__ = "competitions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(160), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    public_results = db.Column(db.Boolean, nullable=False, default=False)
+    created_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    created_by_user = db.relationship("User")
+    members = db.relationship(
+        "CompetitionMember",
+        back_populates="competition",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    invites = db.relationship(
+        "CompetitionInvite",
+        back_populates="competition",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    teams = db.relationship(
+        "Team",
+        back_populates="competition",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    checkpoints = db.relationship(
+        "Checkpoint",
+        back_populates="competition",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    checkpoint_groups = db.relationship(
+        "CheckpointGroup",
+        back_populates="competition",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    devices = db.relationship(
+        "LoRaDevice",
+        back_populates="competition",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    sheets = db.relationship(
+        "SheetConfig",
+        back_populates="competition",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class CompetitionMember(db.Model):
+    __tablename__ = "competition_members"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer,
+        db.ForeignKey("competitions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role = db.Column(db.String(20), nullable=False, default="judge")  # admin|judge|viewer
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    competition = db.relationship("Competition", back_populates="members")
+    user = db.relationship("User", back_populates="competition_memberships")
+
+    __table_args__ = (
+        UniqueConstraint("competition_id", "user_id", name="uq_competition_member"),
+    )
+
+
+class CompetitionInvite(db.Model):
+    __tablename__ = "competition_invites"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer,
+        db.ForeignKey("competitions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    role = db.Column(db.String(20), nullable=False, default="judge")  # admin|judge|viewer
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    invited_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    invited_email = db.Column(db.String(255), nullable=True, index=True)
+
+    competition = db.relationship("Competition", back_populates="invites")
+    created_by_user = db.relationship("User", foreign_keys=[created_by_user_id])
+    invited_user = db.relationship("User", foreign_keys=[invited_user_id], back_populates="competition_invites")
+
+
+class JudgeCheckpoint(db.Model):
+    __tablename__ = "judge_checkpoints"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    checkpoint_id = db.Column(
+        db.Integer,
+        db.ForeignKey("checkpoints.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    is_default = db.Column(db.Boolean, nullable=False, default=False)
+
+    user = db.relationship("User")
+    checkpoint = db.relationship("Checkpoint")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "checkpoint_id", name="uq_judge_checkpoint"),
+    )
+
 # =========
 # Team
 # =========
@@ -35,11 +191,16 @@ class Team(db.Model):
     __tablename__ = "teams"
 
     id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     name = db.Column(db.String(100), nullable=False)
     number = db.Column(db.Integer, nullable=True)
     organization = db.Column(db.String(120), nullable=True, index=True)
+    dnf = db.Column(db.Boolean, nullable=False, default=False)
 
     # relationships
+    competition = db.relationship("Competition", back_populates="teams")
     rfid_card = db.relationship(
         "RFIDCard",
         back_populates="team",
@@ -98,9 +259,14 @@ class CheckpointGroup(db.Model):
     __tablename__ = "checkpoint_groups"
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), unique=True, nullable=False)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text)
+    position = db.Column(db.Integer, nullable=False, default=0)
 
+    competition = db.relationship("Competition", back_populates="checkpoint_groups")
     checkpoint_links = db.relationship(
         "CheckpointGroupLink",
         back_populates="group",
@@ -119,6 +285,10 @@ class CheckpointGroup(db.Model):
     #                                    cascade="all, delete-orphan",
     #                                    passive_deletes=True)
 
+    __table_args__ = (
+        UniqueConstraint("competition_id", "name", name="uq_checkpoint_group_competition_name"),
+    )
+
 
 # ============
 # Checkpoint
@@ -127,7 +297,10 @@ class Checkpoint(db.Model):
     __tablename__ = "checkpoints"
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False, unique=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name = db.Column(db.String(120), nullable=False)
     location = db.Column(db.String(255))
     description = db.Column(db.Text)
     easting = db.Column(db.Float)
@@ -145,6 +318,7 @@ class Checkpoint(db.Model):
     # one-to-many from Checkin
     checkins = db.relationship("Checkin", back_populates="checkpoint", lazy=True)
 
+    competition = db.relationship("Competition", back_populates="checkpoints")
     group_links = db.relationship(
         "CheckpointGroupLink",
         back_populates="checkpoint",
@@ -155,6 +329,10 @@ class Checkpoint(db.Model):
         "group_links",
         "group",
         creator=lambda group: CheckpointGroupLink(group=group),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("competition_id", "name", name="uq_checkpoint_competition_name"),
     )
 
 class CheckpointGroupLink(db.Model):
@@ -187,6 +365,9 @@ class Checkin(db.Model):
     __tablename__ = "checkins"
 
     id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     team_id = db.Column(
         db.Integer, db.ForeignKey("teams.id", ondelete="CASCADE"), nullable=False
     )
@@ -197,6 +378,13 @@ class Checkin(db.Model):
 
     team = db.relationship("Team", back_populates="checkins")
     checkpoint = db.relationship("Checkpoint", back_populates="checkins")
+    competition = db.relationship("Competition")
+    scores = db.relationship(
+        "ScoreEntry",
+        back_populates="checkin",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     __table_args__ = (
         db.UniqueConstraint("team_id", "checkpoint_id", name="uq_team_checkpoint"),
@@ -246,7 +434,10 @@ class LoRaDevice(db.Model):
     __tablename__ = "lora_devices"
 
     id = db.Column(db.Integer, primary_key=True)
-    dev_num = db.Column(db.Integer, unique=True, index=True, nullable=False)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    dev_num = db.Column(db.Integer, index=True, nullable=False)
     name = db.Column(db.String(120), nullable=True)                  # friendly label
     note = db.Column(db.Text, nullable=True)
     model = db.Column(db.String(64), nullable=True)
@@ -261,15 +452,25 @@ class LoRaDevice(db.Model):
 
     # inverse: which checkpoint references this device (0 or 1)
     checkpoint = db.relationship("Checkpoint", back_populates="lora_device", uselist=False)
+    competition = db.relationship("Competition", back_populates="devices")
+
+    __table_args__ = (
+        UniqueConstraint("competition_id", "dev_num", name="uq_device_competition_devnum"),
+    )
 
 class LoRaMessage(db.Model):
     __tablename__ = "lora_messages"
     id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     dev_id = db.Column(db.String(64), index=True, nullable=False)
     payload = db.Column(db.Text, nullable=False)
     rssi = db.Column(db.Float)
     snr = db.Column(db.Float)
     received_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    competition = db.relationship("Competition")
 
 
 # =========================
@@ -279,6 +480,9 @@ class SheetConfig(db.Model):
     __tablename__ = "sheet_configs"
 
     id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     spreadsheet_id = db.Column(db.String(128), nullable=False, index=True)
     spreadsheet_name = db.Column(db.String(200), nullable=False)
     tab_name = db.Column(db.String(200), nullable=False)
@@ -287,10 +491,93 @@ class SheetConfig(db.Model):
     config = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
+    competition = db.relationship("Competition", back_populates="sheets")
     checkpoint = db.relationship("Checkpoint")
 
     __table_args__ = (
         UniqueConstraint("spreadsheet_id", "tab_name", name="uq_sheet_tab"),
+    )
+
+
+# =========================
+# ScoreEntry (judge scoring)
+# =========================
+class ScoreEntry(db.Model):
+    __tablename__ = "score_entries"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    checkin_id = db.Column(
+        db.Integer, db.ForeignKey("checkins.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    team_id = db.Column(
+        db.Integer, db.ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    checkpoint_id = db.Column(
+        db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    judge_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    raw_fields = db.Column(db.JSON, nullable=False, default=dict)
+    total = db.Column(db.Float, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    checkin = db.relationship("Checkin", back_populates="scores")
+    team = db.relationship("Team")
+    checkpoint = db.relationship("Checkpoint")
+    judge_user = db.relationship("User")
+
+
+# =========================
+# ScoreRule (scoring logic)
+# =========================
+class ScoreRule(db.Model):
+    __tablename__ = "score_rules"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    checkpoint_id = db.Column(
+        db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    group_id = db.Column(
+        db.Integer, db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    rules = db.Column(db.JSON, nullable=False, default=dict)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    checkpoint = db.relationship("Checkpoint")
+    group = db.relationship("CheckpointGroup")
+
+    __table_args__ = (
+        UniqueConstraint("competition_id", "checkpoint_id", "group_id", name="uq_score_rule_scope"),
+    )
+
+
+# =========================
+# GlobalScoreRule (group-wide scoring logic)
+# =========================
+class GlobalScoreRule(db.Model):
+    __tablename__ = "global_score_rules"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    group_id = db.Column(
+        db.Integer, db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    rules = db.Column(db.JSON, nullable=False, default=dict)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    group = db.relationship("CheckpointGroup")
+
+    __table_args__ = (
+        UniqueConstraint("competition_id", "group_id", name="uq_global_score_rule_scope"),
     )
 
 

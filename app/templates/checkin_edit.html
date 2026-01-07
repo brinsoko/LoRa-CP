@@ -21,13 +21,16 @@
 
         <div class="col-md-4">
           <label class="form-label">{{ _('Checkpoint') }}</label>
-          <select name="checkpoint_id" class="form-select" required>
+          <select name="checkpoint_id" class="form-select" required {% if not checkpoints %}disabled{% endif %}>
             {% for cp in checkpoints %}
               <option value="{{ cp.id }}" {% if c.checkpoint_id == cp.id %}selected{% endif %}>
                 {{ cp.name }}
               </option>
             {% endfor %}
           </select>
+          {% if not checkpoints %}
+            <div class="form-text text-warning">{{ _('No checkpoints assigned yet.') }}</div>
+          {% endif %}
         </div>
 
         <div class="col-md-4">

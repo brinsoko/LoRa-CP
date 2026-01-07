@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import Team, TeamGroup, CheckpointGroup
 from app.utils.rest_auth import json_roles_required
+from app.utils.competition import require_current_competition_id, get_current_competition_role
 from app.utils.sheets_sync import sync_all_checkpoint_tabs
 
 
@@ -21,6 +22,7 @@ def _serialize_team(team: Team) -> dict:
         "name": team.name,
         "number": team.number,
         "organization": team.organization,
+        "dnf": bool(team.dnf),
         "groups": [
             {
                 "id": tg.group_id,
@@ -69,6 +71,8 @@ def _apply_group_assignment(team: Team, selected_group_id: Optional[int]) -> tup
     group = CheckpointGroup.query.get(selected_group_id)
     if not group:
         return False, "Invalid group"
+    if group.competition_id != team.competition_id:
+        return False, "Invalid group for this competition"
 
     to_remove = [gid for gid in existing_links if gid != selected_group_id]
     if to_remove:
@@ -101,8 +105,13 @@ class TeamListResource(Resource):
         group_id = request.args.get("group_id", type=int)
         sort = (request.args.get("sort") or "name_asc").strip().lower()
 
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+
         query = (
             Team.query
+            .filter(Team.competition_id == comp_id)
             .options(joinedload(Team.group_assignments).joinedload(TeamGroup.group))
         )
 
@@ -143,6 +152,10 @@ class TeamListResource(Resource):
     @json_roles_required("judge", "admin")
     @json_roles_required("judge", "admin")
     def post(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+
         payload = request.get_json(silent=True) or {}
         name = (payload.get("name") or "").strip()
         number = payload.get("number", None)
@@ -150,7 +163,11 @@ class TeamListResource(Resource):
         if not name:
             return {"error": "validation_error", "detail": "name is required"}, 400
 
-        team = Team(name=name, organization=org)
+        team = Team(name=name, organization=org, competition_id=comp_id)
+        if "dnf" in payload:
+            if (get_current_competition_role() or "") != "admin":
+                return {"error": "forbidden", "detail": "dnf requires admin role"}, 403
+            team.dnf = bool(payload.get("dnf"))
         if number is not None:
             try:
                 team.number = int(number)
@@ -193,7 +210,7 @@ class TeamListResource(Resource):
 
         db.session.commit()
         try:
-            sync_all_checkpoint_tabs()
+            sync_all_checkpoint_tabs(competition_id=comp_id)
         except Exception:
             pass
         return {"ok": True, "team": _serialize_team(team)}, 201
@@ -201,10 +218,14 @@ class TeamListResource(Resource):
 
 class TeamItemResource(Resource):
     def get(self, team_id: int):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         team = (
             Team.query
+            .filter(Team.competition_id == comp_id, Team.id == team_id)
             .options(joinedload(Team.group_assignments).joinedload(TeamGroup.group))
-            .get(team_id)
+            .first()
         )
         if not team:
             return {"error": "not_found"}, 404
@@ -219,10 +240,14 @@ class TeamItemResource(Resource):
         return self._update(team_id, partial=False)
 
     def _update(self, team_id: int, partial: bool):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         team = (
             Team.query
+            .filter(Team.competition_id == comp_id, Team.id == team_id)
             .options(joinedload(Team.group_assignments))
-            .get(team_id)
+            .first()
         )
         if not team:
             return {"error": "not_found"}, 404
@@ -248,6 +273,11 @@ class TeamItemResource(Resource):
         if "organization" in payload or not partial:
             org = (payload.get("organization") or "").strip()
             team.organization = org or None
+
+        if "dnf" in payload:
+            if (get_current_competition_role() or "") != "admin":
+                return {"error": "forbidden", "detail": "dnf requires admin role"}, 403
+            team.dnf = bool(payload.get("dnf"))
 
         change_group = False
         selected_group_id: Optional[int] = None
@@ -290,14 +320,17 @@ class TeamItemResource(Resource):
 
         db.session.commit()
         try:
-            sync_all_checkpoint_tabs()
+            sync_all_checkpoint_tabs(competition_id=comp_id)
         except Exception:
             pass
         return {"ok": True, "team": _serialize_team(team)}, 200
 
     @json_roles_required("admin")
     def delete(self, team_id: int):
-        team = Team.query.get(team_id)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
         if not team:
             return {"error": "not_found"}, 404
         if team.checkins:
@@ -316,6 +349,9 @@ class TeamActiveGroupResource(Resource):
     method_decorators = [json_roles_required("judge", "admin")]
 
     def post(self, team_id: int):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         payload = request.get_json(silent=True) or {}
         group_id = payload.get("group_id")
         try:
@@ -323,7 +359,7 @@ class TeamActiveGroupResource(Resource):
         except Exception:
             return {"error": "validation_error", "detail": "group_id must be integer"}, 400
 
-        team = Team.query.get(team_id)
+        team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
         if not team:
             return {"error": "not_found"}, 404
 

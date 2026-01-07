@@ -36,7 +36,10 @@ from app.models import (
     CheckpointGroup,
     TeamGroup,
     CheckpointGroupLink,
+    Competition,
+    CompetitionMember,
 )
+from app.utils.competition import ensure_default_competition, DEFAULT_COMPETITION_NAME
 
 # ----------------------------- helpers -----------------------------
 
@@ -49,15 +52,28 @@ def get_or_create_user(username: str, role: str, password: str) -> User:
         db.session.flush()
     return u
 
-def get_or_create_team(name: str, number: int | None, organization: str | None = None) -> Team:
-    q = Team.query.filter(db.func.lower(Team.name) == name.lower())
+def get_or_create_team(
+    competition_id: int,
+    name: str,
+    number: int | None,
+    organization: str | None = None,
+) -> Team:
+    q = Team.query.filter(
+        Team.competition_id == competition_id,
+        db.func.lower(Team.name) == name.lower(),
+    )
     if number is None:
         q = q.filter(Team.number.is_(None))
     else:
         q = q.filter(Team.number == number)
     t = q.first()
     if not t:
-        t = Team(name=name, number=number, organization=organization)
+        t = Team(
+            competition_id=competition_id,
+            name=name,
+            number=number,
+            organization=organization,
+        )
         db.session.add(t)
         db.session.flush()
     else:
@@ -65,10 +81,21 @@ def get_or_create_team(name: str, number: int | None, organization: str | None =
             t.organization = organization
     return t
 
-def get_or_create_checkpoint(name: str, e=None, n=None, location=None, desc=None) -> Checkpoint:
-    cp = Checkpoint.query.filter(db.func.lower(Checkpoint.name) == name.lower()).first()
+def get_or_create_checkpoint(
+    competition_id: int,
+    name: str,
+    e=None,
+    n=None,
+    location=None,
+    desc=None,
+) -> Checkpoint:
+    cp = Checkpoint.query.filter(
+        Checkpoint.competition_id == competition_id,
+        db.func.lower(Checkpoint.name) == name.lower(),
+    ).first()
     if not cp:
         cp = Checkpoint(
+            competition_id=competition_id,
             name=name,
             easting=e,
             northing=n,
@@ -89,10 +116,21 @@ def get_or_create_checkpoint(name: str, e=None, n=None, location=None, desc=None
             cp.description = desc
     return cp
 
-def get_or_create_group(name: str, desc: str | None = None) -> CheckpointGroup:
-    g = CheckpointGroup.query.filter(db.func.lower(CheckpointGroup.name) == name.lower()).first()
+def get_or_create_group(
+    competition_id: int,
+    name: str,
+    desc: str | None = None,
+) -> CheckpointGroup:
+    g = CheckpointGroup.query.filter(
+        CheckpointGroup.competition_id == competition_id,
+        db.func.lower(CheckpointGroup.name) == name.lower(),
+    ).first()
     if not g:
-        g = CheckpointGroup(name=name, description=desc or None)
+        g = CheckpointGroup(
+            competition_id=competition_id,
+            name=name,
+            description=desc or None,
+        )
         db.session.add(g)
         db.session.flush()
     else:
@@ -138,12 +176,17 @@ def ensure_rfid(team: Team, uid: str, number: int | None):
     db.session.flush()
     return card
 
-def add_checkin(team: Team, cp: Checkpoint, when: datetime):
+def add_checkin(team: Team, cp: Checkpoint, when: datetime, competition_id: int):
     # Respect unique check-in per (team, checkpoint) per your earlier rule
     exists = Checkin.query.filter_by(team_id=team.id, checkpoint_id=cp.id).first()
     if exists:
         return exists
-    c = Checkin(team_id=team.id, checkpoint_id=cp.id, timestamp=when)
+    c = Checkin(
+        competition_id=competition_id,
+        team_id=team.id,
+        checkpoint_id=cp.id,
+        timestamp=when,
+    )
     db.session.add(c)
     return c
 
@@ -199,7 +242,7 @@ def load_teams_from_csv(csv_path: str) -> list[tuple[str, int | None, str, str |
     return teams
 
 
-def import_teams_from_csv(csv_path: str):
+def import_teams_from_csv(csv_path: str, competition_id: int):
     teams = load_teams_from_csv(csv_path)
     if not teams:
         print(f"No teams found in {csv_path}")
@@ -207,10 +250,10 @@ def import_teams_from_csv(csv_path: str):
 
     group_names = set()
     for group_name, number, name, org in teams:
-        group = get_or_create_group(group_name)
+        group = get_or_create_group(competition_id, group_name)
         group_names.add(group.name)
 
-        team = get_or_create_team(name, number, organization=org)
+        team = get_or_create_team(competition_id, name, number, organization=org)
 
         assign_team_to_groups(team, [group.id])
         if org and team.organization != org:
@@ -238,19 +281,55 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
         admin = get_or_create_user("admin", "admin", "change-me-now")
         judge = get_or_create_user("judge", "judge", "judge-pass")
 
+        competition = ensure_default_competition()
+        if not competition:
+            competition = Competition(
+                name=DEFAULT_COMPETITION_NAME,
+                created_by_user_id=admin.id if admin else None,
+            )
+            db.session.add(competition)
+            db.session.flush()
+
+        def ensure_membership(user: User, role: str):
+            if not user or not competition:
+                return
+            membership = (
+                CompetitionMember.query
+                .filter(
+                    CompetitionMember.competition_id == competition.id,
+                    CompetitionMember.user_id == user.id,
+                )
+                .first()
+            )
+            if not membership:
+                db.session.add(
+                    CompetitionMember(
+                        competition_id=competition.id,
+                        user_id=user.id,
+                        role=role,
+                        active=True,
+                    )
+                )
+            else:
+                membership.role = role
+                membership.active = True
+
+        ensure_membership(admin, "admin")
+        ensure_membership(judge, "judge")
+
         if not skip_demo:
             print("Seeding demo groups...")
-            g_alpha = get_or_create_group("Alpha", "Alpha route")
-            g_bravo = get_or_create_group("Bravo", "Bravo route")
-            g_charlie = get_or_create_group("Charlie", "Optional challenge")
+            g_alpha = get_or_create_group(competition.id, "Alpha", "Alpha route")
+            g_bravo = get_or_create_group(competition.id, "Bravo", "Bravo route")
+            g_charlie = get_or_create_group(competition.id, "Charlie", "Optional challenge")
 
             print("Seeding demo teams...")
-            t1 = get_or_create_team("Wolves", 11)
-            t2 = get_or_create_team("Eagles", 21)
-            t3 = get_or_create_team("Foxes", 31)
-            t4 = get_or_create_team("Badgers", 41)
-            t5 = get_or_create_team("Otters", 51)
-            t6 = get_or_create_team("Hawks", 61)
+            t1 = get_or_create_team(competition.id, "Wolves", 11)
+            t2 = get_or_create_team(competition.id, "Eagles", 21)
+            t3 = get_or_create_team(competition.id, "Foxes", 31)
+            t4 = get_or_create_team(competition.id, "Badgers", 41)
+            t5 = get_or_create_team(competition.id, "Otters", 51)
+            t6 = get_or_create_team(competition.id, "Hawks", 61)
 
             print("Assigning demo teams to groups...")
             assign_team_to_groups(t1, [g_alpha.id])
@@ -268,7 +347,14 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
                 name = f"CP-{i:02d}"
                 e = base_e + (i * 10.0)
                 n = base_n + (i * 7.0)
-                cp = get_or_create_checkpoint(name, e=e, n=n, location=f"Sector {i}", desc=f"Scenic point {i}")
+                cp = get_or_create_checkpoint(
+                    competition.id,
+                    name,
+                    e=e,
+                    n=n,
+                    location=f"Sector {i}",
+                    desc=f"Scenic point {i}",
+                )
                 cps.append(cp)
 
             # Group composition (many-to-many)
@@ -310,7 +396,7 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
                 # Spread timestamps over last 24h
                 for k, cp in enumerate(sample):
                     ts = now - timedelta(hours=(24 - (k * 3 + random.randint(0, 2))))
-                    add_checkin(t, cp, ts)
+                    add_checkin(t, cp, ts, competition.id)
 
         # Import real teams from CSV if provided or auto-detected
         csv_candidate = teams_csv
@@ -320,7 +406,7 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
                 csv_candidate = str(default_csv)
         if csv_candidate:
             print(f"Importing teams from CSV: {csv_candidate}")
-            import_teams_from_csv(csv_candidate)
+            import_teams_from_csv(csv_candidate, competition.id)
 
         db.session.commit()
         print("\n✅ Seed complete!")

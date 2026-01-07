@@ -1221,3 +1221,1331 @@ msgstr "Nobena prihod ne ustreza filtrom."
 
 #~ msgid "Sheets"
 #~ msgstr "Preglednice"
+
+#: app/templates/base.html:50
+#: app/templates/competition_select.html:3
+msgid "Select Competition"
+msgstr "Izberi tekmovanje"
+
+#: app/templates/base.html:64
+msgid "No competitions yet"
+msgstr "Ni tekmovanj"
+
+#: app/templates/base.html:68
+msgid "Manage Competitions"
+msgstr "Upravljanje tekmovanj"
+
+#: app/templates/base.html:54
+msgid "member"
+msgstr "član"
+
+#: app/templates/competition_select.html:10
+msgid "Your Competitions"
+msgstr "Tvoja tekmovanja"
+
+#: app/templates/competition_select.html:18
+msgid "Role"
+msgstr "Vloga"
+
+#: app/templates/competition_select.html:20
+msgid "Current"
+msgstr "Trenutno"
+
+#: app/templates/competition_select.html:35
+msgid "No competitions yet. Ask an admin for an invite link, or create a new one below."
+msgstr "Še ni tekmovanj. Prosi skrbnika za povezavo vabila ali ustvari novo spodaj."
+
+#: app/templates/competition_select.html:45
+msgid "Create a Competition"
+msgstr "Ustvari tekmovanje"
+
+#: app/templates/competition_select.html:48
+msgid "Competition Name"
+msgstr "Ime tekmovanja"
+
+#: app/templates/competition_select.html:51
+msgid "Create Competition"
+msgstr "Ustvari tekmovanje"
+
+#: app/templates/competition_select.html:54
+msgid "After you create a competition, you will be the admin and can invite judges."
+msgstr "Ko ustvariš tekmovanje, postaneš skrbnik in lahko povabiš sodnike."
+
+#: app/templates/user_edit.html:31
+#: app/templates/register.html:16
+msgid "Competition Role"
+msgstr "Vloga v tekmovanju"
+
+#: app/templates/user_edit.html:38
+#: app/templates/register.html:22
+msgid "Roles apply per competition."
+msgstr "Vloge veljajo ločeno za vsako tekmovanje."
+
+#: app/templates/register.html:18
+#: app/templates/user_edit.html:34
+msgid "viewer"
+msgstr "gledalec"
+
+#: app/templates/users_list.html:30
+msgid "Remove %(user)s from this competition? This will not affect other competitions."
+msgstr "Odstranim uporabnika %(user)s iz tega tekmovanja? To ne vpliva na druga tekmovanja."
+
+#: app/blueprints/main/routes.py:44
+msgid "Competition name is required."
+msgstr "Ime tekmovanja je obvezno."
+
+#: app/blueprints/main/routes.py:48
+msgid "A competition with that name already exists."
+msgstr "Tekmovanje s tem imenom že obstaja."
+
+#: app/blueprints/main/routes.py:58
+msgid "Competition created."
+msgstr "Tekmovanje je ustvarjeno."
+
+#: app/blueprints/main/routes.py:64
+msgid "You don't have access to that competition."
+msgstr "Nimaš dostopa do tega tekmovanja."
+
+#: app/blueprints/main/routes.py:66
+msgid "Competition selected."
+msgstr "Tekmovanje izbrano."
+
+#: app/blueprints/main/routes.py:104
+#: app/blueprints/users/routes.py:20
+#: app/blueprints/users/routes.py:37
+#: app/blueprints/users/routes.py:75
+#: app/blueprints/users/routes.py:128
+#: app/blueprints/sheets/routes.py:34
+msgid "Select a competition first."
+msgstr "Najprej izberi tekmovanje."
+
+#: app/blueprints/users/routes.py:44
+msgid "Please fill all fields. Role must be viewer/judge/admin."
+msgstr "Izpolni vsa polja. Vloga mora biti gledalec/sodnik/skrbnik."
+
+#: app/blueprints/users/routes.py:48
+msgid "Username already exists."
+msgstr "Uporabniško ime že obstaja."
+
+#: app/blueprints/users/routes.py:66
+msgid "User '%(user)s' created."
+msgstr "Uporabnik '%(user)s' je ustvarjen."
+
+#: app/blueprints/users/routes.py:91
+#: app/blueprints/users/routes.py:138
+msgid "User not found."
+msgstr "Uporabnik ni najden."
+
+#: app/blueprints/users/routes.py:102
+msgid "Invalid form data."
+msgstr "Neveljavni podatki obrazca."
+
+#: app/blueprints/users/routes.py:106
+msgid "Another user already has that username."
+msgstr "Drugi uporabnik že ima to uporabniško ime."
+
+#: app/blueprints/users/routes.py:119
+msgid "New password must be at least 8 characters."
+msgstr "Novo geslo mora imeti vsaj 8 znakov."
+
+#: app/blueprints/users/routes.py:122
+msgid "New passwords do not match."
+msgstr "Novi gesli se ne ujemata."
+
+#: app/blueprints/users/routes.py:125
+msgid "Password should not contain the username."
+msgstr "Geslo ne sme vsebovati uporabniškega imena."
+
+#: app/blueprints/users/routes.py:132
+msgid "User updated."
+msgstr "Uporabnik posodobljen."
+
+#: app/blueprints/users/routes.py:147
+msgid "User removed."
+msgstr "Uporabnik odstranjen."
+
+#: app/templates/base.html:69
+msgid "Judges"
+msgstr "Sodniki"
+
+msgid "Save order"
+msgstr "Shrani vrstni red"
+
+msgid "Drag rows to reorder groups."
+msgstr "Povlecite vrstice za razvrstitev skupin."
+
+msgid "Order"
+msgstr "Vrstni red"
+
+msgid "Drag"
+msgstr "Povleci"
+
+msgid "Could not save order."
+msgstr "Vrstnega reda ni bilo mogoče shraniti."
+
+msgid "Group ranking"
+msgstr "Razvrstitev skupin"
+
+msgid "No group totals yet."
+msgstr "Ni še seštevkov skupin."
+
+msgid "Exclude start checkpoint from found points"
+msgstr "Izloči začetni checkpoint iz točk za najdbe"
+
+msgid "Exclude end checkpoint from found points"
+msgstr "Izloči končni checkpoint iz točk za najdbe"
+
+msgid "Competition Settings"
+msgstr "Nastavitve tekmovanja"
+
+msgid "Competition"
+msgstr "Tekmovanje"
+
+msgid "Public results"
+msgstr "Javni rezultati"
+
+msgid "Allow anyone with the link to view results."
+msgstr "Omogoči ogled rezultatov vsem z povezavo."
+
+msgid "Public results link"
+msgstr "Povezava do javnih rezultatov"
+
+msgid "Copied"
+msgstr "Kopirano"
+
+msgid "Settings"
+msgstr "Nastavitve"
+
+msgid "Public results are not enabled for this competition."
+msgstr "Javni rezultati za to tekmovanje niso omogočeni."
+
+msgid "Competition settings updated."
+msgstr "Nastavitve tekmovanja so posodobljene."
+
+msgid "Competition not found."
+msgstr "Tekmovanje ni bilo najdeno."
+
+msgid "Sheets Language"
+msgstr "Jezik preglednic"
+
+msgid "Sheets Language Pack"
+msgstr "Jezikovni paket za preglednice"
+
+msgid "Back to Sheets admin"
+msgstr "Nazaj na upravljanje preglednic"
+
+msgid "Labels & defaults"
+msgstr "Oznake in privzeto"
+
+msgid "Common headers"
+msgstr "Skupni naslovi"
+
+msgid "Arrived header"
+msgstr "Naslov prihoda"
+
+msgid "Points header"
+msgstr "Naslov tock"
+
+msgid "Dead time header"
+msgstr "Naslov mrtvega casa"
+
+msgid "Time header"
+msgstr "Naslov casa"
+
+msgid "Teams tab"
+msgstr "Zavihek ekip"
+
+msgid "Number header"
+msgstr "Naslov stevilke"
+
+msgid "Team name header"
+msgstr "Naslov imena ekipe"
+
+msgid "Org header"
+msgstr "Naslov organizacije"
+
+msgid "Arrivals tab"
+msgstr "Zavihek prihodov"
+
+msgid "Score tab"
+msgstr "Zavihek rezultatov"
+
+msgid "Group header"
+msgstr "Naslov skupine"
+
+msgid "Dead time sum header"
+msgstr "Naslov vsote mrtvega casa"
+
+msgid "Total header"
+msgstr "Naslov sestevka"
+
+msgid "Organization summary"
+msgstr "Povzetek organizacij"
+
+msgid "Org name header"
+msgstr "Naslov imena organizacije"
+
+msgid "Teams list header"
+msgstr "Naslov seznama ekip"
+
+msgid "Team numbers header"
+msgstr "Naslov stevilk ekip"
+
+msgid "Team count header"
+msgstr "Naslov stevila ekip"
+
+msgid "Org total header"
+msgstr "Naslov sestevka organizacije"
+
+msgid "Save language pack"
+msgstr "Shrani jezikovni paket"
+
+msgid "Sheets Admin"
+msgstr "Upravljanje preglednic"
+
+msgid "Google Sheets (admin)"
+msgstr "Google Sheets (admin)"
+
+msgid "Language pack settings"
+msgstr "Nastavitve jezikovnega paketa"
+
+msgid "Spreadsheet ID"
+msgstr "ID preglednice"
+
+msgid "Spreadsheet ID (used below)"
+msgstr "ID preglednice (uporabljen spodaj)"
+
+msgid "Show ordering"
+msgstr "Pokazi razvrstitev"
+
+msgid "Hide ordering"
+msgstr "Skrij razvrstitev"
+
+msgid "Global group order"
+msgstr "Globalni vrstni red skupin"
+
+msgid "Drag to reorder. This order applies to all checkpoint tabs."
+msgstr "Povlecite za razvrstitev. Ta vrstni red velja za vse checkpoint zavihke."
+
+msgid "Global checkpoint order"
+msgstr "Globalni vrstni red checkpointov"
+
+msgid "Drag to reorder checkpoint columns."
+msgstr "Povlecite za razvrstitev stolpcev checkpointov."
+
+msgid "Per-group checkpoint order (drag within each group)"
+msgstr "Vrstni red checkpointov po skupinah (povlecite znotraj skupine)"
+
+msgid "Drag to reorder; uncheck to exclude a checkpoint for this group."
+msgstr "Povlecite za razvrstitev; odkljukajte, da checkpoint izkljucite iz skupine."
+
+msgid "Wizard: create tabs for all checkpoints"
+msgstr "Carovnik: ustvari zavihke za vse checkpointe"
+
+msgid "Create"
+msgstr "Ustvari"
+
+msgid "Checkpoint"
+msgstr "Checkpoint"
+
+msgid "Dead time?"
+msgstr "Mrtvi cas?"
+
+msgid "Record time?"
+msgstr "Zabelezi cas?"
+
+msgid "Extra headers (comma list)"
+msgstr "Dodatni naslovi (seznam z vejicami)"
+
+msgid "Groups"
+msgstr "Skupine"
+
+msgid "e.g. Start time, Finish time"
+msgstr "npr. cas starta, cas cilja"
+
+msgid "Run wizard"
+msgstr "Zazeni carovnika"
+
+msgid "Arrivals tab name"
+msgstr "Ime zavihka prihodov"
+
+msgid "Build / Refresh"
+msgstr "Ustvari / osvezi"
+
+msgid "Teams tab name"
+msgstr "Ime zavihka ekip"
+
+msgid "Teams headers (comma)"
+msgstr "Naslovi ekip (z vejicami)"
+
+msgid "(optional override)"
+msgstr "(neobvezna zamenjava)"
+
+msgid "Score tab name"
+msgstr "Ime zavihka rezultatov"
+
+msgid "Include dead time sum"
+msgstr "Vkljuci vsoto mrtvega casa"
+
+msgid "Add dead time sum column"
+msgstr "Dodaj stolpec vsote mrtvega casa"
+
+msgid "Add checkpoint tab"
+msgstr "Dodaj checkpoint zavihek"
+
+msgid "Tab title"
+msgstr "Naslov zavihka"
+
+msgid "Checkpoint tab (e.g., Timeline)"
+msgstr "Checkpoint zavihek (npr. casovnica)"
+
+msgid "Checkpoint (optional)"
+msgstr "Checkpoint (neobvezno)"
+
+msgid "— none —"
+msgstr "— brez —"
+
+msgid "Groups & fields"
+msgstr "Skupine in polja"
+
+msgid "GroupName|field1,field2"
+msgstr "GroupName|field1,field2"
+
+msgid "One line per group. Format: GroupName|field1,field2. Fields are optional."
+msgstr "Ena vrstica na skupino. Oblika: GroupName|field1,field2. Polja so neobvezna."
+
+msgid "Include dead time column"
+msgstr "Vkljuci stolpec mrtvega casa"
+
+msgid "Include time column"
+msgstr "Vkljuci stolpec casa"
+
+msgid "Add tab"
+msgstr "Dodaj zavihek"
+
+msgid "Existing sheet configs"
+msgstr "Obstojece nastavitve preglednic"
+
+msgid "Prune missing tabs"
+msgstr "Pocisti manjkajoce zavihke"
+
+msgid "Spreadsheet"
+msgstr "Preglednica"
+
+msgid "Tab"
+msgstr "Zavihek"
+
+msgid "Type"
+msgstr "Tip"
+
+msgid "Actions"
+msgstr "Dejanja"
+
+msgid "Created"
+msgstr "Ustvarjeno"
+
+msgid "Sync team numbers"
+msgstr "Sinhroniziraj stevilke ekip"
+
+msgid "—"
+msgstr "—"
+
+msgid "No sheet configs yet."
+msgstr "Se ni nastavitev preglednic."
+
+msgid "Language pack saved."
+msgstr "Jezikovni paket shranjen."
+
+msgid "Spreadsheet ID is required to build arrivals."
+msgstr "Za izdelavo prihodov je potreben ID preglednice."
+
+msgid "Failed to build arrivals tab: %(error)s"
+msgstr "Ni uspelo izdelati zavihka prihodov: %(error)s"
+
+msgid "Arrivals tab '%(tab)s' updated."
+msgstr "Zavihek prihodov '%(tab)s' je posodobljen."
+
+msgid "Spreadsheet ID is required."
+msgstr "ID preglednice je obvezen."
+
+msgid "Failed to build teams tab: %(error)s"
+msgstr "Ni uspelo izdelati zavihka ekip: %(error)s"
+
+msgid "Teams tab '%(tab)s' updated."
+msgstr "Zavihek ekip '%(tab)s' je posodobljen."
+
+msgid "Failed to build score tab: %(error)s"
+msgstr "Ni uspelo izdelati zavihka rezultatov: %(error)s"
+
+msgid "Score tab '%(tab)s' updated."
+msgstr "Zavihek rezultatov '%(tab)s' je posodobljen."
+
+msgid "No configs to prune."
+msgstr "Ni nastavitev za ciscenje."
+
+msgid "Could not init Sheets client: %(error)s"
+msgstr "Ni bilo mogoce inicializirati Sheets odjemalca: %(error)s"
+
+msgid "Pruned %(count)s stale config(s) (tabs no longer exist)."
+msgstr "Pociscenih %(count)s zastarelih nastavitev (zavihki ne obstajajo)."
+
+msgid "No stale configs found."
+msgstr "Ni bilo najdenih zastarelih nastavitev."
+
+msgid "Select at least one checkpoint to create."
+msgstr "Izberite vsaj en checkpoint za ustvarjanje."
+
+msgid "Wizard failed: %(error)s"
+msgstr "Carovnik ni uspel: %(error)s"
+
+msgid "Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing."
+msgstr "Carovnik koncan. Ustvarjenih %(created)s zavihkov, preskocenih %(skipped)s obstoječih."
+
+msgid "Config not found."
+msgstr "Nastavitev ni bila najdena."
+
+msgid "Config is missing groups; cannot sync."
+msgstr "Nastavitvi manjkajo skupine; sinhronizacija ni mozna."
+
+msgid "Failed to sync team numbers: %(error)s"
+msgstr "Sinhronizacija stevilk ekip ni uspela: %(error)s"
+
+msgid "Synced team numbers for checkpoint tabs."
+msgstr "Stevilke ekip za checkpoint zavihke so sinhronizirane."
+
+msgid "Spreadsheet ID and tab title are required."
+msgstr "ID preglednice in naslov zavihka sta obvezna."
+
+msgid "At least one group line is required."
+msgstr "Potrebna je vsaj ena vrstica skupine."
+
+msgid "Could not add tab: %(error)s"
+msgstr "Ni bilo mogoce dodati zavihka: %(error)s"
+
+msgid "Check that the spreadsheet ID is correct and that the service account email has Editor access to it."
+msgstr "Preverite, da je ID preglednice pravilen in da ima e-posta servisnega racuna urejevalni dostop."
+
+msgid "Added tab '%(tab)s' to spreadsheet."
+msgstr "Zavihek '%(tab)s' je dodan v preglednico."
+
+msgid "Google OAuth is not configured."
+msgstr "Google OAuth ni nastavljen."
+
+msgid "Invalid OAuth state."
+msgstr "Neveljavno stanje OAuth."
+
+msgid "Google OAuth failed to return a code."
+msgstr "Google OAuth ni vrnil kode."
+
+msgid "Google OAuth token exchange failed."
+msgstr "Izmenjava Google OAuth žetona ni uspela."
+
+msgid "Google OAuth did not return an id_token."
+msgstr "Google OAuth ni vrnil id_token."
+
+msgid "Google OAuth token verification failed."
+msgstr "Preverjanje Google OAuth žetona ni uspelo."
+
+msgid "Google OAuth user info missing."
+msgstr "Manjkajo podatki o Google uporabniku."
+
+msgid "No user is linked to this Google account."
+msgstr "Noben uporabnik ni povezan s tem Google računom."
+
+msgid "Sign in with Google"
+msgstr "Prijava z Google"
+
+msgid "Google account did not provide an email."
+msgstr "Google račun ni posredoval e-pošte."
+
+msgid "Account created via Google."
+msgstr "Račun ustvarjen prek Google."
+
+msgid "Welcome"
+msgstr "Dobrodošli"
+
+msgid "Sign in to manage competitions, or view public results below."
+msgstr "Prijavite se za upravljanje tekmovanj ali si oglejte javne rezultate spodaj."
+
+msgid "Public Results"
+msgstr "Javni rezultati"
+
+msgid "View results"
+msgstr "Ogled rezultatov"
+
+msgid "View stats"
+msgstr "Ogled statistike"
+
+msgid "No public results yet."
+msgstr "Še ni javnih rezultatov."
+
+msgid "Stats"
+msgstr "Statistika"
+
+msgid "Group statistics"
+msgstr "Statistika skupin"
+
+msgid "Teams"
+msgstr "Ekipe"
+
+msgid "Finished"
+msgstr "Zaključilo"
+
+msgid "Completion rate"
+msgstr "Stopnja zakljucenih"
+
+msgid "Average points"
+msgstr "Povprecne tocke"
+
+msgid "Average overall time (min)"
+msgstr "Povprecni skupni cas (min)"
+
+msgid "Median overall time (min)"
+msgstr "Mediana skupnega casa (min)"
+
+msgid "Average checkpoints visited"
+msgstr "Povprecno obiskanih checkpointov"
+
+msgid "Fastest team"
+msgstr "Najhitrejša ekipa"
+
+msgid "Highest drop-off checkpoint"
+msgstr "Največji osip na checkpointu"
+msgid "min"
+msgstr "min"
+
+msgid "Average segment times (min)"
+msgstr "Povprecni casi med checkpointi (min)"
+
+msgid "From"
+msgstr "Od"
+
+msgid "To"
+msgstr "Do"
+
+msgid "Average time"
+msgstr "Povprecni cas"
+
+msgid "Samples"
+msgstr "Vzorcev"
+
+msgid "No segment data yet."
+msgstr "Še ni podatkov za segmente."
+
+msgid "Valid email is required."
+msgstr "Veljaven e-poštni naslov je obvezen."
+
+msgid "Invalid role selected."
+msgstr "Izbrana vloga ni veljavna."
+
+msgid "An active invite already exists for this email."
+msgstr "Aktivno povabilo za ta e-poštni naslov že obstaja."
+
+msgid "Invite saved."
+msgstr "Povabilo shranjeno."
+
+msgid "Invite by email"
+msgstr "Povabi po e-pošti"
+
+msgid "Email"
+msgstr "E-pošta"
+
+msgid "Role"
+msgstr "Vloga"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Expires"
+msgstr "Poteče"
+
+msgid "Used"
+msgstr "Uporabljeno"
+
+msgid "Expired"
+msgstr "Pretečeno"
+
+msgid "Pending"
+msgstr "Čaka"
+
+msgid "No invites yet."
+msgstr "Še ni povabil."
+
+msgid "Save invite"
+msgstr "Shrani povabilo"
+
+msgid "Invite not found."
+msgstr "Povabilo ni bilo najdeno."
+
+msgid "Invite revoked."
+msgstr "Povabilo preklicano."
+
+msgid "Revoke this invite?"
+msgstr "Preklicem to povabilo?"
+
+msgid "Revoke"
+msgstr "Prekliči"
+
+msgid "Email (Google login)"
+msgstr "E-pošta (Google prijava)"
+
+msgid "Optional"
+msgstr "Neobvezno"
+
+msgid "Optional; used to link Google OAuth accounts."
+msgstr "Neobvezno; uporablja se za povezavo Google OAuth računov."
+
+msgid "Tap the tag to read its UID and stored digests. We will verify which checkpoints match the truncated HMACs."
+msgstr "Prislonite kartico za branje UID in shranjenih digestov. Preverili bomo, kateri checkpointi se ujemajo s skrajsanimi HMAC."
+
+msgid "Limit to checkpoints (optional)"
+msgstr "Omeji na checkpointe (neobvezno)"
+
+msgid "Leave empty to check against all checkpoints."
+msgstr "Pustite prazno za preverjanje vseh checkpointov."
+
+msgid "Needs Android Chrome 89+. We read text records, split by lines, and compare to all checkpoints (or your selection)."
+msgstr "Potrebuje Android Chrome 89+. Beremo besedilne zapise, jih delimo po vrsticah in primerjamo z vsemi checkpointi (ali z izbranimi)."
+
+#: app/templates/judge_assign.html:3
+msgid "Judge Checkpoint Assignment"
+msgstr "Dodelitev sodnikov kontrolnim točkam"
+
+#: app/templates/judge_assign.html:9
+msgid "Select Judge"
+msgstr "Izberi sodnika"
+
+#: app/templates/judge_assign.html:13
+msgid "Choose..."
+msgstr "Izberi..."
+
+#: app/templates/judge_assign.html:20
+msgid "Load Assignments"
+msgstr "Naloži dodelitve"
+
+#: app/templates/judge_assign.html:27
+msgid "Assign Checkpoints"
+msgstr "Dodeli kontrolne točke"
+
+#: app/templates/judge_assign.html:31
+msgid "Select all checkpoints"
+msgstr "Izberi vse kontrolne točke"
+
+#: app/templates/judge_assign.html:34
+msgid "Clear all"
+msgstr "Počisti vse"
+
+#: app/templates/judge_assign.html:35
+msgid "Use"
+msgstr "Uporabi"
+
+#: app/templates/judge_assign.html:36
+msgid "Checkpoint"
+msgstr "Kontrolna točka"
+
+#: app/templates/judge_assign.html:37
+msgid "Default"
+msgstr "Privzeto"
+
+#: app/templates/judge_assign.html:55
+msgid "Save Assignments"
+msgstr "Shrani dodelitve"
+
+#: app/templates/judge_assign.html:56
+msgid "Back to Users"
+msgstr "Nazaj na uporabnike"
+
+#: app/templates/judge_assign.html:60
+msgid "Select a judge to manage checkpoint access."
+msgstr "Izberi sodnika za upravljanje dostopa do kontrolnih točk."
+
+#: app/blueprints/judges/routes.py:27
+msgid "Select a competition first."
+msgstr "Najprej izberi tekmovanje."
+
+#: app/blueprints/judges/routes.py:57
+msgid "Select a judge."
+msgstr "Izberi sodnika."
+
+#: app/blueprints/judges/routes.py:67
+msgid "Invalid judge selection."
+msgstr "Neveljavna izbira sodnika."
+
+#: app/blueprints/judges/routes.py:110
+msgid "Judge checkpoints updated."
+msgstr "Dodelitve sodnika posodobljene."
+
+#: app/blueprints/checkpoints/routes.py:19
+msgid "Could not load groups."
+msgstr "Ni bilo mogoče naložiti skupin."
+
+#: app/blueprints/checkpoints/routes.py:26
+msgid "Could not load devices."
+msgstr "Ni bilo mogoče naložiti naprav."
+
+#: app/blueprints/checkpoints/routes.py:33
+msgid "Could not load checkpoints."
+msgstr "Ni bilo mogoče naložiti kontrolnih točk."
+
+#: app/blueprints/checkpoints/routes.py:50
+#: app/blueprints/checkpoints/routes.py:108
+msgid "Name is required."
+msgstr "Ime je obvezno."
+
+#: app/blueprints/checkpoints/routes.py:63
+msgid "Checkpoint added."
+msgstr "Kontrolna točka dodana."
+
+#: app/blueprints/checkpoints/routes.py:68
+msgid "Could not add checkpoint."
+msgstr "Kontrolne točke ni bilo mogoče dodati."
+
+#: app/blueprints/checkpoints/routes.py:85
+msgid "Checkpoint not found."
+msgstr "Kontrolna točka ni najdena."
+
+#: app/blueprints/checkpoints/routes.py:125
+msgid "Checkpoint updated."
+msgstr "Kontrolna točka posodobljena."
+
+#: app/blueprints/checkpoints/routes.py:128
+msgid "Could not update checkpoint."
+msgstr "Kontrolne točke ni bilo mogoče posodobiti."
+
+#: app/blueprints/checkpoints/routes.py:166
+msgid "Checkpoint deleted."
+msgstr "Kontrolna točka izbrisana."
+
+#: app/blueprints/checkpoints/routes.py:174
+msgid "Could not delete checkpoint."
+msgstr "Kontrolne točke ni bilo mogoče izbrisati."
+
+#: app/blueprints/checkpoints/routes.py:14
+msgid "Device is already assigned to %(checkpoint)s."
+msgstr "Naprava je že dodeljena kontrolni točki %(checkpoint)s."
+
+#: app/blueprints/checkpoints/routes.py:16
+msgid "Device is already assigned to another checkpoint."
+msgstr "Naprava je že dodeljena drugi kontrolni točki."
+
+#: app/blueprints/checkpoints/routes.py:18
+msgid "Selected device does not exist."
+msgstr "Izbrana naprava ne obstaja."
+
+#: app/blueprints/checkpoints/routes.py:20
+msgid "Selected device is not available for this competition."
+msgstr "Izbrana naprava ni na voljo za to tekmovanje."
+
+#: app/blueprints/checkpoints/routes.py:22
+msgid "Checkpoint name already exists."
+msgstr "Ime kontrolne točke že obstaja."
+
+#: app/templates/rfid_judge.html:9
+msgid "Tap a tag with your phone to read its UID, call ingest for the selected checkpoint, then append the signed payload back onto the tag."
+msgstr "Prisloni kartico, preberi UID, pošlji ingest za izbrano kontrolno točko in podpisan payload zapiši nazaj na kartico."
+
+#: app/templates/rfid_judge.html:14
+msgid "Uses the checkpoint ID sent to /api/ingest."
+msgstr "Uporabi ID kontrolne točke, poslan v /api/ingest."
+
+#: app/templates/rfid_judge.html:16
+msgid "No checkpoints assigned yet."
+msgstr "Nobena kontrolna točka še ni dodeljena."
+
+#: app/templates/rfid_judge.html:60
+msgid "Appended to the tag as a text record. We only store the truncated HMAC (checkpoint ID + card UID) to save space."
+msgstr "Zapisano na kartico kot besedilni zapis. Shranimo le skrajšan HMAC (ID kontrolne točke + UID kartice)."
+
+#: app/templates/rfid_judge.html:104
+msgid "Pick a checkpoint first."
+msgstr "Najprej izberi kontrolno točko."
+
+#: app/templates/base.html:92
+msgid "Score"
+msgstr "Točkovanje"
+
+#: app/templates/base.html:93 app/templates/scores_view.html:2
+msgid "Scores"
+msgstr "Rezultati"
+
+#: app/templates/base.html:94 app/templates/scores_submissions.html:2
+msgid "Score Submissions"
+msgstr "Oddaje točk"
+
+#: app/templates/score_judge.html:2
+msgid "Judge Scoring"
+msgstr "Točkovanje sodnika"
+
+#: app/templates/score_judge.html:8
+msgid "Score via RFID"
+msgstr "Točkovanje prek RFID"
+
+#: app/templates/score_judge.html:10
+msgid "Scan a team RFID tag to load scoring fields for the selected checkpoint."
+msgstr "Skeniraj RFID kartico ekipe za prikaz polj točkovanja za izbrano kontrolno točko."
+
+#: app/templates/score_judge.html:28
+msgid "Assign checkpoints to judges"
+msgstr "Dodeli kontrolne točke sodnikom"
+
+#: app/templates/score_judge.html:33
+msgid "Ask an admin to assign checkpoints."
+msgstr "Prosi skrbnika za dodelitev kontrolnih točk."
+
+#: app/templates/score_judge.html:15
+msgid "Tap tag to load fields"
+msgstr "Prisloni kartico za nalaganje polj"
+
+#: app/templates/score_judge.html:23
+msgid "Score Input"
+msgstr "Vnos točk"
+
+#: app/templates/score_judge.html:24
+msgid "Waiting for scan…"
+msgstr "Čakam na skeniranje…"
+
+#: app/templates/score_judge.html:32
+msgid "Submit Score"
+msgstr "Oddaj točke"
+
+#: app/templates/score_judge.html:83
+msgid "Web NFC not available in this browser."
+msgstr "Web NFC ni na voljo v tem brskalniku."
+
+#: app/templates/score_judge.html:85
+msgid "Check-in created for this team at this checkpoint."
+msgstr "Check-in ustvarjen za to ekipo na tej kontrolni točki."
+
+#: app/templates/score_judge.html:86
+msgid "Failed to resolve tag."
+msgstr "Kartice ni bilo mogoče razpoznati."
+
+#: app/templates/score_judge.html:87
+msgid "Score saved."
+msgstr "Točke shranjene."
+
+#: app/templates/score_judge.html:88
+msgid "Failed to save score."
+msgstr "Točk ni bilo mogoče shraniti."
+
+#: app/templates/scores_submissions.html:12
+msgid "All teams"
+msgstr "Vse ekipe"
+
+#: app/templates/scores_submissions.html:19
+msgid "All checkpoints"
+msgstr "Vse kontrolne točke"
+
+#: app/templates/scores_submissions.html:31
+msgid "Submitted"
+msgstr "Oddano"
+
+#: app/templates/scores_submissions.html:35
+msgid "Dead time"
+msgstr "Mrtvi čas"
+
+#: app/templates/scores_submissions.html:37
+msgid "Fields"
+msgstr "Polja"
+
+#: app/templates/scores_submissions.html:55
+msgid "No submissions yet."
+msgstr "Še ni oddaj."
+
+#: app/templates/scores_view.html:11
+msgid "All groups"
+msgstr "Vse skupine"
+
+#: app/templates/scores_view.html:13
+msgid "Show per-checkpoint"
+msgstr "Prikaži po kontrolnih točkah"
+
+#: app/templates/scores_view.html:61
+msgid "Hide per-checkpoint"
+msgstr "Skrij po kontrolnih točkah"
+
+#: app/templates/scores_view.html:16
+msgid "Filter"
+msgstr "Filtriraj"
+
+#: app/templates/scores_view.html:24
+msgid "Group"
+msgstr "Skupina"
+
+#: app/templates/scores_view.html:25
+msgid "Number"
+msgstr "Številka"
+
+#: app/templates/scores_view.html:26
+msgid "Team"
+msgstr "Ekipa"
+
+#: app/templates/scores_view.html:27
+msgid "Dead time (sum)"
+msgstr "Mrtvi čas (vsota)"
+
+#: app/templates/scores_view.html:28
+msgid "Time points"
+msgstr "Točke časa"
+
+#: app/templates/scores_view.html:29
+msgid "Found points"
+msgstr "Točke najdeno"
+
+#: app/templates/scores_view.html:28
+msgid "Total points"
+msgstr "Skupaj točke"
+
+#: app/templates/scores_view.html:29
+msgid "Actions"
+msgstr "Dejanja"
+
+#: app/templates/scores_view.html:42
+msgid "View submissions"
+msgstr "Poglej oddaje"
+
+#: app/templates/scores_view.html:39
+msgid "No scores yet."
+msgstr "Še ni rezultatov."
+
+#: app/templates/scores_view.html:43
+msgid "Dead time is summed from the latest score per checkpoint."
+msgstr "Mrtvi čas se sešteje iz zadnjega zapisa na kontrolno točko."
+
+#: app/templates/scores_view.html:39
+msgid "Organization totals"
+msgstr "Skupaj po organizacijah"
+
+#: app/templates/scores_view.html:43
+msgid "Organization"
+msgstr "Organizacija"
+
+#: app/templates/scores_view.html:54
+msgid "No organization totals yet."
+msgstr "Še ni seštevkov po organizacijah."
+
+#: app/templates/scores_view.html:58
+msgid "DNF teams do not count toward organization totals."
+msgstr "DNF ekipe se ne štejejo v seštevke organizacij."
+
+#: app/templates/scores_view.html:29 app/templates/team_edit.html:37
+msgid "DNF"
+msgstr "DNF"
+
+#: app/templates/team_edit.html:45
+msgid "DNF (Did Not Finish)"
+msgstr "DNF (ni zaključil)"
+
+msgid "Place"
+msgstr "Mesto"
+
+msgid "Finished"
+msgstr "Zaključil"
+#: app/templates/base.html:160
+msgid "Score Rules"
+msgstr "Pravila točkovanja"
+
+#: app/templates/score_rules.html:2
+msgid "Score Rules"
+msgstr "Pravila točkovanja"
+
+#: app/templates/score_rules.html:8
+msgid "Create / Update Rule"
+msgstr "Ustvari / posodobi pravilo"
+
+#: app/templates/score_rules.html:11
+msgid "Checkpoint"
+msgstr "Kontrolna točka"
+
+#: app/templates/score_rules.html:13
+msgid "Choose..."
+msgstr "Izberi..."
+
+#: app/templates/score_rules.html:19
+msgid "Group"
+msgstr "Skupina"
+
+#: app/templates/score_rules.html:27
+msgid "Rules JSON"
+msgstr "Pravila JSON"
+
+#: app/templates/score_rules.html:31
+msgid "Save Rule"
+msgstr "Shrani pravilo"
+
+#: app/templates/score_rules.html:38
+msgid "Existing Rules"
+msgstr "Obstoječa pravila"
+
+#: app/templates/score_rules.html:45
+msgid "Updated"
+msgstr "Posodobljeno"
+
+#: app/templates/score_rules.html:46
+msgid "Actions"
+msgstr "Dejanja"
+
+#: app/templates/score_rules.html:57
+msgid "Delete this rule?"
+msgstr "Izbrišem to pravilo?"
+
+#: app/templates/score_rules.html:68
+msgid "No rules configured yet."
+msgstr "Še ni nastavljenih pravil."
+
+#: app/blueprints/scores/routes.py:53
+msgid "Select a competition first."
+msgstr "Najprej izberi tekmovanje."
+
+#: app/blueprints/scores/routes.py:73
+msgid "Checkpoint, group, and rules JSON are required."
+msgstr "Kontrolna točka, skupina in pravila JSON so obvezni."
+
+#: app/blueprints/scores/routes.py:79
+msgid "Invalid JSON: %(error)s"
+msgstr "Neveljaven JSON: %(error)s"
+
+#: app/blueprints/scores/routes.py:83 app/templates/score_rules.html:212
+msgid "Rules JSON must be an object."
+msgstr "Pravila JSON morajo biti objekt."
+
+#: app/blueprints/scores/routes.py:88 app/templates/score_rules.html:359
+msgid "Time-based scoring requires start and end checkpoints."
+msgstr "Časovno točkovanje zahteva začetno in končno kontrolno točko."
+
+#: app/blueprints/scores/routes.py:94 app/templates/score_rules.html:479
+msgid "Global time rule requires start and end checkpoints."
+msgstr "Globalno pravilo časa zahteva začetno in končno kontrolno točko."
+
+#: app/blueprints/scores/routes.py:170
+msgid "Group is required for global rules."
+msgstr "Skupina je obvezna za globalna pravila."
+
+#: app/blueprints/scores/routes.py:194
+msgid "Select at least one global rule."
+msgstr "Izberi vsaj eno globalno pravilo."
+
+#: app/blueprints/scores/routes.py:206
+msgid "Global rules updated."
+msgstr "Globalna pravila posodobljena."
+
+#: app/blueprints/scores/routes.py:214
+msgid "Global rules created."
+msgstr "Globalna pravila ustvarjena."
+
+#: app/blueprints/scores/routes.py:234
+msgid "Global rule not found."
+msgstr "Globalno pravilo ni najdeno."
+
+#: app/blueprints/scores/routes.py:239
+msgid "Global rule deleted."
+msgstr "Globalno pravilo izbrisano."
+
+#: app/blueprints/scores/routes.py:97
+msgid "Score rule updated."
+msgstr "Pravilo točkovanja posodobljeno."
+
+#: app/blueprints/scores/routes.py:107
+msgid "Score rule created."
+msgstr "Pravilo točkovanja ustvarjeno."
+
+#: app/blueprints/scores/routes.py:126
+msgid "Score rule not found."
+msgstr "Pravilo točkovanja ni najdeno."
+
+#: app/blueprints/scores/routes.py:132
+msgid "Score rule deleted."
+msgstr "Pravilo točkovanja izbrisano."
+
+#: app/templates/score_rules.html:25
+msgid "Load Fields"
+msgstr "Naloži polja"
+
+#: app/templates/score_rules.html:29
+msgid "Field Rules"
+msgstr "Pravila polj"
+
+#: app/templates/score_rules.html:31
+msgid "Configure per-field rules and which fields count toward total."
+msgstr "Nastavi pravila po poljih in izberi, katera štejejo v skupni seštevek."
+
+#: app/templates/score_rules.html:35
+msgid "Time-based scoring"
+msgstr "Točkovanje po času"
+
+#: app/templates/score_rules.html:55 app/templates/score_rules.html:158
+msgid "Global Rules"
+msgstr "Globalna pravila"
+
+#: app/templates/score_rules.html:57
+msgid "Toggle"
+msgstr "Razširi/skrči"
+
+#: app/templates/score_rules.html:145
+msgid "Save Global Rules"
+msgstr "Shrani globalna pravila"
+
+#: app/templates/score_rules.html:75
+msgid "Checkpoint found points"
+msgstr "Točke za najdene kontrolne točke"
+
+#: app/templates/score_rules.html:79
+msgid "Points per found checkpoint"
+msgstr "Točke na najdeno kontrolno točko"
+
+#: app/templates/score_rules.html:83
+msgid "Counts checkins across checkpoints in this group."
+msgstr "Sešteje checkine po kontrolnih točkah v tej skupini."
+
+#: app/templates/score_rules.html:88
+msgid "Global time rule"
+msgstr "Globalno pravilo časa"
+
+#: app/templates/score_rules.html:111
+msgid "Time threshold (minutes)"
+msgstr "Časovni prag (minute)"
+
+#: app/templates/score_rules.html:115
+msgid "Penalty per minutes"
+msgstr "Kazenska na minute"
+
+#: app/templates/score_rules.html:124
+msgid "If time exceeds threshold, deduct points per penalty window."
+msgstr "Če čas preseže prag, se točke odštejejo po kazenskem intervalu."
+
+#: app/templates/score_rules.html:201
+msgid "No global rules configured yet."
+msgstr "Še ni nastavljenih globalnih pravil."
+
+#: app/templates/score_rules.html:211
+msgid "Rules JSON must be valid JSON."
+msgstr "Pravila JSON morajo biti veljaven JSON."
+
+#: app/templates/score_rules.html:38
+msgid "Enable time-based race scoring"
+msgstr "Omogoči časovno tekmovalno točkovanje"
+
+#: app/templates/score_rules.html:42
+msgid "Start checkpoint"
+msgstr "Začetna kontrolna točka"
+
+#: app/templates/score_rules.html:46
+msgid "End checkpoint"
+msgstr "Končna kontrolna točka"
+
+#: app/templates/score_rules.html:50
+msgid "Min points"
+msgstr "Min točke"
+
+#: app/templates/score_rules.html:54
+msgid "Max points"
+msgstr "Max točke"
+
+#: app/templates/score_rules.html:60
+msgid "You can edit JSON directly; the builder will keep it updated."
+msgstr "JSON lahko urejaš neposredno; gradnik ga bo sproti posodabljal."
+
+#: app/templates/score_rules.html:64
+msgid "Preview"
+msgstr "Predogled"
+
+#: app/templates/score_rules.html:78
+msgid "Load"
+msgstr "Naloži"
+
+#: app/templates/score_rules.html:112
+msgid "Include in total"
+msgstr "Vključi v seštevek"
+
+#: app/templates/score_rules.html:123
+msgid "Add rule"
+msgstr "Dodaj pravilo"
+
+#: app/templates/score_rules.html:132
+msgid "No rule"
+msgstr "Brez pravila"
+
+#: app/templates/score_rules.html:133
+msgid "Mapping"
+msgstr "Preslikava"
+
+#: app/templates/score_rules.html:134
+msgid "Interpolation"
+msgstr "Interpolacija"
+
+#: app/templates/score_rules.html:135
+msgid "Multiplier"
+msgstr "Množilnik"
+
+#: app/templates/score_rules.html:136
+msgid "Found"
+msgstr "Najdeno"
+
+#: app/templates/score_rules.html:137
+msgid "Deviation"
+msgstr "Odstopanje"
+
+#: app/templates/score_rules.html:148
+msgid "Remove rule"
+msgstr "Odstrani pravilo"
+
+#: app/templates/score_rules.html:159
+msgid "Mapping grid (input → output)"
+msgstr "Preslikava (vhod → izhod)"
+
+#: app/templates/score_rules.html:162
+#: app/templates/score_rules.html:182
+msgid "Add row"
+msgstr "Dodaj vrstico"
+
+#: app/templates/score_rules.html:179
+msgid "Interpolation points (x, y)"
+msgstr "Interpolacijske točke (x, y)"
+
+#: app/templates/score_rules.html:200
+msgid "Factor"
+msgstr "Faktor"
+
+#: app/templates/score_rules.html:206
+msgid "Points per checkpoint found"
+msgstr "Točke na najdeno kontrolno točko"
+
+#: app/templates/score_rules.html:208
+msgid "Count checkpoints as found based on checkins."
+msgstr "Kontrolne točke šteje kot najdene na podlagi checkinov."
+
+#: app/templates/score_rules.html:229
+msgid "Deviation scoring (penalize by distance)"
+msgstr "Točkovanje odstopanja (penaliziraj po razdalji)"
+
+#: app/templates/score_rules.html:232
+msgid "Target"
+msgstr "Cilj"
+
+#: app/templates/score_rules.html:240
+msgid "Penalty points"
+msgstr "Kazenske točke"
+
+#: app/templates/score_rules.html:244
+msgid "Penalty distance"
+msgstr "Kazenska razdalja"
+
+#: app/templates/score_judge.html:27
+msgid "Or select team"
+msgstr "Ali izberi ekipo"
+
+#: app/templates/score_judge.html:33
+msgid "Use this when the team has no RFID card."
+msgstr "Uporabi, če ekipa nima RFID kartice."
+
+#: app/templates/score_judge.html:38
+msgid "Load fields"
+msgstr "Naloži polja"
+
+#: app/templates/score_judge.html:91
+msgid "Pick a team first."
+msgstr "Najprej izberi ekipo."
+
+#: app/templates/users_list.html:7
+msgid "Judges"
+msgstr "Sodniki"

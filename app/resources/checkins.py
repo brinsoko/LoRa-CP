@@ -14,18 +14,23 @@ from app.models import Checkin, Team, Checkpoint
 from app.utils.time import from_datetime_local
 
 from app.utils.rest_auth import json_roles_required
+from app.utils.competition import require_current_competition_id
 from app.utils.sheets_sync import mark_arrival_checkbox
 
 
 # -------- helpers --------
 def _parse_date_range(date_from_str: Optional[str], date_to_str: Optional[str]) -> Tuple[Optional[datetime], Optional[datetime]]:
-    """Build an inclusive day range for YYYY-MM-DD inputs."""
+    """Build an inclusive range for YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS inputs."""
     start = end = None
     try:
         if date_from_str:
             start = datetime.fromisoformat(date_from_str)
         if date_to_str:
-            end = datetime.fromisoformat(date_to_str) + timedelta(days=1)  # exclusive
+            end = datetime.fromisoformat(date_to_str)
+            if "T" not in date_to_str and " " not in date_to_str:
+                end = end + timedelta(days=1)
+            else:
+                end = end + timedelta(seconds=1)
     except ValueError:
         pass
     return start, end
@@ -34,8 +39,11 @@ def _parse_date_range(date_from_str: Optional[str], date_to_str: Optional[str]) 
 def _filtered_query(team_id: Optional[int], checkpoint_id: Optional[int],
                     date_from: Optional[str], date_to: Optional[str]):
     """Return a SQLAlchemy query over Checkin with eager-loaded relations and filters applied."""
+    comp_id = require_current_competition_id()
     q = (Checkin.query
          .options(joinedload(Checkin.team), joinedload(Checkin.checkpoint)))
+    if comp_id:
+        q = q.filter(Checkin.competition_id == comp_id)
 
     if team_id:
         q = q.filter(Checkin.team_id == team_id)
@@ -105,6 +113,9 @@ class CheckinListResource(Resource):
     method_decorators = [json_roles_required("judge", "admin")]
 
     def get(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         # filters & sort
         team_id = request.args.get("team_id", type=int)
         checkpoint_id = request.args.get("checkpoint_id", type=int)
@@ -135,6 +146,9 @@ class CheckinListResource(Resource):
           - timestamp | timestamp_local + timezone (optional)
           - override = "replace" (optional)
         """
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         payload = request.get_json(silent=True) or request.form.to_dict()
         try:
             team_id = int(payload.get("team_id"))
@@ -142,13 +156,21 @@ class CheckinListResource(Resource):
         except Exception:
             return {"error": "invalid_request", "detail": "team_id and checkpoint_id are required integers."}, 400
 
-        if not Team.query.get(team_id) or not Checkpoint.query.get(checkpoint_id):
+        team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
+        checkpoint = Checkpoint.query.filter(
+            Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id
+        ).first()
+        if not team or not checkpoint:
             return {"error": "invalid_fk", "detail": "Invalid team or checkpoint."}, 400
 
         ts = _parse_timestamp(payload, datetime.utcnow())
         override = (payload.get("override") or "").strip().lower()
 
-        existing = Checkin.query.filter_by(team_id=team_id, checkpoint_id=checkpoint_id).first()
+        existing = (
+            Checkin.query
+            .filter_by(team_id=team_id, checkpoint_id=checkpoint_id, competition_id=comp_id)
+            .first()
+        )
         if existing:
             if override == "replace":
                 existing.timestamp = ts
@@ -160,7 +182,12 @@ class CheckinListResource(Resource):
                 "checkin": _serialize_checkin(existing),
             }, 409
 
-        c = Checkin(team_id=team_id, checkpoint_id=checkpoint_id, timestamp=ts)
+        c = Checkin(
+            team_id=team_id,
+            checkpoint_id=checkpoint_id,
+            competition_id=comp_id,
+            timestamp=ts,
+        )
         db.session.add(c)
         db.session.commit()
         try:
@@ -179,13 +206,24 @@ class CheckinItemResource(Resource):
     """
 
     def get(self, checkin_id: int):
-        c = Checkin.query.options(joinedload(Checkin.team), joinedload(Checkin.checkpoint)).get(checkin_id)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        c = (
+            Checkin.query
+            .filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
+            .options(joinedload(Checkin.team), joinedload(Checkin.checkpoint))
+            .first()
+        )
         if not c:
             return {"error": "not_found"}, 404
         return _serialize_checkin(c), 200
 
     def _update(self, checkin_id: int, partial: bool):
-        c = Checkin.query.get(checkin_id)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        c = Checkin.query.filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id).first()
         if not c:
             return {"error": "not_found"}, 404
 
@@ -204,9 +242,13 @@ class CheckinItemResource(Resource):
             return {"error": "invalid_request", "detail": "team_id/checkpoint_id must be integers."}, 400
 
         # validate FKs if provided
-        if new_team_id is not None and not Team.query.get(new_team_id):
+        if new_team_id is not None and not Team.query.filter(
+            Team.competition_id == comp_id, Team.id == new_team_id
+        ).first():
             return {"error": "invalid_fk", "detail": "Invalid team."}, 400
-        if new_cp_id is not None and not Checkpoint.query.get(new_cp_id):
+        if new_cp_id is not None and not Checkpoint.query.filter(
+            Checkpoint.competition_id == comp_id, Checkpoint.id == new_cp_id
+        ).first():
             return {"error": "invalid_fk", "detail": "Invalid checkpoint."}, 400
 
         # timestamp
@@ -221,6 +263,7 @@ class CheckinItemResource(Resource):
         dup = (Checkin.query
                .filter(Checkin.team_id == new_team_id,
                        Checkin.checkpoint_id == new_cp_id,
+                       Checkin.competition_id == comp_id,
                        Checkin.id != checkin_id)
                .first())
 
@@ -253,7 +296,10 @@ class CheckinItemResource(Resource):
         return self._update(checkin_id, partial=True)
 
     def delete(self, checkin_id: int):
-        c = Checkin.query.get(checkin_id)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        c = Checkin.query.filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id).first()
         if not c:
             return {"error": "not_found"}, 404
         db.session.delete(c)
@@ -268,6 +314,9 @@ class CheckinExportResource(Resource):
     """
 
     def get(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         team_id = request.args.get("team_id", type=int)
         checkpoint_id = request.args.get("checkpoint_id", type=int)
         date_from = request.args.get("date_from")

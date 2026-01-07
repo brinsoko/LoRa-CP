@@ -1143,3 +1143,1332 @@ msgstr ""
 #: app/templates/view_checkins.html:123
 msgid "No check-ins match your filters."
 msgstr ""
+
+#: app/templates/base.html:50
+#: app/templates/competition_select.html:3
+msgid "Select Competition"
+msgstr ""
+
+#: app/templates/base.html:64
+msgid "No competitions yet"
+msgstr ""
+
+#: app/templates/base.html:68
+msgid "Manage Competitions"
+msgstr ""
+
+#: app/templates/base.html:54
+msgid "member"
+msgstr ""
+
+#: app/templates/competition_select.html:10
+msgid "Your Competitions"
+msgstr ""
+
+#: app/templates/competition_select.html:18
+msgid "Role"
+msgstr ""
+
+#: app/templates/competition_select.html:20
+msgid "Current"
+msgstr ""
+
+#: app/templates/competition_select.html:35
+msgid "No competitions yet. Ask an admin for an invite link, or create a new one below."
+msgstr ""
+
+#: app/templates/competition_select.html:45
+msgid "Create a Competition"
+msgstr ""
+
+#: app/templates/competition_select.html:48
+msgid "Competition Name"
+msgstr ""
+
+#: app/templates/competition_select.html:51
+msgid "Create Competition"
+msgstr ""
+
+#: app/templates/competition_select.html:54
+msgid "After you create a competition, you will be the admin and can invite judges."
+msgstr ""
+
+#: app/templates/user_edit.html:31
+#: app/templates/register.html:16
+msgid "Competition Role"
+msgstr ""
+
+#: app/templates/user_edit.html:38
+#: app/templates/register.html:22
+msgid "Roles apply per competition."
+msgstr ""
+
+#: app/templates/register.html:18
+#: app/templates/user_edit.html:34
+msgid "viewer"
+msgstr ""
+
+#: app/templates/users_list.html:30
+msgid "Remove %(user)s from this competition? This will not affect other competitions."
+msgstr ""
+
+#: app/blueprints/main/routes.py:44
+msgid "Competition name is required."
+msgstr ""
+
+#: app/blueprints/main/routes.py:48
+msgid "A competition with that name already exists."
+msgstr ""
+
+#: app/blueprints/main/routes.py:58
+msgid "Competition created."
+msgstr ""
+
+#: app/blueprints/main/routes.py:64
+msgid "You don't have access to that competition."
+msgstr ""
+
+#: app/blueprints/main/routes.py:66
+msgid "Competition selected."
+msgstr ""
+
+#: app/blueprints/main/routes.py:104
+#: app/blueprints/users/routes.py:20
+#: app/blueprints/users/routes.py:37
+#: app/blueprints/users/routes.py:75
+#: app/blueprints/users/routes.py:128
+#: app/blueprints/sheets/routes.py:34
+msgid "Select a competition first."
+msgstr ""
+
+#: app/blueprints/users/routes.py:44
+msgid "Please fill all fields. Role must be viewer/judge/admin."
+msgstr ""
+
+#: app/blueprints/users/routes.py:48
+msgid "Username already exists."
+msgstr ""
+
+#: app/blueprints/users/routes.py:66
+msgid "User '%(user)s' created."
+msgstr ""
+
+#: app/blueprints/users/routes.py:91
+#: app/blueprints/users/routes.py:138
+msgid "User not found."
+msgstr ""
+
+#: app/blueprints/users/routes.py:102
+msgid "Invalid form data."
+msgstr ""
+
+#: app/blueprints/users/routes.py:106
+msgid "Another user already has that username."
+msgstr ""
+
+#: app/blueprints/users/routes.py:119
+msgid "New password must be at least 8 characters."
+msgstr ""
+
+#: app/blueprints/users/routes.py:122
+msgid "New passwords do not match."
+msgstr ""
+
+#: app/blueprints/users/routes.py:125
+msgid "Password should not contain the username."
+msgstr ""
+
+#: app/blueprints/users/routes.py:132
+msgid "User updated."
+msgstr ""
+
+#: app/blueprints/users/routes.py:147
+msgid "User removed."
+msgstr ""
+
+#: app/templates/base.html:69
+msgid "Judges"
+msgstr ""
+
+msgid "Save order"
+msgstr ""
+
+msgid "Drag rows to reorder groups."
+msgstr ""
+
+msgid "Order"
+msgstr ""
+
+msgid "Drag"
+msgstr ""
+
+msgid "Could not save order."
+msgstr ""
+
+msgid "Group ranking"
+msgstr ""
+
+msgid "No group totals yet."
+msgstr ""
+
+msgid "Exclude start checkpoint from found points"
+msgstr ""
+
+msgid "Exclude end checkpoint from found points"
+msgstr ""
+
+msgid "Competition Settings"
+msgstr ""
+
+msgid "Competition"
+msgstr ""
+
+msgid "Public results"
+msgstr ""
+
+msgid "Allow anyone with the link to view results."
+msgstr ""
+
+msgid "Public results link"
+msgstr ""
+
+msgid "Copied"
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Public results are not enabled for this competition."
+msgstr ""
+
+msgid "Competition settings updated."
+msgstr ""
+
+msgid "Competition not found."
+msgstr ""
+
+msgid "Sheets Language"
+msgstr ""
+
+msgid "Sheets Language Pack"
+msgstr ""
+
+msgid "Back to Sheets admin"
+msgstr ""
+
+msgid "Labels & defaults"
+msgstr ""
+
+msgid "Common headers"
+msgstr ""
+
+msgid "Arrived header"
+msgstr ""
+
+msgid "Points header"
+msgstr ""
+
+msgid "Dead time header"
+msgstr ""
+
+msgid "Time header"
+msgstr ""
+
+msgid "Teams tab"
+msgstr ""
+
+msgid "Number header"
+msgstr ""
+
+msgid "Team name header"
+msgstr ""
+
+msgid "Org header"
+msgstr ""
+
+msgid "Arrivals tab"
+msgstr ""
+
+msgid "Score tab"
+msgstr ""
+
+msgid "Group header"
+msgstr ""
+
+msgid "Dead time sum header"
+msgstr ""
+
+msgid "Total header"
+msgstr ""
+
+msgid "Organization summary"
+msgstr ""
+
+msgid "Org name header"
+msgstr ""
+
+msgid "Teams list header"
+msgstr ""
+
+msgid "Team numbers header"
+msgstr ""
+
+msgid "Team count header"
+msgstr ""
+
+msgid "Org total header"
+msgstr ""
+
+msgid "Save language pack"
+msgstr ""
+
+msgid "Sheets Admin"
+msgstr ""
+
+msgid "Google Sheets (admin)"
+msgstr ""
+
+msgid "Language pack settings"
+msgstr ""
+
+msgid "Spreadsheet ID"
+msgstr ""
+
+msgid "Spreadsheet ID (used below)"
+msgstr ""
+
+msgid "Show ordering"
+msgstr ""
+
+msgid "Hide ordering"
+msgstr ""
+
+msgid "Global group order"
+msgstr ""
+
+msgid "Drag to reorder. This order applies to all checkpoint tabs."
+msgstr ""
+
+msgid "Global checkpoint order"
+msgstr ""
+
+msgid "Drag to reorder checkpoint columns."
+msgstr ""
+
+msgid "Per-group checkpoint order (drag within each group)"
+msgstr ""
+
+msgid "Drag to reorder; uncheck to exclude a checkpoint for this group."
+msgstr ""
+
+msgid "Wizard: create tabs for all checkpoints"
+msgstr ""
+
+msgid "Create"
+msgstr ""
+
+msgid "Checkpoint"
+msgstr ""
+
+msgid "Dead time?"
+msgstr ""
+
+msgid "Record time?"
+msgstr ""
+
+msgid "Extra headers (comma list)"
+msgstr ""
+
+msgid "Groups"
+msgstr ""
+
+msgid "e.g. Start time, Finish time"
+msgstr ""
+
+msgid "Run wizard"
+msgstr ""
+
+msgid "Arrivals tab name"
+msgstr ""
+
+msgid "Build / Refresh"
+msgstr ""
+
+msgid "Teams tab name"
+msgstr ""
+
+msgid "Teams headers (comma)"
+msgstr ""
+
+msgid "(optional override)"
+msgstr ""
+
+msgid "Score tab name"
+msgstr ""
+
+msgid "Include dead time sum"
+msgstr ""
+
+msgid "Add dead time sum column"
+msgstr ""
+
+msgid "Add checkpoint tab"
+msgstr ""
+
+msgid "Tab title"
+msgstr ""
+
+msgid "Checkpoint tab (e.g., Timeline)"
+msgstr ""
+
+msgid "Checkpoint (optional)"
+msgstr ""
+
+msgid "— none —"
+msgstr ""
+
+msgid "Groups & fields"
+msgstr ""
+
+msgid "GroupName|field1,field2"
+msgstr ""
+
+msgid "One line per group. Format: GroupName|field1,field2. Fields are optional."
+msgstr ""
+
+msgid "Include dead time column"
+msgstr ""
+
+msgid "Include time column"
+msgstr ""
+
+msgid "Add tab"
+msgstr ""
+
+msgid "Existing sheet configs"
+msgstr ""
+
+msgid "Prune missing tabs"
+msgstr ""
+
+msgid "Spreadsheet"
+msgstr ""
+
+msgid "Tab"
+msgstr ""
+
+msgid "Type"
+msgstr ""
+
+msgid "Actions"
+msgstr ""
+
+msgid "Created"
+msgstr ""
+
+msgid "Sync team numbers"
+msgstr ""
+
+msgid "—"
+msgstr ""
+
+msgid "No sheet configs yet."
+msgstr ""
+
+msgid "Language pack saved."
+msgstr ""
+
+msgid "Spreadsheet ID is required to build arrivals."
+msgstr ""
+
+msgid "Failed to build arrivals tab: %(error)s"
+msgstr ""
+
+msgid "Arrivals tab '%(tab)s' updated."
+msgstr ""
+
+msgid "Spreadsheet ID is required."
+msgstr ""
+
+msgid "Failed to build teams tab: %(error)s"
+msgstr ""
+
+msgid "Teams tab '%(tab)s' updated."
+msgstr ""
+
+msgid "Failed to build score tab: %(error)s"
+msgstr ""
+
+msgid "Score tab '%(tab)s' updated."
+msgstr ""
+
+msgid "No configs to prune."
+msgstr ""
+
+msgid "Could not init Sheets client: %(error)s"
+msgstr ""
+
+msgid "Pruned %(count)s stale config(s) (tabs no longer exist)."
+msgstr ""
+
+msgid "No stale configs found."
+msgstr ""
+
+msgid "Select at least one checkpoint to create."
+msgstr ""
+
+msgid "Wizard failed: %(error)s"
+msgstr ""
+
+msgid "Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing."
+msgstr ""
+
+msgid "Config not found."
+msgstr ""
+
+msgid "Config is missing groups; cannot sync."
+msgstr ""
+
+msgid "Failed to sync team numbers: %(error)s"
+msgstr ""
+
+msgid "Synced team numbers for checkpoint tabs."
+msgstr ""
+
+msgid "Spreadsheet ID and tab title are required."
+msgstr ""
+
+msgid "At least one group line is required."
+msgstr ""
+
+msgid "Could not add tab: %(error)s"
+msgstr ""
+
+msgid "Check that the spreadsheet ID is correct and that the service account email has Editor access to it."
+msgstr ""
+
+msgid "Added tab '%(tab)s' to spreadsheet."
+msgstr ""
+
+msgid "Google OAuth is not configured."
+msgstr ""
+
+msgid "Invalid OAuth state."
+msgstr ""
+
+msgid "Google OAuth failed to return a code."
+msgstr ""
+
+msgid "Google OAuth token exchange failed."
+msgstr ""
+
+msgid "Google OAuth did not return an id_token."
+msgstr ""
+
+msgid "Google OAuth token verification failed."
+msgstr ""
+
+msgid "Google OAuth user info missing."
+msgstr ""
+
+msgid "No user is linked to this Google account."
+msgstr ""
+
+msgid "Sign in with Google"
+msgstr ""
+
+msgid "Google account did not provide an email."
+msgstr ""
+
+msgid "Account created via Google."
+msgstr ""
+
+msgid "Welcome"
+msgstr ""
+
+msgid "Sign in to manage competitions, or view public results below."
+msgstr ""
+
+msgid "Public Results"
+msgstr ""
+
+msgid "View results"
+msgstr ""
+
+msgid "View stats"
+msgstr ""
+
+msgid "No public results yet."
+msgstr ""
+
+msgid "Stats"
+msgstr ""
+
+msgid "Group statistics"
+msgstr ""
+
+msgid "Teams"
+msgstr ""
+
+msgid "Finished"
+msgstr ""
+
+msgid "Completion rate"
+msgstr ""
+
+msgid "Average points"
+msgstr ""
+
+msgid "Average overall time (min)"
+msgstr ""
+
+msgid "Median overall time (min)"
+msgstr ""
+
+msgid "Average checkpoints visited"
+msgstr ""
+
+msgid "Fastest team"
+msgstr ""
+
+msgid "Highest drop-off checkpoint"
+msgstr ""
+msgid "min"
+msgstr ""
+
+msgid "Average segment times (min)"
+msgstr ""
+
+msgid "From"
+msgstr ""
+
+msgid "To"
+msgstr ""
+
+msgid "Average time"
+msgstr ""
+
+msgid "Samples"
+msgstr ""
+
+msgid "No segment data yet."
+msgstr ""
+
+msgid "Valid email is required."
+msgstr ""
+
+msgid "Invalid role selected."
+msgstr ""
+
+msgid "An active invite already exists for this email."
+msgstr ""
+
+msgid "Invite saved."
+msgstr ""
+
+msgid "Invite by email"
+msgstr ""
+
+msgid "Email"
+msgstr ""
+
+msgid "Role"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "Expires"
+msgstr ""
+
+msgid "Used"
+msgstr ""
+
+msgid "Expired"
+msgstr ""
+
+msgid "Pending"
+msgstr ""
+
+msgid "No invites yet."
+msgstr ""
+
+msgid "Save invite"
+msgstr ""
+
+msgid "Invite not found."
+msgstr ""
+
+msgid "Invite revoked."
+msgstr ""
+
+msgid "Revoke this invite?"
+msgstr ""
+
+msgid "Revoke"
+msgstr ""
+
+msgid "Email (Google login)"
+msgstr ""
+
+msgid "Optional"
+msgstr ""
+
+msgid "Optional; used to link Google OAuth accounts."
+msgstr ""
+
+msgid "Tap the tag to read its UID and stored digests. We will verify which checkpoints match the truncated HMACs."
+msgstr ""
+
+msgid "Limit to checkpoints (optional)"
+msgstr ""
+
+msgid "Leave empty to check against all checkpoints."
+msgstr ""
+
+msgid "Needs Android Chrome 89+. We read text records, split by lines, and compare to all checkpoints (or your selection)."
+msgstr ""
+
+#: app/templates/judge_assign.html:3
+msgid "Judge Checkpoint Assignment"
+msgstr ""
+
+#: app/templates/judge_assign.html:9
+msgid "Select Judge"
+msgstr ""
+
+#: app/templates/judge_assign.html:13
+msgid "Choose..."
+msgstr ""
+
+#: app/templates/judge_assign.html:20
+msgid "Load Assignments"
+msgstr ""
+
+#: app/templates/judge_assign.html:27
+msgid "Assign Checkpoints"
+msgstr ""
+
+#: app/templates/judge_assign.html:31
+msgid "Select all checkpoints"
+msgstr ""
+
+#: app/templates/judge_assign.html:34
+msgid "Clear all"
+msgstr ""
+
+#: app/templates/judge_assign.html:35
+msgid "Use"
+msgstr ""
+
+#: app/templates/judge_assign.html:36
+msgid "Checkpoint"
+msgstr ""
+
+#: app/templates/judge_assign.html:37
+msgid "Default"
+msgstr ""
+
+#: app/templates/judge_assign.html:55
+msgid "Save Assignments"
+msgstr ""
+
+#: app/templates/judge_assign.html:56
+msgid "Back to Users"
+msgstr ""
+
+#: app/templates/judge_assign.html:60
+msgid "Select a judge to manage checkpoint access."
+msgstr ""
+
+#: app/blueprints/judges/routes.py:27
+msgid "Select a competition first."
+msgstr ""
+
+#: app/blueprints/judges/routes.py:57
+msgid "Select a judge."
+msgstr ""
+
+#: app/blueprints/judges/routes.py:67
+msgid "Invalid judge selection."
+msgstr ""
+
+#: app/blueprints/judges/routes.py:110
+msgid "Judge checkpoints updated."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:19
+msgid "Could not load groups."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:26
+msgid "Could not load devices."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:33
+msgid "Could not load checkpoints."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:50
+#: app/blueprints/checkpoints/routes.py:108
+msgid "Name is required."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:63
+msgid "Checkpoint added."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:68
+msgid "Could not add checkpoint."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:85
+msgid "Checkpoint not found."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:125
+msgid "Checkpoint updated."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:128
+msgid "Could not update checkpoint."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:166
+msgid "Checkpoint deleted."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:174
+msgid "Could not delete checkpoint."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:14
+msgid "Device is already assigned to %(checkpoint)s."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:16
+msgid "Device is already assigned to another checkpoint."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:18
+msgid "Selected device does not exist."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:20
+msgid "Selected device is not available for this competition."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:22
+msgid "Checkpoint name already exists."
+msgstr ""
+
+#: app/templates/rfid_judge.html:9
+msgid "Tap a tag with your phone to read its UID, call ingest for the selected checkpoint, then append the signed payload back onto the tag."
+msgstr ""
+
+#: app/templates/rfid_judge.html:14
+msgid "Uses the checkpoint ID sent to /api/ingest."
+msgstr ""
+
+#: app/templates/rfid_judge.html:16
+msgid "No checkpoints assigned yet."
+msgstr ""
+
+#: app/templates/rfid_judge.html:60
+msgid "Appended to the tag as a text record. We only store the truncated HMAC (checkpoint ID + card UID) to save space."
+msgstr ""
+
+#: app/templates/rfid_judge.html:104
+msgid "Pick a checkpoint first."
+msgstr ""
+
+#: app/templates/base.html:92
+msgid "Score"
+msgstr ""
+
+#: app/templates/base.html:93 app/templates/scores_view.html:2
+msgid "Scores"
+msgstr ""
+
+#: app/templates/base.html:94 app/templates/scores_submissions.html:2
+msgid "Score Submissions"
+msgstr ""
+
+#: app/templates/score_judge.html:2
+msgid "Judge Scoring"
+msgstr ""
+
+#: app/templates/score_judge.html:8
+msgid "Score via RFID"
+msgstr ""
+
+#: app/templates/score_judge.html:10
+msgid "Scan a team RFID tag to load scoring fields for the selected checkpoint."
+msgstr ""
+
+#: app/templates/score_judge.html:28
+msgid "Assign checkpoints to judges"
+msgstr ""
+
+#: app/templates/score_judge.html:33
+msgid "Ask an admin to assign checkpoints."
+msgstr ""
+
+#: app/templates/score_judge.html:15
+msgid "Tap tag to load fields"
+msgstr ""
+
+#: app/templates/score_judge.html:23
+msgid "Score Input"
+msgstr ""
+
+#: app/templates/score_judge.html:24
+msgid "Waiting for scan…"
+msgstr ""
+
+#: app/templates/score_judge.html:32
+msgid "Submit Score"
+msgstr ""
+
+#: app/templates/score_judge.html:83
+msgid "Web NFC not available in this browser."
+msgstr ""
+
+#: app/templates/score_judge.html:85
+msgid "Check-in created for this team at this checkpoint."
+msgstr ""
+
+#: app/templates/score_judge.html:86
+msgid "Failed to resolve tag."
+msgstr ""
+
+#: app/templates/score_judge.html:87
+msgid "Score saved."
+msgstr ""
+
+#: app/templates/score_judge.html:88
+msgid "Failed to save score."
+msgstr ""
+
+#: app/templates/scores_submissions.html:12
+msgid "All teams"
+msgstr ""
+
+#: app/templates/scores_submissions.html:19
+msgid "All checkpoints"
+msgstr ""
+
+#: app/templates/scores_submissions.html:31
+msgid "Submitted"
+msgstr ""
+
+#: app/templates/scores_submissions.html:35
+msgid "Dead time"
+msgstr ""
+
+#: app/templates/scores_submissions.html:37
+msgid "Fields"
+msgstr ""
+
+#: app/templates/scores_submissions.html:55
+msgid "No submissions yet."
+msgstr ""
+
+#: app/templates/scores_view.html:11
+msgid "All groups"
+msgstr ""
+
+#: app/templates/scores_view.html:13
+msgid "Show per-checkpoint"
+msgstr ""
+
+#: app/templates/scores_view.html:61
+msgid "Hide per-checkpoint"
+msgstr ""
+
+#: app/templates/scores_view.html:16
+msgid "Filter"
+msgstr ""
+
+#: app/templates/scores_view.html:24
+msgid "Group"
+msgstr ""
+
+#: app/templates/scores_view.html:25
+msgid "Number"
+msgstr ""
+
+#: app/templates/scores_view.html:26
+msgid "Team"
+msgstr ""
+
+#: app/templates/scores_view.html:27
+msgid "Dead time (sum)"
+msgstr ""
+
+#: app/templates/scores_view.html:28
+msgid "Time points"
+msgstr ""
+
+#: app/templates/scores_view.html:29 app/templates/team_edit.html:37
+msgid "DNF"
+msgstr ""
+
+#: app/templates/scores_view.html:39
+msgid "Organization totals"
+msgstr ""
+
+#: app/templates/scores_view.html:43
+msgid "Organization"
+msgstr ""
+
+#: app/templates/scores_view.html:54
+msgid "No organization totals yet."
+msgstr ""
+
+#: app/templates/scores_view.html:58
+msgid "DNF teams do not count toward organization totals."
+msgstr ""
+
+#: app/templates/team_edit.html:45
+msgid "DNF (Did Not Finish)"
+msgstr ""
+
+msgid "Place"
+msgstr ""
+
+msgid "Finished"
+msgstr ""
+
+#: app/templates/scores_view.html:29
+msgid "Found points"
+msgstr ""
+
+#: app/templates/scores_view.html:28
+msgid "Total points"
+msgstr ""
+
+#: app/templates/scores_view.html:29
+msgid "Actions"
+msgstr ""
+
+#: app/templates/scores_view.html:42
+msgid "View submissions"
+msgstr ""
+
+#: app/templates/scores_view.html:39
+msgid "No scores yet."
+msgstr ""
+
+#: app/templates/scores_view.html:43
+msgid "Dead time is summed from the latest score per checkpoint."
+msgstr ""
+
+#: app/templates/base.html:160
+msgid "Score Rules"
+msgstr ""
+
+#: app/templates/score_rules.html:2
+msgid "Score Rules"
+msgstr ""
+
+#: app/templates/score_rules.html:8
+msgid "Create / Update Rule"
+msgstr ""
+
+#: app/templates/score_rules.html:11
+msgid "Checkpoint"
+msgstr ""
+
+#: app/templates/score_rules.html:13
+msgid "Choose..."
+msgstr ""
+
+#: app/templates/score_rules.html:19
+msgid "Group"
+msgstr ""
+
+#: app/templates/score_rules.html:27
+msgid "Rules JSON"
+msgstr ""
+
+#: app/templates/score_rules.html:31
+msgid "Save Rule"
+msgstr ""
+
+#: app/templates/score_rules.html:38
+msgid "Existing Rules"
+msgstr ""
+
+#: app/templates/score_rules.html:45
+msgid "Updated"
+msgstr ""
+
+#: app/templates/score_rules.html:46
+msgid "Actions"
+msgstr ""
+
+#: app/templates/score_rules.html:57
+msgid "Delete this rule?"
+msgstr ""
+
+#: app/templates/score_rules.html:68
+msgid "No rules configured yet."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:53
+msgid "Select a competition first."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:73
+msgid "Checkpoint, group, and rules JSON are required."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:79
+msgid "Invalid JSON: %(error)s"
+msgstr ""
+
+#: app/blueprints/scores/routes.py:83 app/templates/score_rules.html:212
+msgid "Rules JSON must be an object."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:88 app/templates/score_rules.html:359
+msgid "Time-based scoring requires start and end checkpoints."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:94 app/templates/score_rules.html:479
+msgid "Global time rule requires start and end checkpoints."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:170
+msgid "Group is required for global rules."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:194
+msgid "Select at least one global rule."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:206
+msgid "Global rules updated."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:214
+msgid "Global rules created."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:234
+msgid "Global rule not found."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:239
+msgid "Global rule deleted."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:97
+msgid "Score rule updated."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:107
+msgid "Score rule created."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:126
+msgid "Score rule not found."
+msgstr ""
+
+#: app/blueprints/scores/routes.py:132
+msgid "Score rule deleted."
+msgstr ""
+
+#: app/templates/score_rules.html:25
+msgid "Load Fields"
+msgstr ""
+
+#: app/templates/score_rules.html:29
+msgid "Field Rules"
+msgstr ""
+
+#: app/templates/score_rules.html:31
+msgid "Configure per-field rules and which fields count toward total."
+msgstr ""
+
+#: app/templates/score_rules.html:35
+msgid "Time-based scoring"
+msgstr ""
+
+#: app/templates/score_rules.html:55 app/templates/score_rules.html:158
+msgid "Global Rules"
+msgstr ""
+
+#: app/templates/score_rules.html:57
+msgid "Toggle"
+msgstr ""
+
+#: app/templates/score_rules.html:145
+msgid "Save Global Rules"
+msgstr ""
+
+#: app/templates/score_rules.html:75
+msgid "Checkpoint found points"
+msgstr ""
+
+#: app/templates/score_rules.html:79
+msgid "Points per found checkpoint"
+msgstr ""
+
+#: app/templates/score_rules.html:83
+msgid "Counts checkins across checkpoints in this group."
+msgstr ""
+
+#: app/templates/score_rules.html:88
+msgid "Global time rule"
+msgstr ""
+
+#: app/templates/score_rules.html:111
+msgid "Time threshold (minutes)"
+msgstr ""
+
+#: app/templates/score_rules.html:115
+msgid "Penalty per minutes"
+msgstr ""
+
+#: app/templates/score_rules.html:124
+msgid "If time exceeds threshold, deduct points per penalty window."
+msgstr ""
+
+#: app/templates/score_rules.html:201
+msgid "No global rules configured yet."
+msgstr ""
+
+#: app/templates/score_rules.html:211
+msgid "Rules JSON must be valid JSON."
+msgstr ""
+
+#: app/templates/score_rules.html:38
+msgid "Enable time-based race scoring"
+msgstr ""
+
+#: app/templates/score_rules.html:42
+msgid "Start checkpoint"
+msgstr ""
+
+#: app/templates/score_rules.html:46
+msgid "End checkpoint"
+msgstr ""
+
+#: app/templates/score_rules.html:50
+msgid "Min points"
+msgstr ""
+
+#: app/templates/score_rules.html:54
+msgid "Max points"
+msgstr ""
+
+#: app/templates/score_rules.html:60
+msgid "You can edit JSON directly; the builder will keep it updated."
+msgstr ""
+
+#: app/templates/score_rules.html:64
+msgid "Preview"
+msgstr ""
+
+#: app/templates/score_rules.html:78
+msgid "Load"
+msgstr ""
+
+#: app/templates/score_rules.html:112
+msgid "Include in total"
+msgstr ""
+
+#: app/templates/score_rules.html:123
+msgid "Add rule"
+msgstr ""
+
+#: app/templates/score_rules.html:132
+msgid "No rule"
+msgstr ""
+
+#: app/templates/score_rules.html:133
+msgid "Mapping"
+msgstr ""
+
+#: app/templates/score_rules.html:134
+msgid "Interpolation"
+msgstr ""
+
+#: app/templates/score_rules.html:135
+msgid "Multiplier"
+msgstr ""
+
+#: app/templates/score_rules.html:136
+msgid "Found"
+msgstr ""
+
+#: app/templates/score_rules.html:137
+msgid "Deviation"
+msgstr ""
+
+#: app/templates/score_rules.html:148
+msgid "Remove rule"
+msgstr ""
+
+#: app/templates/score_rules.html:159
+msgid "Mapping grid (input → output)"
+msgstr ""
+
+#: app/templates/score_rules.html:162
+#: app/templates/score_rules.html:182
+msgid "Add row"
+msgstr ""
+
+#: app/templates/score_rules.html:179
+msgid "Interpolation points (x, y)"
+msgstr ""
+
+#: app/templates/score_rules.html:200
+msgid "Factor"
+msgstr ""
+
+#: app/templates/score_rules.html:206
+msgid "Points per checkpoint found"
+msgstr ""
+
+#: app/templates/score_rules.html:208
+msgid "Count checkpoints as found based on checkins."
+msgstr ""
+
+#: app/templates/score_rules.html:229
+msgid "Deviation scoring (penalize by distance)"
+msgstr ""
+
+#: app/templates/score_rules.html:232
+msgid "Target"
+msgstr ""
+
+#: app/templates/score_rules.html:240
+msgid "Penalty points"
+msgstr ""
+
+#: app/templates/score_rules.html:244
+msgid "Penalty distance"
+msgstr ""
+
+#: app/templates/score_judge.html:27
+msgid "Or select team"
+msgstr ""
+
+#: app/templates/score_judge.html:33
+msgid "Use this when the team has no RFID card."
+msgstr ""
+
+#: app/templates/score_judge.html:38
+msgid "Load fields"
+msgstr ""
+
+#: app/templates/score_judge.html:91
+msgid "Pick a team first."
+msgstr ""
+
+#: app/templates/users_list.html:7
+msgid "Judges"
+msgstr ""

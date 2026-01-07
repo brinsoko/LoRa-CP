@@ -7,6 +7,12 @@ from .extensions import db, login_manager, babel
 from .resources import register_resources
 from app.utils.time import to_datetime_local
 from .utils.perms import inject_perms
+from .utils.competition import (
+    ensure_default_competition,
+    get_current_competition,
+    get_current_competition_role,
+    get_user_competitions,
+)
 import logging
 import os
 
@@ -76,9 +82,13 @@ def create_app() -> Flask:
     from app.blueprints.messages.routes import messages_bp
     from app.blueprints.docs.routes import docs_bp
     from app.blueprints.users.routes import users_bp
+    from app.blueprints.judges.routes import judges_bp
+    from app.blueprints.scores.routes import scores_bp
     from app.blueprints.sheets.routes import sheets_bp
 
     app.register_blueprint(users_bp, url_prefix="/users")
+    app.register_blueprint(judges_bp, url_prefix="/judges")
+    app.register_blueprint(scores_bp, url_prefix="/scores")
     app.register_blueprint(docs_bp, url_prefix="/docs")
     app.register_blueprint(messages_bp, url_prefix="/messages")
     app.register_blueprint(lora_bp, url_prefix="/lora")
@@ -94,6 +104,10 @@ def create_app() -> Flask:
 
     with app.app_context():
         db.create_all()
+        try:
+            ensure_default_competition()
+        except Exception:
+            app.logger.exception("Failed to ensure default competition")
 
     @app.errorhandler(403)
     def forbidden(e):
@@ -124,12 +138,23 @@ def create_app() -> Flask:
         # Babel determines the locale via locale_selector; store it for templates
         g.locale = str(get_locale() or _select_locale())
 
+    @app.before_request
+    def _set_competition_on_g():
+        g.current_competition = get_current_competition()
+
     @app.context_processor
     def inject_current_app():
         return dict(
             current_app=current_app,
             languages=current_app.config.get("LANGUAGES", {}),
             current_locale=getattr(g, "locale", None) or str(get_locale() or _select_locale()),
+            current_competition=getattr(g, "current_competition", None),
+            current_competition_role=get_current_competition_role(),
+            available_competitions=(
+                get_user_competitions(current_user.id)
+                if getattr(current_user, "is_authenticated", False)
+                else []
+            ),
         )
 
     return app

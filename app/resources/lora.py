@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import LoRaDevice, Checkpoint
 from app.utils.rest_auth import json_login_required, json_roles_required
+from app.utils.competition import require_current_competition_id
 
 
 def _serialize_device(device: LoRaDevice) -> dict:
@@ -66,8 +67,12 @@ class LoRaDeviceListResource(Resource):
     method_decorators = [json_login_required]
 
     def get(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         devices = (
             LoRaDevice.query
+            .filter(LoRaDevice.competition_id == comp_id)
             .options(joinedload(LoRaDevice.checkpoint))
             .order_by(LoRaDevice.name.asc().nulls_last(), LoRaDevice.dev_num.asc())
             .all()
@@ -76,16 +81,24 @@ class LoRaDeviceListResource(Resource):
 
     @json_roles_required("judge", "admin")
     def post(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         payload = request.get_json(silent=True) or {}
         data, errors = _parse_device_payload(payload, for_update=False)
         if errors:
             return {"error": "validation_error", "detail": errors}, 400
 
         dev_num = data.get("dev_num")
-        if LoRaDevice.query.filter_by(dev_num=dev_num).first():
+        if (
+            LoRaDevice.query
+            .filter(LoRaDevice.competition_id == comp_id, LoRaDevice.dev_num == dev_num)
+            .first()
+        ):
             return {"error": "conflict", "detail": "Device number already exists."}, 409
 
         device = LoRaDevice(
+            competition_id=comp_id,
             dev_num=data.get("dev_num"),
             name=data.get("name"),
             note=data.get("note"),
@@ -101,10 +114,14 @@ class LoRaDeviceItemResource(Resource):
     method_decorators = [json_login_required]
 
     def get(self, device_id: int):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         device = (
             LoRaDevice.query
+            .filter(LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id)
             .options(joinedload(LoRaDevice.checkpoint))
-            .get(device_id)
+            .first()
         )
         if not device:
             return {"error": "not_found"}, 404
@@ -119,7 +136,12 @@ class LoRaDeviceItemResource(Resource):
         return self._update(device_id, partial=False)
 
     def _update(self, device_id: int, partial: bool):
-        device = LoRaDevice.query.get(device_id)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        device = LoRaDevice.query.filter(
+            LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id
+        ).first()
         if not device:
             return {"error": "not_found"}, 404
 
@@ -132,7 +154,11 @@ class LoRaDeviceItemResource(Resource):
             dev_num = data["dev_num"]
             if dev_num is None:
                 return {"error": "validation_error", "detail": "dev_num is required"}, 400
-            exists = LoRaDevice.query.filter(LoRaDevice.dev_num == dev_num, LoRaDevice.id != device.id).first()
+            exists = LoRaDevice.query.filter(
+                LoRaDevice.competition_id == comp_id,
+                LoRaDevice.dev_num == dev_num,
+                LoRaDevice.id != device.id,
+            ).first()
             if exists:
                 return {"error": "conflict", "detail": "Device number already exists."}, 409
             device.dev_num = dev_num
@@ -146,7 +172,12 @@ class LoRaDeviceItemResource(Resource):
 
     @json_roles_required("admin")
     def delete(self, device_id: int):
-        device = LoRaDevice.query.get(device_id)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        device = LoRaDevice.query.filter(
+            LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id
+        ).first()
         if not device:
             return {"error": "not_found"}, 404
 

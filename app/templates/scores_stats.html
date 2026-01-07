@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Stats') }}{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5 class="card-title mb-3">
+      {{ _('Group statistics') }}
+      {% if public_competition %}
+        <span class="text-muted small ms-2">{{ public_competition.name }}</span>
+      {% endif %}
+    </h5>
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <canvas id="avgPointsChart" height="180"></canvas>
+      </div>
+      <div class="col-lg-6">
+        <canvas id="avgTimeChart" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% for g in groups %}
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h6 class="card-title mb-2">{{ g.name }}</h6>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <dl class="row mb-0">
+            <dt class="col-6">{{ _('Teams') }}</dt>
+            <dd class="col-6">{{ g.team_count }}</dd>
+            <dt class="col-6">{{ _('Finished') }}</dt>
+            <dd class="col-6">{{ g.finished_count }}</dd>
+            <dt class="col-6">{{ _('Completion rate') }}</dt>
+            <dd class="col-6">{{ (g.completion_rate * 100)|round(0)|int }}%</dd>
+            <dt class="col-6">{{ _('Average points') }}</dt>
+            <dd class="col-6">{{ (g.avg_points or 0)|round(0)|int }}</dd>
+            <dt class="col-6">{{ _('Average overall time (min)') }}</dt>
+            <dd class="col-6">
+              {% if g.avg_time_minutes is not none %}
+                {{ (g.avg_time_minutes)|round(0)|int }}
+              {% else %}
+                —
+              {% endif %}
+            </dd>
+            <dt class="col-6">{{ _('Median overall time (min)') }}</dt>
+            <dd class="col-6">
+              {% if g.median_time_minutes is not none %}
+                {{ (g.median_time_minutes)|round(0)|int }}
+              {% else %}
+                —
+              {% endif %}
+            </dd>
+            <dt class="col-6">{{ _('Average checkpoints visited') }}</dt>
+            <dd class="col-6">
+              {% if g.avg_checkpoint_count is not none %}
+                {{ (g.avg_checkpoint_count)|round(0)|int }}
+              {% else %}
+                —
+              {% endif %}
+            </dd>
+            <dt class="col-6">{{ _('Fastest team') }}</dt>
+            <dd class="col-6">
+              {% if g.fastest_team %}
+                {{ g.fastest_team }} ({{ (g.fastest_minutes or 0)|round(0)|int }} {{ _('min') }})
+              {% else %}
+                —
+              {% endif %}
+            </dd>
+            <dt class="col-6">{{ _('Highest drop-off checkpoint') }}</dt>
+            <dd class="col-6">
+              {% if g.dropoff_checkpoint %}
+                {{ g.dropoff_checkpoint }} ({{ ((g.dropoff_rate or 0) * 100)|round(0)|int }}%)
+              {% else %}
+                —
+              {% endif %}
+            </dd>
+          </dl>
+        </div>
+        <div class="col-md-6">
+          <h6 class="mb-2">{{ _('Average segment times (min)') }}</h6>
+          {% if g.segments %}
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th>{{ _('From') }}</th>
+                    <th>{{ _('To') }}</th>
+                    <th class="text-end">{{ _('Average time') }}</th>
+                    <th class="text-end">{{ _('Samples') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for s in g.segments %}
+                    <tr>
+                      <td>{{ s.from_name or s.from_id }}</td>
+                      <td>{{ s.to_name or s.to_id }}</td>
+                      <td class="text-end">
+                        {% if s.avg_minutes is not none %}
+                          {{ (s.avg_minutes)|round(0)|int }}
+                        {% else %}
+                          —
+                        {% endif %}
+                      </td>
+                      <td class="text-end">{{ s.sample_count }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <p class="text-muted mb-0">{{ _('No segment data yet.') }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const groupLabels = {{ chart_groups | tojson }};
+  const avgPoints = {{ chart_points | tojson }};
+  const avgTimes = {{ chart_times | tojson }};
+
+  const pointsCtx = document.getElementById("avgPointsChart");
+  if (pointsCtx) {
+    new Chart(pointsCtx, {
+      type: "bar",
+      data: {
+        labels: groupLabels,
+        datasets: [{
+          label: "{{ _('Average points') }}",
+          data: avgPoints,
+          backgroundColor: "rgba(13, 110, 253, 0.6)",
+          borderColor: "rgba(13, 110, 253, 1)",
+          borderWidth: 1,
+        }],
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  const timeCtx = document.getElementById("avgTimeChart");
+  if (timeCtx) {
+    new Chart(timeCtx, {
+      type: "bar",
+      data: {
+        labels: groupLabels,
+        datasets: [{
+          label: "{{ _('Average overall time (min)') }}",
+          data: avgTimes,
+          backgroundColor: "rgba(25, 135, 84, 0.6)",
+          borderColor: "rgba(25, 135, 84, 1)",
+          borderWidth: 1,
+        }],
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  }
+</script>
+{% endblock %}

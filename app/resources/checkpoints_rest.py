@@ -10,6 +10,7 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, LoRaDevice
 from app.utils.rest_auth import json_login_required, json_roles_required
+from app.utils.competition import require_current_competition_id
 
 
 def _serialize_checkpoint(cp: Checkpoint) -> dict:
@@ -67,7 +68,10 @@ def _apply_groups(cp: Checkpoint, group_ids: List[int]) -> None:
     groups = (
         db.session.query(CheckpointGroup)
         .options(joinedload(CheckpointGroup.checkpoint_links))
-        .filter(CheckpointGroup.id.in_(group_ids))
+        .filter(
+            CheckpointGroup.id.in_(group_ids),
+            CheckpointGroup.competition_id == cp.competition_id,
+        )
         .all()
     )
     group_lookup = {g.id: g for g in groups}
@@ -90,21 +94,31 @@ def _apply_groups(cp: Checkpoint, group_ids: List[int]) -> None:
     cp.group_links = new_links
 
 
-def _assign_lora_device(cp: Checkpoint, device_id: Optional[int]) -> Optional[str]:
+def _assign_lora_device(cp: Checkpoint, device_id: Optional[int]) -> Optional[dict]:
     if not device_id:
         cp.lora_device = None
         return None
 
     device = LoRaDevice.query.get(device_id)
     if not device:
-        return "Invalid device."
+        return {"error": "invalid_device", "detail": "Invalid device."}
+    if device.competition_id != cp.competition_id:
+        return {
+            "error": "invalid_device_competition",
+            "detail": "Device not available for this competition.",
+        }
 
     existing = Checkpoint.query.filter(
         Checkpoint.lora_device_id == device.id,
         Checkpoint.id != cp.id,
     ).first()
     if existing:
-        return f"Device already attached to checkpoint '{existing.name}'."
+        return {
+            "error": "device_in_use",
+            "detail": f"Device already attached to checkpoint '{existing.name}'.",
+            "checkpoint_id": existing.id,
+            "checkpoint_name": existing.name,
+        }
 
     cp.lora_device = device
     return None
@@ -114,8 +128,12 @@ class CheckpointListResource(Resource):
     method_decorators = [json_login_required]
 
     def get(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         cps = (
             Checkpoint.query
+            .filter(Checkpoint.competition_id == comp_id)
             .options(
                 joinedload(Checkpoint.group_links).joinedload(CheckpointGroupLink.group),
                 joinedload(Checkpoint.lora_device),
@@ -127,14 +145,22 @@ class CheckpointListResource(Resource):
 
     @json_roles_required("judge", "admin")
     def post(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         payload = request.get_json(silent=True) or {}
         name = (payload.get("name") or "").strip()
         if not name:
             return {"error": "validation_error", "detail": "name is required"}, 400
-        if Checkpoint.query.filter_by(name=name).first():
+        if (
+            Checkpoint.query
+            .filter(Checkpoint.competition_id == comp_id, Checkpoint.name == name)
+            .first()
+        ):
             return {"error": "duplicate", "detail": "Checkpoint name already exists."}, 409
 
         cp = Checkpoint(
+            competition_id=comp_id,
             name=name,
             location=(payload.get("location") or "").strip() or None,
             description=(payload.get("description") or "").strip() or None,
@@ -157,7 +183,7 @@ class CheckpointListResource(Resource):
             error = _assign_lora_device(cp, lora_device_id)
             if error:
                 db.session.rollback()
-                return {"error": "validation_error", "detail": error}, 400
+                return error, 400
 
         db.session.commit()
         return {"ok": True, "checkpoint": _serialize_checkpoint(cp)}, 201
@@ -167,13 +193,17 @@ class CheckpointItemResource(Resource):
     method_decorators = [json_login_required]
 
     def get(self, checkpoint_id: int):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         cp = (
             Checkpoint.query
+            .filter(Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id)
             .options(
                 joinedload(Checkpoint.group_links).joinedload(CheckpointGroupLink.group),
                 joinedload(Checkpoint.lora_device),
             )
-            .get(checkpoint_id)
+            .first()
         )
         if not cp:
             return {"error": "not_found"}, 404
@@ -188,10 +218,14 @@ class CheckpointItemResource(Resource):
         return self._update(checkpoint_id, partial=False)
 
     def _update(self, checkpoint_id: int, partial: bool):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         cp = (
             Checkpoint.query
             .options(joinedload(Checkpoint.group_links))
-            .get(checkpoint_id)
+            .filter(Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id)
+            .first()
         )
         if not cp:
             return {"error": "not_found"}, 404
@@ -204,7 +238,11 @@ class CheckpointItemResource(Resource):
                 return {"error": "validation_error", "detail": "name is required"}, 400
             existing = (
                 Checkpoint.query
-                .filter(Checkpoint.name == name, Checkpoint.id != cp.id)
+                .filter(
+                    Checkpoint.competition_id == comp_id,
+                    Checkpoint.name == name,
+                    Checkpoint.id != cp.id,
+                )
                 .first()
             )
             if existing:
@@ -239,14 +277,21 @@ class CheckpointItemResource(Resource):
                 error = _assign_lora_device(cp, raw_device_id)
             if error:
                 db.session.rollback()
-                return {"error": "validation_error", "detail": error}, 400
+                return error, 400
 
         db.session.commit()
         return {"ok": True, "checkpoint": _serialize_checkpoint(cp)}, 200
 
     @json_roles_required("admin")
     def delete(self, checkpoint_id: int):
-        cp = Checkpoint.query.get(checkpoint_id)
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+        cp = (
+            Checkpoint.query
+            .filter(Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id)
+            .first()
+        )
         if not cp:
             return {"error": "not_found"}, 404
         if cp.checkins:
@@ -268,6 +313,9 @@ class CheckpointImportResource(Resource):
         Payload: { "items": [ {name, easting?, northing?, location?, description?, group_ids?, lora_device_id?, action?} ] }
         action: "create"|"update"|"upsert" (default upsert)
         """
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         payload = request.get_json(silent=True) or {}
         items = payload.get("items") or []
         if not isinstance(items, list):
@@ -289,7 +337,11 @@ class CheckpointImportResource(Resource):
                 continue
 
             action = (item.get("action") or "upsert").lower()
-            cp = Checkpoint.query.filter(Checkpoint.name == name).first()
+            cp = (
+                Checkpoint.query
+                .filter(Checkpoint.competition_id == comp_id, Checkpoint.name == name)
+                .first()
+            )
 
             if action == "create" and cp:
                 skipped += 1
@@ -302,7 +354,7 @@ class CheckpointImportResource(Resource):
 
             is_new = False
             if not cp:
-                cp = Checkpoint(name=name)
+                cp = Checkpoint(name=name, competition_id=comp_id)
                 db.session.add(cp)
                 db.session.flush()
                 is_new = True
@@ -337,7 +389,7 @@ class CheckpointImportResource(Resource):
                         continue
                     err = _assign_lora_device(cp, raw_device_id)
                     if err:
-                        errors.append({"index": idx, "detail": err})
+                        errors.append({"index": idx, "detail": err.get("detail")})
                         continue
 
             created += 1 if is_new else 0

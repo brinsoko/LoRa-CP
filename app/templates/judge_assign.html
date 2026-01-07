@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _('Judge Checkpoint Assignment') }}{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">{{ _('Select Judge') }}</h5>
+        <form method="get" action="{{ url_for('judges.assign_checkpoints') }}">
+          <div class="mb-3">
+            <select class="form-select" name="judge_id" required>
+              <option value="">{{ _('Choose...') }}</option>
+              {% for j in judges %}
+                <option value="{{ j.id }}" {% if j.id == selected_judge_id %}selected{% endif %}>
+                  {{ j.username }} ({{ j.role }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <button class="btn btn-outline-primary w-100">{{ _('Load Assignments') }}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">{{ _('Assign Checkpoints') }}</h5>
+        {% if selected_judge_id %}
+          <form method="post" action="{{ url_for('judges.assign_checkpoints') }}">
+            <input type="hidden" name="judge_id" value="{{ selected_judge_id }}">
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              <button class="btn btn-sm btn-outline-secondary" type="button" id="selectAllCheckpoints">
+                {{ _('Select all checkpoints') }}
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" type="button" id="clearAllCheckpoints">
+                {{ _('Clear all') }}
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-striped align-middle">
+                <thead>
+                  <tr>
+                    <th style="width: 80px;">{{ _('Use') }}</th>
+                    <th>{{ _('Checkpoint') }}</th>
+                    <th style="width: 120px;">{{ _('Default') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for cp in checkpoints %}
+                    <tr>
+                      <td>
+                        <input class="form-check-input" type="checkbox" name="checkpoint_ids" value="{{ cp.id }}"
+                               {% if cp.id in assigned_ids %}checked{% endif %}>
+                      </td>
+                      <td>{{ cp.name }}</td>
+                      <td>
+                        <input class="form-check-input" type="radio" name="default_checkpoint_id" value="{{ cp.id }}"
+                               {% if cp.id == default_checkpoint_id %}checked{% endif %}>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary">{{ _('Save Assignments') }}</button>
+              <a class="btn btn-outline-secondary" href="{{ url_for('users.list_users') }}">{{ _('Back to Users') }}</a>
+            </div>
+          </form>
+        {% else %}
+          <p class="text-muted mb-0">{{ _('Select a judge to manage checkpoint access.') }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% if selected_judge_id %}
+<script>
+  const selectAllBtn = document.getElementById("selectAllCheckpoints");
+  const clearAllBtn = document.getElementById("clearAllCheckpoints");
+  const checkpointChecks = document.querySelectorAll("input[name='checkpoint_ids']");
+  const defaultRadios = document.querySelectorAll("input[name='default_checkpoint_id']");
+
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener("click", () => {
+      checkpointChecks.forEach((cb) => { cb.checked = true; });
+      const firstRadio = defaultRadios[0];
+      if (firstRadio) firstRadio.checked = true;
+    });
+  }
+
+  if (clearAllBtn) {
+    clearAllBtn.addEventListener("click", () => {
+      checkpointChecks.forEach((cb) => { cb.checked = false; });
+      defaultRadios.forEach((rb) => { rb.checked = false; });
+    });
+  }
+</script>
+{% endif %}
+{% endblock %}

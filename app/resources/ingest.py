@@ -16,8 +16,8 @@ from app.utils.sheets_sync import mark_arrival_checkbox
 from app.utils.payloads import parse_gps_payload
 from app.utils.card_tokens import compute_card_digest
 
-def resolve_checkpoint_for_dev(dev_num: int) -> Checkpoint:
-    device = LoRaDevice.query.filter_by(dev_num=dev_num).first()
+def resolve_checkpoint_for_dev(competition_id: int, dev_num: int) -> Checkpoint:
+    device = LoRaDevice.query.filter_by(competition_id=competition_id, dev_num=dev_num).first()
 
     if device:
         if device.checkpoint:
@@ -28,6 +28,7 @@ def resolve_checkpoint_for_dev(dev_num: int) -> Checkpoint:
             return cp
 
         cp = Checkpoint(
+            competition_id=competition_id,
             name=f"Device {dev_num}",
             description="Auto-created from device ingest",
             lora_device_id=device.id,
@@ -36,11 +37,12 @@ def resolve_checkpoint_for_dev(dev_num: int) -> Checkpoint:
         db.session.flush()
         return cp
 
-    device = LoRaDevice(dev_num=dev_num, name=f"DEV-{dev_num}", active=True)
+    device = LoRaDevice(competition_id=competition_id, dev_num=dev_num, name=f"DEV-{dev_num}", active=True)
     db.session.add(device)
     db.session.flush()
 
     cp = Checkpoint(
+        competition_id=competition_id,
         name=f"Device {dev_num}",
         description="Auto-created from device ingest",
         lora_device_id=device.id,
@@ -51,7 +53,9 @@ def resolve_checkpoint_for_dev(dev_num: int) -> Checkpoint:
 
 
 _parser = reqparse.RequestParser(bundle_errors=True)
-_parser.add_argument("dev_id", type=int, required=True, help="dev_id is required (int).")
+_parser.add_argument("competition_id", type=int, required=True, help="competition_id is required (int).")
+_parser.add_argument("dev_id", type=int, required=False)
+_parser.add_argument("checkpoint_id", type=int, required=False)
 _parser.add_argument("payload", type=str, required=False)  # optional if gps_* provided
 _parser.add_argument("rssi", type=float)
 _parser.add_argument("snr", type=float)
@@ -95,7 +99,9 @@ def _card_writeback(uid: str,
 class IngestResource(Resource):
     def post(self):
         args = _parser.parse_args()  # supports JSON and form bodies
-        dev_id  = args["dev_id"]
+        competition_id = args["competition_id"]
+        dev_id  = args.get("dev_id")
+        checkpoint_id = args.get("checkpoint_id")
         payload = args.get("payload")
         rssi    = args.get("rssi")
         snr     = args.get("snr")
@@ -106,6 +112,13 @@ class IngestResource(Resource):
         gps_age = args.get("gps_age_ms")
 
         received_at = datetime.utcfromtimestamp(ts_unix) if ts_unix else datetime.utcnow()
+
+        if dev_id is None and checkpoint_id is None:
+            return {
+                "ok": False,
+                "error": "invalid_request",
+                "detail": "Provide either 'dev_id' or 'checkpoint_id'.",
+            }, 400
 
         # Accept either a raw payload string or structured GPS fields.
         if (payload is None or str(payload).strip() == "") and (gps_lat is not None and gps_lon is not None):
@@ -128,8 +141,10 @@ class IngestResource(Resource):
 
         try:
             # 1) Store raw message
+            dev_id_str = str(dev_id) if dev_id is not None else f"checkpoint:{checkpoint_id}"
             msg = LoRaMessage(
-                dev_id=int(dev_id),
+                competition_id=competition_id,
+                dev_id=dev_id_str,
                 payload=str(payload),
                 rssi=float(rssi) if rssi is not None else None,
                 snr=float(snr) if snr is not None else None,
@@ -138,13 +153,28 @@ class IngestResource(Resource):
             db.session.add(msg)
 
             # 2) Update device telemetry + resolve checkpoint
-            device = LoRaDevice.query.filter_by(dev_num=int(dev_id)).first()
-            if device:
-                device.last_seen = received_at
-                if rssi is not None:
-                    device.last_rssi = float(rssi)
-
-            cp = resolve_checkpoint_for_dev(int(dev_id))
+            cp = None
+            if dev_id is not None:
+                device = LoRaDevice.query.filter_by(
+                    competition_id=competition_id, dev_num=int(dev_id)
+                ).first()
+                if device:
+                    device.last_seen = received_at
+                    if rssi is not None:
+                        device.last_rssi = float(rssi)
+                cp = resolve_checkpoint_for_dev(competition_id, int(dev_id))
+            elif checkpoint_id is not None:
+                cp = Checkpoint.query.filter(
+                    Checkpoint.competition_id == competition_id,
+                    Checkpoint.id == checkpoint_id,
+                ).first()
+                if not cp:
+                    db.session.rollback()
+                    return {
+                        "ok": False,
+                        "error": "invalid_request",
+                        "detail": "Invalid checkpoint_id.",
+                    }, 400
 
             # 3) Auto check-in if payload matches RFID UID
             uid = str(payload).strip().upper()
@@ -157,16 +187,21 @@ class IngestResource(Resource):
 
             if card:
                 team = db.session.get(Team, card.team_id)
-                if team and cp:
+                if team and cp and team.competition_id == competition_id and cp.competition_id == competition_id:
                     team_obj = team
                     team_name = team.name
-                    exists = Checkin.query.filter_by(team_id=team.id, checkpoint_id=cp.id).first()
+                    exists = Checkin.query.filter_by(
+                        team_id=team.id,
+                        checkpoint_id=cp.id,
+                        competition_id=competition_id,
+                    ).first()
                     arrived_at = received_at
                     if not exists:
                         db.session.add(
                             Checkin(
                                 team_id=team.id,
                                 checkpoint_id=cp.id,
+                                competition_id=competition_id,
                                 timestamp=received_at,
                             )
                         )
@@ -182,7 +217,8 @@ class IngestResource(Resource):
 
             looks_like_uid = gps_lat is None and gps_lon is None and (payload is not None) and ("," not in str(payload))
             if looks_like_uid:
-                card_writeback = _card_writeback(uid, int(dev_id), cp, team_obj, received_at)
+                digest_id = int(dev_id) if dev_id is not None else int(checkpoint_id or 0)
+                card_writeback = _card_writeback(uid, digest_id, cp, team_obj, received_at)
 
             db.session.commit()
 
@@ -197,7 +233,7 @@ class IngestResource(Resource):
         resp = {
             "ok": True,
             "message_id": msg.id,
-            "dev_id": int(dev_id),
+            "dev_id": int(dev_id) if dev_id is not None else None,
             "uid_seen": bool(card),
             "team": team_name,
             "checkpoint": checkpoint_name,

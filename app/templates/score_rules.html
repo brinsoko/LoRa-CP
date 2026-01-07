@@ -1,0 +1,670 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Score Rules') }}{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">{{ _('Create / Update Rule') }}</h5>
+        <form method="post" id="ruleForm">
+          <div class="mb-3">
+            <label class="form-label">{{ _('Checkpoint') }}</label>
+            <select class="form-select" name="checkpoint_id" id="checkpointSelect" required>
+              <option value="">{{ _('Choose...') }}</option>
+              {% for cp in checkpoints %}
+                <option value="{{ cp.id }}">{{ cp.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('Group') }}</label>
+            <select class="form-select" name="group_id" id="groupSelect" required>
+              <option value="">{{ _('Choose...') }}</option>
+              {% for g in groups %}
+                <option value="{{ g.id }}">{{ g.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <button class="btn btn-outline-primary" type="button" id="loadFieldsBtn">{{ _('Load Fields') }}</button>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('Field Rules') }}</label>
+            <div id="fieldsBuilder" class="border rounded-3 p-3 bg-body-tertiary"></div>
+            <div class="form-text">{{ _('Configure per-field rules and which fields count toward total.') }}</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('Time-based scoring') }}</label>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="timeRaceEnabled">
+              <label class="form-check-label" for="timeRaceEnabled">{{ _('Enable time-based race scoring') }}</label>
+            </div>
+            <div class="row g-2">
+              <div class="col-md-6">
+                <label class="form-label">{{ _('Start checkpoint') }}</label>
+                <select class="form-select" id="timeStartCheckpoint">
+                  <option value="">{{ _('Choose...') }}</option>
+                  {% for cp in checkpoints %}
+                    <option value="{{ cp.id }}">{{ cp.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">{{ _('End checkpoint') }}</label>
+                <select class="form-select" id="timeEndCheckpoint">
+                  <option value="">{{ _('Choose...') }}</option>
+                  {% for cp in checkpoints %}
+                    <option value="{{ cp.id }}">{{ cp.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">{{ _('Min points') }}</label>
+                <input type="number" class="form-control" id="timeMinPoints" value="0">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">{{ _('Max points') }}</label>
+                <input type="number" class="form-control" id="timeMaxPoints" value="100">
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('Rules JSON') }}</label>
+            <textarea class="form-control" name="rules_json" id="rulesJson" rows="10" required></textarea>
+            <div class="form-text">{{ _('You can edit JSON directly; the builder will keep it updated.') }}</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ _('Preview') }}</label>
+            <pre class="bg-body-tertiary rounded p-2 small" id="rulesPreview">{}</pre>
+          </div>
+          <button class="btn btn-primary">{{ _('Save Rule') }}</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h5 class="card-title mb-0">{{ _('Global Rules') }}</h5>
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#globalRulesCollapse">
+            {{ _('Toggle') }}
+          </button>
+        </div>
+        <div class="collapse" id="globalRulesCollapse">
+          <form method="post" action="{{ url_for('scores.save_global_rules') }}" id="globalRulesForm">
+            <div class="mb-3">
+              <label class="form-label">{{ _('Group') }}</label>
+              <select class="form-select" name="global_group_id" id="globalGroupSelect" required>
+                <option value="">{{ _('Choose...') }}</option>
+                {% for g in groups %}
+                  <option value="{{ g.id }}">{{ g.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="globalFoundEnabled" name="global_found_enabled" value="1">
+                <label class="form-check-label" for="globalFoundEnabled">{{ _('Checkpoint found points') }}</label>
+              </div>
+              <label class="form-label">{{ _('Points per found checkpoint') }}</label>
+              <input type="number" class="form-control" id="globalFoundPoints" name="global_found_points" value="0">
+              <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" id="globalFoundExcludeStart" name="global_found_exclude_start" value="1">
+                <label class="form-check-label" for="globalFoundExcludeStart">{{ _('Exclude start checkpoint from found points') }}</label>
+              </div>
+              <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" id="globalFoundExcludeEnd" name="global_found_exclude_end" value="1">
+                <label class="form-check-label" for="globalFoundExcludeEnd">{{ _('Exclude end checkpoint from found points') }}</label>
+              </div>
+              <div class="form-text">{{ _('Counts checkins across checkpoints in this group.') }}</div>
+            </div>
+            <div class="mb-3">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="globalTimeEnabled" name="global_time_enabled" value="1">
+                <label class="form-check-label" for="globalTimeEnabled">{{ _('Global time rule') }}</label>
+              </div>
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label">{{ _('Start checkpoint') }}</label>
+                  <select class="form-select" id="globalTimeStartCheckpoint" name="global_time_start_checkpoint_id">
+                    <option value="">{{ _('Choose...') }}</option>
+                    {% for cp in checkpoints %}
+                      <option value="{{ cp.id }}">{{ cp.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ _('End checkpoint') }}</label>
+                  <select class="form-select" id="globalTimeEndCheckpoint" name="global_time_end_checkpoint_id">
+                    <option value="">{{ _('Choose...') }}</option>
+                    {% for cp in checkpoints %}
+                      <option value="{{ cp.id }}">{{ cp.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">{{ _('Max points') }}</label>
+                  <input type="number" class="form-control" id="globalTimeMaxPoints" name="global_time_max_points" value="100">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">{{ _('Time threshold (minutes)') }}</label>
+                  <input type="number" class="form-control" id="globalTimeThreshold" name="global_time_threshold" value="0">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">{{ _('Penalty per minutes') }}</label>
+                  <input type="number" class="form-control" id="globalTimePenaltyMinutes" name="global_time_penalty_minutes" value="1">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">{{ _('Penalty points') }}</label>
+                  <input type="number" class="form-control" id="globalTimePenaltyPoints" name="global_time_penalty_points" value="1">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">{{ _('Min points') }}</label>
+                  <input type="number" class="form-control" id="globalTimeMinPoints" name="global_time_min_points" value="0">
+                </div>
+              </div>
+              <div class="form-text">{{ _('If time exceeds threshold, deduct points per penalty window.') }}</div>
+            </div>
+            <button class="btn btn-primary">{{ _('Save Global Rules') }}</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">{{ _('Existing Rules') }}</h5>
+        {% if rules %}
+          <div class="table-responsive">
+            <table class="table table-striped align-middle">
+              <thead>
+                <tr>
+                  <th>{{ _('Checkpoint') }}</th>
+                  <th>{{ _('Group') }}</th>
+                  <th>{{ _('Updated') }}</th>
+                  <th class="text-end">{{ _('Actions') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in rules %}
+                <tr>
+                  <td>{{ r.checkpoint.name if r.checkpoint else r.checkpoint_id }}</td>
+                  <td>{{ r.group.name if r.group else r.group_id }}</td>
+                  <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '' }}</td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-outline-secondary me-2 loadRuleBtn"
+                            data-rule='{{ r.rules | tojson }}'
+                            data-checkpoint-id="{{ r.checkpoint_id }}"
+                            data-group-id="{{ r.group_id }}">
+                      {{ _('Load') }}
+                    </button>
+                    <form method="post" action="{{ url_for('scores.delete_score_rule', rule_id=r.id) }}" class="d-inline"
+                          onsubmit="return confirm('{{ _('Delete this rule?') }}');">
+                      <button class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
+                    </form>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="4">
+                    <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ r.rules | tojson(indent=2) }}</pre>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">{{ _('No rules configured yet.') }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <h5 class="card-title mb-3">{{ _('Global Rules') }}</h5>
+        {% if global_rules %}
+          <div class="table-responsive">
+            <table class="table table-striped align-middle">
+              <thead>
+                <tr>
+                  <th>{{ _('Group') }}</th>
+                  <th>{{ _('Updated') }}</th>
+                  <th class="text-end">{{ _('Actions') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in global_rules %}
+                <tr>
+                  <td>{{ r.group.name if r.group else r.group_id }}</td>
+                  <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '' }}</td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-outline-secondary me-2 loadGlobalRuleBtn"
+                            data-rule='{{ r.rules | tojson }}'
+                            data-group-id="{{ r.group_id }}">
+                      {{ _('Load') }}
+                    </button>
+                    <form method="post" action="{{ url_for('scores.delete_global_rule', rule_id=r.id) }}" class="d-inline"
+                          onsubmit="return confirm('{{ _('Delete this rule?') }}');">
+                      <button class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
+                    </form>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="3">
+                    <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ r.rules | tojson(indent=2) }}</pre>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">{{ _('No global rules configured yet.') }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const checkpointSelect = document.getElementById("checkpointSelect");
+  const groupSelect = document.getElementById("groupSelect");
+  const loadFieldsBtn = document.getElementById("loadFieldsBtn");
+  const fieldsBuilder = document.getElementById("fieldsBuilder");
+  const rulesJson = document.getElementById("rulesJson");
+  const rulesPreview = document.getElementById("rulesPreview");
+  const timeRaceEnabled = document.getElementById("timeRaceEnabled");
+  const timeStartCheckpoint = document.getElementById("timeStartCheckpoint");
+  const timeEndCheckpoint = document.getElementById("timeEndCheckpoint");
+  const timeMinPoints = document.getElementById("timeMinPoints");
+  const timeMaxPoints = document.getElementById("timeMaxPoints");
+  const ruleForm = document.getElementById("ruleForm");
+
+  const msgInvalidJson = "{{ _('Rules JSON must be valid JSON.') }}";
+  const msgObjectJson = "{{ _('Rules JSON must be an object.') }}";
+  const msgTimeRaceFields = "{{ _('Time-based scoring requires start and end checkpoints.') }}";
+
+  let currentFields = [];
+  let headers = {};
+
+  function renderFieldRow(field) {
+    const row = document.createElement("div");
+    row.className = "mb-3 border rounded-3 p-2 bg-body";
+
+    const header = document.createElement("div");
+    header.className = "d-flex align-items-center justify-content-between mb-2";
+    header.innerHTML = `
+      <strong>${field}</strong>
+      <label class="form-check-label">
+        <input type="checkbox" class="form-check-input me-1 total-field" data-field="${field}" checked>
+        {{ _('Include in total') }}
+      </label>
+    `;
+
+    const rulesWrap = document.createElement("div");
+    rulesWrap.className = "rule-chain";
+    rulesWrap.dataset.field = field;
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "btn btn-sm btn-outline-primary";
+    addBtn.textContent = "{{ _('Add rule') }}";
+    addBtn.addEventListener("click", () => addRuleBlock(rulesWrap));
+
+    row.appendChild(header);
+    row.appendChild(rulesWrap);
+    row.appendChild(addBtn);
+    return row;
+  }
+
+  function addRuleBlock(container, rule) {
+    const block = document.createElement("div");
+    block.className = "border rounded-3 p-2 mt-2";
+
+    const typeSelect = document.createElement("select");
+    typeSelect.className = "form-select form-select-sm mb-2 rule-type";
+    typeSelect.innerHTML = `
+      <option value="">{{ _('No rule') }}</option>
+      <option value="mapping">{{ _('Mapping') }}</option>
+      <option value="interpolate">{{ _('Interpolation') }}</option>
+      <option value="multiplier">{{ _('Multiplier') }}</option>
+      <option value="found">{{ _('Found') }}</option>
+      <option value="deviation">{{ _('Deviation') }}</option>
+    `;
+    if (rule && rule.type) typeSelect.value = rule.type;
+
+    const configArea = document.createElement("div");
+    configArea.className = "rule-config";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn btn-sm btn-outline-danger mt-2";
+    removeBtn.textContent = "{{ _('Remove rule') }}";
+    removeBtn.addEventListener("click", () => {
+      block.remove();
+      syncRules();
+    });
+
+    typeSelect.addEventListener("change", () => {
+      renderRuleConfig(configArea, typeSelect.value, rule);
+      syncRules();
+    });
+
+    block.appendChild(typeSelect);
+    block.appendChild(configArea);
+    block.appendChild(removeBtn);
+    container.appendChild(block);
+    renderRuleConfig(configArea, typeSelect.value, rule);
+  }
+
+  function renderRuleConfig(container, type, rule) {
+    container.innerHTML = "";
+    if (type === "mapping") {
+      container.innerHTML = `
+        <div class="small text-muted mb-1">{{ _('Mapping grid (input → output)') }}</div>
+        <div class="mapping-grid"></div>
+        <button type="button" class="btn btn-sm btn-outline-secondary mt-2 add-map-row">{{ _('Add row') }}</button>
+      `;
+      const grid = container.querySelector(".mapping-grid");
+      const addRow = (inVal = "", outVal = "") => {
+        const row = document.createElement("div");
+        row.className = "d-flex gap-2 mb-2";
+        row.innerHTML = `
+          <input class="form-control form-control-sm map-in" placeholder="in" value="${inVal}">
+          <input class="form-control form-control-sm map-out" placeholder="out" value="${outVal}">
+          <button type="button" class="btn btn-sm btn-outline-danger">×</button>
+        `;
+        row.querySelector("button").addEventListener("click", () => { row.remove(); syncRules(); });
+        row.querySelectorAll("input").forEach((el) => el.addEventListener("input", syncRules));
+        grid.appendChild(row);
+      };
+      (rule && rule.map ? Object.entries(rule.map) : [["", ""]]).forEach(([k, v]) => addRow(k, v));
+      container.querySelector(".add-map-row").addEventListener("click", () => addRow("", ""));
+    } else if (type === "interpolate") {
+      container.innerHTML = `
+        <div class="small text-muted mb-1">{{ _('Interpolation points (x, y)') }}</div>
+        <div class="interp-grid"></div>
+        <button type="button" class="btn btn-sm btn-outline-secondary mt-2 add-interp-row">{{ _('Add row') }}</button>
+      `;
+      const grid = container.querySelector(".interp-grid");
+      const addRow = (xVal = "", yVal = "") => {
+        const row = document.createElement("div");
+        row.className = "d-flex gap-2 mb-2";
+        row.innerHTML = `
+          <input class="form-control form-control-sm interp-x" placeholder="x" value="${xVal}">
+          <input class="form-control form-control-sm interp-y" placeholder="y" value="${yVal}">
+          <button type="button" class="btn btn-sm btn-outline-danger">×</button>
+        `;
+        row.querySelector("button").addEventListener("click", () => { row.remove(); syncRules(); });
+        row.querySelectorAll("input").forEach((el) => el.addEventListener("input", syncRules));
+        grid.appendChild(row);
+      };
+      (rule && rule.points ? rule.points : [["", ""]]).forEach(([x, y]) => addRow(x, y));
+      container.querySelector(".add-interp-row").addEventListener("click", () => addRow("", ""));
+    } else if (type === "multiplier") {
+      const factor = rule && rule.factor !== undefined ? rule.factor : "";
+      container.innerHTML = `
+        <label class="form-label small">{{ _('Factor') }}</label>
+        <input class="form-control form-control-sm multiplier-factor" value="${factor}">
+      `;
+      container.querySelector(".multiplier-factor").addEventListener("input", syncRules);
+    } else if (type === "found") {
+      const pointsPer = rule && rule.points_per !== undefined ? rule.points_per : "";
+      const selected = new Set((rule && rule.checkpoint_ids) || []);
+      container.innerHTML = `
+        <label class="form-label small">{{ _('Points per checkpoint found') }}</label>
+        <input class="form-control form-control-sm found-points mb-2" value="${pointsPer}">
+        <div class="small text-muted mb-1">{{ _('Count checkpoints as found based on checkins.') }}</div>
+        <div class="found-list"></div>
+      `;
+      const list = container.querySelector(".found-list");
+      const checkpoints = [
+        {% for cp in checkpoints %}
+          { id: {{ cp.id }}, name: {{ cp.name | tojson }} },
+        {% endfor %}
+      ];
+      checkpoints.forEach((cp) => {
+        const wrap = document.createElement("div");
+        wrap.className = "form-check";
+        wrap.innerHTML = `
+          <input class="form-check-input found-checkpoint" type="checkbox" value="${cp.id}">
+          <label class="form-check-label">${cp.name}</label>
+        `;
+        const cb = wrap.querySelector("input");
+        if (selected.has(cp.id)) cb.checked = true;
+        cb.addEventListener("change", syncRules);
+        list.appendChild(wrap);
+      });
+      container.querySelector(".found-points").addEventListener("input", syncRules);
+    } else if (type === "deviation") {
+      const target = rule && rule.target !== undefined ? rule.target : "";
+      const maxPoints = rule && rule.max_points !== undefined ? rule.max_points : "";
+      const penaltyPoints = rule && rule.penalty_points !== undefined ? rule.penalty_points : "";
+      const penaltyDistance = rule && rule.penalty_distance !== undefined ? rule.penalty_distance : "";
+      const minPoints = rule && rule.min_points !== undefined ? rule.min_points : "";
+      container.innerHTML = `
+        <div class="small text-muted mb-1">{{ _('Deviation scoring (penalize by distance)') }}</div>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label small">{{ _('Target') }}</label>
+            <input class="form-control form-control-sm deviation-target" value="${target}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">{{ _('Max points') }}</label>
+            <input class="form-control form-control-sm deviation-max" value="${maxPoints}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">{{ _('Penalty points') }}</label>
+            <input class="form-control form-control-sm deviation-penalty-points" value="${penaltyPoints}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">{{ _('Penalty distance') }}</label>
+            <input class="form-control form-control-sm deviation-penalty-distance" value="${penaltyDistance}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">{{ _('Min points') }}</label>
+            <input class="form-control form-control-sm deviation-min" value="${minPoints}">
+          </div>
+        </div>
+      `;
+      container.querySelectorAll("input").forEach((el) => el.addEventListener("input", syncRules));
+    }
+  }
+
+  function renderFields() {
+    fieldsBuilder.innerHTML = "";
+    currentFields.forEach((f) => {
+      fieldsBuilder.appendChild(renderFieldRow(f));
+    });
+    syncRules();
+  }
+
+  function readRulesFromUI() {
+    const fieldRules = {};
+    const totalFields = [];
+    fieldsBuilder.querySelectorAll(".total-field").forEach((cb) => {
+      if (cb.checked) totalFields.push(cb.dataset.field);
+    });
+    fieldsBuilder.querySelectorAll(".rule-chain").forEach((chain) => {
+      const field = chain.dataset.field;
+      const blocks = [];
+      chain.querySelectorAll(".rule-type").forEach((select) => {
+        const type = select.value;
+        if (!type) return;
+        const config = select.closest(".border").querySelector(".rule-config");
+        if (type === "mapping") {
+          const map = {};
+          config.querySelectorAll(".mapping-grid .d-flex").forEach((row) => {
+            const key = row.querySelector(".map-in").value;
+            const val = row.querySelector(".map-out").value;
+            if (key !== "") map[key] = val;
+          });
+          blocks.push({ type: "mapping", map });
+        } else if (type === "interpolate") {
+          const points = [];
+          config.querySelectorAll(".interp-grid .d-flex").forEach((row) => {
+            const x = row.querySelector(".interp-x").value;
+            const y = row.querySelector(".interp-y").value;
+            if (x !== "" && y !== "") points.push([x, y]);
+          });
+          blocks.push({ type: "interpolate", points });
+        } else if (type === "multiplier") {
+          const factor = config.querySelector(".multiplier-factor").value;
+          blocks.push({ type: "multiplier", factor });
+        } else if (type === "found") {
+          const pointsPer = config.querySelector(".found-points").value;
+          const checkpointIds = Array.from(config.querySelectorAll(".found-checkpoint:checked"))
+            .map((el) => parseInt(el.value, 10))
+            .filter((val) => !Number.isNaN(val));
+          blocks.push({ type: "found", points_per: pointsPer, checkpoint_ids: checkpointIds });
+        } else if (type === "deviation") {
+          const target = config.querySelector(".deviation-target").value;
+          const maxPoints = config.querySelector(".deviation-max").value;
+          const penaltyPoints = config.querySelector(".deviation-penalty-points").value;
+          const penaltyDistance = config.querySelector(".deviation-penalty-distance").value;
+          const minPoints = config.querySelector(".deviation-min").value;
+          blocks.push({
+            type: "deviation",
+            target,
+            max_points: maxPoints,
+            penalty_points: penaltyPoints,
+            penalty_distance: penaltyDistance,
+            min_points: minPoints,
+          });
+        }
+      });
+      if (blocks.length) fieldRules[field] = blocks.length === 1 ? blocks[0] : blocks;
+    });
+
+    const rules = { field_rules: fieldRules, total_fields: totalFields };
+    if (timeRaceEnabled.checked) {
+      rules.time_race = {
+        start_checkpoint_id: timeStartCheckpoint.value || null,
+        end_checkpoint_id: timeEndCheckpoint.value || null,
+        min_points: timeMinPoints.value,
+        max_points: timeMaxPoints.value,
+      };
+    }
+    return rules;
+  }
+
+  function syncRules() {
+    const rules = readRulesFromUI();
+    const json = JSON.stringify(rules, null, 2);
+    rulesJson.value = json;
+    rulesPreview.textContent = json;
+  }
+
+  function validateRulesJson() {
+    const raw = (rulesJson.value || "").trim();
+    if (!raw) return true;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      alert(msgInvalidJson);
+      return false;
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      alert(msgObjectJson);
+      return false;
+    }
+    if (timeRaceEnabled.checked || parsed.time_race) {
+      const tr = parsed.time_race || {};
+      if (!tr.start_checkpoint_id || !tr.end_checkpoint_id) {
+        alert(msgTimeRaceFields);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  async function loadFields() {
+    const cpId = checkpointSelect.value;
+    const groupId = groupSelect.value;
+    if (!cpId || !groupId) return;
+    const resp = await fetch(`/api/score-rules/fields?checkpoint_id=${cpId}&group_id=${groupId}`, { credentials: "same-origin" });
+    const data = await resp.json();
+    const baseFields = [];
+    (data.fields || []).forEach((f) => baseFields.push(f));
+    currentFields = baseFields;
+    renderFields();
+  }
+
+  loadFieldsBtn.addEventListener("click", loadFields);
+  checkpointSelect.addEventListener("change", loadFields);
+  groupSelect.addEventListener("change", loadFields);
+  timeRaceEnabled.addEventListener("change", syncRules);
+  timeStartCheckpoint.addEventListener("change", syncRules);
+  timeEndCheckpoint.addEventListener("change", syncRules);
+  timeMinPoints.addEventListener("input", syncRules);
+  timeMaxPoints.addEventListener("input", syncRules);
+
+  document.querySelectorAll(".loadRuleBtn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      checkpointSelect.value = btn.dataset.checkpointId;
+      groupSelect.value = btn.dataset.groupId;
+      const rules = JSON.parse(btn.dataset.rule);
+      rulesJson.value = JSON.stringify(rules, null, 2);
+      rulesPreview.textContent = rulesJson.value;
+      if (rules.time_race) {
+        timeRaceEnabled.checked = true;
+        timeStartCheckpoint.value = rules.time_race.start_checkpoint_id || "";
+        timeEndCheckpoint.value = rules.time_race.end_checkpoint_id || "";
+        timeMinPoints.value = rules.time_race.min_points || 0;
+        timeMaxPoints.value = rules.time_race.max_points || 100;
+      }
+    });
+  });
+
+  rulesJson.addEventListener("input", () => {
+    rulesPreview.textContent = rulesJson.value || "{}";
+  });
+
+  ruleForm.addEventListener("submit", (event) => {
+    if (!validateRulesJson()) {
+      event.preventDefault();
+    }
+  });
+
+  const globalGroupSelect = document.getElementById("globalGroupSelect");
+  const globalFoundEnabled = document.getElementById("globalFoundEnabled");
+  const globalFoundPoints = document.getElementById("globalFoundPoints");
+  const globalFoundExcludeStart = document.getElementById("globalFoundExcludeStart");
+  const globalFoundExcludeEnd = document.getElementById("globalFoundExcludeEnd");
+  const globalTimeEnabled = document.getElementById("globalTimeEnabled");
+  const globalTimeStartCheckpoint = document.getElementById("globalTimeStartCheckpoint");
+  const globalTimeEndCheckpoint = document.getElementById("globalTimeEndCheckpoint");
+  const globalTimeMaxPoints = document.getElementById("globalTimeMaxPoints");
+  const globalTimeThreshold = document.getElementById("globalTimeThreshold");
+  const globalTimePenaltyMinutes = document.getElementById("globalTimePenaltyMinutes");
+  const globalTimePenaltyPoints = document.getElementById("globalTimePenaltyPoints");
+  const globalTimeMinPoints = document.getElementById("globalTimeMinPoints");
+
+  document.querySelectorAll(".loadGlobalRuleBtn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const rules = JSON.parse(btn.dataset.rule);
+      globalGroupSelect.value = btn.dataset.groupId;
+      globalFoundEnabled.checked = !!rules.found;
+      globalFoundPoints.value = (rules.found && rules.found.points_per) || 0;
+      globalFoundExcludeStart.checked = !!(rules.found && rules.found.exclude_start_checkpoint);
+      globalFoundExcludeEnd.checked = !!(rules.found && rules.found.exclude_end_checkpoint);
+      globalTimeEnabled.checked = !!rules.time;
+      if (rules.time) {
+        globalTimeStartCheckpoint.value = rules.time.start_checkpoint_id || "";
+        globalTimeEndCheckpoint.value = rules.time.end_checkpoint_id || "";
+        globalTimeMaxPoints.value = rules.time.max_points || 100;
+        globalTimeThreshold.value = rules.time.threshold_minutes || 0;
+        globalTimePenaltyMinutes.value = rules.time.penalty_minutes || 1;
+        globalTimePenaltyPoints.value = rules.time.penalty_points || 1;
+        globalTimeMinPoints.value = rules.time.min_points || 0;
+      }
+    });
+  });
+</script>
+{% endblock %}

@@ -2,8 +2,10 @@
 from __future__ import annotations
 from flask_restful import Resource, reqparse
 from app.extensions import db
-from app.models import LoRaMessage
+from app.models import LoRaMessage, Team
 from app.utils.payloads import parse_gps_payload
+from app.utils.rest_auth import json_roles_required
+from app.utils.competition import require_current_competition_id
 
 from app.utils.status import all_checkpoints_for_map, compute_team_statuses
 
@@ -11,20 +13,27 @@ _parser = reqparse.RequestParser(trim=True, bundle_errors=True)
 _parser.add_argument("team_id", type=int, required=False, location="args")
 
 class MapCheckpoints(Resource):
+    method_decorators = [json_roles_required("judge", "admin")]
     """
     GET /api/map/checkpoints
       - No team_id: returns ALL checkpoints (id, name, easting, northing)
       - team_id=N: returns ONLY checkpoints that team N has checked in at
     """
     def get(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         args = _parser.parse_args()
         team_id = args.get("team_id")
 
         if team_id:
-            status_summary = compute_team_statuses(team_id)
+            team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
+            if not team:
+                return {"error": "not_found", "detail": "Team not found."}, 404
+            status_summary = compute_team_statuses(team_id, comp_id)
             return status_summary.get("checkpoints", []), 200
 
-        cps = all_checkpoints_for_map()
+        cps = all_checkpoints_for_map(comp_id)
         return [
             {
                 "id": cp["id"],
@@ -46,12 +55,16 @@ _lora_parser.add_argument("limit", type=int, required=False, location="args")
 
 
 class LoRaMapPoints(Resource):
+    method_decorators = [json_roles_required("judge", "admin")]
     """
     GET /api/map/lora-points
       - dev_id omitted: latest GPS point per device that has GPS payloads
       - dev_id=N: up to `limit` recent points for the given device (default 50)
     """
     def get(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
         args = _lora_parser.parse_args()
         dev_id = args.get("dev_id")
         limit = args.get("limit") or 50
@@ -72,7 +85,10 @@ class LoRaMapPoints(Resource):
                 "received_at": msg.received_at.isoformat() if msg.received_at else None,
             }
 
-        q = LoRaMessage.query.filter(LoRaMessage.payload.like("pos,%"))
+        q = LoRaMessage.query.filter(
+            LoRaMessage.payload.like("pos,%"),
+            LoRaMessage.competition_id == comp_id,
+        )
         if dev_id is not None:
             # Store dev_id as string in DB
             q = q.filter(LoRaMessage.dev_id == str(dev_id))
