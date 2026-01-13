@@ -166,8 +166,12 @@ def login_google_callback():
             google_requests.Request(),
             client_id,
         )
-    except Exception:
-        flash("Google OAuth token verification failed.", "warning")
+    except Exception as exc:
+        current_app.logger.exception("Google OAuth token verification failed: %s", exc)
+        if current_app.debug:
+            flash(f"Google OAuth token verification failed: {exc}", "warning")
+        else:
+            flash("Google OAuth token verification failed.", "warning")
         return redirect(url_for("auth.login"))
 
     sub = id_info.get("sub")

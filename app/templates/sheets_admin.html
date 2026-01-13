@@ -7,6 +7,19 @@
 
 <div class="card mt-3">
   <div class="card-body">
+    {% if sheets_settings and not sheets_settings.sync_enabled %}
+      <div class="alert alert-warning">
+        {{ _('Sheets sync is disabled. Scoring will not update Google Sheets.') }}
+      </div>
+    {% endif %}
+    <form method="post" action="{{ url_for('sheets_admin.save_sheets_settings') }}" class="d-flex flex-wrap align-items-center gap-3 mb-3">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="sheets_sync_enabled" name="sheets_sync_enabled" value="1"
+               {% if sheets_settings and sheets_settings.sync_enabled %}checked{% endif %}>
+        <label class="form-check-label" for="sheets_sync_enabled">{{ _('Enable Sheets sync') }}</label>
+      </div>
+      <button class="btn btn-sm btn-outline-primary" type="submit">{{ _('Save') }}</button>
+    </form>
     <div class="d-flex justify-content-between">
       <div class="mb-3">
         <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('sheets_admin.lang_settings') }}">{{ _('Language pack settings') }}</a>
@@ -14,6 +27,11 @@
       <div class="mb-3 flex-grow-1 ms-3">
         <label class="form-label">{{ _('Spreadsheet ID') }}</label>
         <input class="form-control" id="global_spreadsheet_id" placeholder="{{ _('Spreadsheet ID (used below)') }}">
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="global_local_only"
+                 {% if sheets_settings and not sheets_settings.sync_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="global_local_only">{{ _('Local only (no Sheets)') }}</label>
+        </div>
       </div>
     </div>
     <button class="btn btn-sm btn-outline-secondary mb-2" type="button" id="toggle-ordering">{{ _('Show ordering') }} ▼</button>
@@ -92,6 +110,7 @@
     <h6 class="mt-3">{{ _('Wizard: create tabs for all checkpoints') }}</h6>
     <form method="post" action="{{ url_for('sheets_admin.wizard_checkpoints') }}" class="row g-2">
       <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
+      <input type="hidden" name="local_only" class="local-only-target">
       <input type="hidden" name="group_order" class="group-order-target">
       <input type="hidden" name="checkpoint_order" class="checkpoint-order-target">
       <input type="hidden" name="per_group_cp_order" class="per-group-order-target">
@@ -217,8 +236,9 @@
     <div class="card h-100">
       <div class="card-body">
         <h5 class="card-title">{{ _('Add checkpoint tab') }}</h5>
-        <form method="post" action="{{ url_for('sheets_admin.add_tab') }}">
-          <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
+    <form method="post" action="{{ url_for('sheets_admin.add_tab') }}">
+      <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
+      <input type="hidden" name="local_only" class="local-only-target">
 
           <div class="mb-3">
             <label class="form-label">{{ _('Tab title') }}</label>
@@ -422,6 +442,20 @@
     if (globalId) {
       globalId.addEventListener('input', pushSheetId);
       pushSheetId();
+    }
+
+    const localOnly = document.getElementById('global_local_only');
+    const localTargets = document.querySelectorAll('.local-only-target');
+    function pushLocalOnly() {
+      const val = localOnly && localOnly.checked ? "1" : "";
+      localTargets.forEach(t => { t.value = val; });
+      if (globalId) {
+        globalId.disabled = !!(localOnly && localOnly.checked);
+      }
+    }
+    if (localOnly) {
+      localOnly.addEventListener('change', pushLocalOnly);
+      pushLocalOnly();
     }
 
     if (toggleBtn && orderingPanel) {

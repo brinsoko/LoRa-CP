@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Optional
+from types import SimpleNamespace
 import secrets
 
 from flask import session
@@ -20,7 +21,12 @@ def ensure_default_competition() -> Competition | None:
     if Competition.query.count():
         return Competition.query.order_by(Competition.created_at.asc()).first()
 
-    admin_user = User.query.filter_by(role="admin").order_by(User.id.asc()).first()
+    admin_user = (
+        User.query
+        .filter(User.role.in_(["superadmin", "admin"]))
+        .order_by(User.id.asc())
+        .first()
+    )
     competition = Competition(
         name=DEFAULT_COMPETITION_NAME,
         created_by_user_id=admin_user.id if admin_user else None,
@@ -43,6 +49,17 @@ def ensure_default_competition() -> Competition | None:
 
 
 def get_user_memberships(user_id: int) -> list[CompetitionMember]:
+    user = User.query.filter_by(id=user_id).first()
+    if user and (user.role or "").strip().lower() == "superadmin":
+        competitions = (
+            Competition.query
+            .order_by(Competition.name.asc())
+            .all()
+        )
+        return [
+            SimpleNamespace(competition=comp, role="admin", active=True, user_id=user_id)
+            for comp in competitions
+        ]
     return (
         CompetitionMember.query
         .filter(
@@ -60,6 +77,8 @@ def get_user_competitions(user_id: int) -> list[Competition]:
 
 
 def _is_member(user_id: int, competition_id: int) -> bool:
+    if current_user.is_authenticated and (current_user.role or "").strip().lower() == "superadmin":
+        return True
     return (
         CompetitionMember.query
         .filter(
@@ -79,6 +98,12 @@ def get_current_competition_id() -> Optional[int]:
     comp_id = session.get("competition_id")
     if comp_id and _is_member(current_user.id, comp_id):
         return comp_id
+
+    if (current_user.role or "").strip().lower() == "superadmin":
+        first = Competition.query.order_by(Competition.created_at.asc()).first()
+        if first:
+            session["competition_id"] = first.id
+            return first.id
 
     membership = (
         CompetitionMember.query
@@ -109,6 +134,13 @@ def get_current_membership(user_id: int | None = None) -> CompetitionMember | No
     if not comp_id:
         return None
     user_id = user_id or current_user.id
+    if (current_user.role or "").strip().lower() == "superadmin":
+        return SimpleNamespace(
+            competition_id=comp_id,
+            user_id=user_id,
+            role="admin",
+            active=True,
+        )
     return (
         CompetitionMember.query
         .filter(
@@ -121,6 +153,8 @@ def get_current_membership(user_id: int | None = None) -> CompetitionMember | No
 
 
 def get_current_competition_role() -> Optional[str]:
+    if current_user.is_authenticated and (current_user.role or "").strip().lower() == "superadmin":
+        return "admin"
     membership = get_current_membership()
     if not membership:
         return None

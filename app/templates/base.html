@@ -42,8 +42,12 @@
       <a class="navbar-brand fw-bold" href="{{ url_for('main.index') }}">
         {{ _('RFID Checkpoint System') }}
       </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="{{ _('Toggle navigation') }}">
+        <span class="navbar-toggler-icon"></span>
+      </button>
 
-      <div class="ms-auto d-flex align-items-center gap-2">
+      <div class="collapse navbar-collapse" id="navbarMain">
+        <div class="ms-auto d-flex flex-wrap align-items-center gap-2 mt-3 mt-lg-0">
         {% if current_user.is_authenticated %}
           <div class="dropdown">
             <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -116,9 +120,8 @@
           </div>
         {% endif %}
         
-
-   
-
+        </div>
+      </div>
     </div>
   </nav>
 

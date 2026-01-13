@@ -13,6 +13,12 @@
         <label class="form-label">{{ _('Name') }}</label>
         <input class="form-control" name="name" value="{{ group_obj.name if group_obj else request.form.get('name', '') }}" required>
       </div>
+      <div class="mb-3">
+        <label class="form-label">{{ _('Number prefix') }}</label>
+        <input class="form-control" name="prefix" placeholder="{{ _('e.g. 1xx, 2xx') }}"
+               value="{{ group_obj.prefix if group_obj else request.form.get('prefix', '') }}">
+        <div class="form-text">{{ _('Used for random team numbers (e.g. 1xx → 100-199).') }}</div>
+      </div>
       <div class="mb-4">
         <label class="form-label">{{ _('Description') }}</label>
         <textarea class="form-control" name="description" rows="2">{{ group_obj.description if group_obj else request.form.get('description', '') }}</textarea>

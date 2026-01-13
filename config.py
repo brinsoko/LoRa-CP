@@ -1,5 +1,12 @@
 import os
 
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in ("0", "false", "no", "off", "")
+
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
     DEVICE_CARD_SECRET = os.getenv("DEVICE_CARD_SECRET") or SECRET_KEY
@@ -29,6 +36,7 @@ class Config:
     GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")  # optional: raw JSON string
     GOOGLE_SHEETS_SPREADSHEET_ID = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
     GOOGLE_SHEETS_TEAMS_SHEET = os.getenv("GOOGLE_SHEETS_TEAMS_SHEET", "Teams")
+    SHEETS_SYNC_ENABLED = _env_bool("SHEETS_SYNC_ENABLED", True)
 
     # Google OAuth (login)
     GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")

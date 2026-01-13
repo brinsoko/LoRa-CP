@@ -10,7 +10,7 @@
 
       <div class="col-12 col-md-4">
         <label class="form-label">{{ _('Group') }}</label>
-        <select name="group_id" class="form-select">
+        <select name="group_id" class="form-select" id="groupSelect">
           <option value="">— {{ _('All groups') }} —</option>
           {% for g in groups %}
             <option value="{{ g.id }}" {% if selected_group_id == g.id %}selected{% endif %}>
@@ -40,6 +40,18 @@
     </form>
   </div>
 </div>
+
+{% if has_role('judge','admin') %}
+  <div class="d-flex justify-content-end mb-3">
+    <form method="post" action="{{ url_for('teams.randomize_numbers') }}" id="randomizeForm">
+      <input type="hidden" name="group_id" id="randomizeGroupId" value="{{ selected_group_id or '' }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <button class="btn btn-outline-warning" type="submit" onclick="return confirm('{{ _('Randomise team numbers for the selected group?') }}');">
+        {{ _('Randomise Team Numbers') }}
+      </button>
+    </form>
+  </div>
+{% endif %}
 
 <div class="text-muted mb-2">{{ _('Total: %(count)s', count=teams|length) }}</div>
 
@@ -79,12 +91,13 @@
 
             {% if has_role('judge','admin') %}
               <td class="text-end">
-                <a href="{{ url_for('teams.edit_team', team_id=team.id) }}"
+                <a href="{{ url_for('teams.edit_team', team_id=team.id, next=request.full_path) }}"
                    class="btn btn-sm btn-outline-primary">{{ _('Edit') }}</a>
                 {% if has_role('admin') %}
                 <form action="{{ url_for('teams.delete_team', team_id=team.id) }}"
                       method="post" class="d-inline"
                       onsubmit="return confirm('{{ _('Delete this team?') }}')">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
                   <button type="submit" class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
                 </form>
                 {% endif %}
@@ -95,6 +108,19 @@
       </tbody>
     </table>
   </div>
+{% endif %}
+
+{% if has_role('judge','admin') %}
+<script>
+  const groupSelect = document.getElementById("groupSelect");
+  const randomizeForm = document.getElementById("randomizeForm");
+  const randomizeGroupId = document.getElementById("randomizeGroupId");
+  if (randomizeForm && groupSelect && randomizeGroupId) {
+    randomizeForm.addEventListener("submit", () => {
+      randomizeGroupId.value = groupSelect.value || "";
+    });
+  }
+</script>
 {% endif %}
 
 {% endblock %}

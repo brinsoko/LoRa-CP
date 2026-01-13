@@ -14,6 +14,7 @@ from app.extensions import db
 from app.models import SheetConfig, CheckpointGroup, Team, TeamGroup, Checkpoint, CheckpointGroupLink
 from app.utils.competition import get_competition_group_order
 from app.utils.sheets_client import SheetsClient
+from app.utils.sheets_settings import sheets_sync_enabled
 
 
 def _get_global_group_order(spreadsheet_id: str) -> list[str]:
@@ -72,6 +73,8 @@ def _group_start_cols_from_config(cfg: dict) -> List[int]:
 
 def sync_all_checkpoint_tabs(competition_id: int | None = None):
     """Refresh team numbers and checkbox validation for all checkpoint-type tab configs."""
+    if not sheets_sync_enabled():
+        return
     configs = SheetConfig.query.filter(SheetConfig.tab_type == "checkpoint")
     if competition_id is not None:
         configs = configs.filter(SheetConfig.competition_id == competition_id)
@@ -122,6 +125,8 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
 
 def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime | None = None):
     """Set arrived checkbox TRUE for the given team/checkpoint in any linked checkpoint tab."""
+    if not sheets_sync_enabled():
+        return
     team = Team.query.get(team_id)
     checkpoint = Checkpoint.query.get(checkpoint_id)
     if not team or not checkpoint or team.number is None:
@@ -200,6 +205,8 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime
 
 def update_checkpoint_scores(team_id: int, checkpoint_id: int, group_name: str, values: dict, scored_at: datetime | None = None):
     """Update score-related fields for a team in a checkpoint tab based on config layout."""
+    if not sheets_sync_enabled():
+        return
     team = Team.query.get(team_id)
     checkpoint = Checkpoint.query.get(checkpoint_id)
     if not team or not checkpoint or team.number is None:
@@ -290,6 +297,8 @@ def build_arrivals_tab(
     per_group_checkpoint_order: dict[str, list[str]] | None = None,
 ):
     """Build arrivals matrix (groups x checkpoint tabs)."""
+    if not sheets_sync_enabled():
+        return "Sheets sync is disabled."
     group_order = group_order_override or _get_default_group_order(spreadsheet_id, competition_id)
     per_group_cp_order = per_group_checkpoint_order or _get_group_checkpoint_order_from_db()
 
@@ -450,6 +459,8 @@ def build_teams_tab(
     group_order_override: list[str] | None = None,
     competition_id: int | None = None,
 ):
+    if not sheets_sync_enabled():
+        return "Sheets sync is disabled."
     lang = load_lang()
     group_order = group_order_override or _get_default_group_order(spreadsheet_id, competition_id)
     groups_query = db.session.query(CheckpointGroup)
@@ -520,6 +531,8 @@ def build_score_tab(
     per_group_checkpoint_order: dict[str, list[str]] | None = None,
     competition_id: int | None = None,
 ):
+    if not sheets_sync_enabled():
+        return "Sheets sync is disabled."
     lang = load_lang()
     group_order = group_order_override or _get_default_group_order(spreadsheet_id, competition_id)
     per_group_cp_order = per_group_checkpoint_order or _get_group_checkpoint_order_from_db()
@@ -911,6 +924,99 @@ def wizard_build_checkpoint_tabs(
 
         if pause_every and idx % pause_every == 0:
             time.sleep(pause_seconds)
+
+    db.session.commit()
+    return created, skipped
+
+
+def wizard_create_checkpoint_configs(
+    spreadsheet_id: str,
+    spreadsheet_name: str,
+    arrived_header: str,
+    points_header: str,
+    dead_time_header: str,
+    time_header: str,
+    group_order: list[str] | None,
+    competition_id: int | None = None,
+    per_checkpoint_extra_fields: dict[int, list[str]] | None = None,
+    per_checkpoint_dead_time: dict[int, bool] | None = None,
+    per_checkpoint_groups: dict[int, list[int]] | None = None,
+    per_checkpoint_tabnames: dict[int, str] | None = None,
+    create_only: set[int] | None = None,
+    checkpoint_order_override: list[str] | None = None,
+    per_group_checkpoint_order: dict[str, list[str]] | None = None,
+    record_time_cp: set[int] | None = None,
+):
+    """Create checkpoint tab configs locally without contacting Google Sheets."""
+    if not group_order:
+        group_order = _get_default_group_order(spreadsheet_id, competition_id)
+    checkpoints_query = Checkpoint.query
+    if competition_id is not None:
+        checkpoints_query = checkpoints_query.filter(Checkpoint.competition_id == competition_id)
+    checkpoints = checkpoints_query.order_by(Checkpoint.name.asc()).all()
+    if not checkpoints:
+        return 0, 0
+
+    group_order_norm = [g.lower().strip() for g in group_order]
+    created = 0
+    skipped = 0
+
+    for cp in checkpoints:
+        if create_only is not None and cp.id not in create_only:
+            skipped += 1
+            continue
+
+        tab_title = per_checkpoint_tabnames.get(cp.id) if per_checkpoint_tabnames else None
+        if not tab_title:
+            tab_title = cp.name
+
+        existing = SheetConfig.query.filter_by(spreadsheet_id=spreadsheet_id, tab_name=tab_title).first()
+        if existing:
+            skipped += 1
+            continue
+
+        if per_checkpoint_groups and cp.id in per_checkpoint_groups:
+            raw_groups = (
+                CheckpointGroup.query
+                .filter(CheckpointGroup.id.in_(per_checkpoint_groups[cp.id]))
+                .all()
+            )
+        else:
+            raw_groups = cp.groups or []
+
+        def _sort_key(g):
+            norm = g.name.lower().strip()
+            return (group_order_norm.index(norm) if norm in group_order_norm else len(group_order_norm), g.name)
+        ordered_groups = sorted(raw_groups, key=_sort_key)
+        extra_fields = per_checkpoint_extra_fields.get(cp.id, []) if per_checkpoint_extra_fields else []
+        time_enabled = bool(record_time_cp and cp.id in record_time_cp)
+        groups_def = [{"name": g.name, "fields": list(extra_fields)} for g in ordered_groups]
+        dead_time_enabled = per_checkpoint_dead_time.get(cp.id, True) if per_checkpoint_dead_time else True
+        if not groups_def:
+            continue
+
+        record = SheetConfig(
+            competition_id=competition_id or cp.competition_id,
+            spreadsheet_id=spreadsheet_id,
+            spreadsheet_name=spreadsheet_name,
+            tab_name=tab_title,
+            tab_type="checkpoint",
+            checkpoint_id=cp.id,
+            config={
+                "arrived_header": arrived_header,
+                "dead_time_enabled": dead_time_enabled,
+                "dead_time_header": dead_time_header,
+                "time_enabled": time_enabled,
+                "time_header": time_header,
+                "points_header": points_header,
+                "groups": groups_def,
+                "checkpoint_order": checkpoint_order_override,
+                "per_group_checkpoint_order": per_group_checkpoint_order,
+            },
+        )
+        db.session.add(record)
+        db.session.flush()
+        created += 1
 
     db.session.commit()
     return created, skipped

@@ -15,8 +15,13 @@ from app.utils.competition import get_current_competition_id
 from app.utils.sheets_client import SheetsClient
 from app.utils.sheets_sync import sync_all_checkpoint_tabs
 from app.utils.sheets_sync import build_arrivals_tab, build_teams_tab, build_score_tab
-from app.utils.sheets_sync import wizard_build_checkpoint_tabs
+from app.utils.sheets_sync import wizard_build_checkpoint_tabs, wizard_create_checkpoint_configs
 from app.utils.lang_store import load_lang, save_lang
+from app.utils.sheets_settings import (
+    load_settings as load_sheet_settings,
+    save_settings as save_sheet_settings,
+    sheets_sync_enabled,
+)
 
 sheets_bp = Blueprint("sheets_admin", __name__, template_folder="../../templates")
 
@@ -35,6 +40,17 @@ def _require_competition():
         flash(_("Select a competition first."), "warning")
         return None, redirect(url_for("main.select_competition"))
     return comp_id, None
+
+
+def _require_sheets_enabled():
+    if not sheets_sync_enabled():
+        flash(_("Sheets sync is disabled."), "warning")
+        return redirect(url_for("sheets_admin.list_sheets"))
+    return None
+
+
+def _local_spreadsheet_id(comp_id: int) -> str:
+    return f"local:{comp_id}"
 
 
 def _parse_group_fields(raw: str) -> List[dict]:
@@ -60,6 +76,7 @@ def list_sheets():
     if redirect_resp:
         return redirect_resp
     lang = load_lang()
+    sheets_settings = load_sheet_settings()
     configs = (
         SheetConfig.query
         .filter(SheetConfig.competition_id == comp_id)
@@ -79,7 +96,14 @@ def list_sheets():
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
         .all()
     )
-    return render_template("sheets_admin.html", configs=configs, checkpoints=checkpoints, groups=groups, lang=lang)
+    return render_template(
+        "sheets_admin.html",
+        configs=configs,
+        checkpoints=checkpoints,
+        groups=groups,
+        lang=lang,
+        sheets_settings=sheets_settings,
+    )
 
 
 @sheets_bp.route("/lang", methods=["GET"])
@@ -121,9 +145,21 @@ def save_lang_settings():
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
+@sheets_bp.route("/save-settings", methods=["POST"])
+@roles_required("admin")
+def save_sheets_settings():
+    sync_enabled = bool(request.form.get("sheets_sync_enabled"))
+    save_sheet_settings({"sync_enabled": sync_enabled})
+    flash(_("Sheets settings saved."), "success")
+    return redirect(url_for("sheets_admin.list_sheets"))
+
+
 @sheets_bp.route("/build-arrivals", methods=["POST"])
 @roles_required("admin")
 def build_arrivals():
+    redirect_resp = _require_sheets_enabled()
+    if redirect_resp:
+        return redirect_resp
     comp_id, redirect_resp = _require_competition()
     if redirect_resp:
         return redirect_resp
@@ -172,6 +208,9 @@ def build_arrivals():
 @sheets_bp.route("/build-teams", methods=["POST"])
 @roles_required("admin")
 def build_teams():
+    redirect_resp = _require_sheets_enabled()
+    if redirect_resp:
+        return redirect_resp
     comp_id, redirect_resp = _require_competition()
     if redirect_resp:
         return redirect_resp
@@ -188,13 +227,16 @@ def build_teams():
         flash(_("Spreadsheet ID is required."), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
     try:
-        build_teams_tab(
+        err = build_teams_tab(
             spreadsheet_id,
             tab_name,
             headers=headers,
             group_order_override=group_order,
             competition_id=comp_id,
         )
+        if err:
+            flash(err, "warning")
+            return redirect(url_for("sheets_admin.list_sheets"))
     except Exception as exc:
         current_app.logger.exception("Failed to build teams tab")
         flash(_("Failed to build teams tab: %(error)s", error=exc), "warning")
@@ -206,6 +248,9 @@ def build_teams():
 @sheets_bp.route("/build-score", methods=["POST"])
 @roles_required("admin")
 def build_score():
+    redirect_resp = _require_sheets_enabled()
+    if redirect_resp:
+        return redirect_resp
     comp_id, redirect_resp = _require_competition()
     if redirect_resp:
         return redirect_resp
@@ -252,6 +297,9 @@ def build_score():
 @sheets_bp.route("/prune-missing", methods=["POST"])
 @roles_required("admin")
 def prune_missing():
+    redirect_resp = _require_sheets_enabled()
+    if redirect_resp:
+        return redirect_resp
     comp_id, redirect_resp = _require_competition()
     if redirect_resp:
         return redirect_resp
@@ -299,7 +347,9 @@ def wizard_checkpoints():
     comp_id, redirect_resp = _require_competition()
     if redirect_resp:
         return redirect_resp
+    local_only = bool(request.form.get("local_only"))
     spreadsheet_id = (request.form.get("spreadsheet_id") or "").strip()
+    use_sheets = sheets_sync_enabled() and not local_only
     lang = load_lang()
     arrived_header = (request.form.get("arrived_header") or lang.get("arrived_header") or "Arrived to CP").strip()
     points_header = (request.form.get("points_header") or lang.get("points_header") or "Points").strip()
@@ -385,7 +435,9 @@ def wizard_checkpoints():
             if ids:
                 per_cp_groups[cp_id_int] = ids
 
-    if not spreadsheet_id:
+    if not spreadsheet_id and not use_sheets:
+        spreadsheet_id = _local_spreadsheet_id(comp_id)
+    elif not spreadsheet_id and use_sheets:
         flash(_("Spreadsheet ID is required."), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
 
@@ -395,37 +447,63 @@ def wizard_checkpoints():
         return redirect(url_for("sheets_admin.list_sheets"))
 
     try:
-        created, skipped = wizard_build_checkpoint_tabs(
-            spreadsheet_id=spreadsheet_id,
-            arrived_header=arrived_header,
-            points_header=points_header,
-            dead_time_header=dead_time_header,
-            time_header=time_header,
-            group_order=[g.strip() for g in group_order_raw.split(",") if g.strip()] or None,
-            competition_id=comp_id,
-            per_checkpoint_extra_fields=per_cp_fields,
-            per_checkpoint_dead_time=per_cp_dead_time or None,
-            per_checkpoint_groups=per_cp_groups or None,
-            per_checkpoint_tabnames=per_cp_tabname or None,
-            create_only=per_cp_create or None,
-            checkpoint_order_override=checkpoint_order,
-            per_group_checkpoint_order=per_group_cp_order or None,
-            record_time_cp=per_cp_record_time or None,
-            pause_every=8,  # throttle to avoid 429s (~5 calls per tab => ~40/min)
-            pause_seconds=65,
-        )
+        if not use_sheets:
+            created, skipped = wizard_create_checkpoint_configs(
+                spreadsheet_id=spreadsheet_id,
+                spreadsheet_name="Local",
+                arrived_header=arrived_header,
+                points_header=points_header,
+                dead_time_header=dead_time_header,
+                time_header=time_header,
+                group_order=[g.strip() for g in group_order_raw.split(",") if g.strip()] or None,
+                competition_id=comp_id,
+                per_checkpoint_extra_fields=per_cp_fields,
+                per_checkpoint_dead_time=per_cp_dead_time or None,
+                per_checkpoint_groups=per_cp_groups or None,
+                per_checkpoint_tabnames=per_cp_tabname or None,
+                create_only=per_cp_create or None,
+                checkpoint_order_override=checkpoint_order,
+                per_group_checkpoint_order=per_group_cp_order or None,
+                record_time_cp=per_cp_record_time or None,
+            )
+        else:
+            created, skipped = wizard_build_checkpoint_tabs(
+                spreadsheet_id=spreadsheet_id,
+                arrived_header=arrived_header,
+                points_header=points_header,
+                dead_time_header=dead_time_header,
+                time_header=time_header,
+                group_order=[g.strip() for g in group_order_raw.split(",") if g.strip()] or None,
+                competition_id=comp_id,
+                per_checkpoint_extra_fields=per_cp_fields,
+                per_checkpoint_dead_time=per_cp_dead_time or None,
+                per_checkpoint_groups=per_cp_groups or None,
+                per_checkpoint_tabnames=per_cp_tabname or None,
+                create_only=per_cp_create or None,
+                checkpoint_order_override=checkpoint_order,
+                per_group_checkpoint_order=per_group_cp_order or None,
+                record_time_cp=per_cp_record_time or None,
+                pause_every=8,  # throttle to avoid 429s (~5 calls per tab => ~40/min)
+                pause_seconds=65,
+            )
     except Exception as exc:
         current_app.logger.exception("Wizard failed")
         flash(_("Wizard failed: %(error)s", error=exc), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
 
-    flash(_("Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing.", created=created, skipped=skipped), "success")
+    if not use_sheets:
+        flash(_("Wizard completed. Created %(created)s local configs, skipped %(skipped)s existing.", created=created, skipped=skipped), "success")
+    else:
+        flash(_("Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing.", created=created, skipped=skipped), "success")
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
 @sheets_bp.route("/sync-team-numbers/<int:config_id>", methods=["POST"])
 @roles_required("admin")
 def sync_team_numbers(config_id: int):
+    redirect_resp = _require_sheets_enabled()
+    if redirect_resp:
+        return redirect_resp
     comp_id, redirect_resp = _require_competition()
     if redirect_resp:
         return redirect_resp
@@ -458,7 +536,9 @@ def add_tab():
     comp_id, redirect_resp = _require_competition()
     if redirect_resp:
         return redirect_resp
+    local_only = bool(request.form.get("local_only"))
     spreadsheet_id = (request.form.get("spreadsheet_id") or "").strip()
+    use_sheets = sheets_sync_enabled() and not local_only
     tab_title = (request.form.get("tab_title") or "").strip()
     checkpoint_id = request.form.get("checkpoint_id", type=int)
     lang = load_lang()
@@ -471,8 +551,13 @@ def add_tab():
     groups_raw = request.form.get("groups_raw") or ""
     tab_type = "checkpoint"
 
-    if not spreadsheet_id or not tab_title:
-        flash(_("Spreadsheet ID and tab title are required."), "warning")
+    if not tab_title:
+        flash(_("Tab title is required."), "warning")
+        return redirect(url_for("sheets_admin.list_sheets"))
+    if not spreadsheet_id and not use_sheets:
+        spreadsheet_id = _local_spreadsheet_id(comp_id)
+    elif not spreadsheet_id and use_sheets:
+        flash(_("Spreadsheet ID is required."), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
 
     groups = _parse_group_fields(groups_raw)
@@ -495,46 +580,49 @@ def add_tab():
         headers.append(points_header)
         current_col += 1 + (1 if dead_time_enabled else 0) + (1 if include_time else 0) + len(grp.get("fields", [])) + 1
 
-    try:
-        client = _get_sheets_client()
-        ws = client.add_tab(spreadsheet_id, tab_title)
-        client.set_header_row(spreadsheet_id, tab_title, headers)
+    ws_title = None
+    if use_sheets:
+        try:
+            client = _get_sheets_client()
+            ws = client.add_tab(spreadsheet_id, tab_title)
+            client.set_header_row(spreadsheet_id, tab_title, headers)
 
-        # Populate team numbers under each group header if groups exist
-        for grp, start_col in zip(groups, group_start_cols):
-            db_group = (
-                CheckpointGroup.query
-                .filter(
-                    CheckpointGroup.competition_id == comp_id,
-                    func.lower(CheckpointGroup.name) == grp["name"].strip().lower(),
+            # Populate team numbers under each group header if groups exist
+            for grp, start_col in zip(groups, group_start_cols):
+                db_group = (
+                    CheckpointGroup.query
+                    .filter(
+                        CheckpointGroup.competition_id == comp_id,
+                        func.lower(CheckpointGroup.name) == grp["name"].strip().lower(),
+                    )
+                    .first()
                 )
-                .first()
-            )
-            if not db_group:
-                continue
-            nums = (
-                db.session.query(Team.number)
-                .join(TeamGroup, TeamGroup.team_id == Team.id)
-                .filter(TeamGroup.group_id == db_group.id)
-                .filter(Team.number.isnot(None))
-                .order_by(Team.number.asc())
-                .all()
-            )
-            values = [n[0] for n in nums if n[0] is not None]
-            if values:
-                client.update_column(spreadsheet_id, tab_title, start_col, 2, values)
-    except Exception as exc:
-        current_app.logger.exception("Failed to add tab")
-        msg = _("Could not add tab: %(error)s", error=exc)
-        if "PermissionError" in type(exc).__name__ or "permission" in str(exc).lower():
-            msg += " - " + _("Check that the spreadsheet ID is correct and that the service account email has Editor access to it.")
-        flash(msg, "warning")
-        return redirect(url_for("sheets_admin.list_sheets"))
+                if not db_group:
+                    continue
+                nums = (
+                    db.session.query(Team.number)
+                    .join(TeamGroup, TeamGroup.team_id == Team.id)
+                    .filter(TeamGroup.group_id == db_group.id)
+                    .filter(Team.number.isnot(None))
+                    .order_by(Team.number.asc())
+                    .all()
+                )
+                values = [n[0] for n in nums if n[0] is not None]
+                if values:
+                    client.update_column(spreadsheet_id, tab_title, start_col, 2, values)
+            ws_title = ws.spreadsheet.title
+        except Exception as exc:
+            current_app.logger.exception("Failed to add tab")
+            msg = _("Could not add tab: %(error)s", error=exc)
+            if "PermissionError" in type(exc).__name__ or "permission" in str(exc).lower():
+                msg += " - " + _("Check that the spreadsheet ID is correct and that the service account email has Editor access to it.")
+            flash(msg, "warning")
+            return redirect(url_for("sheets_admin.list_sheets"))
 
     record = SheetConfig(
         competition_id=comp_id,
         spreadsheet_id=spreadsheet_id,
-        spreadsheet_name=ws.spreadsheet.title,
+        spreadsheet_name=ws_title or "Local",
         tab_name=tab_title,
         tab_type=tab_type,
         checkpoint_id=checkpoint_id,
@@ -550,5 +638,8 @@ def add_tab():
     )
     db.session.add(record)
     db.session.commit()
-    flash(_("Added tab '%(tab)s' to spreadsheet.", tab=tab_title), "success")
+    if not use_sheets:
+        flash(_("Added local tab '%(tab)s'.", tab=tab_title), "success")
+    else:
+        flash(_("Added tab '%(tab)s' to spreadsheet.", tab=tab_title), "success")
     return redirect(url_for("sheets_admin.list_sheets"))

@@ -9,6 +9,11 @@ from app.utils.perms import roles_required
 
 teams_bp = Blueprint("teams", __name__, template_folder="../../templates")
 
+def _safe_next_url(default: str):
+    next_url = (request.form.get("next") or request.args.get("next") or "").strip()
+    if next_url.startswith("/") and not next_url.startswith("//"):
+        return next_url
+    return default
 
 def _load_organizations() -> list[str]:
     resp, payload = api_json("GET", "/api/teams")
@@ -40,7 +45,7 @@ def _transform_team_payload(team: dict) -> dict:
 def list_teams():
     q = (request.args.get("q") or "").strip()
     group_id = request.args.get("group_id")
-    sort = (request.args.get("sort") or "name_asc").strip().lower()
+    sort = (request.args.get("sort") or "number_asc").strip().lower()
 
     params = {"sort": sort}
     if q:
@@ -137,6 +142,7 @@ def add_team():
 @teams_bp.route("/<int:team_id>/edit", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def edit_team(team_id: int):
+    next_url = (request.args.get("next") or request.form.get("next") or "").strip()
     team_resp, team_payload = api_json("GET", f"/api/teams/{team_id}")
     if team_resp.status_code != 200:
         flash("Team not found.", "warning")
@@ -182,6 +188,7 @@ def edit_team(team_id: int):
                 groups=groups,
                 selected_group_id=selected_group_id,
                 organizations=organizations,
+                next_url=next_url,
             )
 
         update_payload = {
@@ -228,7 +235,7 @@ def edit_team(team_id: int):
                         flash(rfid_payload.get("detail") or rfid_payload.get("error") or "Could not save RFID mapping.", "warning")
 
             flash("Team updated.", "success")
-            return redirect(url_for("teams.list_teams"))
+            return redirect(_safe_next_url(url_for("teams.list_teams")))
 
         flash(payload.get("error") or "Could not update team.", "warning")
         team["name"] = name
@@ -250,6 +257,7 @@ def edit_team(team_id: int):
         rfid_card=rfid_card,
         selected_group_id=selected_group_id,
         organizations=organizations,
+        next_url=next_url,
     )
 
 
@@ -263,4 +271,34 @@ def delete_team(team_id: int):
     else:
         flash(payload.get("detail") or payload.get("error") or "Could not delete team.", "warning")
 
-    return redirect(url_for("teams.list_teams"))
+    return redirect(_safe_next_url(url_for("teams.list_teams")))
+
+
+@teams_bp.route("/randomize", methods=["POST"])
+@roles_required("judge", "admin")
+def randomize_numbers():
+    group_id = (request.form.get("group_id") or "").strip()
+    payload = {}
+    if group_id:
+        payload["group_id"] = group_id
+
+    resp, data = api_json("POST", "/api/teams/randomize", json=payload)
+    if resp.status_code != 200:
+        flash(data.get("detail") or data.get("error") or "Could not randomize team numbers.", "warning")
+        return redirect(_safe_next_url(url_for("teams.list_teams")))
+
+    assigned_total = data.get("assigned_total", 0)
+    if assigned_total:
+        flash(f"Randomized team numbers. Assigned {assigned_total}.", "success")
+    else:
+        flash("No team numbers were assigned.", "info")
+
+    for res in data.get("results", []):
+        status = res.get("status")
+        name = res.get("group_name") or f"Group {res.get('group_id')}"
+        if status == "insufficient_numbers":
+            flash(f"{name}: not enough numbers in range.", "warning")
+        elif status == "skipped":
+            flash(f"{name}: invalid or missing prefix.", "warning")
+
+    return redirect(_safe_next_url(url_for("teams.list_teams")))

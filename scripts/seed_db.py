@@ -278,8 +278,21 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
             db.create_all()
 
         print("Seeding users...")
-        admin = get_or_create_user("admin", "admin", "change-me-now")
-        judge = get_or_create_user("judge", "judge", "judge-pass")
+        admin_user = (os.environ.get("SEED_ADMIN_USER") or "admin").strip()
+        admin_pass = os.environ.get("SEED_ADMIN_PASS") or "change-me-now"
+        admin_role = (os.environ.get("SEED_ADMIN_ROLE") or "admin").strip().lower()
+        if admin_role not in ("public", "judge", "admin", "superadmin"):
+            admin_role = "admin"
+        admin = get_or_create_user(admin_user, admin_role, admin_pass)
+
+        judge_user = (os.environ.get("SEED_JUDGE_USER") or "judge").strip()
+        judge_pass = os.environ.get("SEED_JUDGE_PASS") or "judge-pass"
+        judge = get_or_create_user(judge_user, "judge", judge_pass)
+
+        super_user = (os.environ.get("SEED_SUPERADMIN_USER") or "").strip()
+        if super_user:
+            super_pass = os.environ.get("SEED_SUPERADMIN_PASS") or "change-me-now"
+            get_or_create_user(super_user, "superadmin", super_pass)
 
         competition = ensure_default_competition()
         if not competition:

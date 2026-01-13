@@ -23,6 +23,7 @@ def _serialize_group(group: CheckpointGroup, include_checkpoints: bool = True) -
     data = {
         "id": group.id,
         "name": group.name,
+        "prefix": group.prefix,
         "description": group.description,
         "position": group.position,
     }
@@ -96,6 +97,7 @@ class GroupListResource(Resource):
             return {"error": "no_competition"}, 400
         payload = request.get_json(silent=True) or {}
         name = (payload.get("name") or "").strip()
+        prefix = (payload.get("prefix") or "").strip() or None
         description = (payload.get("description") or "").strip() or None
         checkpoint_ids = _parse_checkpoint_ids(payload.get("checkpoint_ids"))
 
@@ -116,6 +118,7 @@ class GroupListResource(Resource):
         next_position = (max_position if max_position is not None else -1) + 1
         group = CheckpointGroup(
             name=name,
+            prefix=prefix,
             description=description,
             competition_id=comp_id,
             position=next_position,
@@ -175,6 +178,9 @@ class GroupItemResource(Resource):
             if not name:
                 return {"error": "validation_error", "detail": "name is required"}, 400
             group.name = name
+
+        if "prefix" in payload or not partial:
+            group.prefix = (payload.get("prefix") or "").strip() or None
 
         if "description" in payload or not partial:
             group.description = (payload.get("description") or "").strip() or None

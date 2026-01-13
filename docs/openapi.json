@@ -193,7 +193,8 @@
             "enum": [
               "public",
               "judge",
-              "admin"
+              "admin",
+              "superadmin"
             ]
           }
         },
@@ -290,6 +291,12 @@
           },
           "name": {
             "type": "string"
+          },
+          "prefix": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "description": {
             "type": [
@@ -1198,6 +1205,67 @@
         }
       }
     },
+    "/api/teams/randomize": {
+      "post": {
+        "tags": ["teams"],
+        "summary": "Randomize team numbers by group prefix",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "group_id": {
+                    "type": "integer",
+                    "description": "Optional group id. If omitted, randomize for all groups."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Randomized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "assigned_total": { "type": "integer" },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "group_id": { "type": "integer" },
+                          "group_name": { "type": "string" },
+                          "status": { "type": "string" },
+                          "assigned": { "type": "integer" },
+                          "needed": { "type": "integer" },
+                          "available": { "type": "integer" },
+                          "range": {
+                            "type": "array",
+                            "items": { "type": "integer" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/groups": {
       "get": {
         "tags": ["groups"],
@@ -1245,6 +1313,7 @@
                 "required": ["name"],
                 "properties": {
                   "name": { "type": "string" },
+                  "prefix": { "type": ["string","null"] },
                   "description": { "type": ["string","null"] },
                   "checkpoint_ids": {
                     "type": "array",
@@ -1310,6 +1379,7 @@
                 "type": "object",
                 "properties": {
                   "name": { "type": "string" },
+                  "prefix": { "type": ["string","null"] },
                   "description": { "type": ["string","null"] },
                   "checkpoint_ids": {
                     "type": "array",

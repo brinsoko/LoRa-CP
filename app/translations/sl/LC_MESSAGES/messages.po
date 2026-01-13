@@ -1018,11 +1018,11 @@ msgstr "Uredi ekipo"
 
 #: app/templates/team_edit.html:13 app/templates/teams_list.html:55
 msgid "Rod / Org"
-msgstr "Rod / org"
+msgstr "Rod / organizaija"
 
 #: app/templates/team_edit.html:14
 msgid "e.g. mGG / local org"
-msgstr "npr. mGG / lokalna org"
+msgstr "npr. RJŠ / lokalna org"
 
 #: app/templates/teams_list.html:14
 msgid "All groups"
@@ -1701,6 +1701,30 @@ msgstr "Carovnik ni uspel: %(error)s"
 msgid "Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing."
 msgstr "Carovnik koncan. Ustvarjenih %(created)s zavihkov, preskocenih %(skipped)s obstoječih."
 
+msgid "Wizard completed. Created %(created)s local configs, skipped %(skipped)s existing."
+msgstr "Carovnik koncan. Ustvarjenih %(created)s lokalnih nastavitev, preskocenih %(skipped)s obstoječih."
+
+msgid "Sheets sync is disabled."
+msgstr "Sinhronizacija Sheets je izkljucena."
+
+msgid "Sheets sync is disabled. Scoring will not update Google Sheets."
+msgstr "Sinhronizacija Sheets je izkljucena. Rezultati se ne bodo posodabljali v Google Sheets."
+
+msgid "Enable Sheets sync"
+msgstr "Omogoci sinhronizacijo Sheets"
+
+msgid "Local only (no Sheets)"
+msgstr "Samo lokalno (brez Sheets)"
+
+msgid "Number prefix"
+msgstr "Predpona stevilk"
+
+msgid "Optional; can be assigned later."
+msgstr "Neobvezno; lahko dodelite pozneje."
+
+msgid "Randomise Team Numbers"
+msgstr "Nakljucno dodeli stevilke ekip"
+
 msgid "Config not found."
 msgstr "Nastavitev ni bila najdena."
 
@@ -1789,7 +1813,7 @@ msgid "Teams"
 msgstr "Ekipe"
 
 msgid "Finished"
-msgstr "Zaključilo"
+msgstr "V cilju"
 
 msgid "Completion rate"
 msgstr "Stopnja zakljucenih"

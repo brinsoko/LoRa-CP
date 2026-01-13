@@ -66,6 +66,7 @@ def add_group():
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
+        prefix = (request.form.get("prefix") or "").strip() or None
         desc = (request.form.get("description") or "").strip() or None
 
         if not name:
@@ -84,6 +85,7 @@ def add_group():
             "/api/groups",
             json={
                 "name": name,
+                "prefix": prefix,
                 "description": desc,
                 "checkpoint_ids": selected_ids,
             },
@@ -122,6 +124,7 @@ def edit_group(group_id: int):
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
+        prefix = (request.form.get("prefix") or "").strip() or None
         desc = (request.form.get("description") or "").strip() or None
 
         if not name:
@@ -146,6 +149,7 @@ def edit_group(group_id: int):
             f"/api/groups/{group_id}",
             json={
                 "name": name,
+                "prefix": prefix,
                 "description": desc,
                 "checkpoint_ids": selected_ids,
             },
@@ -157,6 +161,7 @@ def edit_group(group_id: int):
 
         flash(payload.get("error") or payload.get("detail") or "Could not update group.", "warning")
         group["name"] = name
+        group["prefix"] = prefix
         group["description"] = desc
         group["checkpoints"] = [
             {"id": cp.get("id"), "name": cp.get("name"), "position": idx}

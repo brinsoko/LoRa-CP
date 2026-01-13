@@ -11,7 +11,7 @@ from .auth import (
     Me,
 )
 from .checkins import CheckinListResource, CheckinItemResource, CheckinExportResource
-from .teams import TeamListResource, TeamItemResource, TeamActiveGroupResource
+from .teams import TeamListResource, TeamItemResource, TeamActiveGroupResource, TeamNumberRandomizeResource
 from .groups import GroupListResource, GroupItemResource, GroupOrderResource
 from .checkpoints_rest import (
     CheckpointListResource,
@@ -51,6 +51,7 @@ def register_resources(api: Api) -> None:
     api.add_resource(TeamListResource, "/api/teams")
     api.add_resource(TeamItemResource, "/api/teams/<int:team_id>")
     api.add_resource(TeamActiveGroupResource, "/api/teams/<int:team_id>/active-group")
+    api.add_resource(TeamNumberRandomizeResource, "/api/teams/randomize")
 
     # Groups & Checkpoints
     api.add_resource(GroupListResource, "/api/groups")

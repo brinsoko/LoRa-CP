@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from typing import Iterable, List, Optional
+import random
+import re
 
 from flask import request
 from flask_restful import Resource
@@ -369,3 +371,134 @@ class TeamActiveGroupResource(Resource):
 
         db.session.commit()
         return {"ok": True}, 200
+
+
+def _parse_group_prefix(prefix: str) -> tuple[int, int] | None:
+    if not prefix:
+        return None
+    text = prefix.strip().lower()
+    match = re.match(r"^(\d+)(x+)$", text)
+    if not match:
+        return None
+    base = int(match.group(1))
+    width = len(match.group(2))
+    start = base * (10 ** width)
+    end = start + (10 ** width) - 1
+    return start, end
+
+
+class TeamNumberRandomizeResource(Resource):
+    method_decorators = [json_roles_required("judge", "admin")]
+
+    def post(self):
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return {"error": "no_competition"}, 400
+
+        payload = request.get_json(silent=True) or {}
+        group_id = payload.get("group_id")
+
+        groups_query = CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
+        if group_id not in (None, ""):
+            try:
+                group_id = int(group_id)
+            except Exception:
+                return {"error": "validation_error", "detail": "group_id must be integer"}, 400
+            groups_query = groups_query.filter(CheckpointGroup.id == group_id)
+        groups = groups_query.all()
+        if group_id not in (None, "") and not groups:
+            return {"error": "not_found", "detail": "group not found"}, 404
+
+        results = []
+        assigned_total = 0
+
+        for group in groups:
+            prefix = (group.prefix or "").strip()
+            parsed = _parse_group_prefix(prefix)
+            if not parsed:
+                results.append({
+                    "group_id": group.id,
+                    "group_name": group.name,
+                    "status": "skipped",
+                    "detail": "invalid_prefix",
+                })
+                continue
+
+            start, end = parsed
+            total_teams = (
+                Team.query
+                .join(TeamGroup, TeamGroup.team_id == Team.id)
+                .filter(
+                    Team.competition_id == comp_id,
+                    TeamGroup.group_id == group.id,
+                    TeamGroup.active.is_(True),
+                )
+                .count()
+            )
+            if total_teams <= 0:
+                results.append({
+                    "group_id": group.id,
+                    "group_name": group.name,
+                    "status": "no_op",
+                    "detail": "no_teams_in_group",
+                })
+                continue
+            range_start = start + 1
+            range_end = min(end, start + total_teams)
+            used_numbers = (
+                db.session.query(Team.number)
+                .filter(Team.competition_id == comp_id)
+                .filter(Team.number.isnot(None))
+                .filter(Team.number >= range_start, Team.number <= range_end)
+                .all()
+            )
+            used_set = {n[0] for n in used_numbers}
+
+            teams = (
+                Team.query
+                .join(TeamGroup, TeamGroup.team_id == Team.id)
+                .filter(
+                    Team.competition_id == comp_id,
+                    TeamGroup.group_id == group.id,
+                    TeamGroup.active.is_(True),
+                    Team.number.is_(None),
+                )
+                .all()
+            )
+            needed = len(teams)
+            if needed == 0:
+                results.append({
+                    "group_id": group.id,
+                    "group_name": group.name,
+                    "status": "no_op",
+                    "detail": "no_unnumbered_teams",
+                })
+                continue
+
+            available = [n for n in range(range_start, range_end + 1) if n not in used_set]
+            if len(available) < needed:
+                results.append({
+                    "group_id": group.id,
+                    "group_name": group.name,
+                    "status": "insufficient_numbers",
+                    "needed": needed,
+                    "available": len(available),
+                    "range": [range_start, range_end],
+                })
+                continue
+
+            random.shuffle(available)
+            for team, number in zip(teams, available):
+                team.number = number
+            assigned_total += needed
+            results.append({
+                "group_id": group.id,
+                "group_name": group.name,
+                "status": "assigned",
+                "assigned": needed,
+                "range": [range_start, range_end],
+            })
+
+        if assigned_total:
+            db.session.commit()
+        return {"ok": True, "assigned_total": assigned_total, "results": results}, 200

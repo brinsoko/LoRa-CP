@@ -12,8 +12,8 @@ def main() -> None:
     password = os.environ.get("ADMIN_PASS", "admin123")
     role     = (os.environ.get("ADMIN_ROLE", "admin") or "admin").strip()
 
-    if role not in ("public", "judge", "admin"):
-        raise SystemExit(f"Invalid ADMIN_ROLE={role!r}; must be one of public|judge|admin")
+    if role not in ("public", "judge", "admin", "superadmin"):
+        raise SystemExit(f"Invalid ADMIN_ROLE={role!r}; must be one of public|judge|admin|superadmin")
 
     app = create_app()
     with app.app_context():
