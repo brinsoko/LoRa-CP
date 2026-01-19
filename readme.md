@@ -41,9 +41,8 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 - **Database:** SQLite (SQLAlchemy ORM)
 - **Frontend:** Bootstrap 5 + Jinja2 templates
 - **Mapping:** Google Maps JavaScript API
-- **Authentication:** Flask-Login
+- **Authentication:** Flask-Login, Google OAuth2
 - **Logging:** Built-in Flask logger with DEBUG output
-- **Environment:** macOS/Linux/Windows (works best with virtualenv)
 
 ---
 
@@ -65,7 +64,7 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 ## API Docs
 
 - Swagger UI: `/docs`
-- Raw spec: `/docs/openapi.yaml`
+- Raw spec: `/docs/openapi.json`
 
 ### Auth
 Cookie-based session from `/login` (form POST). Many routes are public; judge/admin routes require login. Roles are per competition, and the current competition is selected after login.
