@@ -54,6 +54,7 @@ class Competition(db.Model):
     name = db.Column(db.String(160), nullable=False, unique=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     public_results = db.Column(db.Boolean, nullable=False, default=False)
+    ingest_password_hash = db.Column(db.String(255), nullable=True)
     created_by_user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -101,6 +102,18 @@ class Competition(db.Model):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    def set_ingest_password(self, raw: str | None) -> None:
+        raw = (raw or "").strip()
+        if not raw:
+            self.ingest_password_hash = None
+        else:
+            self.ingest_password_hash = generate_password_hash(raw)
+
+    def check_ingest_password(self, raw: str | None) -> bool:
+        if not self.ingest_password_hash:
+            return False
+        return check_password_hash(self.ingest_password_hash, (raw or "").strip())
 
 
 class CompetitionMember(db.Model):

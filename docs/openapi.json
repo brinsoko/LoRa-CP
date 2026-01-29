@@ -534,6 +534,8 @@
           "snr": { "type": ["number", "null"], "format": "float", "description": "Signal-to-noise ratio (dB)." },
           "ts": { "type": ["integer", "null"], "format": "int64", "description": "Unix timestamp (seconds); if omitted, server uses current UTC." },
           "source": { "type": ["string", "null"], "description": "Optional client hint (e.g., judge_web_nfc)." },
+          "ingest_password": { "type": ["string", "null"], "description": "Optional ingest password for unauthenticated devices." },
+          "password": { "type": ["string", "null"], "description": "Alias for ingest_password." },
           "gps_lat": { "type": ["number", "null"], "format": "float" },
           "gps_lon": { "type": ["number", "null"], "format": "float" },
           "gps_alt": { "type": ["number", "null"], "format": "float" },

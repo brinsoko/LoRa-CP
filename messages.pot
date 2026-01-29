@@ -1323,6 +1323,18 @@ msgstr ""
 msgid "Competition"
 msgstr ""
 
+msgid "Ingest password (optional)"
+msgstr ""
+
+msgid "Leave blank to keep existing"
+msgstr ""
+
+msgid "If set, unauthenticated devices must provide this password when ingesting."
+msgstr ""
+
+msgid "Disable ingest password"
+msgstr ""
+
 msgid "Public results"
 msgstr ""
 

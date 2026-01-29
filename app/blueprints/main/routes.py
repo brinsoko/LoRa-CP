@@ -225,6 +225,12 @@ def competition_settings():
             return redirect(url_for("main.competition_settings"))
         competition.name = new_name
         competition.public_results = bool(request.form.get("public_results"))
+        if request.form.get("clear_ingest_password"):
+            competition.set_ingest_password(None)
+        else:
+            ingest_pw = (request.form.get("ingest_password") or "").strip()
+            if ingest_pw:
+                competition.set_ingest_password(ingest_pw)
         db.session.commit()
         flash(_("Competition settings updated."), "success")
         return redirect(url_for("main.competition_settings"))

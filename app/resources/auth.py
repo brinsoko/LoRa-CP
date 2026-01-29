@@ -70,6 +70,9 @@ class AuthChangePassword(Resource):
         if err_resp:
             return err_resp, err_code
 
+        if current_user.google_sub:
+            return {"error": "Password changes are disabled for Google accounts"}, 403
+
         cur = data.get("current_password") or ""
         new = data.get("new_password") or ""
         new2 = data.get("confirm_password") or ""

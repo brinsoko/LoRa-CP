@@ -11,6 +11,7 @@ BACKOFF_0   = float(os.getenv("BACKOFF_START", "0.5"))       # initial backoff w
 BACKOFF_MAX = float(os.getenv("BACKOFF_MAX", "10"))          # max backoff cap
 DEBUG       = os.getenv("DEBUG", "0") == "1"
 POST_TIMEOUT= float(os.getenv("POST_TIMEOUT", "5"))          # HTTP POST timeout
+INGEST_PASSWORD = os.getenv("INGEST_PASSWORD")
 
 # dev_id|payload|rssi|snr   (e.g. 1|A1B2C3D4|-66.0|9.5)
 LINE_RE = re.compile(
@@ -106,6 +107,8 @@ def run():
                                     body["competition_id"] = int(COMPETITION_ID)
                                 except Exception:
                                     body["competition_id"] = COMPETITION_ID
+                            if INGEST_PASSWORD:
+                                body["ingest_password"] = INGEST_PASSWORD
                             resp = session.post(API_URL, json=body, timeout=POST_TIMEOUT)
                             resp.raise_for_status()
                             print(f"[reader] OK dev={dev} payload={payload} -> {resp.json()}", flush=True)

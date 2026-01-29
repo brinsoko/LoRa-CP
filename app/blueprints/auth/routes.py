@@ -257,6 +257,10 @@ def register():
 @auth_bp.route("/change_password", methods=["GET", "POST"])
 @login_required
 def change_password():
+    if current_user.google_sub:
+        flash("Password changes are disabled for Google accounts.", "warning")
+        return redirect(url_for("main.select_competition"))
+
     if request.method == "POST":
         cur = request.form.get("current_password") or ""
         new = request.form.get("new_password") or ""

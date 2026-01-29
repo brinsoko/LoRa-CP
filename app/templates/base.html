@@ -79,9 +79,11 @@
           <form method="post" action="{{ url_for('auth.logout') }}" class="d-inline">
             <button class="btn btn-sm btn-outline-danger">{{ _('Logout') }}</button>
           </form>
-          <a href="{{ url_for('auth.change_password') }}" class="btn btn-sm btn-outline-secondary">
-            {{ _('Change Password') }}
-          </a>
+          {% if not current_user.google_sub %}
+            <a href="{{ url_for('auth.change_password') }}" class="btn btn-sm btn-outline-secondary">
+              {{ _('Change Password') }}
+            </a>
+          {% endif %}
         {% else %}
           <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-outline-primary">{{ _('Login') }}</a>
         {% endif %}

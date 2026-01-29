@@ -4,13 +4,14 @@ from datetime import datetime
 import hashlib, hmac
 
 from flask import current_app
+from flask_login import current_user
 
 from flask_restful import Resource, reqparse
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.extensions import db
 from app.models import (
-    LoRaMessage, RFIDCard, Team, Checkpoint, Checkin, LoRaDevice
+    LoRaMessage, RFIDCard, Team, Checkpoint, Checkin, LoRaDevice, Competition
 )
 from app.utils.sheets_sync import mark_arrival_checkbox
 from app.utils.payloads import parse_gps_payload
@@ -61,6 +62,8 @@ _parser.add_argument("rssi", type=float)
 _parser.add_argument("snr", type=float)
 _parser.add_argument("ts", type=int)  # unix seconds
 _parser.add_argument("source", type=str)  # optional client hint (e.g., mobile)
+_parser.add_argument("ingest_password", type=str)
+_parser.add_argument("password", type=str)
 
 # Optional GPS fields (allow posting structured GPS instead of string payload)
 _parser.add_argument("gps_lat", type=float)
@@ -110,8 +113,24 @@ class IngestResource(Resource):
         gps_lon = args.get("gps_lon")
         gps_alt = args.get("gps_alt")
         gps_age = args.get("gps_age_ms")
+        ingest_password = args.get("ingest_password") or args.get("password")
 
         received_at = datetime.utcfromtimestamp(ts_unix) if ts_unix else datetime.utcnow()
+
+        competition = Competition.query.filter(Competition.id == competition_id).first()
+        if not competition:
+            return {
+                "ok": False,
+                "error": "invalid_request",
+                "detail": "Invalid competition_id.",
+            }, 400
+
+        if competition.ingest_password_hash and not (current_user.is_authenticated or competition.check_ingest_password(ingest_password)):
+            return {
+                "ok": False,
+                "error": "forbidden",
+                "detail": "Ingest password required.",
+            }, 403
 
         if dev_id is None and checkpoint_id is None:
             return {

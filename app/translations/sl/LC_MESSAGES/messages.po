@@ -1401,6 +1401,18 @@ msgstr "Nastavitve tekmovanja"
 msgid "Competition"
 msgstr "Tekmovanje"
 
+msgid "Ingest password (optional)"
+msgstr "Geslo za ingest (neobvezno)"
+
+msgid "Leave blank to keep existing"
+msgstr "Pusti prazno, da obdržiš obstoječe"
+
+msgid "If set, unauthenticated devices must provide this password when ingesting."
+msgstr "Če je nastavljeno, morajo neavtenticirane naprave ob ingestu navesti to geslo."
+
+msgid "Disable ingest password"
+msgstr "Onemogoči geslo za ingest"
+
 msgid "Public results"
 msgstr "Javni rezultati"
 

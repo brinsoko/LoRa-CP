@@ -12,6 +12,28 @@
         <input class="form-control" name="name" value="{{ competition.name }}" required>
       </div>
 
+      <div>
+        <label class="form-label">{{ _('Competition ID') }}</label>
+        <div class="input-group">
+          <input type="text" class="form-control" value="{{ competition.id }}" readonly>
+          <button class="btn btn-outline-secondary" type="button" data-copy="{{ competition.id }}">{{ _('Copy') }}</button>
+        </div>
+        <div class="form-text">{{ _('Use this ID when configuring LoRa devices for ingest.') }}</div>
+      </div>
+
+      <div>
+        <label class="form-label">{{ _('Ingest password (optional)') }}</label>
+        <input class="form-control" type="password" name="ingest_password" autocomplete="new-password"
+               placeholder="{{ _('Leave blank to keep existing') }}">
+        <div class="form-text">
+          {{ _('If set, unauthenticated devices must provide this password when ingesting.') }}
+        </div>
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="clearIngestPassword" name="clear_ingest_password" value="1">
+          <label class="form-check-label" for="clearIngestPassword">{{ _('Disable ingest password') }}</label>
+        </div>
+      </div>
+
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" id="publicResults" name="public_results" value="1"
                {% if competition.public_results %}checked{% endif %}>
@@ -120,5 +142,26 @@
       }
     });
   }
+
+  document.querySelectorAll("[data-copy]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const value = btn.getAttribute("data-copy") || "";
+      if (!value) return;
+      try {
+        await navigator.clipboard.writeText(value);
+        const prev = btn.textContent;
+        btn.textContent = "{{ _('Copied') }}";
+        setTimeout(() => {
+          btn.textContent = prev;
+        }, 1500);
+      } catch (err) {
+        const input = btn.closest(".input-group")?.querySelector("input");
+        if (input) {
+          input.select();
+          document.execCommand("copy");
+        }
+      }
+    });
+  });
 </script>
 {% endblock %}

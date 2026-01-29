@@ -4,6 +4,7 @@ from flask_babel import get_locale
 from flask_restful import Api
 from flask_login import current_user
 from .extensions import db, login_manager, babel
+from sqlalchemy import inspect, text
 from .resources import register_resources
 from app.utils.time import to_datetime_local
 from .utils.perms import inject_perms
@@ -108,6 +109,14 @@ def create_app() -> Flask:
             ensure_default_competition()
         except Exception:
             app.logger.exception("Failed to ensure default competition")
+        try:
+            insp = inspect(db.engine)
+            cols = {c["name"] for c in insp.get_columns("competitions")}
+            if "ingest_password_hash" not in cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE competitions ADD COLUMN ingest_password_hash VARCHAR(255)"))
+        except Exception:
+            app.logger.exception("Failed to ensure competitions.ingest_password_hash column")
 
     @app.errorhandler(403)
     def forbidden(e):
