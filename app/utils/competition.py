@@ -107,6 +107,12 @@ def get_current_competition_id() -> Optional[int]:
     if comp_id:
         session.pop("competition_id", None)
 
+    last_id = getattr(current_user, "last_competition_id", None)
+    if last_id and _is_member(current_user.id, last_id):
+        session["competition_id"] = last_id
+        session.modified = True
+        return last_id
+
     if (current_user.role or "").strip().lower() == "superadmin":
         first = Competition.query.order_by(Competition.created_at.asc()).first()
         if first:
@@ -185,6 +191,11 @@ def set_current_competition_id(competition_id: int) -> bool:
         return False
     session["competition_id"] = competition_id
     session.modified = True
+    try:
+        current_user.last_competition_id = competition_id
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     return True
 
 

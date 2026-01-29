@@ -117,6 +117,14 @@ def create_app() -> Flask:
                     conn.execute(text("ALTER TABLE competitions ADD COLUMN ingest_password_hash VARCHAR(255)"))
         except Exception:
             app.logger.exception("Failed to ensure competitions.ingest_password_hash column")
+        try:
+            insp = inspect(db.engine)
+            cols = {c["name"] for c in insp.get_columns("users")}
+            if "last_competition_id" not in cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN last_competition_id INTEGER"))
+        except Exception:
+            app.logger.exception("Failed to ensure users.last_competition_id column")
 
     @app.errorhandler(403)
     def forbidden(e):

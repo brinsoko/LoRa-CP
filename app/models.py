@@ -22,6 +22,7 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), nullable=False, default="public")  # public|judge|admin|superadmin
     google_sub = db.Column(db.String(255), unique=True, nullable=True)
     email = db.Column(db.String(255), unique=True, nullable=True)
+    last_competition_id = db.Column(db.Integer, nullable=True, index=True)
 
     competition_memberships = db.relationship(
         "CompetitionMember",
