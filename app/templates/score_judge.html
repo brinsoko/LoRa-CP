@@ -72,6 +72,7 @@
         <h6 class="card-title mb-3">{{ _('Score Input') }}</h6>
         <div id="teamInfo" class="text-body-secondary small mb-2">{{ _('Waiting for scan…') }}</div>
         <div id="checkinNotice" class="alert alert-info d-none"></div>
+        <div id="writebackNotice" class="alert d-none"></div>
 
         <form id="fieldsForm">
           <input type="hidden" id="teamId" value="">
@@ -104,6 +105,7 @@
   const teamId = document.getElementById("teamId");
   const checkpointId = document.getElementById("checkpointId");
   const checkinNotice = document.getElementById("checkinNotice");
+  const writebackNotice = document.getElementById("writebackNotice");
   const scoreSummaryList = document.getElementById("scoreSummaryList");
   const scoreSummaryEmpty = document.getElementById("scoreSummaryEmpty");
   const hasWebNfc = typeof NDEFReader !== "undefined";
@@ -118,6 +120,10 @@
     resolveFailed: "{{ _('Failed to resolve tag.') }}",
     scoreSaved: "{{ _('Score saved.') }}",
     scoreSaveFailed: "{{ _('Failed to save score.') }}",
+    writebackSuccess: "{{ _('Card write-back completed.') }}",
+    writebackFailed: "{{ _('Card write-back failed.') }}",
+    writebackSkipped: "{{ _('Card write-back skipped.') }}",
+    writebackTap: "{{ _('Tap the card to write back.') }}",
     teamLabel: "{{ _('Team') }}",
     checkpointLabel: "{{ _('Checkpoint') }}",
     groupLabel: "{{ _('Group') }}",
@@ -132,6 +138,17 @@
     }
     checkinNotice.textContent = text;
     checkinNotice.classList.remove("d-none");
+  }
+
+  function setWritebackNotice(text, kind) {
+    if (!text) {
+      writebackNotice.classList.add("d-none");
+      writebackNotice.textContent = "";
+      writebackNotice.className = "alert d-none";
+      return;
+    }
+    writebackNotice.textContent = text;
+    writebackNotice.className = `alert alert-${kind || "info"}`;
   }
 
   function renderFields(fields, latestValues) {
@@ -287,6 +304,7 @@
         renderFields(data.fields, data.latest_score || {});
         submitBtn.disabled = false;
         setNotice(data.checkin_created ? I18N.checkinCreated : "");
+        setWritebackNotice("", "");
         currentContext = data;
         renderSummary(currentContext, data.latest_score || {}, null);
       } catch (err) {
@@ -315,6 +333,7 @@
       renderFields(data.fields, data.latest_score || {});
       submitBtn.disabled = false;
       setNotice(data.checkin_created ? I18N.checkinCreated : "");
+      setWritebackNotice("", "");
       currentContext = data;
       renderSummary(currentContext, data.latest_score || {}, null);
     } catch (err) {
@@ -332,10 +351,31 @@
       const data = await submitScore({
         team_id: teamId.value,
         checkpoint_id: checkpointId.value,
+        uid: (cardUid.value || "").trim(),
         fields: fields,
       });
       renderSummary(currentContext, fields, data.total);
       alert(I18N.scoreSaved);
+      setNotice(data.checkin_created ? I18N.checkinCreated : "");
+
+      if (data.card_writeback && data.card_writeback.payload) {
+        if (!hasWebNfc) {
+          setWritebackNotice(I18N.writebackFailed, "warning");
+          return;
+        }
+        setWritebackNotice(I18N.writebackTap, "info");
+        try {
+          const writer = new NDEFReader();
+          await writer.write({ records: [{ recordType: "text", data: data.card_writeback.payload }] });
+          setWritebackNotice(I18N.writebackSuccess, "success");
+        } catch (err) {
+          setWritebackNotice(I18N.writebackFailed, "danger");
+        }
+      } else if (data.writeback_error) {
+        setWritebackNotice(I18N.writebackFailed, "warning");
+      } else {
+        setWritebackNotice(I18N.writebackSkipped, "secondary");
+      }
     } catch (err) {
       alert(err.message || I18N.scoreSaveFailed);
     }

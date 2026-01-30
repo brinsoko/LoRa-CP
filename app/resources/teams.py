@@ -25,6 +25,7 @@ def _serialize_team(team: Team) -> dict:
         "number": team.number,
         "organization": team.organization,
         "dnf": bool(team.dnf),
+        "checkins_count": len(team.checkins or []),
         "groups": [
             {
                 "id": tg.group_id,
@@ -335,11 +336,20 @@ class TeamItemResource(Resource):
         team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
         if not team:
             return {"error": "not_found"}, 404
+        payload = request.get_json(silent=True) or {}
+        force = bool(payload.get("force"))
+        confirm_text = (payload.get("confirm_text") or "").strip()
         if team.checkins:
-            return {
-                "error": "conflict",
-                "detail": "Cannot delete team with existing check-ins.",
-            }, 409
+            if not force:
+                return {
+                    "error": "conflict",
+                    "detail": "Cannot delete team with existing check-ins.",
+                }, 409
+            if confirm_text != "Delete":
+                return {
+                    "error": "validation_error",
+                    "detail": "Type Delete to confirm deletion.",
+                }, 400
 
         TeamGroup.query.filter_by(team_id=team.id).delete()
         db.session.delete(team)

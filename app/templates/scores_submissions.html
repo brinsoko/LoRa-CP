@@ -38,6 +38,7 @@
             <th>{{ _('Team') }}</th>
             <th>{{ _('Checkpoint') }}</th>
             <th class="text-end">{{ _('Dead time') }}</th>
+            <th class="text-end">{{ _('Time points') }}</th>
             <th class="text-end">{{ _('Total points') }}</th>
             <th>{{ _('Fields') }}</th>
           </tr>
@@ -49,6 +50,13 @@
               <td>{{ row.team }}</td>
               <td>{{ row.checkpoint }}</td>
               <td class="text-end">{{ '%.2f'|format(row.dead_time or 0) }}</td>
+              <td class="text-end">
+                {% if row.time_points is not none %}
+                  {{ '%.2f'|format(row.time_points or 0) }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td class="text-end">{{ '%.2f'|format(row.total or 0) }}</td>
               <td style="min-width: 240px;">
                 <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ row.raw_fields | tojson(indent=2) }}</pre>
@@ -56,7 +64,7 @@
             </tr>
           {% else %}
             <tr>
-              <td colspan="6" class="text-muted text-center py-4">{{ _('No submissions yet.') }}</td>
+              <td colspan="7" class="text-muted text-center py-4">{{ _('No submissions yet.') }}</td>
             </tr>
           {% endfor %}
         </tbody>

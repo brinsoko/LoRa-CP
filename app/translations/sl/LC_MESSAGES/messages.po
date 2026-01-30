@@ -1069,6 +1069,9 @@ msgstr "Ni najdenih ekip."
 msgid "Delete this team?"
 msgstr "Izbrišem to ekipo?"
 
+msgid "This team has existing check-ins. Type Delete to confirm."
+msgstr "Ekipa ima obstoječe check-ine. Vnesi Delete za potrditev."
+
 #: app/templates/user_edit.html:2 app/templates/user_edit.html:4
 #: app/templates/users_list.html:6
 msgid "Add User"
@@ -1434,6 +1437,12 @@ msgstr "Javni rezultati za to tekmovanje niso omogočeni."
 msgid "Competition settings updated."
 msgstr "Nastavitve tekmovanja so posodobljene."
 
+msgid "Competition deleted."
+msgstr "Tekmovanje je izbrisano."
+
+msgid "Could not delete competition."
+msgstr "Tekmovanja ni bilo mogoče izbrisati."
+
 msgid "Competition not found."
 msgstr "Tekmovanje ni bilo najdeno."
 
@@ -1448,6 +1457,18 @@ msgstr "Nazaj na upravljanje preglednic"
 
 msgid "Labels & defaults"
 msgstr "Oznake in privzeto"
+
+msgid "Danger Zone"
+msgstr "Nevarno območje"
+
+msgid "Delete this competition and all related data. This cannot be undone."
+msgstr "Izbriši to tekmovanje in vse povezane podatke. Tega ni mogoče razveljaviti."
+
+msgid "Delete this competition? This cannot be undone."
+msgstr "Izbrišem to tekmovanje? Tega ni mogoče razveljaviti."
+
+msgid "Delete Competition"
+msgstr "Izbriši tekmovanje"
 
 msgid "Common headers"
 msgstr "Skupni naslovi"
@@ -2164,6 +2185,18 @@ msgstr "Točke shranjene."
 msgid "Failed to save score."
 msgstr "Točk ni bilo mogoče shraniti."
 
+msgid "Card write-back completed."
+msgstr "Zapis na kartico je uspel."
+
+msgid "Card write-back failed."
+msgstr "Zapis na kartico ni uspel."
+
+msgid "Card write-back skipped."
+msgstr "Zapis na kartico preskočen."
+
+msgid "Tap the card to write back."
+msgstr "Prisloni kartico za zapis."
+
 #: app/templates/scores_submissions.html:12
 msgid "All teams"
 msgstr "Vse ekipe"
@@ -2277,6 +2310,9 @@ msgstr "Mesto"
 
 msgid "Finished"
 msgstr "Zaključil"
+
+msgid "Time (min)"
+msgstr "Čas (min)"
 #: app/templates/base.html:160
 msgid "Score Rules"
 msgstr "Pravila točkovanja"

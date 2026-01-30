@@ -40,6 +40,7 @@ docker compose -f docker-compose.prod.yml up -d
 ```
 
 Caddy will request/renew certificates automatically for `DOMAIN` and reverse-proxy to `web`.
+Static assets (including the favicon) are served by the app through the proxy.
 
 ## 5) CI: publish images to GHCR
 - The workflow `.github/workflows/publish.yml` builds the `lora-kt-web` image and pushes to GHCR on every push to `master` (images: `ghcr.io/brinsoko/lora-cp/...`).

@@ -333,7 +333,9 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
                 team_group_ids[link.team_id] = link.group_id
 
     group_checkpoint_ids = {}
+    group_checkpoint_order = {}
     group_final_checkpoint = {}
+    group_start_checkpoint = {}
     if team_group_ids:
         unique_group_ids = sorted({gid for gid in team_group_ids.values() if gid})
         group_links = (
@@ -348,8 +350,11 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         )
         for link in group_links:
             group_checkpoint_ids.setdefault(link.group_id, set()).add(link.checkpoint_id)
+            group_checkpoint_order.setdefault(link.group_id, []).append(link.checkpoint_id)
             if link.checkpoint_id:
                 group_final_checkpoint[link.group_id] = link.checkpoint_id
+                if link.group_id not in group_start_checkpoint:
+                    group_start_checkpoint[link.group_id] = link.checkpoint_id
 
     totals = {team_id: 0.0 for team_id in team_ids}
     dead_times = {team_id: 0.0 for team_id in team_ids}
@@ -378,6 +383,35 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         if group_id_for_team:
             allowed_checkpoint_ids[team_id] = group_checkpoint_ids.get(group_id_for_team, set())
 
+    team_time_minutes: dict[int, float | None] = {team_id: None for team_id in team_ids}
+    if team_ids and group_start_checkpoint and group_final_checkpoint:
+        start_ids = {cid for cid in group_start_checkpoint.values() if cid}
+        end_ids = {cid for cid in group_final_checkpoint.values() if cid}
+        checkins = (
+            Checkin.query
+            .filter(Checkin.competition_id == comp_id)
+            .filter(Checkin.team_id.in_(team_ids))
+            .filter(Checkin.checkpoint_id.in_(start_ids.union(end_ids)))
+            .order_by(Checkin.timestamp.asc())
+            .all()
+        )
+        team_cp_times: dict[int, dict[int, datetime]] = {tid: {} for tid in team_ids}
+        for c in checkins:
+            if c.checkpoint_id not in team_cp_times.get(c.team_id, {}):
+                team_cp_times.setdefault(c.team_id, {})[c.checkpoint_id] = c.timestamp
+        for team_id in team_ids:
+            group_id_for_team = team_group_ids.get(team_id)
+            if not group_id_for_team:
+                continue
+            start_id = group_start_checkpoint.get(group_id_for_team)
+            end_id = group_final_checkpoint.get(group_id_for_team)
+            if not start_id or not end_id:
+                continue
+            start_ts = team_cp_times.get(team_id, {}).get(start_id)
+            end_ts = team_cp_times.get(team_id, {}).get(end_id)
+            if start_ts and end_ts and end_ts >= start_ts:
+                team_time_minutes[team_id] = (end_ts - start_ts).total_seconds() / 60.0
+
     global_rules = (
         GlobalScoreRule.query
         .filter(GlobalScoreRule.competition_id == comp_id)
@@ -387,6 +421,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     global_totals = {}
     global_time_points = {}
     global_found_points = {}
+    excluded_checkpoints_by_team: dict[int, set[int]] = {team_id: set() for team_id in team_ids}
     for team_id in team_ids:
         group_id_for_team = team_group_ids.get(team_id)
         if not group_id_for_team:
@@ -399,6 +434,19 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         global_totals[team_id] = global_data["total"] or 0.0
         global_time_points[team_id] = global_data["time_points"] or 0.0
         global_found_points[team_id] = global_data["found_points"] or 0.0
+        if global_rule:
+            found_rule = global_rule.get("found") or {}
+            time_rule = global_rule.get("time") or {}
+            if found_rule.get("exclude_start_checkpoint") and time_rule.get("start_checkpoint_id"):
+                try:
+                    excluded_checkpoints_by_team[team_id].add(int(time_rule.get("start_checkpoint_id")))
+                except Exception:
+                    pass
+            if found_rule.get("exclude_end_checkpoint") and time_rule.get("end_checkpoint_id"):
+                try:
+                    excluded_checkpoints_by_team[team_id].add(int(time_rule.get("end_checkpoint_id")))
+                except Exception:
+                    pass
 
     rows = []
     finished_map = {team_id: False for team_id in team_ids}
@@ -426,10 +474,12 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             "dead_time": dead_times.get(team.id, 0.0),
             "global_time": global_time_points.get(team.id, 0.0),
             "global_found": global_found_points.get(team.id, 0.0),
+            "time_minutes": team_time_minutes.get(team.id),
             "dnf": bool(team.dnf),
             "finished": finished_map.get(team.id, False),
             "organization": team.organization or "",
             "allowed_checkpoints": allowed_checkpoint_ids.get(team.id, set()),
+            "excluded_checkpoints": excluded_checkpoints_by_team.get(team.id, set()),
         })
 
     group_order_norm = [g.lower().strip() for g in group_order]
@@ -779,6 +829,34 @@ def score_submissions():
         query = query.filter(ScoreEntry.checkpoint_id == checkpoint_id)
     entries = query.limit(300).all()
 
+    entry_team_ids = sorted({e.team_id for e in entries if e.team_id})
+    team_group_map = {}
+    if entry_team_ids:
+        links = (
+            TeamGroup.query
+            .filter(TeamGroup.team_id.in_(entry_team_ids), TeamGroup.active.is_(True))
+            .all()
+        )
+        for link in links:
+            if link.team_id not in team_group_map:
+                team_group_map[link.team_id] = link.group_id
+
+    global_rules = (
+        GlobalScoreRule.query
+        .filter(GlobalScoreRule.competition_id == comp_id)
+        .all()
+    )
+    global_rules_map = {rule.group_id: rule.rules for rule in global_rules}
+    team_time_points: dict[int, float | None] = {}
+    for team_id in entry_team_ids:
+        group_id_for_team = team_group_map.get(team_id)
+        if not group_id_for_team:
+            team_time_points[team_id] = None
+            continue
+        global_rule = global_rules_map.get(group_id_for_team)
+        global_data = _compute_global_contrib(comp_id, team_id, group_id_for_team, global_rule)
+        team_time_points[team_id] = global_data.get("time_points")
+
     rows = []
     for entry in entries:
         raw = entry.raw_fields or {}
@@ -797,6 +875,7 @@ def score_submissions():
             "created_at": entry.created_at,
             "total": entry.total,
             "dead_time": dead_num,
+            "time_points": team_time_points.get(entry.team_id),
             "raw_fields": raw,
         })
 

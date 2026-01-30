@@ -9,14 +9,6 @@
 	encode zstd gzip
 	tls {$ACME_EMAIL}
 
-	@static {
-		path /static/* /favicon.ico
-	}
-
-	handle @static {
-		file_server
-	}
-
 	handle {
 		reverse_proxy web:5000
 	}

@@ -22,6 +22,7 @@ from app.models import (
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_roles_required
 from app.utils.sheets_sync import mark_arrival_checkbox, update_checkpoint_scores
+from app.utils.card_tokens import compute_card_digest
 
 
 def _get_active_group(team_id: int) -> TeamGroup | None:
@@ -573,36 +574,26 @@ class ScoreResolve(Resource):
             .first()
         )
 
-        checkin = Checkin.query.filter_by(
-            competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id
-        ).first()
-        created_checkin = False
-        if not checkin:
-            checkin = Checkin(
-                competition_id=comp_id,
-                team_id=team.id,
-                checkpoint_id=checkpoint_id,
-                timestamp=datetime.utcnow(),
-            )
-            db.session.add(checkin)
-            db.session.commit()
-            created_checkin = True
-            try:
-                mark_arrival_checkbox(team.id, checkpoint_id, checkin.timestamp)
-            except Exception:
-                pass
+        checkin_exists = (
+            Checkin.query
+            .filter_by(competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id)
+            .first()
+            is not None
+        )
 
         rule = _get_score_rule(comp_id, checkpoint_id, group_id) if group_id else None
 
         return {
             "ok": True,
+            "uid": uid or None,
             "team": {"id": team.id, "name": team.name, "number": team.number},
             "checkpoint": {"id": checkpoint.id, "name": checkpoint.name},
             "group": {"name": group_name},
             "fields": field_defs,
             "latest_score": existing.raw_fields if existing else None,
             "latest_total": existing.total if existing else None,
-            "checkin_created": created_checkin,
+            "checkin_created": False,
+            "checkin_exists": checkin_exists,
             "rules": rule,
         }, 200
 
@@ -618,6 +609,7 @@ class ScoreSubmit(Resource):
         team_id = payload.get("team_id")
         checkpoint_id = payload.get("checkpoint_id")
         fields = payload.get("fields") or {}
+        uid = (payload.get("uid") or "").strip().upper()
 
         try:
             team_id = int(team_id)
@@ -661,6 +653,7 @@ class ScoreSubmit(Resource):
         checkin = Checkin.query.filter_by(
             competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id
         ).first()
+        created_checkin = False
         if not checkin:
             checkin = Checkin(
                 competition_id=comp_id,
@@ -670,6 +663,7 @@ class ScoreSubmit(Resource):
             )
             db.session.add(checkin)
             db.session.commit()
+            created_checkin = True
             try:
                 mark_arrival_checkbox(team.id, checkpoint_id, checkin.timestamp)
             except Exception:
@@ -738,21 +732,51 @@ class ScoreSubmit(Resource):
                     max_points,
                 )
                 for e in entries:
+                    base_total = _compute_total(
+                        e.raw_fields or {},
+                        points_header,
+                        rule,
+                        {"team_id": e.team_id, "competition_id": comp_id, "group_id": group_id},
+                    )
                     if e.team_id in scores:
-                        e.total = scores[e.team_id]
+                        base_val = base_total or 0.0
+                        e.total = base_val + scores[e.team_id]
+                    else:
+                        e.total = base_total
                 db.session.commit()
 
                 for e in entries:
                     if e.team_id in scores:
                         try:
                             values = dict(e.raw_fields or {})
-                            values["points"] = scores[e.team_id]
+                            values["points"] = e.total
                             update_checkpoint_scores(e.team_id, checkpoint_id, group_name, values, e.created_at)
                         except Exception:
                             pass
+
+        card_writeback = None
+        writeback_error = None
+        if created_checkin and uid:
+            digest = compute_card_digest(uid, int(checkpoint_id))
+            if digest:
+                card_writeback = {
+                    "payload": digest,
+                    "hmac": digest,
+                    "device_id": int(checkpoint_id),
+                    "card_uid": uid,
+                    "checkpoint_id": checkpoint_id,
+                    "checkpoint": checkpoint.name,
+                    "team_id": team.id,
+                    "team": team.name,
+                }
+            else:
+                writeback_error = "writeback_unavailable"
 
         return {
             "ok": True,
             "score_id": entry.id,
             "total": entry.total,
+            "checkin_created": created_checkin,
+            "card_writeback": card_writeback,
+            "writeback_error": writeback_error,
         }, 201

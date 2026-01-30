@@ -1058,6 +1058,9 @@ msgstr ""
 msgid "Delete this team?"
 msgstr ""
 
+msgid "This team has existing check-ins. Type Delete to confirm."
+msgstr ""
+
 #: app/templates/user_edit.html:2 app/templates/user_edit.html:4
 #: app/templates/users_list.html:6
 msgid "Add User"
@@ -1356,6 +1359,12 @@ msgstr ""
 msgid "Competition settings updated."
 msgstr ""
 
+msgid "Competition deleted."
+msgstr ""
+
+msgid "Could not delete competition."
+msgstr ""
+
 msgid "Competition not found."
 msgstr ""
 
@@ -1369,6 +1378,18 @@ msgid "Back to Sheets admin"
 msgstr ""
 
 msgid "Labels & defaults"
+msgstr ""
+
+msgid "Danger Zone"
+msgstr ""
+
+msgid "Delete this competition and all related data. This cannot be undone."
+msgstr ""
+
+msgid "Delete this competition? This cannot be undone."
+msgstr ""
+
+msgid "Delete Competition"
 msgstr ""
 
 msgid "Common headers"
@@ -2062,6 +2083,22 @@ msgstr ""
 msgid "Failed to save score."
 msgstr ""
 
+#: app/templates/score_judge.html:89
+msgid "Card write-back completed."
+msgstr ""
+
+#: app/templates/score_judge.html:90
+msgid "Card write-back failed."
+msgstr ""
+
+#: app/templates/score_judge.html:91
+msgid "Card write-back skipped."
+msgstr ""
+
+#: app/templates/score_judge.html:92
+msgid "Tap the card to write back."
+msgstr ""
+
 #: app/templates/scores_submissions.html:12
 msgid "All teams"
 msgstr ""
@@ -2150,6 +2187,10 @@ msgid "Place"
 msgstr ""
 
 msgid "Finished"
+msgstr ""
+
+#: app/templates/scores_view.html:27
+msgid "Time (min)"
 msgstr ""
 
 #: app/templates/scores_view.html:29

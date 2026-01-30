@@ -289,3 +289,31 @@ def revoke_invite(invite_id: int):
     db.session.commit()
     flash(_("Invite revoked."), "success")
     return redirect(url_for("main.competition_settings"))
+
+
+@main_bp.route("/competition/delete", methods=["POST"])
+@roles_required("superadmin")
+def delete_competition():
+    comp_id = get_current_competition_id()
+    if not comp_id:
+        flash(_("Select a competition first."), "warning")
+        return redirect(url_for("main.select_competition"))
+
+    competition = Competition.query.filter(Competition.id == comp_id).first()
+    if not competition:
+        flash(_("Competition not found."), "warning")
+        return redirect(url_for("main.select_competition"))
+
+    try:
+        db.session.query(User).filter(User.last_competition_id == comp_id).update(
+            {User.last_competition_id: None},
+            synchronize_session=False,
+        )
+        db.session.delete(competition)
+        db.session.commit()
+        session.pop("competition_id", None)
+        flash(_("Competition deleted."), "success")
+    except Exception:
+        db.session.rollback()
+        flash(_("Could not delete competition."), "warning")
+    return redirect(url_for("main.select_competition"))

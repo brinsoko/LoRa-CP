@@ -264,7 +264,12 @@ def edit_team(team_id: int):
 @teams_bp.route("/<int:team_id>/delete", methods=["POST"])
 @roles_required("admin")
 def delete_team(team_id: int):
-    resp, payload = api_json("DELETE", f"/api/teams/{team_id}")
+    force = (request.form.get("force") or "").strip() == "1"
+    confirm_text = (request.form.get("confirm_text") or "").strip()
+    json_payload = None
+    if force or confirm_text:
+        json_payload = {"force": force, "confirm_text": confirm_text}
+    resp, payload = api_json("DELETE", f"/api/teams/{team_id}", json=json_payload)
 
     if resp.status_code == 200:
         flash("Team deleted.", "success")
