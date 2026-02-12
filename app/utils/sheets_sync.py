@@ -880,21 +880,24 @@ def wizard_build_checkpoint_tabs(
         _with_retry(client.set_header_row, spreadsheet_id, tab_title, headers)
 
         for grp, start_col in zip(groups_def, group_start_cols):
-            db_group = (
+            group_q = (
                 CheckpointGroup.query
                 .filter(func.lower(CheckpointGroup.name) == grp["name"].strip().lower())
-                .first()
             )
+            if competition_id is not None:
+                group_q = group_q.filter(CheckpointGroup.competition_id == competition_id)
+            db_group = group_q.first()
             if not db_group:
                 continue
-            nums = (
+            nums_q = (
                 db.session.query(Team.number)
                 .join(TeamGroup, TeamGroup.team_id == Team.id)
                 .filter(TeamGroup.group_id == db_group.id)
                 .filter(Team.number.isnot(None))
-                .order_by(Team.number.asc())
-                .all()
             )
+            if competition_id is not None:
+                nums_q = nums_q.filter(Team.competition_id == competition_id)
+            nums = nums_q.order_by(Team.number.asc()).all()
             values = [n[0] for n in nums if n[0] is not None]
             if values:
                 _with_retry(client.update_column, spreadsheet_id, tab_title, start_col, 2, values)
