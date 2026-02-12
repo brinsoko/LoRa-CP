@@ -10,6 +10,14 @@ from app.utils.perms import roles_required
 
 teams_bp = Blueprint("teams", __name__, template_folder="../../templates")
 
+
+def _tr(msg: str) -> str:
+    try:
+        return _(msg)
+    except Exception:
+        return msg
+
+
 def _safe_next_url(default: str):
     next_url = (request.form.get("next") or request.args.get("next") or "").strip()
     if next_url.startswith("/") and not next_url.startswith("//"):
@@ -124,9 +132,9 @@ def add_team():
                     json={"uid": rfid_uid, "team_id": team_id, "number": rfid_number},
                 )
                 if rfid_resp.status_code == 201:
-                    flash(_("RFID mapping created."), "success")
+                    flash(_tr("RFID mapping created."), "success")
                 else:
-                    flash(rfid_payload.get("detail") or rfid_payload.get("error") or _("Could not create RFID mapping."), "warning")
+                    flash(rfid_payload.get("detail") or rfid_payload.get("error") or _tr("Could not create RFID mapping."), "warning")
             flash("Team created.", "success")
             return redirect(url_for("teams.list_teams"))
 
@@ -163,7 +171,7 @@ def edit_team(team_id: int):
                 rfid_card = c
                 break
     else:
-        flash(_("Could not load RFID mappings."), "warning")
+        flash(_tr("Could not load RFID mappings."), "warning")
 
     selected_group_id = next((g.get("group", {}).get("id") for g in team.get("group_assignments", []) if g.get("group")), None)
     organizations = _load_organizations()
@@ -231,9 +239,9 @@ def edit_team(team_id: int):
 
                 if rfid_resp:
                     if rfid_resp.status_code in (200, 201):
-                        flash(_("RFID mapping saved."), "success")
+                        flash(_tr("RFID mapping saved."), "success")
                     else:
-                        flash(rfid_payload.get("detail") or rfid_payload.get("error") or _("Could not save RFID mapping."), "warning")
+                        flash(rfid_payload.get("detail") or rfid_payload.get("error") or _tr("Could not save RFID mapping."), "warning")
 
             flash("Team updated.", "success")
             return redirect(_safe_next_url(url_for("teams.list_teams")))
