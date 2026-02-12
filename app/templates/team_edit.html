@@ -80,6 +80,19 @@
   const nfcMessage = document.getElementById("nfcMessage");
   const uidInput = document.querySelector('input[name="rfid_uid"]');
   const hasWebNfc = typeof NDEFReader !== "undefined";
+  const i18n = {
+    unavailable: {{ _('Unavailable')|tojson }},
+    ready: {{ _('Ready')|tojson }},
+    read: {{ _('Read')|tojson }},
+    failed: {{ _('Failed')|tojson }},
+    supported: {{ _('Supported')|tojson }},
+    webNfcNotAvailableInBrowser: {{ _('Web NFC not available in this browser.')|tojson }},
+    holdTagNearDevice: {{ _('Hold the tag near your device to read.')|tojson }},
+    uidReadPrefix: {{ _('UID read:')|tojson }},
+    uidReadFailed: {{ _('Could not read UID from tag.')|tojson }},
+    webNfcReadError: {{ _('Web NFC read error.')|tojson }},
+    webNfcNotAvailable: {{ _('Web NFC not available.')|tojson }},
+  };
 
   function setStatus(text, variant) {
     nfcStatus.textContent = text;
@@ -93,45 +106,45 @@
   async function handleNfcRead() {
     setMessage("");
     if (!hasWebNfc) {
-      setStatus("Unavailable", "secondary");
-      setMessage("Web NFC not available in this browser.");
+      setStatus(i18n.unavailable, "secondary");
+      setMessage(i18n.webNfcNotAvailableInBrowser);
       return;
     }
-    setStatus("Ready", "info");
+    setStatus(i18n.ready, "info");
     try {
       const reader = new NDEFReader();
       await reader.scan();
-      setMessage("Hold the tag near your device to read.");
+      setMessage(i18n.holdTagNearDevice);
 
       const onRead = (event) => {
         reader.removeEventListener("reading", onRead);
         const uid = (event.serialNumber || "").toUpperCase();
         if (uid) {
           uidInput.value = uid;
-          setStatus("Read", "success");
-          setMessage(`UID read: ${uid}`);
+          setStatus(i18n.read, "success");
+          setMessage(`${i18n.uidReadPrefix} ${uid}`);
         } else {
-          setStatus("Failed", "danger");
-          setMessage("Could not read UID from tag.");
+          setStatus(i18n.failed, "danger");
+          setMessage(i18n.uidReadFailed);
         }
       };
 
       const onError = () => {
         reader.removeEventListener("reading", onRead);
-        setStatus("Failed", "danger");
-        setMessage("Web NFC read error.");
+        setStatus(i18n.failed, "danger");
+        setMessage(i18n.webNfcReadError);
       };
 
       reader.addEventListener("reading", onRead, { once: true });
       reader.addEventListener("readingerror", onError, { once: true });
     } catch (err) {
-      setStatus("Failed", "danger");
-      setMessage(err?.message || "Web NFC not available.");
+      setStatus(i18n.failed, "danger");
+      setMessage(err?.message || i18n.webNfcNotAvailable);
     }
   }
 
   if (hasWebNfc) {
-    setStatus("Supported", "success");
+    setStatus(i18n.supported, "success");
   }
   nfcBtn?.addEventListener("click", handleNfcRead);
 </script>

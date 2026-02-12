@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_babel import gettext as _
 
 from app.utils.frontend_api import api_json
 from app.utils.competition import get_current_competition_role
@@ -123,9 +124,9 @@ def add_team():
                     json={"uid": rfid_uid, "team_id": team_id, "number": rfid_number},
                 )
                 if rfid_resp.status_code == 201:
-                    flash("RFID mapping created.", "success")
+                    flash(_("RFID mapping created."), "success")
                 else:
-                    flash(rfid_payload.get("detail") or rfid_payload.get("error") or "Could not create RFID mapping.", "warning")
+                    flash(rfid_payload.get("detail") or rfid_payload.get("error") or _("Could not create RFID mapping."), "warning")
             flash("Team created.", "success")
             return redirect(url_for("teams.list_teams"))
 
@@ -162,7 +163,7 @@ def edit_team(team_id: int):
                 rfid_card = c
                 break
     else:
-        flash("Could not load RFID mappings.", "warning")
+        flash(_("Could not load RFID mappings."), "warning")
 
     selected_group_id = next((g.get("group", {}).get("id") for g in team.get("group_assignments", []) if g.get("group")), None)
     organizations = _load_organizations()
@@ -230,9 +231,9 @@ def edit_team(team_id: int):
 
                 if rfid_resp:
                     if rfid_resp.status_code in (200, 201):
-                        flash("RFID mapping saved.", "success")
+                        flash(_("RFID mapping saved."), "success")
                     else:
-                        flash(rfid_payload.get("detail") or rfid_payload.get("error") or "Could not save RFID mapping.", "warning")
+                        flash(rfid_payload.get("detail") or rfid_payload.get("error") or _("Could not save RFID mapping."), "warning")
 
             flash("Team updated.", "success")
             return redirect(_safe_next_url(url_for("teams.list_teams")))

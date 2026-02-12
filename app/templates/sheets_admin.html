@@ -163,7 +163,7 @@
                                  id="cp{{ cp.id }}_g{{ g.id }}"
                                  name="group_ids_cp_{{ cp.id }}"
                                  value="{{ g.id }}"
-                                 {% if g in cp.groups %}checked{% endif %}>
+                                 checked>
                           <label class="form-check-label" for="cp{{ cp.id }}_g{{ g.id }}">{{ g.name }}</label>
                         </div>
                       {% endfor %}

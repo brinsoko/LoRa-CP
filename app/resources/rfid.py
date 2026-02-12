@@ -8,6 +8,7 @@ from typing import Optional
 from flask import request
 from flask_restful import Resource
 from flask import current_app
+from flask_babel import gettext as _
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
 
@@ -41,16 +42,16 @@ def _parse_card_payload(payload: dict, require_team: bool = True) -> tuple[Optio
     uid_raw = (payload.get("uid") or "").strip()
     uid = uid_raw
     if not uid:
-        return None, None, None, "uid is required"
+        return None, None, None, _("uid is required")
 
     team_id = payload.get("team_id")
     if team_id is None and require_team:
-        return uid, None, None, "team_id is required"
+        return uid, None, None, _("team_id is required")
     if team_id is not None:
         try:
             team_id = int(team_id)
         except Exception:
-            return uid, None, None, "team_id must be integer"
+            return uid, None, None, _("team_id must be integer")
 
     number = payload.get("number")
     if number in ("", None):
@@ -59,9 +60,9 @@ def _parse_card_payload(payload: dict, require_team: bool = True) -> tuple[Optio
         try:
             number = int(number)
             if number <= 0:
-                return uid, team_id, None, "number must be positive"
+                return uid, team_id, None, _("number must be positive")
         except Exception:
-            return uid, team_id, None, "number must be integer"
+            return uid, team_id, None, _("number must be integer")
 
     return uid, team_id, number, None
 
@@ -101,12 +102,12 @@ class RFIDCardListResource(Resource):
             else None
         )
         if not team and team_id is not None:
-            return {"error": "validation_error", "detail": "Invalid team_id"}, 400
+            return {"error": "validation_error", "detail": _("Invalid team_id")}, 400
 
         if team and RFIDCard.query.filter_by(team_id=team.id).first():
             return {
                 "error": "conflict",
-                "detail": "This team already has an RFID card assigned.",
+                "detail": _("This team already has an RFID card assigned."),
             }, 409
 
         card = RFIDCard(uid=uid, team_id=team_id, number=number)
@@ -115,7 +116,7 @@ class RFIDCardListResource(Resource):
             db.session.commit()
         except IntegrityError:
             db.session.rollback()
-            return {"error": "conflict", "detail": "UID already exists."}, 409
+            return {"error": "conflict", "detail": _("UID already exists.")}, 409
 
         return {"ok": True, "card": _serialize_card(card)}, 201
 
@@ -174,7 +175,7 @@ class RFIDCardItemResource(Resource):
         if team_id is not None and not Team.query.filter(
             Team.competition_id == comp_id, Team.id == team_id
         ).first():
-            return {"error": "validation_error", "detail": "Invalid team_id"}, 400
+            return {"error": "validation_error", "detail": _("Invalid team_id")}, 400
 
         if team_id is not None:
             exists = (
@@ -185,7 +186,7 @@ class RFIDCardItemResource(Resource):
             if exists:
                 return {
                     "error": "conflict",
-                    "detail": "That team already has an RFID card assigned.",
+                    "detail": _("That team already has an RFID card assigned."),
                 }, 409
 
         card.uid = uid
@@ -196,7 +197,7 @@ class RFIDCardItemResource(Resource):
             db.session.commit()
         except IntegrityError:
             db.session.rollback()
-            return {"error": "conflict", "detail": "UID already exists."}, 409
+            return {"error": "conflict", "detail": _("UID already exists.")}, 409
 
         return {"ok": True, "card": _serialize_card(card)}, 200
 
@@ -226,7 +227,7 @@ class RFIDScanResource(Resource):
         if not uid:
             return {
                 "ok": False,
-                "error": "No UID read (check device, cable, or increase timeout).",
+                "error": _("No UID read (check device, cable, or increase timeout)."),
             }, 200
         return {"ok": True, "uid": uid}, 200
 

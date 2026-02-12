@@ -145,14 +145,13 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
             if not db_group:
                 continue
             nums = (
-                db.session.query(Team.number)
+                db.session.query(Team.id, Team.number, Team.name)
                 .join(TeamGroup, TeamGroup.team_id == Team.id)
                 .filter(TeamGroup.group_id == db_group.id, Team.competition_id == comp_id)
-                .filter(Team.number.isnot(None))
-                .order_by(Team.number.asc())
+                .order_by(Team.number.asc().nulls_last(), Team.name.asc())
                 .all()
             )
-            values = [n[0] for n in nums if n[0] is not None]
+            values = [n[1] if n[1] is not None else (n[2] or "") for n in nums]
             if values:
                 client.update_column(cfg.spreadsheet_id, cfg.tab_name, start_col, 2, values)
 
@@ -163,7 +162,7 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime
         return
     team = Team.query.get(team_id)
     checkpoint = Checkpoint.query.get(checkpoint_id)
-    if not team or not checkpoint or team.number is None:
+    if not team or not checkpoint:
         return
 
     configs = (
@@ -205,16 +204,15 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime
                 continue
             # Determine row by sorted team numbers
             nums = (
-                db.session.query(Team.number)
+                db.session.query(Team.id, Team.number, Team.name)
                 .join(TeamGroup, TeamGroup.team_id == Team.id)
                 .filter(TeamGroup.group_id == db_group.id)
-                .filter(Team.number.isnot(None))
-                .order_by(Team.number.asc())
+                .order_by(Team.number.asc().nulls_last(), Team.name.asc())
                 .all()
             )
-            ordered = [n[0] for n in nums if n[0] is not None]
+            ordered = [n[0] for n in nums]
             try:
-                idx = ordered.index(team.number)
+                idx = ordered.index(team.id)
             except ValueError:
                 continue
             row = 2 + idx  # header at row 1
@@ -239,7 +237,7 @@ def update_checkpoint_scores(team_id: int, checkpoint_id: int, group_name: str, 
         return
     team = Team.query.get(team_id)
     checkpoint = Checkpoint.query.get(checkpoint_id)
-    if not team or not checkpoint or team.number is None:
+    if not team or not checkpoint:
         return
 
     configs = (
@@ -281,15 +279,15 @@ def update_checkpoint_scores(team_id: int, checkpoint_id: int, group_name: str, 
                 continue
 
             nums = (
-                db.session.query(Team.number)
+                db.session.query(Team.id, Team.number, Team.name)
                 .join(TeamGroup, TeamGroup.team_id == Team.id)
-                .filter(TeamGroup.group_id == db_group.id, Team.number.isnot(None))
-                .order_by(Team.number.asc())
+                .filter(TeamGroup.group_id == db_group.id, Team.competition_id == cfg.competition_id)
+                .order_by(Team.number.asc().nulls_last(), Team.name.asc())
                 .all()
             )
-            ordered = [n[0] for n in nums if n[0] is not None]
+            ordered = [n[0] for n in nums]
             try:
-                idx = ordered.index(team.number)
+                idx = ordered.index(team.id)
             except ValueError:
                 continue
             row = 2 + idx
@@ -915,15 +913,14 @@ def wizard_build_checkpoint_tabs(
             if not db_group:
                 continue
             nums_q = (
-                db.session.query(Team.number)
+                db.session.query(Team.id, Team.number, Team.name)
                 .join(TeamGroup, TeamGroup.team_id == Team.id)
                 .filter(TeamGroup.group_id == db_group.id)
-                .filter(Team.number.isnot(None))
             )
             if competition_id is not None:
                 nums_q = nums_q.filter(Team.competition_id == competition_id)
-            nums = nums_q.order_by(Team.number.asc()).all()
-            values = [n[0] for n in nums if n[0] is not None]
+            nums = nums_q.order_by(Team.number.asc().nulls_last(), Team.name.asc()).all()
+            values = [n[1] if n[1] is not None else (n[2] or "") for n in nums]
             if values:
                 _with_retry(client.update_column, spreadsheet_id, tab_title, start_col, 2, values)
 

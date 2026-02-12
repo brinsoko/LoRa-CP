@@ -1,6 +1,19 @@
 
 msgid ""
 msgstr ""
+"Project-Id-Version: LoRa KT\n"
+"Report-Msgid-Bugs-To: brin.soko@gmail.com\n"
+"POT-Creation-Date: 2025-12-03 23:37+0100\n"
+"PO-Revision-Date: 2025-12-04 00:00+0100\n"
+"Last-Translator: Brin Soko <brin.soko@gmail.com>\n"
+"Language: sl\n"
+"Language-Team: sl \n"
+"Plural-Forms: nplurals=4; plural=(n%100==1 ? 0 : n%100==2 ? 1 : n%100==3 "
+"|| n%100==4 ? 2 : 3);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.13.0\n"
 
 #: app/templates/rfid_judge.html:101
 msgid "HMAC already on tag; skipped writing."
@@ -59,19 +72,102 @@ msgstr "Neobvezno; shrani RFID povezavo za to ekipo."
 #: app/templates/team_edit.html:28
 msgid "Current mapping ID"
 msgstr "ID trenutne povezave"
-"Project-Id-Version: LoRa KT\n"
-"Report-Msgid-Bugs-To: brin.soko@gmail.com\n"
-"POT-Creation-Date: 2025-12-03 23:37+0100\n"
-"PO-Revision-Date: 2025-12-04 00:00+0100\n"
-"Last-Translator: Brin Soko <brin.soko@gmail.com>\n"
-"Language: sl\n"
-"Language-Team: sl \n"
-"Plural-Forms: nplurals=4; plural=(n%100==1 ? 0 : n%100==2 ? 1 : n%100==3 "
-"|| n%100==4 ? 2 : 3);\n"
-"MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=utf-8\n"
-"Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.13.0\n"
+
+#: app/blueprints/teams/routes.py:127
+msgid "RFID mapping created."
+msgstr "RFID povezava ustvarjena."
+
+#: app/blueprints/teams/routes.py:129
+msgid "Could not create RFID mapping."
+msgstr "RFID povezave ni bilo mogoče ustvariti."
+
+#: app/blueprints/teams/routes.py:167
+msgid "Could not load RFID mappings."
+msgstr "RFID povezav ni bilo mogoče naložiti."
+
+#: app/blueprints/teams/routes.py:235
+msgid "RFID mapping saved."
+msgstr "RFID povezava shranjena."
+
+#: app/blueprints/teams/routes.py:237
+msgid "Could not save RFID mapping."
+msgstr "RFID povezave ni bilo mogoče shraniti."
+
+#: app/resources/rfid.py:43 app/resources/rfid.py:47
+msgid "uid is required"
+msgstr "uid je obvezen"
+
+#: app/resources/rfid.py:47
+msgid "team_id is required"
+msgstr "team_id je obvezen"
+
+#: app/resources/rfid.py:52
+msgid "team_id must be integer"
+msgstr "team_id mora biti celo število"
+
+#: app/resources/rfid.py:61
+msgid "number must be positive"
+msgstr "številka mora biti pozitivna"
+
+#: app/resources/rfid.py:63
+msgid "number must be integer"
+msgstr "številka mora biti celo število"
+
+#: app/resources/rfid.py:100 app/resources/rfid.py:176
+msgid "Invalid team_id"
+msgstr "Neveljaven team_id"
+
+#: app/resources/rfid.py:105
+msgid "This team already has an RFID card assigned."
+msgstr "Ta ekipa že ima dodeljeno RFID kartico."
+
+#: app/resources/rfid.py:118 app/resources/rfid.py:199
+msgid "UID already exists."
+msgstr "UID že obstaja."
+
+#: app/resources/rfid.py:188
+msgid "That team already has an RFID card assigned."
+msgstr "Ta ekipa že ima dodeljeno RFID kartico."
+
+#: app/resources/rfid.py:229
+msgid "No UID read (check device, cable, or increase timeout)."
+msgstr "UID ni bil prebran (preveri napravo, kabel ali povečaj časovno omejitev)."
+
+#: app/templates/add_team.html:64 app/templates/team_edit.html:69
+msgid "Unavailable"
+msgstr "Nedosegljivo"
+
+#: app/templates/add_team.html:65 app/templates/team_edit.html:70
+msgid "Ready"
+msgstr "Pripravljeno"
+
+#: app/templates/add_team.html:66 app/templates/team_edit.html:71
+msgid "Read"
+msgstr "Prebrano"
+
+#: app/templates/add_team.html:67 app/templates/team_edit.html:72
+msgid "Failed"
+msgstr "Napaka"
+
+#: app/templates/add_team.html:68 app/templates/team_edit.html:73
+msgid "Supported"
+msgstr "Podprto"
+
+#: app/templates/add_team.html:69 app/templates/team_edit.html:74
+msgid "Web NFC not available in this browser."
+msgstr "Web NFC v tem brskalniku ni na voljo."
+
+#: app/templates/add_team.html:71 app/templates/team_edit.html:76
+msgid "UID read:"
+msgstr "Prebran UID:"
+
+#: app/templates/add_team.html:73 app/templates/team_edit.html:78
+msgid "Web NFC read error."
+msgstr "Napaka pri branju Web NFC."
+
+#: app/templates/add_team.html:74 app/templates/team_edit.html:79
+msgid "Web NFC not available."
+msgstr "Web NFC ni na voljo."
 
 #: app/templates/403.html:3
 msgid "Forbidden: you don’t have access to this page."

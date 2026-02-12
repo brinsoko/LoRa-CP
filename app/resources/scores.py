@@ -25,6 +25,10 @@ from app.utils.sheets_sync import mark_arrival_checkbox, update_checkpoint_score
 from app.utils.card_tokens import compute_card_digest
 
 
+def _norm_name(value: str | None) -> str:
+    return (value or "").strip().casefold()
+
+
 def _get_active_group(team_id: int) -> TeamGroup | None:
     return (
         TeamGroup.query
@@ -33,7 +37,7 @@ def _get_active_group(team_id: int) -> TeamGroup | None:
     )
 
 
-def _get_checkpoint_fields(competition_id: int, checkpoint_id: int, group_name: str) -> dict:
+def _get_checkpoint_fields(competition_id: int, checkpoint_id: int, group_name: str, group_id: int | None = None) -> dict:
     from app.models import SheetConfig
 
     cfg = (
@@ -55,10 +59,11 @@ def _get_checkpoint_fields(competition_id: int, checkpoint_id: int, group_name: 
         "points": (cfg.config or {}).get("points_header"),
     }
     group_defs = (cfg.config or {}).get("groups", [])
-    group_def = next(
-        (g for g in group_defs if (g.get("name") or "").strip().lower() == (group_name or "").strip().lower()),
-        None,
-    )
+    group_def = None
+    if group_id is not None:
+        group_def = next((g for g in group_defs if g.get("group_id") == group_id), None)
+    if group_def is None:
+        group_def = next((g for g in group_defs if _norm_name(g.get("name")) == _norm_name(group_name)), None)
     fields = list(group_def.get("fields") or []) if group_def else []
     return {"fields": fields, "headers": headers, "config": cfg.config or {}}
 
@@ -546,7 +551,7 @@ class ScoreResolve(Resource):
             return {"error": "invalid_request", "detail": "Team has no active group."}, 400
         group_id = group_link.group_id if group_link else None
 
-        fields_info = _get_checkpoint_fields(comp_id, checkpoint_id, group_name)
+        fields_info = _get_checkpoint_fields(comp_id, checkpoint_id, group_name, group_id)
         config = fields_info.get("config")
         if config is None:
             return {"error": "invalid_request", "detail": "No scoring fields configured for this checkpoint."}, 400
@@ -646,7 +651,7 @@ class ScoreSubmit(Resource):
         if not group_name:
             return {"error": "invalid_request", "detail": "Team has no active group."}, 400
         group_id = group_link.group_id if group_link else None
-        fields_info = _get_checkpoint_fields(comp_id, checkpoint_id, group_name)
+        fields_info = _get_checkpoint_fields(comp_id, checkpoint_id, group_name, group_id)
         points_header = (fields_info.get("headers") or {}).get("points")
         rule = _get_score_rule(comp_id, checkpoint_id, group_id) if group_id else None
 

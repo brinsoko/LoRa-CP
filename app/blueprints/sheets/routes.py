@@ -611,14 +611,13 @@ def add_tab():
                 if not db_group:
                     continue
                 nums = (
-                    db.session.query(Team.number)
+                    db.session.query(Team.id, Team.number, Team.name)
                     .join(TeamGroup, TeamGroup.team_id == Team.id)
                     .filter(TeamGroup.group_id == db_group.id, Team.competition_id == comp_id)
-                    .filter(Team.number.isnot(None))
-                    .order_by(Team.number.asc())
+                    .order_by(Team.number.asc().nulls_last(), Team.name.asc())
                     .all()
                 )
-                values = [n[0] for n in nums if n[0] is not None]
+                values = [n[1] if n[1] is not None else (n[2] or "") for n in nums]
                 if values:
                     client.update_column(spreadsheet_id, tab_title, start_col, 2, values)
             ws_title = ws.spreadsheet.title
