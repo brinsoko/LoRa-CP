@@ -25,7 +25,7 @@ pyserial==3.5
 requests==2.32.5
 
 # --- Data Handling ---
-pandas==2.2.3
+pandas==3.0.0
 
 # --- CSV / Excel / File parsing ---
 openpyxl==3.1.5
