@@ -69,6 +69,10 @@ def _parse_group_fields(raw: str) -> List[dict]:
     return result
 
 
+def _norm_name(value: str | None) -> str:
+    return (value or "").strip().casefold()
+
+
 @sheets_bp.route("/", methods=["GET"])
 @roles_required("admin")
 def list_sheets():
@@ -581,6 +585,20 @@ def add_tab():
         current_col += 1 + (1 if dead_time_enabled else 0) + (1 if include_time else 0) + len(grp.get("fields", [])) + 1
 
     ws_title = None
+    db_groups = (
+        CheckpointGroup.query
+        .filter(CheckpointGroup.competition_id == comp_id)
+        .all()
+    )
+    group_by_name = {_norm_name(g.name): g for g in db_groups}
+    groups_with_ids = []
+    for grp in groups:
+        g = group_by_name.get(_norm_name(grp.get("name")))
+        grp_copy = dict(grp)
+        if g:
+            grp_copy["group_id"] = g.id
+        groups_with_ids.append(grp_copy)
+
     if use_sheets:
         try:
             client = _get_sheets_client()
@@ -588,21 +606,14 @@ def add_tab():
             client.set_header_row(spreadsheet_id, tab_title, headers)
 
             # Populate team numbers under each group header if groups exist
-            for grp, start_col in zip(groups, group_start_cols):
-                db_group = (
-                    CheckpointGroup.query
-                    .filter(
-                        CheckpointGroup.competition_id == comp_id,
-                        func.lower(CheckpointGroup.name) == grp["name"].strip().lower(),
-                    )
-                    .first()
-                )
+            for grp, start_col in zip(groups_with_ids, group_start_cols):
+                db_group = group_by_name.get(_norm_name(grp.get("name")))
                 if not db_group:
                     continue
                 nums = (
                     db.session.query(Team.number)
                     .join(TeamGroup, TeamGroup.team_id == Team.id)
-                    .filter(TeamGroup.group_id == db_group.id)
+                    .filter(TeamGroup.group_id == db_group.id, Team.competition_id == comp_id)
                     .filter(Team.number.isnot(None))
                     .order_by(Team.number.asc())
                     .all()
@@ -633,7 +644,7 @@ def add_tab():
             "time_enabled": include_time,
             "time_header": time_header,
             "points_header": points_header,
-            "groups": groups,
+            "groups": groups_with_ids,
         },
     )
     db.session.add(record)

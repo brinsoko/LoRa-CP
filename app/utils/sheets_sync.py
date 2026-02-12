@@ -17,6 +17,46 @@ from app.utils.sheets_client import SheetsClient
 from app.utils.sheets_settings import sheets_sync_enabled
 
 
+def _norm_name(value: str | None) -> str:
+    return (value or "").strip().casefold()
+
+
+def _resolve_group_from_cfg(
+    competition_id: int | None,
+    grp_def: dict,
+    cache: dict[int, list[CheckpointGroup]],
+) -> CheckpointGroup | None:
+    if competition_id is None:
+        return None
+    groups = cache.get(competition_id)
+    if groups is None:
+        groups = (
+            CheckpointGroup.query
+            .filter(CheckpointGroup.competition_id == competition_id)
+            .all()
+        )
+        cache[competition_id] = groups
+
+    group_id = grp_def.get("group_id")
+    if group_id is not None:
+        try:
+            group_id = int(group_id)
+        except Exception:
+            group_id = None
+    if group_id is not None:
+        for g in groups:
+            if g.id == group_id:
+                return g
+
+    name_norm = _norm_name(grp_def.get("name"))
+    if not name_norm:
+        return None
+    for g in groups:
+        if _norm_name(g.name) == name_norm:
+            return g
+    return None
+
+
 def _get_global_group_order(spreadsheet_id: str) -> list[str]:
     cfgs = (
         SheetConfig.query
@@ -92,6 +132,7 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
         current_app.logger.warning("Sheets sync skipped: %s", exc)
         return
 
+    group_cache: dict[int, list[CheckpointGroup]] = {}
     for cfg in configs:
         comp_id = cfg.competition_id
         groups = (cfg.config or {}).get("groups", [])
@@ -100,14 +141,7 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
         group_cols = _group_start_cols_from_config(cfg.config or {})
 
         for grp, start_col in zip(groups, group_cols):
-            db_group = (
-                CheckpointGroup.query
-                .filter(
-                    func.lower(CheckpointGroup.name) == grp["name"].strip().lower(),
-                    CheckpointGroup.competition_id == comp_id,
-                )
-                .first()
-            )
+            db_group = _resolve_group_from_cfg(comp_id, grp, group_cache)
             if not db_group:
                 continue
             nums = (
@@ -152,17 +186,13 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime
         return
 
     # Team may belong to multiple groups; mark in each matching block.
+    group_cache: dict[int, list[CheckpointGroup]] = {}
     for cfg in configs:
         group_defs = (cfg.config or {}).get("groups", [])
         group_cols = _group_start_cols_from_config(cfg.config or {})
         time_enabled = bool((cfg.config or {}).get("time_enabled"))
         for grp_def, start_col in zip(group_defs, group_cols):
-            grp_name = grp_def.get("name", "").strip()
-            db_group = (
-                CheckpointGroup.query
-                .filter(func.lower(CheckpointGroup.name) == grp_name.lower())
-                .first()
-            )
+            db_group = _resolve_group_from_cfg(cfg.competition_id, grp_def, group_cache)
             if not db_group:
                 continue
             # Is team in this group?
@@ -231,6 +261,7 @@ def update_checkpoint_scores(team_id: int, checkpoint_id: int, group_name: str, 
         current_app.logger.warning("Sheets score sync skipped: %s", exc)
         return
 
+    group_cache: dict[int, list[CheckpointGroup]] = {}
     for cfg in configs:
         group_defs = (cfg.config or {}).get("groups", [])
         group_cols = _group_start_cols_from_config(cfg.config or {})
@@ -242,14 +273,10 @@ def update_checkpoint_scores(team_id: int, checkpoint_id: int, group_name: str, 
 
         for grp_def, start_col in zip(group_defs, group_cols):
             grp_name = (grp_def.get("name") or "").strip()
-            if grp_name.lower() != (group_name or "").strip().lower():
+            if _norm_name(grp_name) != _norm_name(group_name):
                 continue
 
-            db_group = (
-                CheckpointGroup.query
-                .filter(func.lower(CheckpointGroup.name) == grp_name.lower())
-                .first()
-            )
+            db_group = _resolve_group_from_cfg(cfg.competition_id, grp_def, group_cache)
             if not db_group:
                 continue
 
@@ -856,7 +883,7 @@ def wizard_build_checkpoint_tabs(
         ordered_groups = sorted(raw_groups, key=_sort_key)
         extra_fields = per_checkpoint_extra_fields.get(cp.id, []) if per_checkpoint_extra_fields else []
         time_enabled = bool(record_time_cp and cp.id in record_time_cp)
-        groups_def = [{"name": g.name, "fields": list(extra_fields)} for g in ordered_groups]
+        groups_def = [{"group_id": g.id, "name": g.name, "fields": list(extra_fields)} for g in ordered_groups]
         dead_time_enabled = per_checkpoint_dead_time.get(cp.id, True) if per_checkpoint_dead_time else True
         if not groups_def:
             continue
@@ -880,13 +907,11 @@ def wizard_build_checkpoint_tabs(
         _with_retry(client.set_header_row, spreadsheet_id, tab_title, headers)
 
         for grp, start_col in zip(groups_def, group_start_cols):
-            group_q = (
-                CheckpointGroup.query
-                .filter(func.lower(CheckpointGroup.name) == grp["name"].strip().lower())
-            )
-            if competition_id is not None:
-                group_q = group_q.filter(CheckpointGroup.competition_id == competition_id)
-            db_group = group_q.first()
+            db_group = CheckpointGroup.query.get(grp.get("group_id"))
+            if not db_group:
+                continue
+            if competition_id is not None and db_group.competition_id != competition_id:
+                continue
             if not db_group:
                 continue
             nums_q = (
@@ -993,7 +1018,7 @@ def wizard_create_checkpoint_configs(
         ordered_groups = sorted(raw_groups, key=_sort_key)
         extra_fields = per_checkpoint_extra_fields.get(cp.id, []) if per_checkpoint_extra_fields else []
         time_enabled = bool(record_time_cp and cp.id in record_time_cp)
-        groups_def = [{"name": g.name, "fields": list(extra_fields)} for g in ordered_groups]
+        groups_def = [{"group_id": g.id, "name": g.name, "fields": list(extra_fields)} for g in ordered_groups]
         dead_time_enabled = per_checkpoint_dead_time.get(cp.id, True) if per_checkpoint_dead_time else True
         if not groups_def:
             continue
