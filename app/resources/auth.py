@@ -11,6 +11,19 @@ from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_login_required, json_roles_required
 
 # ---------- helpers ----------
+def _find_login_user(login_id: str) -> User | None:
+    login_id = (login_id or "").strip()
+    if not login_id:
+        return None
+
+    # Preserve exact username login first, then fall back to email for
+    # admin-created local accounts that also have an email address.
+    user = User.query.filter_by(username=login_id).first()
+    if user:
+        return user
+    return User.query.filter_by(email=login_id.lower()).first()
+
+
 def _validate_new_password(username: str, pw1: str, pw2: str) -> str | None:
     if not pw1 or not pw2:
         return "Please fill in all fields."
@@ -43,7 +56,7 @@ class AuthLogin(Resource):
         if not username or not password:
             return {"error": "username and password required"}, 400
 
-        user = User.query.filter_by(username=username).first()
+        user = _find_login_user(username)
         if not user or not user.check_password(password):
             return {"error": "Invalid credentials"}, 401
 

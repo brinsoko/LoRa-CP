@@ -54,6 +54,26 @@ def _fetch_checkpoints():
     return payload.get("checkpoints", [])
 
 
+def _parse_optional_int(raw_value, field_label: str) -> tuple[int | None, str | None]:
+    if raw_value in (None, ""):
+        return None, None
+    try:
+        return int(str(raw_value).strip()), None
+    except (TypeError, ValueError):
+        return None, _(f"{field_label} must be an integer.")
+
+
+def _parse_int_list(values, field_label: str) -> tuple[list[int], str | None]:
+    parsed: list[int] = []
+    for value in values or []:
+        item, err = _parse_optional_int(value, field_label)
+        if err:
+            return [], err
+        if item is not None:
+            parsed.append(item)
+    return parsed, None
+
+
 def _normalize_checkpoint_form(form):
     name = (form.get("name") or "").strip()
     location = (form.get("location") or "").strip() or None
@@ -62,9 +82,8 @@ def _normalize_checkpoint_form(form):
     northing_raw = form.get("northing")
     easting = float(easting_raw) if easting_raw else None
     northing = float(northing_raw) if northing_raw else None
-    lora_device_raw = form.get("lora_device_id")
-    lora_device_id = int(lora_device_raw) if lora_device_raw else None
-    group_ids = [int(x) for x in form.getlist("group_ids")]
+    lora_device_id, lora_device_error = _parse_optional_int(form.get("lora_device_id"), "Device ID")
+    group_ids, group_ids_error = _parse_int_list(form.getlist("group_ids"), "Group ID")
 
     return {
         "name": name,
@@ -74,7 +93,7 @@ def _normalize_checkpoint_form(form):
         "northing": northing,
         "lora_device_id": lora_device_id,
         "group_ids": group_ids,
-    }
+    }, lora_device_error or group_ids_error
 
 
 @checkpoints_bp.route("/", methods=["GET"])
@@ -90,9 +109,18 @@ def add_checkpoint():
     groups = _fetch_groups()
     devices = _fetch_devices()
 
-    form_data = _normalize_checkpoint_form(request.form) if request.method == "POST" else None
+    form_data, form_error = _normalize_checkpoint_form(request.form) if request.method == "POST" else (None, None)
 
     if request.method == "POST":
+        if form_error:
+            flash(form_error, "warning")
+            return render_template(
+                "add_checkpoint.html",
+                groups=groups,
+                devices=devices,
+                selected_group_ids=form_data["group_ids"] if form_data else [],
+                selected_device_id=(form_data["lora_device_id"] if form_data else "") or "",
+            )
         if not form_data["name"]:
             flash(_("Name is required."), "warning")
             return render_template(
@@ -136,7 +164,23 @@ def edit_checkpoint(cp_id: int):
     existing_group_ids = [g.get("id") for g in checkpoint.get("groups", []) if isinstance(g, dict)]
 
     if request.method == "POST":
-        form_data = _normalize_checkpoint_form(request.form)
+        form_data, form_error = _normalize_checkpoint_form(request.form)
+
+        if form_error:
+            flash(form_error, "warning")
+            checkpoint.update({k: v for k, v in form_data.items() if k != "group_ids"})
+            checkpoint["groups"] = [
+                next((g for g in groups if g.get("id") == gid), {"id": gid, "name": "Unknown"})
+                for gid in form_data["group_ids"]
+            ]
+            return render_template(
+                "checkpoint_edit.html",
+                cp=checkpoint,
+                groups=groups,
+                devices=devices,
+                selected_group_ids=form_data["group_ids"],
+                selected_device_id=form_data["lora_device_id"] or "",
+            )
 
         if not form_data["name"]:
             flash(_("Name is required."), "warning")

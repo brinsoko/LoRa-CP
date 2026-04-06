@@ -12,27 +12,41 @@ from app.utils.perms import roles_required
 groups_bp = Blueprint("groups", __name__, template_folder="../../templates")
 
 
+def _parse_int(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _parse_checkpoint_ids(values) -> List[int]:
     ids: List[int] = []
     for value in values or []:
-        try:
-            num = int(value)
-            if num > 0:
-                ids.append(num)
-        except Exception:
-            continue
+        num = _parse_int(value)
+        if num and num > 0:
+            ids.append(num)
     return ids
 
 
 def _partition_checkpoints(all_checkpoints: List[dict], ordered_ids: List[int]) -> Tuple[List[dict], List[dict]]:
-    lookup = {int(cp.get("id")): cp for cp in all_checkpoints}
+    lookup = {}
+    for cp in all_checkpoints:
+        cp_id = _parse_int(cp.get("id"))
+        if cp_id is not None:
+            lookup[cp_id] = cp
     selected: List[dict] = []
     for cid in ordered_ids:
         cp = lookup.get(cid)
         if cp:
             selected.append(cp)
-    selected_ids = {int(cp.get("id")) for cp in selected}
-    available = [cp for cp in all_checkpoints if int(cp.get("id")) not in selected_ids]
+    selected_ids = {
+        cp_id for cp in selected
+        if (cp_id := _parse_int(cp.get("id"))) is not None
+    }
+    available = [
+        cp for cp in all_checkpoints
+        if (cp_id := _parse_int(cp.get("id"))) is not None and cp_id not in selected_ids
+    ]
     return selected, available
 
 
@@ -205,10 +219,15 @@ def set_active_group_for_team():
         flash("team_id and group_id are required.", "warning")
         return redirect(url_for("groups.list_groups"))
 
+    parsed_group_id = _parse_int(group_id)
+    if parsed_group_id is None:
+        flash("group_id must be an integer.", "warning")
+        return redirect(url_for("groups.list_groups"))
+
     resp, payload = api_json(
         "POST",
         f"/api/teams/{team_id}/active-group",
-        json={"group_id": int(group_id)},
+        json={"group_id": parsed_group_id},
     )
 
     if resp.status_code == 200:

@@ -24,6 +24,15 @@ def _safe_next_url(default: str):
         return next_url
     return default
 
+
+def _parse_optional_int(raw_value, field_label: str) -> tuple[int | None, str | None]:
+    if raw_value in (None, ""):
+        return None, None
+    try:
+        return int(str(raw_value).strip()), None
+    except (TypeError, ValueError):
+        return None, f"{field_label} must be an integer."
+
 def _load_organizations() -> list[str]:
     resp, payload = api_json("GET", "/api/teams")
     if resp.status_code != 200:
@@ -53,14 +62,15 @@ def _transform_team_payload(team: dict) -> dict:
 @teams_bp.route("/", methods=["GET"])
 def list_teams():
     q = (request.args.get("q") or "").strip()
-    group_id = request.args.get("group_id")
+    group_id_raw = (request.args.get("group_id") or "").strip()
     sort = (request.args.get("sort") or "number_asc").strip().lower()
+    selected_group_id, group_id_error = _parse_optional_int(group_id_raw, "Group")
 
     params = {"sort": sort}
     if q:
         params["q"] = q
-    if group_id:
-        params["group_id"] = group_id
+    if selected_group_id is not None:
+        params["group_id"] = selected_group_id
 
     team_resp, team_payload = api_json("GET", "/api/teams", params=params)
     groups_resp, groups_payload = api_json("GET", "/api/groups")
@@ -72,8 +82,8 @@ def list_teams():
     if groups_resp.status_code != 200:
         flash("Could not load groups.", "warning")
     groups = groups_payload.get("groups", [])
-
-    selected_group_id = int(group_id) if group_id else None
+    if group_id_error:
+        flash(group_id_error, "warning")
 
     return render_template(
         "teams_list.html",
@@ -88,20 +98,27 @@ def list_teams():
 @teams_bp.route("/add", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def add_team():
-    _, groups_payload = api_json("GET", "/api/groups")
+    groups_resp, groups_payload = api_json("GET", "/api/groups")
     groups = groups_payload.get("groups", [])
     selected_group_id = None
     organizations = _load_organizations()
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
-        number_raw = request.form.get("number")
-        number = int(number_raw) if number_raw else None
+        number, number_error = _parse_optional_int(request.form.get("number"), "Team number")
         organization = (request.form.get("organization") or "").strip() or None
         selected_group_id = request.form.get("group_id", type=int)
         rfid_uid = (request.form.get("rfid_uid") or "").strip().upper()
-        rfid_number_raw = request.form.get("rfid_number")
-        rfid_number = int(rfid_number_raw) if rfid_number_raw else None
+        rfid_number, rfid_number_error = _parse_optional_int(request.form.get("rfid_number"), "RFID number")
+
+        if number_error or rfid_number_error:
+            flash(number_error or rfid_number_error, "warning")
+            return render_template(
+                "add_team.html",
+                groups=groups,
+                selected_group_id=selected_group_id,
+                organizations=organizations,
+            )
 
         if not name:
             flash("Team name is required.", "warning")
@@ -159,7 +176,7 @@ def edit_team(team_id: int):
 
     team = _transform_team_payload(team_payload.get("team", team_payload))
 
-    _, groups_payload = api_json("GET", "/api/groups")
+    groups_resp, groups_payload = api_json("GET", "/api/groups")
     groups = groups_payload.get("groups", [])
 
     rfid_card = None
@@ -178,13 +195,25 @@ def edit_team(team_id: int):
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
-        number_raw = request.form.get("number")
-        number = int(number_raw) if number_raw else None
+        number, number_error = _parse_optional_int(request.form.get("number"), "Team number")
         organization = (request.form.get("organization") or "").strip() or None
         selected_group_id = request.form.get("group_id", type=int)
         rfid_uid = (request.form.get("rfid_uid") or "").strip().upper()
-        rfid_number_raw = request.form.get("rfid_number")
-        rfid_number = int(rfid_number_raw) if rfid_number_raw else None
+        rfid_number, rfid_number_error = _parse_optional_int(request.form.get("rfid_number"), "RFID number")
+
+        if number_error or rfid_number_error:
+            flash(number_error or rfid_number_error, "warning")
+            team["name"] = name
+            team["number"] = number
+            team["organization"] = organization
+            return render_template(
+                "team_edit.html",
+                team=team,
+                groups=groups,
+                selected_group_id=selected_group_id,
+                organizations=organizations,
+                next_url=next_url,
+            )
 
         if not name:
             flash("Team name is required.", "warning")
