@@ -15,6 +15,7 @@ from app.models import SheetConfig, CheckpointGroup, Team, TeamGroup, Checkpoint
 from app.utils.competition import get_competition_group_order
 from app.utils.sheets_client import SheetsClient
 from app.utils.sheets_settings import sheets_sync_enabled
+from app.utils.export_safety import escape_formula_cell
 
 
 def _norm_name(value: str | None) -> str:
@@ -380,7 +381,7 @@ def build_arrivals_tab(
         if not relevant:
             continue
 
-        header_row = [g.name] + [cfg.tab_name for cfg in relevant]
+        header_row = [escape_formula_cell(g.name)] + [escape_formula_cell(cfg.tab_name) for cfg in relevant]
         values.append(header_row)
         for team_num in teams:
             row_idx = len(values) + 1
@@ -520,7 +521,7 @@ def build_teams_tab(
     header = []
     subheader = []
     for block in group_blocks:
-        header.extend([block["name"]] + [""] * (col_count - 1))
+        header.extend([escape_formula_cell(block["name"])] + [""] * (col_count - 1))
         subheader.extend(headers)
 
     values = [header, subheader]
@@ -529,7 +530,11 @@ def build_teams_tab(
         for block in group_blocks:
             if i < len(block["rows"]):
                 # pad to col_count
-                row.extend(block["rows"][i] + [""] * (col_count - len(block["rows"][i])))
+                safe_row = [
+                    escape_formula_cell(v) if isinstance(v, str) else v
+                    for v in block["rows"][i]
+                ]
+                row.extend(safe_row + [""] * (col_count - len(block["rows"][i])))
             else:
                 row.extend([""] * col_count)
         values.append(row)

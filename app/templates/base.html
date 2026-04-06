@@ -165,6 +165,7 @@
       {% if current_user.is_authenticated and current_competition_role == 'admin' %}
       <a href="{{ url_for('sheets_admin.list_sheets') }}" class="btn btn-outline-secondary">{{ _('Sheets') }}</a>
       <a href="{{ url_for('scores.score_rules') }}" class="btn btn-outline-secondary">{{ _('Score Rules') }}</a>
+      <a href="{{ url_for('audit.list_audit_events') }}" class="btn btn-outline-secondary">{{ _('Audit') }}</a>
       <a href="{{ url_for('main.competition_settings') }}" class="btn btn-outline-secondary">{{ _('Settings') }}</a>
       {% endif %}
     {% endif %}

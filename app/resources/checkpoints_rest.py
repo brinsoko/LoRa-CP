@@ -4,13 +4,16 @@ from __future__ import annotations
 from typing import Iterable, List, Optional
 
 from flask import request
+from flask_login import current_user
 from flask_restful import Resource
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, LoRaDevice
+from app.utils.audit import record_audit_event
 from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.competition import require_current_competition_id
+from app.utils.validators import validate_text
 
 
 def _serialize_checkpoint(cp: Checkpoint) -> dict:
@@ -38,6 +41,10 @@ def _serialize_checkpoint(cp: Checkpoint) -> dict:
             "name": cp.lora_device.name,
         } if cp.lora_device else None,
     }
+
+
+def _checkpoint_snapshot(cp: Checkpoint) -> dict:
+    return _serialize_checkpoint(cp)
 
 
 def _parse_group_ids(values: Iterable) -> List[int]:
@@ -99,7 +106,7 @@ def _assign_lora_device(cp: Checkpoint, device_id: Optional[int]) -> Optional[di
         cp.lora_device = None
         return None
 
-    device = LoRaDevice.query.get(device_id)
+    device = db.session.get(LoRaDevice, device_id)
     if not device:
         return {"error": "invalid_device", "detail": "Invalid device."}
     if device.competition_id != cp.competition_id:
@@ -149,9 +156,20 @@ class CheckpointListResource(Resource):
         if not comp_id:
             return {"error": "no_competition"}, 400
         payload = request.get_json(silent=True) or {}
-        name = (payload.get("name") or "").strip()
-        if not name:
-            return {"error": "validation_error", "detail": "name is required"}, 400
+        name, name_error = validate_text(payload.get("name"), field_name="name", max_length=120, required=True)
+        location, location_error = validate_text(payload.get("location"), field_name="location", max_length=255)
+        description, description_error = validate_text(
+            payload.get("description"),
+            field_name="description",
+            max_length=2000,
+            multiline=True,
+        )
+        if name_error:
+            return {"error": "validation_error", "detail": name_error}, 400
+        if location_error:
+            return {"error": "validation_error", "detail": location_error}, 400
+        if description_error:
+            return {"error": "validation_error", "detail": description_error}, 400
         if (
             Checkpoint.query
             .filter(Checkpoint.competition_id == comp_id, Checkpoint.name == name)
@@ -162,8 +180,8 @@ class CheckpointListResource(Resource):
         cp = Checkpoint(
             competition_id=comp_id,
             name=name,
-            location=(payload.get("location") or "").strip() or None,
-            description=(payload.get("description") or "").strip() or None,
+            location=location,
+            description=description,
             easting=payload.get("easting"),
             northing=payload.get("northing"),
         )
@@ -185,6 +203,16 @@ class CheckpointListResource(Resource):
                 db.session.rollback()
                 return error, 400
 
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="checkpoint_created",
+            entity_type="checkpoint",
+            entity_id=cp.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Checkpoint {cp.name} created.",
+            details=_checkpoint_snapshot(cp),
+        )
         db.session.commit()
         return {"ok": True, "checkpoint": _serialize_checkpoint(cp)}, 201
 
@@ -207,6 +235,7 @@ class CheckpointItemResource(Resource):
         )
         if not cp:
             return {"error": "not_found"}, 404
+        before = _checkpoint_snapshot(cp)
         return _serialize_checkpoint(cp), 200
 
     @json_roles_required("judge", "admin")
@@ -229,13 +258,14 @@ class CheckpointItemResource(Resource):
         )
         if not cp:
             return {"error": "not_found"}, 404
+        before = _checkpoint_snapshot(cp)
 
         payload = request.get_json(silent=True) or {}
 
         if not partial or "name" in payload:
-            name = (payload.get("name") or "").strip()
-            if not name:
-                return {"error": "validation_error", "detail": "name is required"}, 400
+            name, name_error = validate_text(payload.get("name"), field_name="name", max_length=120, required=True)
+            if name_error:
+                return {"error": "validation_error", "detail": name_error}, 400
             existing = (
                 Checkpoint.query
                 .filter(
@@ -250,10 +280,21 @@ class CheckpointItemResource(Resource):
             cp.name = name
 
         if "location" in payload or not partial:
-            cp.location = (payload.get("location") or "").strip() or None
+            location, location_error = validate_text(payload.get("location"), field_name="location", max_length=255)
+            if location_error:
+                return {"error": "validation_error", "detail": location_error}, 400
+            cp.location = location or None
 
         if "description" in payload or not partial:
-            cp.description = (payload.get("description") or "").strip() or None
+            description, description_error = validate_text(
+                payload.get("description"),
+                field_name="description",
+                max_length=2000,
+                multiline=True,
+            )
+            if description_error:
+                return {"error": "validation_error", "detail": description_error}, 400
+            cp.description = description or None
 
         if "easting" in payload or not partial:
             cp.easting = payload.get("easting")
@@ -279,6 +320,16 @@ class CheckpointItemResource(Resource):
                 db.session.rollback()
                 return error, 400
 
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="checkpoint_updated",
+            entity_type="checkpoint",
+            entity_id=cp.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Checkpoint {cp.name} updated.",
+            details={"before": before, "after": _checkpoint_snapshot(cp)},
+        )
         db.session.commit()
         return {"ok": True, "checkpoint": _serialize_checkpoint(cp)}, 200
 
@@ -299,6 +350,16 @@ class CheckpointItemResource(Resource):
                 "error": "conflict",
                 "detail": "Cannot delete checkpoint with existing check-ins.",
             }, 409
+        snapshot = _checkpoint_snapshot(cp)
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="checkpoint_deleted",
+            entity_type="checkpoint",
+            entity_id=cp.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Checkpoint {cp.name} deleted.",
+            details=snapshot,
+        )
         db.session.delete(cp)
         db.session.commit()
         return {"ok": True}, 200

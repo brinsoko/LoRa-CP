@@ -2717,3 +2717,215 @@ msgstr "Najprej izberi ekipo."
 #: app/templates/users_list.html:7
 msgid "Judges"
 msgstr "Sodniki"
+
+#: app/templates/users_list.html:13
+msgid "Add Existing User To This Competition"
+msgstr "Dodaj obstoječega uporabnika v to tekmovanje"
+
+#: app/templates/users_list.html:16
+msgid "Username or Email"
+msgstr "Uporabniško ime ali e-pošta"
+
+#: app/templates/users_list.html:23
+msgid "Use an existing global username or email address."
+msgstr "Uporabi obstoječe globalno uporabniško ime ali e-poštni naslov."
+
+#: app/templates/users_list.html:34
+msgid "Add Existing User"
+msgstr "Dodaj obstoječega uporabnika"
+
+#: app/utils/audit.py
+msgid "Unknown device"
+msgstr "Neznana naprava"
+
+#: app/utils/audit.py
+msgid "Unknown user"
+msgstr "Neznan uporabnik"
+
+#: app/utils/audit.py
+msgid "System"
+msgstr "Sistem"
+
+#: app/utils/audit.py
+msgid "Device ID %(id)s"
+msgstr "ID naprave %(id)s"
+
+#: app/utils/audit.py
+msgid "User %(id)s"
+msgstr "Uporabnik %(id)s"
+
+#: app/blueprints/scores/routes.py:882
+msgid "Legacy or unknown"
+msgstr "Staro ali neznano"
+
+#: app/templates/base.html:168 app/templates/audit_list.html:2
+msgid "Audit"
+msgstr "Revizija"
+
+#: app/templates/audit_list.html:9
+msgid "Event Type"
+msgstr "Vrsta dogodka"
+
+#: app/templates/audit_list.html:11
+msgid "All event types"
+msgstr "Vse vrste dogodkov"
+
+#: app/templates/audit_list.html:18
+msgid "Entity Type"
+msgstr "Vrsta entitete"
+
+#: app/templates/audit_list.html:20
+msgid "All entity types"
+msgstr "Vse vrste entitet"
+
+#: app/templates/audit_list.html:27 app/templates/audit_list.html:59
+msgid "Actor"
+msgstr "Akter"
+
+#: app/templates/audit_list.html:49
+msgid "Audit Trail"
+msgstr "Revizijska sled"
+
+#: app/templates/audit_list.html:50
+msgid "Showing up to 500 newest events."
+msgstr "Prikazanih je največ 500 najnovejših dogodkov."
+
+#: app/templates/audit_list.html:56
+msgid "When"
+msgstr "Kdaj"
+
+#: app/templates/audit_list.html:57
+msgid "Event"
+msgstr "Dogodek"
+
+#: app/templates/audit_list.html:58
+msgid "Entity"
+msgstr "Entiteta"
+
+#: app/templates/audit_list.html:60
+msgid "Summary"
+msgstr "Povzetek"
+
+#: app/templates/audit_list.html:61
+msgid "Details"
+msgstr "Podrobnosti"
+
+#: app/templates/audit_list.html:87
+msgid "No audit events match your filters."
+msgstr "Noben revizijski dogodek ne ustreza vašim filtrom."
+
+#: app/templates/scores_submissions.html:38
+msgid "Submitted By"
+msgstr "Oddal"
+
+#: app/templates/view_checkins.html:90
+msgid "Created By"
+msgstr "Ustvaril"
+
+#: app/blueprints/audit/routes.py:54
+msgid "Check-in recorded for team %(team)s at %(checkpoint)s."
+msgstr "Prihod ekipe %(team)s na kontrolni točki %(checkpoint)s je zabeležen."
+
+#: app/blueprints/audit/routes.py:56
+msgid "Check-in updated."
+msgstr "Prihod je bil posodobljen."
+
+#: app/blueprints/audit/routes.py:58
+msgid "Check-in deleted."
+msgstr "Prihod je bil izbrisan."
+
+#: app/blueprints/audit/routes.py:60
+msgid "Score submitted for team %(team)s at %(checkpoint)s."
+msgstr "Točkovanje za ekipo %(team)s na kontrolni točki %(checkpoint)s je bilo oddano."
+
+#: app/blueprints/audit/routes.py:62
+msgid "User %(user)s created."
+msgstr "Uporabnik %(user)s je bil ustvarjen."
+
+#: app/blueprints/audit/routes.py:64
+msgid "User %(user)s updated."
+msgstr "Uporabnik %(user)s je bil posodobljen."
+
+#: app/blueprints/audit/routes.py:66
+msgid "User %(user)s added to the competition."
+msgstr "Uporabnik %(user)s je bil dodan tekmovanju."
+
+#: app/blueprints/audit/routes.py:68
+msgid "User %(user)s removed from the competition."
+msgstr "Uporabnik %(user)s je bil odstranjen iz tekmovanja."
+
+#: app/blueprints/audit/routes.py:70
+msgid "Competition %(name)s created."
+msgstr "Tekmovanje %(name)s je bilo ustvarjeno."
+
+#: app/blueprints/audit/routes.py:72
+msgid "Competition settings updated."
+msgstr "Nastavitve tekmovanja so bile posodobljene."
+
+#: app/blueprints/audit/routes.py:74
+msgid "Invite saved for %(email)s."
+msgstr "Vabilo za %(email)s je bilo shranjeno."
+
+#: app/blueprints/audit/routes.py:76
+msgid "Invite revoked for %(email)s."
+msgstr "Vabilo za %(email)s je bilo preklicano."
+
+#: app/blueprints/audit/routes.py:78
+msgid "Team %(name)s created."
+msgstr "Ekipa %(name)s je bila ustvarjena."
+
+#: app/blueprints/audit/routes.py:80
+msgid "Team updated."
+msgstr "Ekipa je bila posodobljena."
+
+#: app/blueprints/audit/routes.py:82
+msgid "Team %(name)s deleted."
+msgstr "Ekipa %(name)s je bila izbrisana."
+
+#: app/blueprints/audit/routes.py:84
+msgid "Active group updated for the team."
+msgstr "Aktivna skupina ekipe je bila posodobljena."
+
+#: app/blueprints/audit/routes.py:86
+msgid "Team numbers randomized."
+msgstr "Številke ekip so bile naključno dodeljene."
+
+#: app/blueprints/audit/routes.py:88
+msgid "Checkpoint %(name)s created."
+msgstr "Kontrolna točka %(name)s je bila ustvarjena."
+
+#: app/blueprints/audit/routes.py:90
+msgid "Checkpoint updated."
+msgstr "Kontrolna točka je bila posodobljena."
+
+#: app/blueprints/audit/routes.py:92
+msgid "Checkpoint %(name)s deleted."
+msgstr "Kontrolna točka %(name)s je bila izbrisana."
+
+#: app/blueprints/audit/routes.py:94
+msgid "Group %(name)s created."
+msgstr "Skupina %(name)s je bila ustvarjena."
+
+#: app/blueprints/audit/routes.py:96
+msgid "Group updated."
+msgstr "Skupina je bila posodobljena."
+
+#: app/blueprints/audit/routes.py:98
+msgid "Group %(name)s deleted."
+msgstr "Skupina %(name)s je bila izbrisana."
+
+#: app/blueprints/audit/routes.py:100
+msgid "Group order updated."
+msgstr "Vrstni red skupin je bil posodobljen."
+
+#: app/blueprints/audit/routes.py:102
+msgid "Device %(name)s created."
+msgstr "Naprava %(name)s je bila ustvarjena."
+
+#: app/blueprints/audit/routes.py:104
+msgid "Device updated."
+msgstr "Naprava je bila posodobljena."
+
+#: app/blueprints/audit/routes.py:106
+msgid "Device %(name)s deleted."
+msgstr "Naprava %(name)s je bila izbrisana."

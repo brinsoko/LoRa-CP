@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Iterable, List, Tuple
 
 from flask import request
+from flask_login import current_user
 from flask_restful import Resource
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -15,8 +16,10 @@ from app.models import (
     CheckpointGroupLink,
     TeamGroup,
 )
+from app.utils.audit import record_audit_event
 from app.utils.rest_auth import json_roles_required
 from app.utils.competition import require_current_competition_id
+from app.utils.validators import validate_text
 
 
 def _serialize_group(group: CheckpointGroup, include_checkpoints: bool = True) -> dict:
@@ -37,6 +40,10 @@ def _serialize_group(group: CheckpointGroup, include_checkpoints: bool = True) -
             for link in group.checkpoint_links
         ]
     return data
+
+
+def _group_snapshot(group: CheckpointGroup) -> dict:
+    return _serialize_group(group)
 
 
 def _parse_checkpoint_ids(values: Iterable) -> List[int]:
@@ -96,13 +103,22 @@ class GroupListResource(Resource):
         if not comp_id:
             return {"error": "no_competition"}, 400
         payload = request.get_json(silent=True) or {}
-        name = (payload.get("name") or "").strip()
-        prefix = (payload.get("prefix") or "").strip() or None
-        description = (payload.get("description") or "").strip() or None
+        name, name_error = validate_text(payload.get("name"), field_name="name", max_length=120, required=True)
+        prefix, prefix_error = validate_text(payload.get("prefix"), field_name="prefix", max_length=20)
+        description, description_error = validate_text(
+            payload.get("description"),
+            field_name="description",
+            max_length=2000,
+            multiline=True,
+        )
         checkpoint_ids = _parse_checkpoint_ids(payload.get("checkpoint_ids"))
 
-        if not name:
-            return {"error": "validation_error", "detail": "name is required"}, 400
+        if name_error:
+            return {"error": "validation_error", "detail": name_error}, 400
+        if prefix_error:
+            return {"error": "validation_error", "detail": prefix_error}, 400
+        if description_error:
+            return {"error": "validation_error", "detail": description_error}, 400
         if (
             db.session.query(CheckpointGroup)
             .filter(CheckpointGroup.competition_id == comp_id, CheckpointGroup.name == name)
@@ -129,6 +145,16 @@ class GroupListResource(Resource):
         if checkpoint_ids:
             _sync_group_checkpoints(group, checkpoint_ids)
 
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="group_created",
+            entity_type="group",
+            entity_id=group.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Group {group.name} created.",
+            details=_group_snapshot(group),
+        )
         db.session.commit()
         return {"ok": True, "group": _serialize_group(group)}, 201
 
@@ -171,24 +197,46 @@ class GroupItemResource(Resource):
         )
         if not group:
             return {"error": "not_found"}, 404
+        before = _group_snapshot(group)
 
         payload = request.get_json(silent=True) or {}
         if not partial or "name" in payload:
-            name = (payload.get("name") or "").strip()
-            if not name:
-                return {"error": "validation_error", "detail": "name is required"}, 400
+            name, name_error = validate_text(payload.get("name"), field_name="name", max_length=120, required=True)
+            if name_error:
+                return {"error": "validation_error", "detail": name_error}, 400
             group.name = name
 
         if "prefix" in payload or not partial:
-            group.prefix = (payload.get("prefix") or "").strip() or None
+            prefix, prefix_error = validate_text(payload.get("prefix"), field_name="prefix", max_length=20)
+            if prefix_error:
+                return {"error": "validation_error", "detail": prefix_error}, 400
+            group.prefix = prefix or None
 
         if "description" in payload or not partial:
-            group.description = (payload.get("description") or "").strip() or None
+            description, description_error = validate_text(
+                payload.get("description"),
+                field_name="description",
+                max_length=2000,
+                multiline=True,
+            )
+            if description_error:
+                return {"error": "validation_error", "detail": description_error}, 400
+            group.description = description or None
 
         if "checkpoint_ids" in payload:
             checkpoint_ids = _parse_checkpoint_ids(payload.get("checkpoint_ids"))
             _sync_group_checkpoints(group, checkpoint_ids)
 
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="group_updated",
+            entity_type="group",
+            entity_id=group.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Group {group.name} updated.",
+            details={"before": before, "after": _group_snapshot(group)},
+        )
         db.session.commit()
         return {"ok": True, "group": _serialize_group(group)}, 200
 
@@ -216,6 +264,16 @@ class GroupItemResource(Resource):
                 "detail": "Cannot delete a group that is active for one or more teams.",
             }, 409
 
+        snapshot = _group_snapshot(group)
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="group_deleted",
+            entity_type="group",
+            entity_id=group.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Group {group.name} deleted.",
+            details=snapshot,
+        )
         db.session.delete(group)
         db.session.commit()
         return {"ok": True}, 200
@@ -247,5 +305,14 @@ class GroupOrderResource(Resource):
         for position, group_id in enumerate(ordered_ids):
             group_by_id[group_id].position = position
 
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="group_order_updated",
+            entity_type="group_batch",
+            entity_id=None,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary="Group order updated.",
+            details={"group_ids": ordered_ids},
+        )
         db.session.commit()
         return {"ok": True}, 200

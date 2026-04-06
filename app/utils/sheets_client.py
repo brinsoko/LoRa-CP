@@ -8,6 +8,7 @@ import time
 import gspread
 from gspread.utils import rowcol_to_a1
 from google.oauth2.service_account import Credentials
+from app.utils.export_safety import escape_formula_cell, escape_formula_cells
 
 log = logging.getLogger(__name__)
 
@@ -74,7 +75,10 @@ class SheetsClient:
         ss = self.gc.open_by_key(spreadsheet_id)
         ws = ss.worksheet(tab_name)
         # Write headers in first row
-        ws.update(range_name=f"A1:{rowcol_to_a1(1, len(headers))}", values=[headers])
+        ws.update(
+            range_name=f"A1:{rowcol_to_a1(1, len(headers))}",
+            values=[escape_formula_cells(headers)],
+        )
         return ws
 
     def update_column(self, spreadsheet_id: str, tab_name: str, col_index: int, start_row: int, values: List[str]):
@@ -84,14 +88,14 @@ class SheetsClient:
         ws = ss.worksheet(tab_name)
         end_row = start_row + len(values) - 1
         rng = f"{rowcol_to_a1(start_row, col_index)}:{rowcol_to_a1(end_row, col_index)}"
-        ws.update(range_name=rng, values=[[v] for v in values])
+        ws.update(range_name=rng, values=[[escape_formula_cell(v)] for v in values])
 
     def update_cell(self, spreadsheet_id: str, tab_name: str, row: int, col: int, value):
         self._throttle()
         ss = self.gc.open_by_key(spreadsheet_id)
         ws = ss.worksheet(tab_name)
         rng = rowcol_to_a1(row, col)
-        ws.update(range_name=rng, values=[[value]])
+        ws.update(range_name=rng, values=[[escape_formula_cell(value)]])
 
     def set_checkbox_validation(self, spreadsheet_id: str, tab_name: str, col_index: int, start_row: int, end_row: int):
         """Apply checkbox validation to a column range."""

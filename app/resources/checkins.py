@@ -6,15 +6,18 @@ import io, csv
 from typing import Optional, Tuple
 
 from flask import request, make_response
+from flask_login import current_user
 from flask_restful import Resource
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
-from app.models import Checkin, Team, Checkpoint
+from app.models import Checkin, Team, Checkpoint, JudgeCheckpoint
+from app.utils.audit import actor_label_for, record_audit_event
+from app.utils.export_safety import escape_formula_cell
 from app.utils.time import from_datetime_local
 
 from app.utils.rest_auth import json_roles_required
-from app.utils.competition import require_current_competition_id
+from app.utils.competition import require_current_competition_id, get_current_competition_role
 from app.utils.sheets_sync import mark_arrival_checkbox
 
 
@@ -41,7 +44,12 @@ def _filtered_query(team_id: Optional[int], checkpoint_id: Optional[int],
     """Return a SQLAlchemy query over Checkin with eager-loaded relations and filters applied."""
     comp_id = require_current_competition_id()
     q = (Checkin.query
-         .options(joinedload(Checkin.team), joinedload(Checkin.checkpoint)))
+         .options(
+             joinedload(Checkin.team),
+             joinedload(Checkin.checkpoint),
+             joinedload(Checkin.created_by_user),
+             joinedload(Checkin.created_by_device),
+         ))
     if comp_id:
         q = q.filter(Checkin.competition_id == comp_id)
 
@@ -91,6 +99,13 @@ def _serialize_checkin(c: Checkin) -> dict:
     return {
         "id": c.id,
         "timestamp_utc": c.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+        "created_by": {
+            "type": "user" if c.created_by_user else "device" if c.created_by_device else "system",
+            "label": actor_label_for(
+                actor_user=c.created_by_user,
+                actor_device=c.created_by_device,
+            ),
+        },
         "team": {
             "id": c.team.id if c.team else None,
             "name": c.team.name if c.team else None,
@@ -100,6 +115,35 @@ def _serialize_checkin(c: Checkin) -> dict:
             "id": c.checkpoint.id if c.checkpoint else None,
             "name": c.checkpoint.name if c.checkpoint else None,
         },
+    }
+
+
+def _judge_can_access_checkpoint(checkpoint_id: int, comp_id: int) -> bool:
+    role = get_current_competition_role()
+    if role != "judge":
+        return True
+    return (
+        JudgeCheckpoint.query
+        .join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
+        .filter(
+            JudgeCheckpoint.user_id == current_user.id,
+            Checkpoint.competition_id == comp_id,
+            JudgeCheckpoint.checkpoint_id == checkpoint_id,
+        )
+        .first()
+        is not None
+    )
+
+
+def _checkin_snapshot(c: Checkin) -> dict:
+    return {
+        "id": c.id,
+        "team_id": c.team_id,
+        "team_name": c.team.name if c.team else None,
+        "checkpoint_id": c.checkpoint_id,
+        "checkpoint_name": c.checkpoint.name if c.checkpoint else None,
+        "timestamp": c.timestamp.isoformat() if c.timestamp else None,
+        "created_by": _serialize_checkin(c)["created_by"],
     }
 
 
@@ -162,6 +206,8 @@ class CheckinListResource(Resource):
         ).first()
         if not team or not checkpoint:
             return {"error": "invalid_fk", "detail": "Invalid team or checkpoint."}, 400
+        if not _judge_can_access_checkpoint(checkpoint_id, comp_id):
+            return {"error": "forbidden", "detail": "Checkpoint is not assigned to the current judge."}, 403
 
         ts = _parse_timestamp(payload, datetime.utcnow())
         override = (payload.get("override") or "").strip().lower()
@@ -173,7 +219,19 @@ class CheckinListResource(Resource):
         )
         if existing:
             if override == "replace":
+                before = _checkin_snapshot(existing)
                 existing.timestamp = ts
+                db.session.flush()
+                record_audit_event(
+                    competition_id=comp_id,
+                    event_type="checkin_updated",
+                    entity_type="checkin",
+                    entity_id=existing.id,
+                    actor_user=current_user if current_user.is_authenticated else None,
+                    summary="Check-in updated.",
+                    details={"before": before, "after": _checkin_snapshot(existing)},
+                    created_at=datetime.utcnow(),
+                )
                 db.session.commit()
                 return {"ok": True, "replaced": True, "checkin": _serialize_checkin(existing)}, 200
             return {
@@ -187,8 +245,20 @@ class CheckinListResource(Resource):
             checkpoint_id=checkpoint_id,
             competition_id=comp_id,
             timestamp=ts,
+            created_by_user_id=current_user.id if current_user.is_authenticated else None,
         )
         db.session.add(c)
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="checkin_created",
+            entity_type="checkin",
+            entity_id=c.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Check-in recorded for team {team.name} at {checkpoint.name}.",
+            details=_checkin_snapshot(c),
+            created_at=ts,
+        )
         db.session.commit()
         try:
             mark_arrival_checkbox(team_id, checkpoint_id, ts)
@@ -212,7 +282,12 @@ class CheckinItemResource(Resource):
         c = (
             Checkin.query
             .filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
-            .options(joinedload(Checkin.team), joinedload(Checkin.checkpoint))
+            .options(
+                joinedload(Checkin.team),
+                joinedload(Checkin.checkpoint),
+                joinedload(Checkin.created_by_user),
+                joinedload(Checkin.created_by_device),
+            )
             .first()
         )
         if not c:
@@ -223,9 +298,20 @@ class CheckinItemResource(Resource):
         comp_id = require_current_competition_id()
         if not comp_id:
             return {"error": "no_competition"}, 400
-        c = Checkin.query.filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id).first()
+        c = (
+            Checkin.query
+            .filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
+            .options(
+                joinedload(Checkin.team),
+                joinedload(Checkin.checkpoint),
+                joinedload(Checkin.created_by_user),
+                joinedload(Checkin.created_by_device),
+            )
+            .first()
+        )
         if not c:
             return {"error": "not_found"}, 404
+        before = _checkin_snapshot(c)
 
         payload = request.get_json(silent=True) or request.form.to_dict()
 
@@ -250,6 +336,8 @@ class CheckinItemResource(Resource):
             Checkpoint.competition_id == comp_id, Checkpoint.id == new_cp_id
         ).first():
             return {"error": "invalid_fk", "detail": "Invalid checkpoint."}, 400
+        if new_cp_id is not None and not _judge_can_access_checkpoint(new_cp_id, comp_id):
+            return {"error": "forbidden", "detail": "Checkpoint is not assigned to the current judge."}, 403
 
         # timestamp
         new_ts = _parse_timestamp(payload, c.timestamp)
@@ -282,6 +370,17 @@ class CheckinItemResource(Resource):
         c.team_id = new_team_id
         c.checkpoint_id = new_cp_id
         c.timestamp = new_ts
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="checkin_updated",
+            entity_type="checkin",
+            entity_id=c.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary="Check-in updated.",
+            details={"before": before, "after": _checkin_snapshot(c)},
+            created_at=datetime.utcnow(),
+        )
         db.session.commit()
         try:
             mark_arrival_checkbox(new_team_id, new_cp_id)
@@ -299,9 +398,30 @@ class CheckinItemResource(Resource):
         comp_id = require_current_competition_id()
         if not comp_id:
             return {"error": "no_competition"}, 400
-        c = Checkin.query.filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id).first()
+        c = (
+            Checkin.query
+            .filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
+            .options(
+                joinedload(Checkin.team),
+                joinedload(Checkin.checkpoint),
+                joinedload(Checkin.created_by_user),
+                joinedload(Checkin.created_by_device),
+            )
+            .first()
+        )
         if not c:
             return {"error": "not_found"}, 404
+        snapshot = _checkin_snapshot(c)
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="checkin_deleted",
+            entity_type="checkin",
+            entity_id=c.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary="Check-in deleted.",
+            details=snapshot,
+            created_at=datetime.utcnow(),
+        )
         db.session.delete(c)
         db.session.commit()
         return {"ok": True, "deleted": True}, 200
@@ -347,10 +467,10 @@ class CheckinExportResource(Resource):
             w.writerow([
                 r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 r.team.id if r.team else "",
-                r.team.name if r.team else "",
+                escape_formula_cell(r.team.name) if r.team else "",
                 r.team.number if (r.team and r.team.number is not None) else "",
                 r.checkpoint.id if r.checkpoint else "",
-                r.checkpoint.name if r.checkpoint else "",
+                escape_formula_cell(r.checkpoint.name) if r.checkpoint else "",
             ])
 
         resp = make_response(buf.getvalue(), 200)

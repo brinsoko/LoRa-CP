@@ -35,6 +35,7 @@
         <thead>
           <tr>
             <th>{{ _('Submitted') }}</th>
+            <th>{{ _('Submitted By') }}</th>
             <th>{{ _('Team') }}</th>
             <th>{{ _('Checkpoint') }}</th>
             <th class="text-end">{{ _('Dead time') }}</th>
@@ -47,6 +48,7 @@
           {% for row in rows %}
             <tr>
               <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M:%S') if row.created_at else '' }}</td>
+              <td>{{ row.submitted_by }}</td>
               <td>{{ row.team }}</td>
               <td>{{ row.checkpoint }}</td>
               <td class="text-end">{{ '%.2f'|format(row.dead_time or 0) }}</td>
@@ -64,7 +66,7 @@
             </tr>
           {% else %}
             <tr>
-              <td colspan="7" class="text-muted text-center py-4">{{ _('No submissions yet.') }}</td>
+              <td colspan="8" class="text-muted text-center py-4">{{ _('No submissions yet.') }}</td>
             </tr>
           {% endfor %}
         </tbody>

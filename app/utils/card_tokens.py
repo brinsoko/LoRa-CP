@@ -50,7 +50,7 @@ def match_digests(uid: str, digests: Iterable[str], device_ids: Iterable[int]) -
         matched = []
         for dev_id in device_ids:
             expected = compute_card_digest(uid_norm, dev_id)
-            if expected and expected.lower() == dg:
+            if expected and hmac.compare_digest(expected.lower(), dg):
                 matched.append(dev_id)
         results.append({"digest": dg, "matches": matched})
     return results

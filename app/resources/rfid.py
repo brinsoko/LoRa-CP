@@ -40,7 +40,7 @@ def _serialize_card(card: RFIDCard) -> dict:
 
 def _parse_card_payload(payload: dict, require_team: bool = True) -> tuple[Optional[str], Optional[int], Optional[int], Optional[str]]:
     uid_raw = (payload.get("uid") or "").strip()
-    uid = uid_raw
+    uid = normalize_uid(uid_raw)
     if not uid:
         return None, None, None, _("uid is required")
 
@@ -484,8 +484,8 @@ class RFIDVerifyResource(Resource):
             for dev_num in matches:
                 d = device_lookup.get(dev_num)
                 cp = None
-                if d and d.checkpoint_id:
-                    cp = checkpoint_lookup.get(d.checkpoint_id)
+                if d and d.checkpoint:
+                    cp = d.checkpoint
                 if not cp:
                     cp = checkpoint_lookup.get(dev_num)
                 cp_name = cp.name if cp else None

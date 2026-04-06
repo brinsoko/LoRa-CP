@@ -3,9 +3,10 @@ from __future__ import annotations
 import re
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_babel import gettext as _
-from flask_login import login_required
+from flask_login import current_user, login_required
 from app.extensions import db
 from app.models import User, CompetitionMember
+from app.utils.audit import record_audit_event
 from app.utils.competition import get_current_competition_id
 from app.utils.perms import roles_required  # already in your project
 
@@ -101,16 +102,25 @@ def attach_user():
         membership.role = role
         flash(_("User '%(user)s' re-added to this competition.", user=user.username), "success")
     else:
-        db.session.add(
-            CompetitionMember(
-                competition_id=comp_id,
-                user_id=user.id,
-                role=role,
-                active=True,
-            )
+        membership = CompetitionMember(
+            competition_id=comp_id,
+            user_id=user.id,
+            role=role,
+            active=True,
         )
+        db.session.add(membership)
         flash(_("User '%(user)s' added to this competition.", user=user.username), "success")
 
+    db.session.flush()
+    record_audit_event(
+        competition_id=comp_id,
+        event_type="competition_member_attached",
+        entity_type="competition_member",
+        entity_id=membership.id if membership else None,
+        actor_user=current_user if current_user.is_authenticated else None,
+        summary=f"User {user.username} added to the competition.",
+        details={"user_id": user.id, "username": user.username, "role": role, "active": True},
+    )
     db.session.commit()
     return redirect(url_for("users.list_users"))
 
@@ -148,6 +158,33 @@ def add_user():
                 active=True,
             )
         )
+        db.session.flush()
+        membership = (
+            CompetitionMember.query
+            .filter(
+                CompetitionMember.competition_id == comp_id,
+                CompetitionMember.user_id == u.id,
+            )
+            .first()
+        )
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="user_created",
+            entity_type="user",
+            entity_id=u.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"User {username} created.",
+            details={"user_id": u.id, "username": u.username, "role": membership_role},
+        )
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="competition_member_attached",
+            entity_type="competition_member",
+            entity_id=membership.id if membership else None,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"User {username} added to the competition.",
+            details={"user_id": u.id, "username": u.username, "role": membership_role, "active": True},
+        )
         db.session.commit()
         flash(_("User '%(user)s' created.", user=username), "success")
         return redirect(url_for("users.list_users"))
@@ -177,6 +214,11 @@ def edit_user(user_id: int):
         return redirect(url_for("users.list_users"))
 
     if request.method == "POST":
+        before = {
+            "user_id": u.id,
+            "username": u.username,
+            "role": membership.role if membership else None,
+        }
         username = (request.form.get("username") or "").strip()
         role = (request.form.get("role") or "viewer").strip()
         new_pw = request.form.get("new_password") or ""
@@ -209,6 +251,24 @@ def edit_user(user_id: int):
                 return render_template("user_edit.html", mode="edit", u=u, membership=membership)
             u.set_password(new_pw)
 
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="user_updated",
+            entity_type="user",
+            entity_id=u.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"User {u.username} updated.",
+            details={
+                "before": before,
+                "after": {
+                    "user_id": u.id,
+                    "username": u.username,
+                    "role": membership.role if membership else None,
+                    "password_changed": bool(new_pw or new_pw2),
+                },
+            },
+        )
         db.session.commit()
         flash(_("User updated."), "success")
         return redirect(url_for("users.list_users"))
@@ -233,9 +293,25 @@ def delete_user(user_id: int):
     if not membership:
         flash(_("User not found."), "warning")
         return redirect(url_for("users.list_users"))
+    user = User.query.get(user_id)
+    snapshot = {
+        "user_id": user_id,
+        "username": user.username if user else None,
+        "role": membership.role,
+        "active": membership.active,
+    }
 
     db.session.delete(membership)
     db.session.flush()
+    record_audit_event(
+        competition_id=comp_id,
+        event_type="competition_member_removed",
+        entity_type="competition_member",
+        entity_id=membership.id,
+        actor_user=current_user if current_user.is_authenticated else None,
+        summary=f"User {snapshot['username'] or user_id} removed from the competition.",
+        details=snapshot,
+    )
     remaining = CompetitionMember.query.filter(
         CompetitionMember.user_id == user_id
     ).count()

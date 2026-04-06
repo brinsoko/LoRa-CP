@@ -12,6 +12,7 @@ from app.models import User, CompetitionInvite, CompetitionMember
 from app.extensions import db
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
+from app.utils.redirects import safe_redirect_target
 
 
 auth_bp = Blueprint("auth", __name__)
@@ -85,12 +86,17 @@ def login():  # endpoint: auth.login
 
         if resp.status_code == 200:
             user_info = payload.get("user") or {}
-            user_obj = User.query.get(user_info.get("id")) if user_info.get("id") else None
+            user_obj = db.session.get(User, user_info.get("id")) if user_info.get("id") else None
             if user_obj:
                 _accept_pending_invites(user_obj)
                 login_user(user_obj)
             flash("Signed in.", "success")
-            return redirect(request.args.get("next") or url_for("main.select_competition"))
+            return redirect(
+                safe_redirect_target(
+                    request.args.get("next"),
+                    url_for("main.select_competition"),
+                )
+            )
 
         flash(payload.get("error") or "Invalid username or password.", "warning")
 
@@ -107,7 +113,10 @@ def login_google():
         return redirect(url_for("auth.login"))
     state = secrets.token_urlsafe(16)
     session["google_oauth_state"] = state
-    session["google_oauth_next"] = request.args.get("next") or ""
+    session["google_oauth_next"] = safe_redirect_target(
+        request.args.get("next"),
+        "",
+    )
     redirect_uri = url_for("auth.login_google_callback", _external=True)
     params = {
         "client_id": client_id,
@@ -211,7 +220,10 @@ def login_google_callback():
         login_user(user)
     finally:
         session.pop("google_oauth_state", None)
-        next_url = session.pop("google_oauth_next", None) or ""
+        next_url = safe_redirect_target(
+            session.pop("google_oauth_next", None),
+            "",
+        )
 
     flash("Signed in.", "success")
     return redirect(next_url or url_for("main.select_competition"))

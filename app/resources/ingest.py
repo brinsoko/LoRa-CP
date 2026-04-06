@@ -4,6 +4,7 @@ from datetime import datetime
 import hashlib, hmac
 
 from flask import current_app
+from flask import request
 from flask_login import current_user
 
 from flask_restful import Resource, reqparse
@@ -13,20 +14,23 @@ from app.extensions import db
 from app.models import (
     LoRaMessage, RFIDCard, Team, Checkpoint, Checkin, LoRaDevice, Competition
 )
+from app.utils.audit import format_device_label, record_audit_event
 from app.utils.sheets_sync import mark_arrival_checkbox
 from app.utils.payloads import parse_gps_payload
 from app.utils.card_tokens import compute_card_digest
 
-def resolve_checkpoint_for_dev(competition_id: int, dev_num: int) -> Checkpoint:
+def resolve_checkpoint_for_dev(competition_id: int, dev_num: int) -> tuple[Checkpoint, LoRaDevice, bool, bool]:
     device = LoRaDevice.query.filter_by(competition_id=competition_id, dev_num=dev_num).first()
+    created_device = False
+    created_checkpoint = False
 
     if device:
         if device.checkpoint:
-            return device.checkpoint
+            return device.checkpoint, device, created_device, created_checkpoint
 
         cp = Checkpoint.query.filter_by(lora_device_id=device.id).first()
         if cp:
-            return cp
+            return cp, device, created_device, created_checkpoint
 
         cp = Checkpoint(
             competition_id=competition_id,
@@ -36,11 +40,13 @@ def resolve_checkpoint_for_dev(competition_id: int, dev_num: int) -> Checkpoint:
         )
         db.session.add(cp)
         db.session.flush()
-        return cp
+        created_checkpoint = True
+        return cp, device, created_device, created_checkpoint
 
     device = LoRaDevice(competition_id=competition_id, dev_num=dev_num, name=f"DEV-{dev_num}", active=True)
     db.session.add(device)
     db.session.flush()
+    created_device = True
 
     cp = Checkpoint(
         competition_id=competition_id,
@@ -50,7 +56,8 @@ def resolve_checkpoint_for_dev(competition_id: int, dev_num: int) -> Checkpoint:
     )
     db.session.add(cp)
     db.session.flush()
-    return cp
+    created_checkpoint = True
+    return cp, device, created_device, created_checkpoint
 
 
 _parser = reqparse.RequestParser(bundle_errors=True)
@@ -101,6 +108,16 @@ def _card_writeback(uid: str,
 
 class IngestResource(Resource):
     def post(self):
+        expected_secret = current_app.config.get("LORA_WEBHOOK_SECRET")
+        if expected_secret and expected_secret != "CHANGE_LATER":
+            provided_secret = request.headers.get("X-Webhook-Secret", "")
+            if not hmac.compare_digest(provided_secret, expected_secret):
+                return {
+                    "ok": False,
+                    "error": "forbidden",
+                    "detail": "Invalid webhook secret.",
+                }, 403
+
         args = _parser.parse_args()  # supports JSON and form bodies
         competition_id = args["competition_id"]
         dev_id  = args.get("dev_id")
@@ -117,13 +134,13 @@ class IngestResource(Resource):
 
         received_at = datetime.utcfromtimestamp(ts_unix) if ts_unix else datetime.utcnow()
 
-        competition = Competition.query.filter(Competition.id == competition_id).first()
+        competition = db.session.get(Competition, competition_id)
         if not competition:
             return {
                 "ok": False,
-                "error": "invalid_request",
-                "detail": "Invalid competition_id.",
-            }, 400
+                "error": "not_found",
+                "detail": "Competition not found.",
+            }, 404
 
         if competition.ingest_password_hash and not (current_user.is_authenticated or competition.check_ingest_password(ingest_password)):
             return {
@@ -173,6 +190,7 @@ class IngestResource(Resource):
 
             # 2) Update device telemetry + resolve checkpoint
             cp = None
+            device = None
             if dev_id is not None:
                 device = LoRaDevice.query.filter_by(
                     competition_id=competition_id, dev_num=int(dev_id)
@@ -181,7 +199,34 @@ class IngestResource(Resource):
                     device.last_seen = received_at
                     if rssi is not None:
                         device.last_rssi = float(rssi)
-                cp = resolve_checkpoint_for_dev(competition_id, int(dev_id))
+                cp, device, created_device, created_checkpoint = resolve_checkpoint_for_dev(competition_id, int(dev_id))
+                device.last_seen = received_at
+                if rssi is not None:
+                    device.last_rssi = float(rssi)
+                if created_device:
+                    record_audit_event(
+                        competition_id=competition_id,
+                        event_type="device_created",
+                        entity_type="device",
+                        entity_id=device.id,
+                        actor_type="device",
+                        actor_device=device,
+                        summary=f"Device {format_device_label(device)} auto-created from ingest.",
+                        details={"id": device.id, "dev_num": device.dev_num, "name": device.name, "source": "ingest"},
+                        created_at=received_at,
+                    )
+                if created_checkpoint:
+                    record_audit_event(
+                        competition_id=competition_id,
+                        event_type="checkpoint_created",
+                        entity_type="checkpoint",
+                        entity_id=cp.id,
+                        actor_type="device",
+                        actor_device=device,
+                        summary=f"Checkpoint {cp.name} auto-created from ingest.",
+                        details={"id": cp.id, "name": cp.name, "lora_device_id": cp.lora_device_id, "source": "ingest"},
+                        created_at=received_at,
+                    )
             elif checkpoint_id is not None:
                 cp = Checkpoint.query.filter(
                     Checkpoint.competition_id == competition_id,
@@ -216,13 +261,33 @@ class IngestResource(Resource):
                     ).first()
                     arrived_at = received_at
                     if not exists:
-                        db.session.add(
-                            Checkin(
-                                team_id=team.id,
-                                checkpoint_id=cp.id,
-                                competition_id=competition_id,
-                                timestamp=received_at,
-                            )
+                        created = Checkin(
+                            team_id=team.id,
+                            checkpoint_id=cp.id,
+                            competition_id=competition_id,
+                            timestamp=received_at,
+                            created_by_device_id=device.id if device else None,
+                        )
+                        db.session.add(created)
+                        db.session.flush()
+                        record_audit_event(
+                            competition_id=competition_id,
+                            event_type="checkin_created",
+                            entity_type="checkin",
+                            entity_id=created.id,
+                            actor_type="device" if device else "system",
+                            actor_device=device,
+                            summary=f"Check-in recorded for team {team.name} at {cp.name}.",
+                            details={
+                                "id": created.id,
+                                "team_id": team.id,
+                                "team_name": team.name,
+                                "checkpoint_id": cp.id,
+                                "checkpoint_name": cp.name,
+                                "timestamp": received_at.isoformat(),
+                                "source": "ingest",
+                            },
+                            created_at=received_at,
                         )
                         created_checkin = True
                     else:

@@ -33,12 +33,12 @@
             <dt class="col-6">{{ _('Finished') }}</dt>
             <dd class="col-6">{{ g.finished_count }}</dd>
             <dt class="col-6">{{ _('Completion rate') }}</dt>
-            <dd class="col-6">{{ (g.completion_rate * 100)|round(0)|int }}%</dd>
+            <dd class="col-6">{{ ((g.completion_rate|default(0, true)) * 100)|round(0)|int }}%</dd>
             <dt class="col-6">{{ _('Average points') }}</dt>
-            <dd class="col-6">{{ (g.avg_points or 0)|round(0)|int }}</dd>
+            <dd class="col-6">{{ (g.avg_points|default(0, true))|round(0)|int }}</dd>
             <dt class="col-6">{{ _('Average overall time (min)') }}</dt>
             <dd class="col-6">
-              {% if g.avg_time_minutes is not none %}
+              {% if g.avg_time_minutes is defined and g.avg_time_minutes is not none %}
                 {{ (g.avg_time_minutes)|round(0)|int }}
               {% else %}
                 —
@@ -46,7 +46,7 @@
             </dd>
             <dt class="col-6">{{ _('Median overall time (min)') }}</dt>
             <dd class="col-6">
-              {% if g.median_time_minutes is not none %}
+              {% if g.median_time_minutes is defined and g.median_time_minutes is not none %}
                 {{ (g.median_time_minutes)|round(0)|int }}
               {% else %}
                 —
@@ -54,7 +54,7 @@
             </dd>
             <dt class="col-6">{{ _('Average checkpoints visited') }}</dt>
             <dd class="col-6">
-              {% if g.avg_checkpoint_count is not none %}
+              {% if g.avg_checkpoint_count is defined and g.avg_checkpoint_count is not none %}
                 {{ (g.avg_checkpoint_count)|round(0)|int }}
               {% else %}
                 —
@@ -62,16 +62,16 @@
             </dd>
             <dt class="col-6">{{ _('Fastest team') }}</dt>
             <dd class="col-6">
-              {% if g.fastest_team %}
-                {{ g.fastest_team }} ({{ (g.fastest_minutes or 0)|round(0)|int }} {{ _('min') }})
+              {% if g.fastest_team is defined and g.fastest_team %}
+                {{ g.fastest_team }} ({{ (g.fastest_minutes|default(0, true))|round(0)|int }} {{ _('min') }})
               {% else %}
                 —
               {% endif %}
             </dd>
             <dt class="col-6">{{ _('Highest drop-off checkpoint') }}</dt>
             <dd class="col-6">
-              {% if g.dropoff_checkpoint %}
-                {{ g.dropoff_checkpoint }} ({{ ((g.dropoff_rate or 0) * 100)|round(0)|int }}%)
+              {% if g.dropoff_checkpoint is defined and g.dropoff_checkpoint %}
+                {{ g.dropoff_checkpoint }} ({{ ((g.dropoff_rate|default(0, true)) * 100)|round(0)|int }}%)
               {% else %}
                 —
               {% endif %}
@@ -97,7 +97,7 @@
                       <td>{{ s.from_name or s.from_id }}</td>
                       <td>{{ s.to_name or s.to_id }}</td>
                       <td class="text-end">
-                        {% if s.avg_minutes is not none %}
+                        {% if s.avg_minutes is defined and s.avg_minutes is not none %}
                           {{ (s.avg_minutes)|round(0)|int }}
                         {% else %}
                           —

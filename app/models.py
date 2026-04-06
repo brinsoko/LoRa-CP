@@ -390,10 +390,18 @@ class Checkin(db.Model):
         db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False
     )
     timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_by_device_id = db.Column(
+        db.Integer, db.ForeignKey("lora_devices.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     team = db.relationship("Team", back_populates="checkins")
     checkpoint = db.relationship("Checkpoint", back_populates="checkins")
     competition = db.relationship("Competition")
+    created_by_user = db.relationship("User", foreign_keys=[created_by_user_id])
+    created_by_device = db.relationship("LoRaDevice", foreign_keys=[created_by_device_id])
     scores = db.relationship(
         "ScoreEntry",
         back_populates="checkin",
@@ -571,6 +579,36 @@ class ScoreRule(db.Model):
     __table_args__ = (
         UniqueConstraint("competition_id", "checkpoint_id", "group_id", name="uq_score_rule_scope"),
     )
+
+
+# =========================
+# AuditEvent (append-only audit trail)
+# =========================
+class AuditEvent(db.Model):
+    __tablename__ = "audit_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    event_type = db.Column(db.String(64), nullable=False, index=True)
+    entity_type = db.Column(db.String(64), nullable=False, index=True)
+    entity_id = db.Column(db.Integer, nullable=True, index=True)
+    actor_type = db.Column(db.String(20), nullable=False, default="system", index=True)
+    actor_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    actor_device_id = db.Column(
+        db.Integer, db.ForeignKey("lora_devices.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    actor_label = db.Column(db.String(255), nullable=True)
+    summary = db.Column(db.String(255), nullable=False)
+    details = db.Column(db.JSON, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    competition = db.relationship("Competition")
+    actor_user = db.relationship("User", foreign_keys=[actor_user_id])
+    actor_device = db.relationship("LoRaDevice", foreign_keys=[actor_device_id])
 
 
 # =========================

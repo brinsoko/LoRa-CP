@@ -17,9 +17,11 @@ from .utils.competition import (
 import logging
 import os
 
-def create_app() -> Flask:
+def create_app(config_overrides: dict | None = None) -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config.from_object("config.Config")
+    if config_overrides:
+        app.config.update(config_overrides)
     app.jinja_env.filters["local_dt"] = to_datetime_local
 
     os.makedirs(app.instance_path, exist_ok=True)
@@ -86,10 +88,12 @@ def create_app() -> Flask:
     from app.blueprints.judges.routes import judges_bp
     from app.blueprints.scores.routes import scores_bp
     from app.blueprints.sheets.routes import sheets_bp
+    from app.blueprints.audit.routes import audit_bp
 
     app.register_blueprint(users_bp, url_prefix="/users")
     app.register_blueprint(judges_bp, url_prefix="/judges")
     app.register_blueprint(scores_bp, url_prefix="/scores")
+    app.register_blueprint(audit_bp, url_prefix="/audit")
     app.register_blueprint(docs_bp, url_prefix="/docs")
     app.register_blueprint(messages_bp, url_prefix="/messages")
     app.register_blueprint(lora_bp, url_prefix="/lora")
@@ -125,6 +129,16 @@ def create_app() -> Flask:
                     conn.execute(text("ALTER TABLE users ADD COLUMN last_competition_id INTEGER"))
         except Exception:
             app.logger.exception("Failed to ensure users.last_competition_id column")
+        try:
+            insp = inspect(db.engine)
+            cols = {c["name"] for c in insp.get_columns("checkins")}
+            with db.engine.begin() as conn:
+                if "created_by_user_id" not in cols:
+                    conn.execute(text("ALTER TABLE checkins ADD COLUMN created_by_user_id INTEGER"))
+                if "created_by_device_id" not in cols:
+                    conn.execute(text("ALTER TABLE checkins ADD COLUMN created_by_device_id INTEGER"))
+        except Exception:
+            app.logger.exception("Failed to ensure checkins audit columns")
 
     @app.errorhandler(403)
     def forbidden(e):

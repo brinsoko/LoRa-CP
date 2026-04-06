@@ -1,4 +1,5 @@
 import os
+import sys
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -8,7 +9,10 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return raw.strip().lower() not in ("0", "false", "no", "off", "")
 
 class Config:
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
+    _SECRET_KEY_ENV = os.getenv("SECRET_KEY")
+    if not _SECRET_KEY_ENV and os.getenv("FLASK_ENV") == "production":
+        sys.exit("FATAL: SECRET_KEY must be set in production.")
+    SECRET_KEY = _SECRET_KEY_ENV or "dev-secret"
     DEVICE_CARD_SECRET = os.getenv("DEVICE_CARD_SECRET") or SECRET_KEY
     DEVICE_CARD_HMAC_LEN = int(os.getenv("DEVICE_CARD_HMAC_LEN", "12"))
     # Only read DATABASE_URL from env; if missing, app factory will set a proper sqlite path
@@ -24,7 +28,10 @@ class Config:
     )
 
     # App settings
-    LORA_WEBHOOK_SECRET = os.getenv("LORA_WEBHOOK_SECRET", "CHANGE_LATER")
+    _WEBHOOK_SECRET_ENV = os.getenv("LORA_WEBHOOK_SECRET")
+    if (not _WEBHOOK_SECRET_ENV or _WEBHOOK_SECRET_ENV == "CHANGE_LATER") and os.getenv("FLASK_ENV") == "production":
+        sys.exit("FATAL: LORA_WEBHOOK_SECRET must be set in production.")
+    LORA_WEBHOOK_SECRET = _WEBHOOK_SECRET_ENV or "CHANGE_LATER"
 
     # Serial defaults
     SERIAL_BAUDRATE = int(os.environ.get("SERIAL_BAUDRATE", "9600"))

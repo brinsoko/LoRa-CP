@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from flask import request
+from flask_login import current_user
 from flask_restful import Resource
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import LoRaDevice, Checkpoint
+from app.utils.audit import record_audit_event
 from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.competition import require_current_competition_id
 
@@ -28,6 +30,10 @@ def _serialize_device(device: LoRaDevice) -> dict:
             "description": device.checkpoint.description,
         } if device.checkpoint else None,
     }
+
+
+def _device_snapshot(device: LoRaDevice) -> dict:
+    return _serialize_device(device)
 
 
 def _parse_device_payload(payload: dict, *, for_update: bool = False) -> tuple[dict, list[str]]:
@@ -106,6 +112,16 @@ class LoRaDeviceListResource(Resource):
             active=data.get("active", True),
         )
         db.session.add(device)
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="device_created",
+            entity_type="device",
+            entity_id=device.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Device {device.name or f'DEV-{device.dev_num}'} created.",
+            details=_device_snapshot(device),
+        )
         db.session.commit()
         return {"ok": True, "device": _serialize_device(device)}, 201
 
@@ -144,6 +160,7 @@ class LoRaDeviceItemResource(Resource):
         ).first()
         if not device:
             return {"error": "not_found"}, 404
+        before = _device_snapshot(device)
 
         payload = request.get_json(silent=True) or {}
         data, errors = _parse_device_payload(payload, for_update=True)
@@ -167,6 +184,16 @@ class LoRaDeviceItemResource(Resource):
             if field in data:
                 setattr(device, field, data[field])
 
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="device_updated",
+            entity_type="device",
+            entity_id=device.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Device {device.name or f'DEV-{device.dev_num}'} updated.",
+            details={"before": before, "after": _device_snapshot(device)},
+        )
         db.session.commit()
         return {"ok": True, "device": _serialize_device(device)}, 200
 
@@ -185,6 +212,16 @@ class LoRaDeviceItemResource(Resource):
         if checkpoint:
             checkpoint.lora_device = None
 
+        snapshot = _device_snapshot(device)
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="device_deleted",
+            entity_type="device",
+            entity_id=device.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Device {device.name or f'DEV-{device.dev_num}'} deleted.",
+            details=snapshot,
+        )
         db.session.delete(device)
         db.session.commit()
         return {"ok": True}, 200

@@ -6,20 +6,62 @@
     "description": "REST API for team management, checkpoints, RFID access control, LoRa telemetry, and map data."
   },
   "tags": [
-    {"name": "system", "description": "Health and internal system endpoints"},
-    {"name": "auth", "description": "Authentication & session management"},
-    {"name": "users", "description": "User administration"},
-    {"name": "teams", "description": "Teams and assignments"},
-    {"name": "groups", "description": "Checkpoint groups"},
-    {"name": "checkpoints", "description": "Checkpoint management"},
-    {"name": "sheets", "description": "Admin endpoints for Google Sheets sync/build"},
-    {"name": "checkins", "description": "Team check-ins"},
-    {"name": "rfid", "description": "RFID cards & scanning"},
-    {"name": "lora", "description": "LoRa devices & messages"},
-    {"name": "map", "description": "Map data endpoints"},
-    {"name": "docs", "description": "Documentation endpoints"},
-    {"name": "ingest", "description": "LoRa message ingestion"},
-    {"name": "scores", "description": "Judge scoring and score rules"}
+    {
+      "name": "system",
+      "description": "Health and internal system endpoints"
+    },
+    {
+      "name": "auth",
+      "description": "Authentication & session management"
+    },
+    {
+      "name": "users",
+      "description": "User administration"
+    },
+    {
+      "name": "teams",
+      "description": "Teams and assignments"
+    },
+    {
+      "name": "groups",
+      "description": "Checkpoint groups"
+    },
+    {
+      "name": "checkpoints",
+      "description": "Checkpoint management"
+    },
+    {
+      "name": "sheets",
+      "description": "Admin endpoints for Google Sheets sync/build"
+    },
+    {
+      "name": "checkins",
+      "description": "Team check-ins"
+    },
+    {
+      "name": "rfid",
+      "description": "RFID cards & scanning"
+    },
+    {
+      "name": "lora",
+      "description": "LoRa devices & messages"
+    },
+    {
+      "name": "map",
+      "description": "Map data endpoints"
+    },
+    {
+      "name": "docs",
+      "description": "Documentation endpoints"
+    },
+    {
+      "name": "ingest",
+      "description": "LoRa message ingestion"
+    },
+    {
+      "name": "scores",
+      "description": "Judge scoring and score rules"
+    }
   ],
   "servers": [
     {
@@ -33,132 +75,6 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "session"
-      }
-    },
-    "/api/devices": {
-      "get": {
-        "tags": ["lora"],
-        "summary": "List devices (LoRa gateways or phones)",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Devices",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "devices": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/LoRaDevice"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": ["lora"],
-        "summary": "Create device (alias of /api/lora/devices)",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoRaDevice"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created device"
-          }
-        }
-      }
-    },
-    "/api/devices/{device_id}": {
-      "parameters": [
-        {
-          "name": "device_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "integer"
-          }
-        }
-      ],
-      "get": {
-        "tags": ["lora"],
-        "summary": "Device detail (alias of /api/lora/devices/{device_id})",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Device",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LoRaDevice"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": ["lora"],
-        "summary": "Update device (alias)",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoRaDevice"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated device"
-          }
-        }
-      },
-      "delete": {
-        "tags": ["lora"],
-        "summary": "Delete device (alias)",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Deleted"
-          }
-        }
       }
     },
     "schemas": {
@@ -381,6 +297,26 @@
           "name"
         ]
       },
+      "CreatedByActor": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "user",
+              "device",
+              "system"
+            ]
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "label"
+        ]
+      },
       "Checkin": {
         "type": "object",
         "properties": {
@@ -389,6 +325,9 @@
           },
           "timestamp_utc": {
             "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/CreatedByActor"
           },
           "team": {
             "$ref": "#/components/schemas/Team"
@@ -400,8 +339,54 @@
         "required": [
           "id",
           "timestamp_utc",
+          "created_by",
           "team",
           "checkpoint"
+        ]
+      },
+      "MapCheckpoint": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "easting": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "northing": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name"
         ]
       },
       "RFIDCard": {
@@ -515,6 +500,26 @@
               "string",
               "null"
             ]
+          },
+          "gps": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "lat": {
+                "type": "number"
+              },
+              "lon": {
+                "type": "number"
+              },
+              "alt": {
+                "type": "number"
+              },
+              "age_ms": {
+                "type": "integer"
+              }
+            }
           }
         },
         "required": [
@@ -523,76 +528,287 @@
           "payload"
         ]
       },
+      "LoRaMapPoint": {
+        "type": "object",
+        "properties": {
+          "dev_id": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lon": {
+            "type": "number"
+          },
+          "alt": {
+            "type": "number"
+          },
+          "age_ms": {
+            "type": "integer"
+          },
+          "rssi": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "snr": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "received_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "dev_id",
+          "lat",
+          "lon",
+          "alt",
+          "age_ms"
+        ]
+      },
       "IngestRequest": {
         "type": "object",
-        "required": ["competition_id", "dev_id"],
+        "required": [
+          "competition_id"
+        ],
         "properties": {
-          "competition_id": { "type": "integer", "description": "Competition identifier for multi-competition scoping." },
-          "dev_id": { "type": "integer", "description": "Numeric identifier of the device/gateway/phone." },
-          "payload": { "type": "string", "description": "Payload string (RFID UID or GPS payload). Required unless gps_lat/gps_lon are provided." },
-          "rssi": { "type": ["number", "null"], "format": "float", "description": "Received signal strength (dBm)." },
-          "snr": { "type": ["number", "null"], "format": "float", "description": "Signal-to-noise ratio (dB)." },
-          "ts": { "type": ["integer", "null"], "format": "int64", "description": "Unix timestamp (seconds); if omitted, server uses current UTC." },
-          "source": { "type": ["string", "null"], "description": "Optional client hint (e.g., judge_web_nfc)." },
-          "ingest_password": { "type": ["string", "null"], "description": "Optional ingest password for unauthenticated devices." },
-          "password": { "type": ["string", "null"], "description": "Alias for ingest_password." },
-          "gps_lat": { "type": ["number", "null"], "format": "float" },
-          "gps_lon": { "type": ["number", "null"], "format": "float" },
-          "gps_alt": { "type": ["number", "null"], "format": "float" },
-          "gps_age_ms": { "type": ["integer", "null"], "format": "int64" }
+          "competition_id": {
+            "type": "integer",
+            "description": "Competition identifier for multi-competition scoping."
+          },
+          "dev_id": {
+            "type": "integer",
+            "description": "Numeric identifier of the device/gateway/phone."
+          },
+          "checkpoint_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Optional checkpoint identifier when ingest is not tied to a device id."
+          },
+          "payload": {
+            "type": "string",
+            "description": "Payload string (RFID UID or GPS payload). Required unless gps_lat/gps_lon are provided."
+          },
+          "rssi": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float",
+            "description": "Received signal strength (dBm)."
+          },
+          "snr": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float",
+            "description": "Signal-to-noise ratio (dB)."
+          },
+          "ts": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Unix timestamp (seconds); if omitted, server uses current UTC."
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional client hint (e.g., judge_web_nfc)."
+          },
+          "ingest_password": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional ingest password for unauthenticated devices."
+          },
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Alias for ingest_password."
+          },
+          "gps_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float"
+          },
+          "gps_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float"
+          },
+          "gps_alt": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float"
+          },
+          "gps_age_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
         },
         "description": "Provide either payload (string) or gps_lat/gps_lon (structured GPS). competition_id is required."
       },
       "IngestResponse": {
         "type": "object",
         "properties": {
-          "ok": { "type": "boolean" },
-          "message_id": { "type": "integer", "description": "Primary key of the stored message." },
-          "dev_id": { "type": "integer" },
-          "uid_seen": { "type": "boolean", "description": "Whether payload matched a known RFID card UID." },
-          "team": { "type": ["string", "null"], "description": "Team name if UID matched." },
-          "checkpoint": { "type": ["string", "null"], "description": "Resolved checkpoint name for the device." },
-          "checkin_created": { "type": "boolean", "description": "True if a new Checkin row was inserted." },
+          "ok": {
+            "type": "boolean"
+          },
+          "message_id": {
+            "type": "integer",
+            "description": "Primary key of the stored message."
+          },
+          "dev_id": {
+            "type": "integer"
+          },
+          "uid_seen": {
+            "type": "boolean",
+            "description": "Whether payload matched a known RFID card UID."
+          },
+          "team": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Team name if UID matched."
+          },
+          "checkpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Resolved checkpoint name for the device."
+          },
+          "checkin_created": {
+            "type": "boolean",
+            "description": "True if a new Checkin row was inserted."
+          },
           "gps": {
             "type": "object",
             "nullable": true,
             "properties": {
-              "lat": { "type": "number" },
-              "lon": { "type": "number" },
-              "alt": { "type": "number" },
-              "age_ms": { "type": "integer" }
+              "lat": {
+                "type": "number"
+              },
+              "lon": {
+                "type": "number"
+              },
+              "alt": {
+                "type": "number"
+              },
+              "age_ms": {
+                "type": "integer"
+              }
             }
           },
           "card_writeback": {
             "type": "object",
             "nullable": true,
             "properties": {
-              "payload": { "type": "string", "description": "Truncated HMAC written to card/tag." },
-              "hmac": { "type": "string" },
-              "device_id": { "type": "integer" },
-              "card_uid": { "type": "string" },
-              "checkpoint_id": { "type": ["integer", "null"] },
-              "checkpoint": { "type": ["string", "null"] },
-              "team_id": { "type": ["integer", "null"] },
-              "team": { "type": ["string", "null"] }
+              "payload": {
+                "type": "string",
+                "description": "Truncated HMAC written to card/tag."
+              },
+              "hmac": {
+                "type": "string"
+              },
+              "device_id": {
+                "type": "integer"
+              },
+              "card_uid": {
+                "type": "string"
+              },
+              "checkpoint_id": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "checkpoint": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "team_id": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "team": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
             }
           }
         },
-        "required": ["ok", "message_id", "dev_id", "uid_seen", "checkin_created"]
+        "required": [
+          "ok",
+          "message_id",
+          "dev_id",
+          "uid_seen",
+          "checkin_created"
+        ]
       },
       "ValidationError": {
         "type": "object",
         "properties": {
-          "message": { "type": ["object", "string"], "additionalProperties": true },
-          "errors": { "type": "object", "additionalProperties": { "type": "string" } }
+          "message": {
+            "type": [
+              "object",
+              "string"
+            ],
+            "additionalProperties": true
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
         }
       },
       "ServerError": {
         "type": "object",
         "properties": {
-          "ok": { "type": "boolean" },
-          "error": { "type": "string" },
-          "detail": { "type": "string" }
+          "ok": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
         }
       }
     }
@@ -600,7 +816,9 @@
   "paths": {
     "/health": {
       "get": {
-        "tags": ["system"],
+        "tags": [
+          "system"
+        ],
         "summary": "Health probe",
         "responses": {
           "200": {
@@ -623,7 +841,9 @@
     },
     "/api/auth/login": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Authenticate user",
         "requestBody": {
           "required": true,
@@ -675,7 +895,9 @@
     },
     "/api/auth/logout": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Logout current user",
         "security": [
           {
@@ -698,7 +920,9 @@
     },
     "/api/auth/password": {
       "post": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Change current user's password",
         "security": [
           {
@@ -750,7 +974,9 @@
     },
     "/api/auth/me": {
       "get": {
-        "tags": ["auth"],
+        "tags": [
+          "auth"
+        ],
         "summary": "Current user profile",
         "security": [
           {
@@ -773,7 +999,9 @@
     },
     "/api/users": {
       "get": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "summary": "List users",
         "security": [
           {
@@ -791,7 +1019,27 @@
                     "users": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/AuthUser"
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          },
+                          "membership_role": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "username",
+                          "role",
+                          "membership_role"
+                        ]
                       }
                     }
                   }
@@ -802,7 +1050,9 @@
         }
       },
       "post": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "summary": "Create user",
         "security": [
           {
@@ -831,7 +1081,7 @@
                   "role": {
                     "type": "string",
                     "enum": [
-                      "public",
+                      "viewer",
                       "judge",
                       "admin"
                     ]
@@ -863,7 +1113,9 @@
         }
       ],
       "get": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "summary": "User detail",
         "security": [
           {
@@ -884,7 +1136,9 @@
         }
       },
       "patch": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "summary": "Update user",
         "security": [
           {
@@ -904,7 +1158,7 @@
                   "role": {
                     "type": "string",
                     "enum": [
-                      "public",
+                      "viewer",
                       "judge",
                       "admin"
                     ]
@@ -929,7 +1183,9 @@
         }
       },
       "delete": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "summary": "Delete user",
         "security": [
           {
@@ -945,7 +1201,9 @@
     },
     "/api/groups/order": {
       "post": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "summary": "Update group order",
         "security": [
           {
@@ -958,11 +1216,15 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["group_ids"],
+                "required": [
+                  "group_ids"
+                ],
                 "properties": {
                   "group_ids": {
                     "type": "array",
-                    "items": { "type": "integer" },
+                    "items": {
+                      "type": "integer"
+                    },
                     "description": "Ordered list of all group IDs."
                   }
                 }
@@ -979,7 +1241,9 @@
     },
     "/api/teams": {
       "get": {
-        "tags": ["teams"],
+        "tags": [
+          "teams"
+        ],
         "summary": "List teams",
         "security": [
           {
@@ -1037,7 +1301,9 @@
         }
       },
       "post": {
-        "tags": ["teams"],
+        "tags": [
+          "teams"
+        ],
         "summary": "Create team",
         "security": [
           {
@@ -1101,7 +1367,9 @@
         }
       ],
       "get": {
-        "tags": ["teams"],
+        "tags": [
+          "teams"
+        ],
         "summary": "Team detail",
         "security": [
           {
@@ -1122,7 +1390,9 @@
         }
       },
       "patch": {
-        "tags": ["teams"],
+        "tags": [
+          "teams"
+        ],
         "summary": "Update team",
         "security": [
           {
@@ -1146,7 +1416,9 @@
         }
       },
       "delete": {
-        "tags": ["teams"],
+        "tags": [
+          "teams"
+        ],
         "summary": "Delete team",
         "security": [
           {
@@ -1161,11 +1433,39 @@
             "description": "Conflict"
           }
         }
+      },
+      "put": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Replace team",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Team"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced team"
+          }
+        }
       }
     },
     "/api/teams/{team_id}/active-group": {
       "post": {
-        "tags": ["teams"],
+        "tags": [
+          "teams"
+        ],
         "summary": "Activate a group for the team",
         "security": [
           {
@@ -1209,7 +1509,9 @@
     },
     "/api/teams/randomize": {
       "post": {
-        "tags": ["teams"],
+        "tags": [
+          "teams"
+        ],
         "summary": "Randomize team numbers by group prefix",
         "security": [
           {
@@ -1240,22 +1542,40 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean" },
-                    "assigned_total": { "type": "integer" },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "assigned_total": {
+                      "type": "integer"
+                    },
                     "results": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "group_id": { "type": "integer" },
-                          "group_name": { "type": "string" },
-                          "status": { "type": "string" },
-                          "assigned": { "type": "integer" },
-                          "needed": { "type": "integer" },
-                          "available": { "type": "integer" },
+                          "group_id": {
+                            "type": "integer"
+                          },
+                          "group_name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "assigned": {
+                            "type": "integer"
+                          },
+                          "needed": {
+                            "type": "integer"
+                          },
+                          "available": {
+                            "type": "integer"
+                          },
                           "range": {
                             "type": "array",
-                            "items": { "type": "integer" }
+                            "items": {
+                              "type": "integer"
+                            }
                           }
                         }
                       }
@@ -1270,7 +1590,9 @@
     },
     "/api/groups": {
       "get": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "summary": "List checkpoint groups",
         "security": [
           {
@@ -1299,7 +1621,9 @@
         }
       },
       "post": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "summary": "Create group",
         "security": [
           {
@@ -1312,14 +1636,30 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["name"],
+                "required": [
+                  "name"
+                ],
                 "properties": {
-                  "name": { "type": "string" },
-                  "prefix": { "type": ["string","null"] },
-                  "description": { "type": ["string","null"] },
+                  "name": {
+                    "type": "string"
+                  },
+                  "prefix": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "checkpoint_ids": {
                     "type": "array",
-                    "items": { "type": "integer" }
+                    "items": {
+                      "type": "integer"
+                    }
                   }
                 }
               }
@@ -1345,7 +1685,9 @@
         }
       ],
       "get": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "summary": "Group detail",
         "security": [
           {
@@ -1366,7 +1708,9 @@
         }
       },
       "patch": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "summary": "Update group",
         "security": [
           {
@@ -1380,12 +1724,26 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "name": { "type": "string" },
-                  "prefix": { "type": ["string","null"] },
-                  "description": { "type": ["string","null"] },
+                  "name": {
+                    "type": "string"
+                  },
+                  "prefix": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "checkpoint_ids": {
                     "type": "array",
-                    "items": { "type": "integer" }
+                    "items": {
+                      "type": "integer"
+                    }
                   }
                 }
               }
@@ -1399,7 +1757,9 @@
         }
       },
       "delete": {
-        "tags": ["groups"],
+        "tags": [
+          "groups"
+        ],
         "summary": "Delete group",
         "security": [
           {
@@ -1414,11 +1774,62 @@
             "description": "Conflict"
           }
         }
+      },
+      "put": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Replace group",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "prefix": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "checkpoint_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced group"
+          }
+        }
       }
     },
     "/api/checkpoints": {
       "get": {
-        "tags": ["checkpoints"],
+        "tags": [
+          "checkpoints"
+        ],
         "summary": "List checkpoints",
         "security": [
           {
@@ -1447,7 +1858,9 @@
         }
       },
       "post": {
-        "tags": ["checkpoints"],
+        "tags": [
+          "checkpoints"
+        ],
         "summary": "Create checkpoint",
         "security": [
           {
@@ -1483,7 +1896,9 @@
         }
       ],
       "get": {
-        "tags": ["checkpoints"],
+        "tags": [
+          "checkpoints"
+        ],
         "summary": "Checkpoint detail",
         "security": [
           {
@@ -1504,7 +1919,9 @@
         }
       },
       "patch": {
-        "tags": ["checkpoints"],
+        "tags": [
+          "checkpoints"
+        ],
         "summary": "Update checkpoint",
         "security": [
           {
@@ -1528,7 +1945,9 @@
         }
       },
       "delete": {
-        "tags": ["checkpoints"],
+        "tags": [
+          "checkpoints"
+        ],
         "summary": "Delete checkpoint",
         "security": [
           {
@@ -1543,11 +1962,39 @@
             "description": "Conflict"
           }
         }
+      },
+      "put": {
+        "tags": [
+          "checkpoints"
+        ],
+        "summary": "Replace checkpoint",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Checkpoint"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced checkpoint"
+          }
+        }
       }
     },
     "/api/checkpoints/import": {
       "post": {
-        "tags": ["checkpoints"],
+        "tags": [
+          "checkpoints"
+        ],
         "summary": "Bulk import checkpoints",
         "security": [
           {
@@ -1584,7 +2031,9 @@
     },
     "/api/checkins": {
       "get": {
-        "tags": ["checkins"],
+        "tags": [
+          "checkins"
+        ],
         "summary": "List check-ins",
         "security": [
           {
@@ -1611,7 +2060,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "format": "date"
+              "format": "date-time"
             }
           },
           {
@@ -1619,7 +2068,19 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "format": "date"
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "old",
+                "team"
+              ]
             }
           }
         ],
@@ -1645,7 +2106,9 @@
         }
       },
       "post": {
-        "tags": ["checkins"],
+        "tags": [
+          "checkins"
+        ],
         "summary": "Create check-in",
         "security": [
           {
@@ -1686,7 +2149,46 @@
         },
         "responses": {
           "201": {
-            "description": "Created check-in"
+            "description": "Created check-in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "created": {
+                      "type": "boolean"
+                    },
+                    "checkin": {
+                      "$ref": "#/components/schemas/Checkin"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Existing check-in replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "replaced": {
+                      "type": "boolean"
+                    },
+                    "checkin": {
+                      "$ref": "#/components/schemas/Checkin"
+                    }
+                  }
+                }
+              }
+            }
           },
           "409": {
             "description": "Duplicate"
@@ -1706,7 +2208,9 @@
         }
       ],
       "get": {
-        "tags": ["checkins"],
+        "tags": [
+          "checkins"
+        ],
         "summary": "Check-in detail",
         "security": [
           {
@@ -1727,7 +2231,9 @@
         }
       },
       "patch": {
-        "tags": ["checkins"],
+        "tags": [
+          "checkins"
+        ],
         "summary": "Update check-in",
         "security": [
           {
@@ -1746,12 +2252,32 @@
         },
         "responses": {
           "200": {
-            "description": "Updated check-in"
+            "description": "Updated check-in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "updated": {
+                      "type": "boolean"
+                    },
+                    "checkin": {
+                      "$ref": "#/components/schemas/Checkin"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
       "delete": {
-        "tags": ["checkins"],
+        "tags": [
+          "checkins"
+        ],
         "summary": "Delete check-in",
         "security": [
           {
@@ -1763,11 +2289,57 @@
             "description": "Deleted"
           }
         }
+      },
+      "put": {
+        "tags": [
+          "checkins"
+        ],
+        "summary": "Replace check-in",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Checkin"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced check-in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "updated": {
+                      "type": "boolean"
+                    },
+                    "checkin": {
+                      "$ref": "#/components/schemas/Checkin"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/checkins/export.csv": {
       "get": {
-        "tags": ["checkins"],
+        "tags": [
+          "checkins"
+        ],
         "summary": "Export check-ins CSV",
         "security": [
           {
@@ -1791,7 +2363,9 @@
     },
     "/api/map/checkpoints": {
       "get": {
-        "tags": ["map"],
+        "tags": [
+          "map"
+        ],
         "summary": "Map checkpoints (all or filtered by team)",
         "security": [
           {
@@ -1815,7 +2389,95 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Checkpoint"
+                    "$ref": "#/components/schemas/MapCheckpoint"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/map/lora-points": {
+      "get": {
+        "tags": [
+          "map"
+        ],
+        "summary": "LoRa GPS points for the map",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dev_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GPS points",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LoRaMapPoint"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/map/device-points": {
+      "get": {
+        "tags": [
+          "map"
+        ],
+        "summary": "LoRa GPS points for the map (alias of /api/map/lora-points)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dev_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GPS points",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LoRaMapPoint"
                   }
                 }
               }
@@ -1826,7 +2488,9 @@
     },
     "/api/rfid/cards": {
       "get": {
-        "tags": ["rfid"],
+        "tags": [
+          "rfid"
+        ],
         "summary": "List RFID cards",
         "security": [
           {
@@ -1855,7 +2519,9 @@
         }
       },
       "post": {
-        "tags": ["rfid"],
+        "tags": [
+          "rfid"
+        ],
         "summary": "Create RFID card mapping",
         "security": [
           {
@@ -1891,7 +2557,9 @@
         }
       ],
       "get": {
-        "tags": ["rfid"],
+        "tags": [
+          "rfid"
+        ],
         "summary": "RFID card detail",
         "security": [
           {
@@ -1912,7 +2580,9 @@
         }
       },
       "patch": {
-        "tags": ["rfid"],
+        "tags": [
+          "rfid"
+        ],
         "summary": "Update card",
         "security": [
           {
@@ -1936,7 +2606,9 @@
         }
       },
       "delete": {
-        "tags": ["rfid"],
+        "tags": [
+          "rfid"
+        ],
         "summary": "Delete card",
         "security": [
           {
@@ -1948,11 +2620,39 @@
             "description": "Deleted"
           }
         }
+      },
+      "put": {
+        "tags": [
+          "rfid"
+        ],
+        "summary": "Replace RFID card",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RFIDCard"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced card"
+          }
+        }
       }
     },
     "/api/rfid/scan": {
       "post": {
-        "tags": ["rfid"],
+        "tags": [
+          "rfid"
+        ],
         "summary": "Scan single RFID card via serial bridge",
         "security": [
           {
@@ -1968,7 +2668,9 @@
     },
     "/api/rfid/import": {
       "post": {
-        "tags": ["rfid"],
+        "tags": [
+          "rfid"
+        ],
         "summary": "Bulk import RFID mappings",
         "security": [
           {
@@ -2013,7 +2715,9 @@
     },
     "/api/rfid/verify": {
       "post": {
-        "tags": ["rfid"],
+        "tags": [
+          "rfid"
+        ],
         "summary": "Verify tag digests against checkpoints/devices and team check-ins",
         "security": [
           {
@@ -2027,24 +2731,36 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "uid": { "type": "string", "description": "Card UID" },
+                  "uid": {
+                    "type": "string",
+                    "description": "Card UID"
+                  },
                   "digests": {
                     "type": "array",
-                    "items": { "type": "string" },
+                    "items": {
+                      "type": "string"
+                    },
                     "description": "List of truncated HMAC strings read from the tag"
                   },
                   "device_ids": {
                     "type": "array",
-                    "items": { "type": "integer" },
+                    "items": {
+                      "type": "integer"
+                    },
                     "description": "Optional: limit verification to these device IDs"
                   },
                   "checkpoint_ids": {
                     "type": "array",
-                    "items": { "type": "integer" },
+                    "items": {
+                      "type": "integer"
+                    },
                     "description": "Optional: limit verification to these checkpoint IDs"
                   }
                 },
-                "required": ["uid", "digests"]
+                "required": [
+                  "uid",
+                  "digests"
+                ]
               }
             }
           }
@@ -2057,42 +2773,75 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "ok": { "type": "boolean" },
-                    "uid": { "type": "string" },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "uid": {
+                      "type": "string"
+                    },
                     "device_ids": {
                       "type": "array",
-                      "items": { "type": "integer" }
+                      "items": {
+                        "type": "integer"
+                      }
                     },
                     "checkpoint_ids": {
                       "type": "array",
-                      "items": { "type": "integer" }
+                      "items": {
+                        "type": "integer"
+                      }
                     },
                     "team": {
                       "type": "object",
                       "nullable": true,
                       "properties": {
-                        "id": { "type": "integer" },
-                        "name": { "type": "string" }
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
                       }
                     },
-                    "has_mismatch": { "type": "boolean", "description": "True if any digest matched a checkpoint the team has not checked in at" },
+                    "has_mismatch": {
+                      "type": "boolean",
+                      "description": "True if any digest matched a checkpoint the team has not checked in at"
+                    },
                     "results": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "digest": { "type": "string" },
-                          "collision": { "type": "boolean" },
+                          "digest": {
+                            "type": "string"
+                          },
+                          "collision": {
+                            "type": "boolean"
+                          },
                           "matches": {
                             "type": "array",
                             "items": {
                               "type": "object",
                               "properties": {
-                                "device_id": { "type": "integer" },
-                                "device_name": { "type": "string", "nullable": true },
-                                "checkpoint": { "type": "string", "nullable": true },
-                                "checkpoint_id": { "type": "integer", "nullable": true },
-                                "checked_in": { "type": "boolean", "nullable": true }
+                                "device_id": {
+                                  "type": "integer"
+                                },
+                                "device_name": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "checkpoint": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "checkpoint_id": {
+                                  "type": "integer",
+                                  "nullable": true
+                                },
+                                "checked_in": {
+                                  "type": "boolean",
+                                  "nullable": true
+                                }
                               }
                             }
                           }
@@ -2101,7 +2850,9 @@
                     },
                     "unknown": {
                       "type": "array",
-                      "items": { "type": "string" }
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
@@ -2113,7 +2864,9 @@
     },
     "/api/lora/devices": {
       "get": {
-        "tags": ["lora"],
+        "tags": [
+          "lora"
+        ],
         "summary": "List LoRa devices",
         "security": [
           {
@@ -2142,7 +2895,9 @@
         }
       },
       "post": {
-        "tags": ["lora"],
+        "tags": [
+          "lora"
+        ],
         "summary": "Create LoRa device",
         "security": [
           {
@@ -2178,7 +2933,9 @@
         }
       ],
       "get": {
-        "tags": ["lora"],
+        "tags": [
+          "lora"
+        ],
         "summary": "Device detail",
         "security": [
           {
@@ -2199,7 +2956,9 @@
         }
       },
       "patch": {
-        "tags": ["lora"],
+        "tags": [
+          "lora"
+        ],
         "summary": "Update device",
         "security": [
           {
@@ -2223,7 +2982,9 @@
         }
       },
       "delete": {
-        "tags": ["lora"],
+        "tags": [
+          "lora"
+        ],
         "summary": "Delete device",
         "security": [
           {
@@ -2235,11 +2996,39 @@
             "description": "Deleted"
           }
         }
+      },
+      "put": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Replace LoRa device",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoRaDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced device"
+          }
+        }
       }
     },
     "/api/lora/messages": {
       "get": {
-        "tags": ["lora"],
+        "tags": [
+          "lora"
+        ],
         "summary": "List LoRa uplink messages",
         "security": [
           {
@@ -2282,6 +3071,258 @@
                       "items": {
                         "$ref": "#/components/schemas/LoRaMessage"
                       }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices": {
+      "get": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "List devices (alias of /api/lora/devices)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Devices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "devices": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LoRaDevice"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Create device (alias of /api/lora/devices)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoRaDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created device"
+          }
+        }
+      }
+    },
+    "/api/devices/{device_id}": {
+      "parameters": [
+        {
+          "name": "device_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Device detail (alias of /api/lora/devices/{device_id})",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoRaDevice"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Update device (alias)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoRaDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated device"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Delete device (alias)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Replace device",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoRaDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced device"
+          }
+        }
+      }
+    },
+    "/api/devices/messages": {
+      "get": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "List LoRa uplink messages (alias of /api/lora/messages)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dev_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LoRaMessage"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
+                        }
+                      }
                     }
                   }
                 }
@@ -2293,25 +3334,45 @@
     },
     "/api/ingest": {
       "post": {
-        "tags": ["ingest"],
+        "tags": [
+          "ingest"
+        ],
         "summary": "Ingest a device message (LoRa or phone) and optionally create a Check-in",
         "description": "Stores the raw message, updates device telemetry, ensures a Checkpoint is linked to the device (dev_num), and if payload matches a known RFID UID, creates a Checkin for that team at the device's checkpoint (only if one doesn't already exist). Returns optional GPS parse and a truncated HMAC payload suitable for writing back to a tag.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/IngestRequest" },
+              "schema": {
+                "$ref": "#/components/schemas/IngestRequest"
+              },
               "examples": {
                 "basic": {
-                  "value": { "competition_id": 1, "dev_id": 1, "payload": "A1B2C3D4", "rssi": -62.5, "snr": 9.0, "ts": 1730200000 }
+                  "value": {
+                    "competition_id": 1,
+                    "dev_id": 1,
+                    "payload": "A1B2C3D4",
+                    "rssi": -62.5,
+                    "snr": 9.0,
+                    "ts": 1730200000
+                  }
                 },
                 "gpsFields": {
-                  "value": { "competition_id": 1, "dev_id": 2, "gps_lat": 46.051, "gps_lon": 14.505, "gps_alt": 320.5, "gps_age_ms": 5000 }
+                  "value": {
+                    "competition_id": 1,
+                    "dev_id": 2,
+                    "gps_lat": 46.051,
+                    "gps_lon": 14.505,
+                    "gps_alt": 320.5,
+                    "gps_age_ms": 5000
+                  }
                 }
               }
             },
             "application/x-www-form-urlencoded": {
-              "schema": { "$ref": "#/components/schemas/IngestRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/IngestRequest"
+              }
             }
           }
         },
@@ -2321,12 +3382,16 @@
             "headers": {
               "Location": {
                 "description": "URL of the created message resource (future expansion)",
-                "schema": { "type": "string" }
+                "schema": {
+                  "type": "string"
+                }
               }
             },
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/IngestResponse" },
+                "schema": {
+                  "$ref": "#/components/schemas/IngestResponse"
+                },
                 "examples": {
                   "createdCheckin": {
                     "value": {
@@ -2346,7 +3411,15 @@
                     }
                   },
                   "noCheckin": {
-                    "value": { "ok": true, "message_id": 124, "dev_id": 2, "uid_seen": false, "team": null, "checkpoint": "LoRa Gateway 2", "checkin_created": false }
+                    "value": {
+                      "ok": true,
+                      "message_id": 124,
+                      "dev_id": 2,
+                      "uid_seen": false,
+                      "team": null,
+                      "checkpoint": "LoRa Gateway 2",
+                      "checkin_created": false
+                    }
                   }
                 }
               }
@@ -2356,12 +3429,18 @@
             "description": "Validation error (missing/invalid fields)",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ValidationError" },
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
                 "examples": {
                   "missing_dev_id": {
                     "value": {
-                      "message": { "dev_id": "dev_id is required (int)." },
-                      "errors": { "dev_id": "Missing required parameter in the JSON body or the post body or the query string" }
+                      "message": {
+                        "dev_id": "dev_id is required (int)."
+                      },
+                      "errors": {
+                        "dev_id": "Missing required parameter in the JSON body or the post body or the query string"
+                      }
                     }
                   }
                 }
@@ -2372,10 +3451,16 @@
             "description": "Database error while processing the message",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ServerError" },
+                "schema": {
+                  "$ref": "#/components/schemas/ServerError"
+                },
                 "examples": {
                   "db_error": {
-                    "value": { "ok": false, "error": "database_error", "detail": "SQLAlchemyError" }
+                    "value": {
+                      "ok": false,
+                      "error": "database_error",
+                      "detail": "SQLAlchemyError"
+                    }
                   }
                 }
               }
@@ -2386,7 +3471,9 @@
     },
     "/api/docs": {
       "get": {
-        "tags": ["docs"],
+        "tags": [
+          "docs"
+        ],
         "summary": "List documentation artifacts",
         "responses": {
           "200": {
@@ -2418,29 +3505,43 @@
         }
       }
     },
-    "/api/docs/openapi.json": {
+    "/api/docs/{filename}": {
       "get": {
-        "tags": ["docs"],
-        "summary": "OpenAPI document",
+        "tags": [
+          "docs"
+        ],
+        "summary": "Fetch a documentation artifact by filename",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Spec",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
+            "description": "Spec or documentation artifact"
+          },
+          "404": {
+            "description": "Not found"
           }
         }
       }
     },
     "/sheets/": {
       "get": {
-        "tags": ["sheets"],
+        "tags": [
+          "sheets"
+        ],
         "summary": "Sheets admin UI",
-        "security": [{"cookieAuth": []}],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "HTML page"
@@ -2453,9 +3554,15 @@
     },
     "/sheets/build-arrivals": {
       "post": {
-        "tags": ["sheets"],
+        "tags": [
+          "sheets"
+        ],
         "summary": "Build or refresh arrivals tab",
-        "security": [{"cookieAuth": []}],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2463,24 +3570,39 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "spreadsheet_id": {"type": "string"},
-                  "tab_name": {"type": "string", "default": "Prihodi"}
+                  "spreadsheet_id": {
+                    "type": "string"
+                  },
+                  "tab_name": {
+                    "type": "string",
+                    "default": "Prihodi"
+                  }
                 },
-                "required": ["spreadsheet_id"]
+                "required": [
+                  "spreadsheet_id"
+                ]
               }
             }
           }
         },
         "responses": {
-          "302": {"description": "Redirect back to admin page"}
+          "302": {
+            "description": "Redirect back to admin page"
+          }
         }
       }
     },
     "/sheets/build-teams": {
       "post": {
-        "tags": ["sheets"],
+        "tags": [
+          "sheets"
+        ],
         "summary": "Build or refresh teams tab",
-        "security": [{"cookieAuth": []}],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2488,26 +3610,47 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "spreadsheet_id": {"type": "string"},
-                  "tab_name": {"type": "string", "default": "Ekipe"},
-                  "teams_headers": {"type": "string", "description": "Comma-separated headers"},
-                  "group_order": {"type": "string", "description": "Comma-separated group order"}
+                  "spreadsheet_id": {
+                    "type": "string"
+                  },
+                  "tab_name": {
+                    "type": "string",
+                    "default": "Ekipe"
+                  },
+                  "teams_headers": {
+                    "type": "string",
+                    "description": "Comma-separated headers"
+                  },
+                  "group_order": {
+                    "type": "string",
+                    "description": "Comma-separated group order"
+                  }
                 },
-                "required": ["spreadsheet_id"]
+                "required": [
+                  "spreadsheet_id"
+                ]
               }
             }
           }
         },
         "responses": {
-          "302": {"description": "Redirect back to admin page"}
+          "302": {
+            "description": "Redirect back to admin page"
+          }
         }
       }
     },
     "/sheets/build-score": {
       "post": {
-        "tags": ["sheets"],
+        "tags": [
+          "sheets"
+        ],
         "summary": "Build or refresh total score tab",
-        "security": [{"cookieAuth": []}],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2515,27 +3658,49 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "spreadsheet_id": {"type": "string"},
-                  "tab_name": {"type": "string", "default": "Skupni seštevek"},
-                  "include_dead_time_sum": {"type": "boolean", "default": true},
-                  "group_order": {"type": "string"},
-                  "checkpoint_order": {"type": "string"}
+                  "spreadsheet_id": {
+                    "type": "string"
+                  },
+                  "tab_name": {
+                    "type": "string",
+                    "default": "Skupni seštevek"
+                  },
+                  "include_dead_time_sum": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "group_order": {
+                    "type": "string"
+                  },
+                  "checkpoint_order": {
+                    "type": "string"
+                  }
                 },
-                "required": ["spreadsheet_id"]
+                "required": [
+                  "spreadsheet_id"
+                ]
               }
             }
           }
         },
         "responses": {
-          "302": {"description": "Redirect back to admin page"}
+          "302": {
+            "description": "Redirect back to admin page"
+          }
         }
       }
     },
     "/sheets/wizard/checkpoints": {
       "post": {
-        "tags": ["sheets"],
+        "tags": [
+          "sheets"
+        ],
         "summary": "Run checkpoint tab wizard",
-        "security": [{"cookieAuth": []}],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2543,28 +3708,50 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "spreadsheet_id": {"type": "string"},
-                  "arrived_header": {"type": "string"},
-                  "points_header": {"type": "string"},
-                  "dead_time_header": {"type": "string"},
-                  "group_order": {"type": "string"},
-                  "checkpoint_order": {"type": "string"}
+                  "spreadsheet_id": {
+                    "type": "string"
+                  },
+                  "arrived_header": {
+                    "type": "string"
+                  },
+                  "points_header": {
+                    "type": "string"
+                  },
+                  "dead_time_header": {
+                    "type": "string"
+                  },
+                  "group_order": {
+                    "type": "string"
+                  },
+                  "checkpoint_order": {
+                    "type": "string"
+                  }
                 },
-                "required": ["spreadsheet_id"]
+                "required": [
+                  "spreadsheet_id"
+                ]
               }
             }
           }
         },
         "responses": {
-          "302": {"description": "Redirect back to admin page"}
+          "302": {
+            "description": "Redirect back to admin page"
+          }
         }
       }
     },
     "/sheets/add-tab": {
       "post": {
-        "tags": ["sheets"],
+        "tags": [
+          "sheets"
+        ],
         "summary": "Add a single checkpoint tab",
-        "security": [{"cookieAuth": []}],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2572,64 +3759,111 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "spreadsheet_id": {"type": "string"},
-                  "tab_title": {"type": "string"},
-                  "checkpoint_id": {"type": "integer", "nullable": true},
-                  "groups_raw": {"type": "string", "description": "Lines Group|field1,field2"}
+                  "spreadsheet_id": {
+                    "type": "string"
+                  },
+                  "tab_title": {
+                    "type": "string"
+                  },
+                  "checkpoint_id": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "groups_raw": {
+                    "type": "string",
+                    "description": "Lines Group|field1,field2"
+                  }
                 },
-                "required": ["spreadsheet_id", "tab_title", "groups_raw"]
+                "required": [
+                  "spreadsheet_id",
+                  "tab_title",
+                  "groups_raw"
+                ]
               }
             }
           }
         },
         "responses": {
-          "302": {"description": "Redirect back to admin page"}
+          "302": {
+            "description": "Redirect back to admin page"
+          }
         }
       }
     },
     "/sheets/prune-missing": {
       "post": {
-        "tags": ["sheets"],
+        "tags": [
+          "sheets"
+        ],
         "summary": "Delete stored sheet configs whose tabs are gone",
-        "security": [{"cookieAuth": []}],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "responses": {
-          "302": {"description": "Redirect back to admin page"}
+          "302": {
+            "description": "Redirect back to admin page"
+          }
         }
       }
     },
     "/sheets/sync-team-numbers/{config_id}": {
       "post": {
-        "tags": ["sheets"],
+        "tags": [
+          "sheets"
+        ],
         "summary": "Sync team numbers for a checkpoint tab",
-        "security": [{"cookieAuth": []}],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "config_id",
             "in": "path",
             "required": true,
-            "schema": {"type": "integer"}
+            "schema": {
+              "type": "integer"
+            }
           }
         ],
         "responses": {
-          "302": {"description": "Redirect back to admin page"}
+          "302": {
+            "description": "Redirect back to admin page"
+          }
         }
       }
     },
     "/api/scores/resolve": {
       "post": {
-        "tags": ["scores"],
+        "tags": [
+          "scores"
+        ],
         "summary": "Resolve RFID tag to scoring fields",
-        "security": [{ "cookieAuth": [] }],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["uid", "checkpoint_id"],
+                "required": [
+                  "uid",
+                  "checkpoint_id"
+                ],
                 "properties": {
-                  "uid": { "type": "string" },
-                  "checkpoint_id": { "type": "integer" }
+                  "uid": {
+                    "type": "string"
+                  },
+                  "checkpoint_id": {
+                    "type": "integer"
+                  }
                 }
               }
             }
@@ -2637,27 +3871,140 @@
         },
         "responses": {
           "200": {
-            "description": "Resolved scoring fields"
+            "description": "Resolved scoring fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "uid": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "team": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "number": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "checkpoint": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "group": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "latest_score": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "additionalProperties": true
+                    },
+                    "latest_total": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "checkin_created": {
+                      "type": "boolean"
+                    },
+                    "checkin_exists": {
+                      "type": "boolean"
+                    },
+                    "rules": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/scores/submit": {
       "post": {
-        "tags": ["scores"],
+        "tags": [
+          "scores"
+        ],
         "summary": "Submit a score entry",
-        "security": [{ "cookieAuth": [] }],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["team_id", "checkpoint_id", "fields"],
+                "required": [
+                  "team_id",
+                  "checkpoint_id",
+                  "fields"
+                ],
                 "properties": {
-                  "team_id": { "type": "integer" },
-                  "checkpoint_id": { "type": "integer" },
-                  "fields": { "type": "object" }
+                  "team_id": {
+                    "type": "integer"
+                  },
+                  "checkpoint_id": {
+                    "type": "integer"
+                  },
+                  "fields": {
+                    "type": "object"
+                  }
                 }
               }
             }
@@ -2665,50 +4012,135 @@
         },
         "responses": {
           "201": {
-            "description": "Score created"
+            "description": "Score created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "score_id": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "checkin_created": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "score_id",
+                    "checkin_created"
+                  ]
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/score-rules": {
       "get": {
-        "tags": ["scores"],
+        "tags": [
+          "scores"
+        ],
         "summary": "List score rules",
-        "security": [{ "cookieAuth": [] }],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "checkpoint_id", "in": "query", "schema": { "type": "integer" } },
-          { "name": "group_id", "in": "query", "schema": { "type": "integer" } }
+          {
+            "name": "checkpoint_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Rules" }
+          "200": {
+            "description": "Rules"
+          }
         }
       },
       "post": {
-        "tags": ["scores"],
+        "tags": [
+          "scores"
+        ],
         "summary": "Create or update a score rule",
-        "security": [{ "cookieAuth": [] }],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["checkpoint_id", "group_id", "rules"],
+                "required": [
+                  "checkpoint_id",
+                  "group_id",
+                  "rules"
+                ],
                 "properties": {
-                  "checkpoint_id": { "type": "integer" },
-                  "group_id": { "type": "integer" },
+                  "checkpoint_id": {
+                    "type": "integer"
+                  },
+                  "group_id": {
+                    "type": "integer"
+                  },
                   "rules": {
                     "type": "object",
                     "description": "Rule object with optional field_rules and time_race. field_rules maps field keys to a rule or list of rules: mapping {type:'mapping', map:{input:output}}, interpolate {type:'interpolate', points:[[x,y],...]}, multiplier {type:'multiplier', factor}, found {type:'found', checkpoint_ids:[int], points_per:number}, deviation {type:'deviation', target, max_points, penalty_points, penalty_distance, min_points}. time_race uses checkin times between checkpoints: {start_checkpoint_id, end_checkpoint_id, min_points, max_points}.",
                     "example": {
                       "field_rules": {
                         "Distance": [
-                          { "type": "deviation", "target": 0, "max_points": 100, "penalty_points": 1, "penalty_distance": 1, "min_points": 0 }
+                          {
+                            "type": "deviation",
+                            "target": 0,
+                            "max_points": 100,
+                            "penalty_points": 1,
+                            "penalty_distance": 1,
+                            "min_points": 0
+                          }
                         ],
-                        "Found": { "type": "found", "checkpoint_ids": [12, 14], "points_per": 5 }
+                        "Found": {
+                          "type": "found",
+                          "checkpoint_ids": [
+                            12,
+                            14
+                          ],
+                          "points_per": 5
+                        }
                       },
-                      "total_fields": ["Distance", "Found"],
-                      "time_race": { "start_checkpoint_id": 3, "end_checkpoint_id": 7, "min_points": 10, "max_points": 100 }
+                      "total_fields": [
+                        "Distance",
+                        "Found"
+                      ],
+                      "time_race": {
+                        "start_checkpoint_id": 3,
+                        "end_checkpoint_id": 7,
+                        "min_points": 10,
+                        "max_points": 100
+                      }
                     }
                   }
                 }
@@ -2717,35 +4149,74 @@
           }
         },
         "responses": {
-          "200": { "description": "Updated rule" },
-          "201": { "description": "Created rule" }
+          "200": {
+            "description": "Updated rule"
+          },
+          "201": {
+            "description": "Created rule"
+          }
         }
       }
     },
     "/api/score-rules/fields": {
       "get": {
-        "tags": ["scores"],
+        "tags": [
+          "scores"
+        ],
         "summary": "Get score rule fields",
-        "security": [{ "cookieAuth": [] }],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "checkpoint_id", "in": "query", "schema": { "type": "integer" } },
-          { "name": "group_id", "in": "query", "schema": { "type": "integer" } }
+          {
+            "name": "checkpoint_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Available scoring fields" }
+          "200": {
+            "description": "Available scoring fields"
+          }
         }
       }
     },
     "/api/score-rules/{rule_id}": {
       "parameters": [
-        { "name": "rule_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        {
+          "name": "rule_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
       ],
       "delete": {
-        "tags": ["scores"],
+        "tags": [
+          "scores"
+        ],
         "summary": "Delete a score rule",
-        "security": [{ "cookieAuth": [] }],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "responses": {
-          "200": { "description": "Deleted" }
+          "200": {
+            "description": "Deleted"
+          }
         }
       }
     }

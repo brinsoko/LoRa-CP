@@ -100,6 +100,7 @@ def _decorate_checkins(items):
             {
                 "id": item.get("id"),
                 "timestamp": dt,
+                "created_by": item.get("created_by") or {},
                 "team": item.get("team") or {},
                 "checkpoint": item.get("checkpoint") or {},
             }

@@ -6,15 +6,18 @@ import random
 import re
 
 from flask import request
+from flask_login import current_user
 from flask_restful import Resource
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import Team, TeamGroup, CheckpointGroup
+from app.utils.audit import record_audit_event
 from app.utils.rest_auth import json_roles_required
 from app.utils.competition import require_current_competition_id, get_current_competition_role
 from app.utils.sheets_sync import sync_all_checkpoint_tabs
+from app.utils.validators import validate_text
 
 
 def _serialize_team(team: Team) -> dict:
@@ -38,6 +41,10 @@ def _serialize_team(team: Team) -> dict:
             )
         ],
     }
+
+
+def _team_snapshot(team: Team) -> dict:
+    return _serialize_team(team)
 
 
 def _parse_group_ids(raw_ids: Iterable) -> List[int]:
@@ -71,7 +78,7 @@ def _apply_group_assignment(team: Team, selected_group_id: Optional[int]) -> tup
     except Exception:
         return False, "group_id must be a positive integer"
 
-    group = CheckpointGroup.query.get(selected_group_id)
+    group = db.session.get(CheckpointGroup, selected_group_id)
     if not group:
         return False, "Invalid group"
     if group.competition_id != team.competition_id:
@@ -160,11 +167,13 @@ class TeamListResource(Resource):
             return {"error": "no_competition"}, 400
 
         payload = request.get_json(silent=True) or {}
-        name = (payload.get("name") or "").strip()
+        name, name_error = validate_text(payload.get("name"), field_name="name", max_length=100, required=True)
         number = payload.get("number", None)
-        org = (payload.get("organization") or "").strip() or None
-        if not name:
-            return {"error": "validation_error", "detail": "name is required"}, 400
+        org, org_error = validate_text(payload.get("organization"), field_name="organization", max_length=120)
+        if name_error:
+            return {"error": "validation_error", "detail": name_error}, 400
+        if org_error:
+            return {"error": "validation_error", "detail": org_error}, 400
 
         team = Team(name=name, organization=org, competition_id=comp_id)
         if "dnf" in payload:
@@ -210,7 +219,15 @@ class TeamListResource(Resource):
                 return {"error": "validation_error", "detail": err}, 400
 
         db.session.flush()
-
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="team_created",
+            entity_type="team",
+            entity_id=team.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Team {team.name} created.",
+            details=_team_snapshot(team),
+        )
         db.session.commit()
         try:
             sync_all_checkpoint_tabs(competition_id=comp_id)
@@ -254,13 +271,14 @@ class TeamItemResource(Resource):
         )
         if not team:
             return {"error": "not_found"}, 404
+        before = _team_snapshot(team)
 
         payload = request.get_json(silent=True) or {}
 
         if not partial or "name" in payload:
-            name = (payload.get("name") or "").strip()
-            if not name:
-                return {"error": "validation_error", "detail": "name is required"}, 400
+            name, name_error = validate_text(payload.get("name"), field_name="name", max_length=100, required=True)
+            if name_error:
+                return {"error": "validation_error", "detail": name_error}, 400
             team.name = name
 
         if "number" in payload or not partial:
@@ -274,7 +292,9 @@ class TeamItemResource(Resource):
                     return {"error": "validation_error", "detail": "number must be integer"}, 400
 
         if "organization" in payload or not partial:
-            org = (payload.get("organization") or "").strip()
+            org, org_error = validate_text(payload.get("organization"), field_name="organization", max_length=120)
+            if org_error:
+                return {"error": "validation_error", "detail": org_error}, 400
             team.organization = org or None
 
         if "dnf" in payload:
@@ -321,6 +341,16 @@ class TeamItemResource(Resource):
                 db.session.rollback()
                 return {"error": "validation_error", "detail": err}, 400
 
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="team_updated",
+            entity_type="team",
+            entity_id=team.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Team {team.name} updated.",
+            details={"before": before, "after": _team_snapshot(team)},
+        )
         db.session.commit()
         try:
             sync_all_checkpoint_tabs(competition_id=comp_id)
@@ -336,6 +366,7 @@ class TeamItemResource(Resource):
         team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
         if not team:
             return {"error": "not_found"}, 404
+        snapshot = _team_snapshot(team)
         payload = request.get_json(silent=True) or {}
         force = bool(payload.get("force"))
         confirm_text = (payload.get("confirm_text") or "").strip()
@@ -352,6 +383,15 @@ class TeamItemResource(Resource):
                 }, 400
 
         TeamGroup.query.filter_by(team_id=team.id).delete()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="team_deleted",
+            entity_type="team",
+            entity_id=team.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Team {team.name} deleted.",
+            details=snapshot,
+        )
         db.session.delete(team)
         db.session.commit()
         return {"ok": True}, 200
@@ -379,6 +419,16 @@ class TeamActiveGroupResource(Resource):
         if not ok:
             return {"error": "validation_error", "detail": err}, 400
 
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="team_group_updated",
+            entity_type="team",
+            entity_id=team.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Active group changed for team {team.name}.",
+            details=_team_snapshot(team),
+        )
         db.session.commit()
         return {"ok": True}, 200
 
@@ -510,5 +560,14 @@ class TeamNumberRandomizeResource(Resource):
             })
 
         if assigned_total:
+            record_audit_event(
+                competition_id=comp_id,
+                event_type="team_numbers_randomized",
+                entity_type="team_batch",
+                entity_id=None,
+                actor_user=current_user if current_user.is_authenticated else None,
+                summary="Team numbers randomized.",
+                details={"assigned_total": assigned_total, "results": results},
+            )
             db.session.commit()
         return {"ok": True, "assigned_total": assigned_total, "results": results}, 200

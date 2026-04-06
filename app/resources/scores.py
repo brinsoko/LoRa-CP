@@ -19,6 +19,7 @@ from app.models import (
     Team,
     TeamGroup,
 )
+from app.utils.audit import record_audit_event
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_roles_required
 from app.utils.sheets_sync import mark_arrival_checkbox, update_checkpoint_scores
@@ -100,6 +101,21 @@ def _to_number(value):
         return float(value)
     except Exception:
         return None
+
+
+def _score_entry_snapshot(entry: ScoreEntry) -> dict:
+    return {
+        "id": entry.id,
+        "team_id": entry.team_id,
+        "team_name": entry.team.name if entry.team else None,
+        "checkpoint_id": entry.checkpoint_id,
+        "checkpoint_name": entry.checkpoint.name if entry.checkpoint else None,
+        "judge_user_id": entry.judge_user_id,
+        "judge_username": entry.judge_user.username if entry.judge_user else None,
+        "total": entry.total,
+        "raw_fields": entry.raw_fields or {},
+        "created_at": entry.created_at.isoformat() if entry.created_at else None,
+    }
 
 
 def _apply_field_rule(value, rule, context: dict) -> float | None:
@@ -665,8 +681,27 @@ class ScoreSubmit(Resource):
                 team_id=team.id,
                 checkpoint_id=checkpoint_id,
                 timestamp=datetime.utcnow(),
+                created_by_user_id=current_user.id,
             )
             db.session.add(checkin)
+            db.session.flush()
+            record_audit_event(
+                competition_id=comp_id,
+                event_type="checkin_created",
+                entity_type="checkin",
+                entity_id=checkin.id,
+                actor_user=current_user,
+                summary=f"Check-in auto-created during scoring for team {team.name} at {checkpoint.name}.",
+                details={
+                    "id": checkin.id,
+                    "team_id": team.id,
+                    "team_name": team.name,
+                    "checkpoint_id": checkpoint.id,
+                    "checkpoint_name": checkpoint.name,
+                    "timestamp": checkin.timestamp.isoformat() if checkin.timestamp else None,
+                },
+                created_at=checkin.timestamp,
+            )
             db.session.commit()
             created_checkin = True
             try:
@@ -691,6 +726,17 @@ class ScoreSubmit(Resource):
             created_at=datetime.utcnow(),
         )
         db.session.add(entry)
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="score_submitted",
+            entity_type="score_entry",
+            entity_id=entry.id,
+            actor_user=current_user,
+            summary=f"Score submitted for team {team.name} at {checkpoint.name}.",
+            details=_score_entry_snapshot(entry),
+            created_at=entry.created_at,
+        )
         db.session.commit()
 
         # Update Google Sheets

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Audit') }}{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-3">
+        <label class="form-label">{{ _('Event Type') }}</label>
+        <select name="event_type" class="form-select">
+          <option value="">{{ _('All event types') }}</option>
+          {% for item in event_types %}
+            <option value="{{ item }}" {% if item == selected_event_type %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">{{ _('Entity Type') }}</label>
+        <select name="entity_type" class="form-select">
+          <option value="">{{ _('All entity types') }}</option>
+          {% for item in entity_types %}
+            <option value="{{ item }}" {% if item == selected_entity_type %}selected{% endif %}>{{ item }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label">{{ _('Actor') }}</label>
+        <input type="text" name="actor" class="form-control" maxlength="100" value="{{ selected_actor }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">{{ _('From') }}</label>
+        <input type="datetime-local" step="1" name="date_from" class="form-control" value="{{ selected_date_from }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">{{ _('To') }}</label>
+        <input type="datetime-local" step="1" name="date_to" class="form-control" value="{{ selected_date_to }}">
+      </div>
+      <div class="col-12 d-flex gap-2 justify-content-md-end">
+        <button class="btn btn-primary" type="submit">{{ _('Apply Filters') }}</button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('audit.list_audit_events') }}">{{ _('Reset') }}</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h5 class="card-title mb-0">{{ _('Audit Trail') }}</h5>
+      <span class="text-muted small">{{ _('Showing up to 500 newest events.') }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>{{ _('When') }}</th>
+            <th>{{ _('Event') }}</th>
+            <th>{{ _('Entity') }}</th>
+            <th>{{ _('Actor') }}</th>
+            <th>{{ _('Summary') }}</th>
+            <th>{{ _('Details') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in events %}
+            <tr>
+              <td>{{ row.created_at | local_dt }}</td>
+              <td><code>{{ row.event_type }}</code></td>
+              <td>
+                <code>{{ row.entity_type }}</code>
+                {% if row.entity_id is not none %}
+                  <span class="text-muted">#{{ row.entity_id }}</span>
+                {% endif %}
+              </td>
+              <td>{{ row.actor }}</td>
+              <td>{{ row.summary }}</td>
+              <td style="min-width: 260px;">
+                {% if row.details %}
+                  <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ row.details | tojson(indent=2) }}</pre>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-4">{{ _('No audit events match your filters.') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

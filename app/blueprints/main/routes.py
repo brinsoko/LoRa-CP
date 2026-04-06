@@ -4,9 +4,12 @@ from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import Team, Checkpoint, Checkin, Competition, CompetitionMember, CompetitionInvite, User
+from app.utils.audit import record_audit_event
 from app.utils.time import to_datetime_local
 from app.utils.competition import get_current_competition_id, get_user_memberships, set_current_competition_id, create_invite
 from app.utils.perms import roles_required
+from app.utils.redirects import safe_redirect_target
+from app.utils.export_safety import escape_formula_cell
 import io, csv
 from datetime import datetime, timedelta
 
@@ -62,6 +65,33 @@ def create_competition():
             active=True,
         )
     )
+    db.session.flush()
+    membership = (
+        CompetitionMember.query
+        .filter(
+            CompetitionMember.competition_id == competition.id,
+            CompetitionMember.user_id == current_user.id,
+        )
+        .first()
+    )
+    record_audit_event(
+        competition_id=competition.id,
+        event_type="competition_created",
+        entity_type="competition",
+        entity_id=competition.id,
+        actor_user=current_user,
+        summary=f"Competition {competition.name} created.",
+        details={"id": competition.id, "name": competition.name},
+    )
+    record_audit_event(
+        competition_id=competition.id,
+        event_type="competition_member_attached",
+        entity_type="competition_member",
+        entity_id=membership.id if membership else None,
+        actor_user=current_user,
+        summary=f"User {current_user.username} added to the competition.",
+        details={"user_id": current_user.id, "username": current_user.username, "role": "admin", "active": True},
+    )
     db.session.commit()
 
     set_current_competition_id(competition.id)
@@ -85,7 +115,10 @@ def set_language(lang_code: str):
     if lang_code not in languages:
         abort(404)
     session["lang"] = lang_code
-    next_url = request.args.get("next") or request.referrer or url_for("main.index")
+    next_url = safe_redirect_target(
+        request.args.get("next") or request.referrer,
+        url_for("main.index"),
+    )
     return redirect(next_url)
 
 
@@ -140,9 +173,9 @@ def export_checkins_csv():
     for r in rows:
         w.writerow([r.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                     r.team.id if r.team else "",
-                    r.team.name if r.team else "",
+                    escape_formula_cell(r.team.name) if r.team else "",
                     r.checkpoint.id if r.checkpoint else "",
-                    r.checkpoint.name if r.checkpoint else ""])
+                    escape_formula_cell(r.checkpoint.name) if r.checkpoint else ""])
     return Response(si.getvalue(), mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=checkins.csv"})
 
@@ -207,10 +240,44 @@ def competition_settings():
                     )
                 invite.invited_user_id = user.id
                 invite.used_at = datetime.utcnow()
+            db.session.flush()
+            record_audit_event(
+                competition_id=competition.id,
+                event_type="competition_invite_saved",
+                entity_type="competition_invite",
+                entity_id=invite.id,
+                actor_user=current_user,
+                summary=f"Invite saved for {email}.",
+                details={"invite_id": invite.id, "email": email, "role": role, "auto_attached_user_id": user.id if user else None},
+            )
+            if user:
+                membership = (
+                    CompetitionMember.query
+                    .filter(
+                        CompetitionMember.competition_id == competition.id,
+                        CompetitionMember.user_id == user.id,
+                    )
+                    .first()
+                )
+                if membership:
+                    record_audit_event(
+                        competition_id=competition.id,
+                        event_type="competition_member_attached",
+                        entity_type="competition_member",
+                        entity_id=membership.id,
+                        actor_user=current_user,
+                        summary=f"User {user.username} added to the competition.",
+                        details={"user_id": user.id, "username": user.username, "role": membership.role, "active": membership.active},
+                    )
             db.session.commit()
             flash(_("Invite saved."), "success")
             return redirect(url_for("main.competition_settings"))
 
+        before = {
+            "name": competition.name,
+            "public_results": competition.public_results,
+            "has_ingest_password": bool(competition.ingest_password_hash),
+        }
         new_name = (request.form.get("name") or "").strip()
         if not new_name:
             flash(_("Competition name is required."), "warning")
@@ -231,6 +298,23 @@ def competition_settings():
             ingest_pw = (request.form.get("ingest_password") or "").strip()
             if ingest_pw:
                 competition.set_ingest_password(ingest_pw)
+        db.session.flush()
+        record_audit_event(
+            competition_id=competition.id,
+            event_type="competition_updated",
+            entity_type="competition",
+            entity_id=competition.id,
+            actor_user=current_user,
+            summary=f"Competition {competition.name} settings updated.",
+            details={
+                "before": before,
+                "after": {
+                    "name": competition.name,
+                    "public_results": competition.public_results,
+                    "has_ingest_password": bool(competition.ingest_password_hash),
+                },
+            },
+        )
         db.session.commit()
         flash(_("Competition settings updated."), "success")
         return redirect(url_for("main.competition_settings"))
@@ -285,6 +369,21 @@ def revoke_invite(invite_id: int):
         flash(_("Invite not found."), "warning")
         return redirect(url_for("main.competition_settings"))
 
+    snapshot = {
+        "invite_id": invite.id,
+        "email": invite.invited_email,
+        "role": invite.role,
+        "used_at": invite.used_at.isoformat() if invite.used_at else None,
+    }
+    record_audit_event(
+        competition_id=comp_id,
+        event_type="competition_invite_revoked",
+        entity_type="competition_invite",
+        entity_id=invite.id,
+        actor_user=current_user,
+        summary=f"Invite revoked for {invite.invited_email or invite.id}.",
+        details=snapshot,
+    )
     db.session.delete(invite)
     db.session.commit()
     flash(_("Invite revoked."), "success")

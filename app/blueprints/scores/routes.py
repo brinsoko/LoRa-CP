@@ -4,6 +4,7 @@ from __future__ import annotations
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_babel import gettext as _
 import json
+from sqlalchemy.orm import joinedload
 
 from app.utils.perms import roles_required
 from app.utils.competition import get_current_competition_id, get_current_competition_role
@@ -640,10 +641,13 @@ def _build_stats_context(comp_id: int) -> dict:
                 "completion_rate": 0,
                 "avg_points": None,
                 "avg_time_minutes": None,
+                "median_time_minutes": None,
                 "fastest_team": None,
                 "fastest_minutes": None,
                 "avg_checkpoint_count": None,
                 "segments": [],
+                "dropoff_checkpoint": None,
+                "dropoff_rate": None,
             })
             continue
 
@@ -821,6 +825,11 @@ def score_submissions():
     query = (
         ScoreEntry.query
         .filter(ScoreEntry.competition_id == comp_id)
+        .options(
+            joinedload(ScoreEntry.team),
+            joinedload(ScoreEntry.checkpoint),
+            joinedload(ScoreEntry.judge_user),
+        )
         .order_by(ScoreEntry.created_at.desc())
     )
     if team_id:
@@ -873,6 +882,7 @@ def score_submissions():
             "checkpoint": entry.checkpoint.name if entry.checkpoint else "",
             "checkpoint_id": entry.checkpoint_id,
             "created_at": entry.created_at,
+            "submitted_by": entry.judge_user.username if entry.judge_user else _("Legacy or unknown"),
             "total": entry.total,
             "dead_time": dead_num,
             "time_points": team_time_points.get(entry.team_id),

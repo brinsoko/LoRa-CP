@@ -100,6 +100,3 @@ Export check-ins (CSV):
 
 
 
-To do:
-- design a PCB
-- add wifi support for data transfers??

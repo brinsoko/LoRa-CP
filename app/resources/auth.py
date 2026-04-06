@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models import User, CompetitionMember
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_login_required, json_roles_required
+from app.utils.validators import validate_email, validate_username
 
 # ---------- helpers ----------
 def _find_login_user(login_id: str) -> User | None:
@@ -144,12 +145,16 @@ class UserList(Resource):
         if err_resp:
             return err_resp, err_code
 
-        username = (data.get("username") or "").strip()
+        username, username_error = validate_username(data.get("username"))
         password = data.get("password") or ""
         role = (data.get("role") or "viewer").strip()
-        email = (data.get("email") or "").strip().lower() or None
+        email, email_error = validate_email(data.get("email"))
 
-        if not username or not password or role not in ("viewer", "judge", "admin"):
+        if username_error:
+            return {"error": username_error}, 400
+        if email_error:
+            return {"error": email_error}, 400
+        if not password or role not in ("viewer", "judge", "admin"):
             return {"error": "Invalid form data"}, 400
         if User.query.filter_by(username=username).first():
             return {"error": "Username already exists"}, 409
@@ -232,7 +237,7 @@ class UserItem(Resource):
         if err_resp:
             return err_resp, err_code
 
-        new_username = (data.get("username") or u.username).strip()
+        new_username, username_error = validate_username(data.get("username") or u.username)
         membership = (
             CompetitionMember.query
             .filter(
@@ -246,6 +251,8 @@ class UserItem(Resource):
 
         if new_role not in ("viewer", "judge", "admin"):
             return {"error": "Invalid role"}, 400
+        if username_error:
+            return {"error": username_error}, 400
 
         # enforce unique username if changed
         if new_username != u.username and User.query.filter_by(username=new_username).first():
@@ -288,7 +295,7 @@ class UserItem(Resource):
             CompetitionMember.user_id == user_id
         ).count()
         if remaining == 0:
-            u = User.query.get(user_id)
+            u = db.session.get(User, user_id)
             if u:
                 db.session.delete(u)
         db.session.commit()

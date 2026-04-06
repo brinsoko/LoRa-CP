@@ -87,6 +87,7 @@
             <th>{{ _('Team') }}</th>
             <th>{{ _('Team #') }}</th>
             <th>{{ _('Checkpoint') }}</th>
+            <th>{{ _('Created By') }}</th>
             {% if has_role('judge','admin') %}
               <th class="text-end" style="width:160px;">{{ _('Actions') }}</th>
             {% endif %}
@@ -100,6 +101,7 @@
             <td>{{ c.team.name if c.team else '—' }}</td>
             <td>{{ c.team.number if c.team and c.team.number is not none else '—' }}</td>
             <td>{{ c.checkpoint.name if c.checkpoint else '—' }}</td>
+            <td>{{ c.created_by.label if c.created_by else '—' }}</td>
             {% if has_role('judge','admin') %}
             <td class="text-end">
               <a href="{{ url_for('checkins.edit_checkin', checkin_id=c.id) }}"
