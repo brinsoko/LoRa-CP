@@ -293,7 +293,7 @@ def delete_user(user_id: int):
     if not membership:
         flash(_("User not found."), "warning")
         return redirect(url_for("users.list_users"))
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     snapshot = {
         "user_id": user_id,
         "username": user.username if user else None,
@@ -316,7 +316,7 @@ def delete_user(user_id: int):
         CompetitionMember.user_id == user_id
     ).count()
     if remaining == 0:
-        u = User.query.get(user_id)
+        u = db.session.get(User, user_id)
         if u:
             db.session.delete(u)
     db.session.commit()

@@ -161,8 +161,8 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime
     """Set arrived checkbox TRUE for the given team/checkpoint in any linked checkpoint tab."""
     if not sheets_sync_enabled():
         return
-    team = Team.query.get(team_id)
-    checkpoint = Checkpoint.query.get(checkpoint_id)
+    team = db.session.get(Team, team_id)
+    checkpoint = db.session.get(Checkpoint, checkpoint_id)
     if not team or not checkpoint:
         return
 
@@ -236,8 +236,8 @@ def update_checkpoint_scores(team_id: int, checkpoint_id: int, group_name: str, 
     """Update score-related fields for a team in a checkpoint tab based on config layout."""
     if not sheets_sync_enabled():
         return
-    team = Team.query.get(team_id)
-    checkpoint = Checkpoint.query.get(checkpoint_id)
+    team = db.session.get(Team, team_id)
+    checkpoint = db.session.get(Checkpoint, checkpoint_id)
     if not team or not checkpoint:
         return
 
@@ -651,7 +651,7 @@ def build_score_tab(
             lang.get("score_team_header", "Ime ekipe"),
             lang.get("score_org_header", "Rod/Org"),
         ]
-        header.extend([cfg.tab_name for cfg in relevant])
+        header.extend([escape_formula_cell(cfg.tab_name) for cfg in relevant])
         if include_dead_time_sum:
             header.append(lang.get("score_dead_time_sum_header", "Mrtvi čas (sum)"))
         header.append(lang.get("score_total_header", "Skupaj točke"))
@@ -661,7 +661,12 @@ def build_score_tab(
         # For each team, compute row with same column positions
         for t in teams:
             row_idx = len(values) + 1
-            row = [g.name, t.number or "", t.name, t.organization or ""]
+            row = [
+                escape_formula_cell(g.name),
+                t.number or "",
+                escape_formula_cell(t.name),
+                escape_formula_cell(t.organization or ""),
+            ]
             cp_formulas = []
             dead_time_formulas = []
             for cfg in relevant:
@@ -781,7 +786,7 @@ def build_score_tab(
             totals_expr = f"IFERROR({totals_raw}; 0)"
             count_expr = f"=SUMPRODUCT(N(LEN({nums_expr})>0))"
             org_row = [
-                org,
+                escape_formula_cell(org),
                 f"=TEXTJOIN(\", \"; TRUE; {names_expr})",
                 f"=TEXTJOIN(\", \"; TRUE; {nums_expr})",
                 count_expr,
@@ -910,7 +915,7 @@ def wizard_build_checkpoint_tabs(
         _with_retry(client.set_header_row, spreadsheet_id, tab_title, headers)
 
         for grp, start_col in zip(groups_def, group_start_cols):
-            db_group = CheckpointGroup.query.get(grp.get("group_id"))
+            db_group = db.session.get(CheckpointGroup, grp.get("group_id"))
             if not db_group:
                 continue
             if competition_id is not None and db_group.competition_id != competition_id:

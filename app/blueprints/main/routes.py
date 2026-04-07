@@ -10,6 +10,7 @@ from app.utils.competition import get_current_competition_id, get_user_membershi
 from app.utils.perms import roles_required
 from app.utils.redirects import safe_redirect_target
 from app.utils.export_safety import escape_formula_cell
+from app.utils.validators import validate_email, validate_text
 import io, csv
 from datetime import datetime, timedelta
 
@@ -43,9 +44,14 @@ def select_competition():
 @main_bp.route("/competitions/create", methods=["POST"])
 @login_required
 def create_competition():
-    name = (request.form.get("name") or "").strip()
-    if not name:
-        flash(_("Competition name is required."), "warning")
+    name, name_error = validate_text(
+        request.form.get("name"),
+        field_name="Competition name",
+        max_length=160,
+        required=True,
+    )
+    if name_error:
+        flash(_(name_error), "warning")
         return redirect(url_for("main.select_competition"))
 
     existing = Competition.query.filter_by(name=name).first()
@@ -196,10 +202,10 @@ def competition_settings():
     if request.method == "POST":
         action = request.form.get("action") or "settings"
         if action == "invite":
-            email = (request.form.get("invite_email") or "").strip().lower()
+            email, email_error = validate_email(request.form.get("invite_email"))
             role = (request.form.get("invite_role") or "judge").strip().lower()
-            if not email or "@" not in email:
-                flash(_("Valid email is required."), "warning")
+            if email_error or not email:
+                flash(_(email_error or "Valid email is required."), "warning")
                 return redirect(url_for("main.competition_settings"))
             if role not in ("viewer", "judge", "admin"):
                 flash(_("Invalid role selected."), "warning")
@@ -278,9 +284,14 @@ def competition_settings():
             "public_results": competition.public_results,
             "has_ingest_password": bool(competition.ingest_password_hash),
         }
-        new_name = (request.form.get("name") or "").strip()
-        if not new_name:
-            flash(_("Competition name is required."), "warning")
+        new_name, name_error = validate_text(
+            request.form.get("name"),
+            field_name="Competition name",
+            max_length=160,
+            required=True,
+        )
+        if name_error:
+            flash(_(name_error), "warning")
             return redirect(url_for("main.competition_settings"))
         existing = (
             Competition.query

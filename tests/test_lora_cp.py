@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import Checkin, Checkpoint, CompetitionMember, LoRaDevice, RFIDCard, Team, User
+from app.models import Checkin, Checkpoint, Competition, CompetitionMember, LoRaDevice, RFIDCard, Team, User
 from tests.support import (
     add_membership,
     assign_team_group,
@@ -357,11 +357,11 @@ class TestHtmlFlows:
         login_as(client, user)
 
         response = client.post("/competitions/create", data={"name": "Created Race"}, follow_redirects=True)
-        competition = create_competition  # type: ignore[assignment]
+        competition = Competition.query.filter_by(name="Created Race").first()
 
         assert response.status_code == 200
-        assert Team.query.count() == 0
-        assert User.query.filter_by(username="competition-admin").one() is not None
+        assert competition is not None
+        assert CompetitionMember.query.filter_by(user_id=user.id, competition_id=competition.id, role="admin").count() == 1
 
     def test_delete_competition_as_superadmin(self, client, app):
         user = create_user(username="super-user", role="superadmin")
@@ -373,7 +373,7 @@ class TestHtmlFlows:
         response = client.post("/competition/delete", follow_redirects=True)
 
         assert response.status_code == 200
-        assert db.session.get(Checkpoint, competition.id) is None or True
+        assert db.session.get(Competition, competition.id) is None
         assert Team.query.filter_by(competition_id=competition.id).count() == 0
 
     def test_team_add_edit_delete_routes(self, client, app):
@@ -534,8 +534,7 @@ class TestHtmlFlows:
         user = create_user(username="finish-judge")
         competition = create_competition(name="Finish Race")
         add_membership(user, competition, role="judge")
-        checkpoint = create_checkpoint(competition, name="Finish Gate")
-        assign_team_group  # keep import used
+        create_checkpoint(competition, name="Finish Gate")
         login_as(client, user, competition)
 
         response = client.get("/rfid/finish")

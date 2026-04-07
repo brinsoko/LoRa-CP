@@ -44,6 +44,9 @@ class User(UserMixin, db.Model):
     def check_password(self, raw: str) -> bool:
         return check_password_hash(self.password_hash, raw)
 
+    def __repr__(self) -> str:
+        return f"<User id={self.id} username={self.username!r} role={self.role!r}>"
+
 
 # =================
 # Competition
@@ -115,6 +118,9 @@ class Competition(db.Model):
         if not self.ingest_password_hash:
             return False
         return check_password_hash(self.ingest_password_hash, (raw or "").strip())
+
+    def __repr__(self) -> str:
+        return f"<Competition id={self.id} name={self.name!r}>"
 
 
 class CompetitionMember(db.Model):
@@ -241,6 +247,9 @@ class Team(db.Model):
         CheckConstraint("number IS NULL OR number > 0", name="ck_team_number_positive"),
     )
 
+    def __repr__(self) -> str:
+        return f"<Team id={self.id} comp={self.competition_id} number={self.number} name={self.name!r}>"
+
 
 # ==============
 # RFIDCard
@@ -264,6 +273,9 @@ class RFIDCard(db.Model):
     __table_args__ = (
         CheckConstraint("number IS NULL OR number > 0", name="ck_rfid_number_positive"),
     )
+
+    def __repr__(self) -> str:
+        return f"<RFIDCard id={self.id} uid={self.uid!r} team_id={self.team_id}>"
 
 
 # ====================
@@ -303,6 +315,9 @@ class CheckpointGroup(db.Model):
     __table_args__ = (
         UniqueConstraint("competition_id", "name", name="uq_checkpoint_group_competition_name"),
     )
+
+    def __repr__(self) -> str:
+        return f"<CheckpointGroup id={self.id} comp={self.competition_id} name={self.name!r}>"
 
 
 # ============
@@ -349,6 +364,9 @@ class Checkpoint(db.Model):
     __table_args__ = (
         UniqueConstraint("competition_id", "name", name="uq_checkpoint_competition_name"),
     )
+
+    def __repr__(self) -> str:
+        return f"<Checkpoint id={self.id} comp={self.competition_id} name={self.name!r}>"
 
 class CheckpointGroupLink(db.Model):
     __tablename__ = "checkpoint_group_links"
@@ -412,6 +430,12 @@ class Checkin(db.Model):
     __table_args__ = (
         db.UniqueConstraint("team_id", "checkpoint_id", name="uq_team_checkpoint"),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<Checkin id={self.id} comp={self.competition_id} team_id={self.team_id} "
+            f"checkpoint_id={self.checkpoint_id}>"
+        )
 
 
 # =========================
@@ -480,6 +504,9 @@ class LoRaDevice(db.Model):
     __table_args__ = (
         UniqueConstraint("competition_id", "dev_num", name="uq_device_competition_devnum"),
     )
+
+    def __repr__(self) -> str:
+        return f"<LoRaDevice id={self.id} comp={self.competition_id} dev_num={self.dev_num} name={self.name!r}>"
 
 class LoRaMessage(db.Model):
     __tablename__ = "lora_messages"

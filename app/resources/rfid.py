@@ -314,16 +314,20 @@ class RFIDBulkImportResource(Resource):
             card = RFIDCard.query.filter_by(uid=uid).first()
             is_new = False
             if not card:
+                if not team_id:
+                    skipped += 1
+                    errors.append({"row": idx, "detail": "Missing team_id or team_name"})
+                    continue
                 card = RFIDCard(uid=uid)
-                db.session.add(card)
                 is_new = True
 
             if team_id:
-                conflict = (
-                    RFIDCard.query
-                    .filter(RFIDCard.team_id == team_id, RFIDCard.id != card.id)
-                    .first()
-                )
+                with db.session.no_autoflush:
+                    conflict = (
+                        RFIDCard.query
+                        .filter(RFIDCard.team_id == team_id, RFIDCard.id != card.id)
+                        .first()
+                    )
                 if conflict:
                     skipped += 1
                     errors.append({"row": idx, "detail": "Team already has a card"})
@@ -331,6 +335,8 @@ class RFIDBulkImportResource(Resource):
                     continue
                 card.team_id = team_id
             card.number = number
+            if is_new:
+                db.session.add(card)
 
             try:
                 db.session.flush()

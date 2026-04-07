@@ -138,7 +138,7 @@ def get_current_competition() -> Competition | None:
     comp_id = get_current_competition_id()
     if not comp_id:
         return None
-    return Competition.query.get(comp_id)
+    return db.session.get(Competition, comp_id)
 
 
 def get_current_membership(user_id: int | None = None) -> CompetitionMember | None:

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import json
+import csv
+import importlib
+from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
 from app.extensions import db
-from app.models import Checkin, Checkpoint, JudgeCheckpoint, LoRaMessage, Team
+from app.models import Checkin, LoRaMessage
+from app.utils import serial_helpers, sheets_sync
 from app.utils.card_tokens import compute_card_digest, match_digests
 from tests.support import (
     add_membership,
@@ -44,6 +48,77 @@ class TestCardDigestHelpers:
         assert rows == [{"digest": digest, "matches": [11]}]
 
 
+class TestSerialHelpers:
+    def test_find_serial_port_prefers_hint(self, monkeypatch):
+        ports = [
+            SimpleNamespace(device="/dev/cu.usbmodem-a", description="USB Modem A", manufacturer="Acme"),
+            SimpleNamespace(device="/dev/cu.reader-b", description="RFID Reader B", manufacturer="Brin"),
+        ]
+        monkeypatch.setattr(serial_helpers.list_ports, "comports", lambda: ports)
+
+        assert serial_helpers.find_serial_port("reader b") == "/dev/cu.reader-b"
+
+    def test_read_uid_once_normalizes_reader_output(self, monkeypatch):
+        class FakeSerial:
+            def __init__(self, port, baudrate, timeout):
+                self.port = port
+                self.baudrate = baudrate
+                self.timeout = timeout
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def readline(self):
+                return b"tag=aa-bb-cc-dd\r\n"
+
+        monkeypatch.setattr(serial_helpers, "find_serial_port", lambda hint="": "/dev/ttyUSB0")
+        monkeypatch.setattr(serial_helpers.serial, "Serial", FakeSerial)
+
+        assert serial_helpers.read_uid_once(9600, "rfid", 1.0) == "AABBCCDD"
+
+
+class TestConfigHardening:
+    def test_default_secret_key_is_dev_only(self, monkeypatch):
+        import config as config_module
+
+        monkeypatch.setenv("FLASK_ENV", "development")
+        monkeypatch.delenv("SECRET_KEY", raising=False)
+        monkeypatch.delenv("LORA_WEBHOOK_SECRET", raising=False)
+        reloaded = importlib.reload(config_module)
+
+        assert reloaded.Config.SECRET_KEY == "dev-secret"
+        assert reloaded.Config.LORA_WEBHOOK_SECRET == "CHANGE_LATER"
+
+    def test_production_requires_secret_key(self, monkeypatch):
+        import config as config_module
+
+        monkeypatch.setenv("FLASK_ENV", "production")
+        monkeypatch.delenv("SECRET_KEY", raising=False)
+        monkeypatch.setenv("LORA_WEBHOOK_SECRET", "webhook-secret")
+        with pytest.raises(SystemExit):
+            importlib.reload(config_module)
+
+        monkeypatch.setenv("FLASK_ENV", "development")
+        importlib.reload(config_module)
+
+    def test_production_requires_non_default_webhook_secret(self, monkeypatch):
+        import config as config_module
+
+        monkeypatch.setenv("FLASK_ENV", "production")
+        monkeypatch.setenv("SECRET_KEY", "prod-secret")
+        monkeypatch.setenv("LORA_WEBHOOK_SECRET", "CHANGE_LATER")
+        with pytest.raises(SystemExit):
+            importlib.reload(config_module)
+
+        monkeypatch.setenv("FLASK_ENV", "development")
+        monkeypatch.delenv("SECRET_KEY", raising=False)
+        monkeypatch.delenv("LORA_WEBHOOK_SECRET", raising=False)
+        importlib.reload(config_module)
+
+
 class TestDocsAndConfig:
     def test_config_exposes_supported_languages(self, app):
         assert app.config["BABEL_DEFAULT_LOCALE"] == "en"
@@ -71,8 +146,18 @@ class TestDocsAndConfig:
         data = response.data.lower()
         assert b"swagger" in data or b"openapi" in data
 
+    def test_openapi_structure_includes_core_paths_and_schemas(self, client, app):
+        response = client.get("/docs/openapi.json")
+        spec = response.get_json()
 
-class TestLocaleRoutes:
+        assert response.status_code == 200
+        assert "/api/ingest" in spec["paths"]
+        assert "/api/rfid/verify" in spec["paths"]
+        assert "/api/devices" in spec["paths"]
+        assert spec["components"]["schemas"]
+
+
+class TestLocaleAndRedirectSecurity:
     def test_set_language_to_slovenian(self, client, app):
         response = client.get("/lang/sl")
         assert response.status_code == 302
@@ -82,6 +167,93 @@ class TestLocaleRoutes:
     def test_unknown_language_returns_404(self, client, app):
         response = client.get("/lang/xx")
         assert response.status_code == 404
+
+    def test_language_switch_blocks_external_redirects(self, client, app):
+        response = client.get("/lang/sl?next=https://attacker.example", follow_redirects=False)
+
+        assert response.status_code == 302
+        assert response.headers["Location"] == "/"
+
+    def test_google_oauth_callback_blocks_external_redirects(self, app_factory, monkeypatch):
+        application = app_factory(
+            GOOGLE_OAUTH_CLIENT_ID="client-id",
+            GOOGLE_OAUTH_CLIENT_SECRET="client-secret",
+        )
+        client = application.test_client()
+
+        class FakeTokenResponse:
+            status_code = 200
+
+            def json(self):
+                return {"id_token": "signed-token"}
+
+        monkeypatch.setattr(
+            "app.blueprints.auth.routes.requests.post",
+            lambda *args, **kwargs: FakeTokenResponse(),
+        )
+        monkeypatch.setattr(
+            "app.blueprints.auth.routes.id_token.verify_oauth2_token",
+            lambda *args, **kwargs: {"sub": "google-sub-1", "email": "oauth@example.com"},
+        )
+
+        with client.session_transaction() as sess:
+            sess["google_oauth_state"] = "state-123"
+            sess["google_oauth_next"] = "https://attacker.example/path"
+
+        response = client.get(
+            "/login/google/callback?state=state-123&code=oauth-code",
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/competitions")
+        assert "attacker.example" not in response.headers["Location"]
+
+
+class TestWebhookSecurity:
+    def test_ingest_rejects_missing_webhook_secret_header(self, app_factory):
+        application = app_factory(LORA_WEBHOOK_SECRET="webhook-secret")
+        client = application.test_client()
+        with application.app_context():
+            competition_id = create_competition(name="Webhook Race").id
+
+        response = client.post(
+            "/api/ingest",
+            json={"competition_id": competition_id, "dev_id": 1, "payload": "AABBCCDD"},
+        )
+        body = response.get_json()
+
+        assert response.status_code == 403
+        assert body["error"] == "forbidden"
+
+    def test_ingest_rejects_wrong_webhook_secret_header(self, app_factory):
+        application = app_factory(LORA_WEBHOOK_SECRET="webhook-secret")
+        client = application.test_client()
+        with application.app_context():
+            competition_id = create_competition(name="Webhook Race 2").id
+
+        response = client.post(
+            "/api/ingest",
+            json={"competition_id": competition_id, "dev_id": 1, "payload": "AABBCCDD"},
+            headers={"X-Webhook-Secret": "wrong-secret"},
+        )
+
+        assert response.status_code == 403
+
+    def test_ingest_accepts_correct_webhook_secret_header(self, app_factory):
+        application = app_factory(LORA_WEBHOOK_SECRET="webhook-secret")
+        client = application.test_client()
+        with application.app_context():
+            competition_id = create_competition(name="Webhook Allowed Race").id
+
+        response = client.post(
+            "/api/ingest",
+            json={"competition_id": competition_id, "dev_id": 33, "payload": "AABBCCDD"},
+            headers={"X-Webhook-Secret": "webhook-secret"},
+        )
+
+        assert response.status_code == 201
+        assert response.get_json()["ok"] is True
 
 
 class TestVerificationAndMessages:
@@ -128,6 +300,37 @@ class TestVerificationAndMessages:
         assert response.status_code == 200
         assert body["unknown"] == ["deadbeef"]
         assert body["team"] is None
+
+    def test_rfid_verify_rejects_invalid_checkpoint_id_list(self, client, app):
+        admin = create_user(username="verify-invalid-admin")
+        competition = create_competition(name="Verify Invalid Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+        create_checkpoint(competition, name="Any CP")
+
+        response = client.post(
+            "/api/rfid/verify",
+            json={"uid": "VERIFY99", "digests": [], "checkpoint_ids": ["abc"]},
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()["detail"] == "checkpoint_ids must be integers"
+
+    def test_finish_console_shows_only_assigned_checkpoints(self, client, app):
+        judge = create_user(username="finish-judge")
+        competition = create_competition(name="Finish Assignment Race")
+        add_membership(judge, competition, role="judge")
+        first = create_checkpoint(competition, name="Finish A")
+        second = create_checkpoint(competition, name="Finish B")
+        assign_judge_checkpoint(judge, first, is_default=True)
+        login_as(client, judge, competition)
+
+        response = client.get("/rfid/finish")
+        html = response.data.decode("utf-8", errors="replace")
+
+        assert response.status_code == 200
+        assert "Finish A" in html
+        assert "Finish B" not in html
 
     def test_messages_endpoint_returns_pagination_meta(self, client, app):
         admin = create_user(username="message-admin")
@@ -195,24 +398,59 @@ class TestCsvAndIsolation:
         assert response.status_code == 200
         assert lines == ["timestamp_utc,team_id,team_name,team_number,checkpoint_id,checkpoint_name"]
 
-    def test_csv_export_team_sort_orders_by_team_name(self, client, app):
-        admin = create_user(username="csv-sort-admin")
-        competition = create_competition(name="CSV Sort Race")
+    def test_api_checkin_export_orders_oldest_first(self, client, app):
+        admin = create_user(username="csv-order-admin")
+        competition = create_competition(name="CSV Order Race")
         add_membership(admin, competition, role="admin")
         login_as(client, admin, competition)
 
-        checkpoint = create_checkpoint(competition, name="Sort CP")
-        alpha = create_team(competition, name="Alpha", number=2)
-        zulu = create_team(competition, name="Zulu", number=1)
-        create_checkin(competition, zulu, checkpoint)
-        create_checkin(competition, alpha, checkpoint)
+        checkpoint = create_checkpoint(competition, name="Order CP")
+        older_team = create_team(competition, name="Older Team", number=1)
+        newer_team = create_team(competition, name="Newer Team", number=2)
+        create_checkin(
+            competition,
+            older_team,
+            checkpoint,
+            timestamp=datetime.utcnow() - timedelta(hours=1),
+        )
+        create_checkin(
+            competition,
+            newer_team,
+            checkpoint,
+            timestamp=datetime.utcnow(),
+        )
 
-        response = client.get("/checkins/export.csv?sort=team")
-        lines = response.data.decode("utf-8").splitlines()
+        response = client.get("/api/checkins/export.csv?sort=old")
+        rows = list(csv.reader(response.data.decode("utf-8").splitlines()))
 
         assert response.status_code == 200
-        assert "Alpha" in lines[1]
-        assert "Zulu" in lines[2]
+        assert rows[0] == [
+            "timestamp_utc",
+            "team_id",
+            "team_name",
+            "team_number",
+            "checkpoint_id",
+            "checkpoint_name",
+        ]
+        assert rows[1][2] == "Older Team"
+        assert rows[2][2] == "Newer Team"
+
+    def test_csv_export_escapes_formula_cells(self, client, app):
+        admin = create_user(username="csv-escape-admin")
+        competition = create_competition(name="CSV Escape Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        checkpoint = create_checkpoint(competition, name="=Danger")
+        team = create_team(competition, name="+Malicious", number=4)
+        create_checkin(competition, team, checkpoint)
+
+        response = client.get("/api/checkins/export.csv")
+        rows = list(csv.reader(response.data.decode("utf-8").splitlines()))
+
+        assert response.status_code == 200
+        assert rows[1][2] == "'+Malicious"
+        assert rows[1][5] == "'=Danger"
 
     def test_viewer_can_read_but_not_write(self, client, app):
         viewer = create_user(username="viewer-user")
@@ -242,6 +480,32 @@ class TestCsvAndIsolation:
         assert response.status_code == 200
         assert "Visible Team" in html
         assert "Hidden Team" not in html
+
+    def test_multi_competition_role_isolation_blocks_viewer_writes(self, client, app):
+        user = create_user(username="isolated-user")
+        admin_comp = create_competition(name="Writable Race")
+        viewer_comp = create_competition(name="Read Only Race")
+        add_membership(user, admin_comp, role="admin")
+        add_membership(user, viewer_comp, role="viewer")
+        admin_team = create_team(admin_comp, name="Writable Team", number=1)
+        admin_cp = create_checkpoint(admin_comp, name="Writable CP")
+        viewer_team = create_team(viewer_comp, name="Read Team", number=2)
+        viewer_cp = create_checkpoint(viewer_comp, name="Read CP")
+
+        login_as(client, user, viewer_comp)
+        denied = client.post(
+            "/api/checkins",
+            json={"team_id": viewer_team.id, "checkpoint_id": viewer_cp.id},
+        )
+
+        login_as(client, user, admin_comp)
+        allowed = client.post(
+            "/api/checkins",
+            json={"team_id": admin_team.id, "checkpoint_id": admin_cp.id},
+        )
+
+        assert denied.status_code == 403
+        assert allowed.status_code == 201
 
 
 class TestJudgeAssignments:
@@ -279,6 +543,109 @@ class TestJudgeAssignments:
         assert response.status_code == 200
         assert "Default Gate" in html
 
+    def test_judge_cannot_submit_unassigned_checkpoint(self, client, app):
+        judge = create_user(username="guarded-judge")
+        competition = create_competition(name="Judge Guard Race")
+        add_membership(judge, competition, role="judge")
+        allowed_cp = create_checkpoint(competition, name="Allowed CP")
+        denied_cp = create_checkpoint(competition, name="Denied CP")
+        team = create_team(competition, name="Assigned Team", number=9)
+        assign_judge_checkpoint(judge, allowed_cp, is_default=True)
+        login_as(client, judge, competition)
+
+        response = client.post(
+            "/api/checkins",
+            json={"team_id": team.id, "checkpoint_id": denied_cp.id},
+        )
+
+        assert response.status_code == 403
+        assert response.get_json()["detail"] == "Checkpoint is not assigned to the current judge."
+
+
+class TestValidationAndSecurity:
+    def test_create_user_rejects_invalid_username(self, client, app):
+        admin = create_user(username="user-admin")
+        competition = create_competition(name="User Validation Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        response = client.post(
+            "/api/users",
+            json={"username": "bad user!", "password": "secret123", "role": "judge"},
+        )
+
+        assert response.status_code == 400
+        assert "username may contain only" in response.get_json()["error"]
+
+    def test_team_api_rejects_overlong_name(self, client, app):
+        admin = create_user(username="team-validation-admin")
+        competition = create_competition(name="Team Validation Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        response = client.post("/api/teams", json={"name": "T" * 101})
+
+        assert response.status_code == 400
+        assert response.get_json()["detail"] == "name must be at most 100 characters"
+
+    def test_group_api_rejects_control_characters(self, client, app):
+        admin = create_user(username="group-validation-admin")
+        competition = create_competition(name="Group Validation Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        response = client.post(
+            "/api/groups",
+            json={"name": "Group Name", "description": "bad\x01value"},
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()["detail"] == "description contains invalid control characters"
+
+    def test_checkpoint_api_rejects_overlong_location(self, client, app):
+        admin = create_user(username="checkpoint-validation-admin")
+        competition = create_competition(name="Checkpoint Validation Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        response = client.post(
+            "/api/checkpoints",
+            json={"name": "Valid Name", "location": "L" * 256},
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()["detail"] == "location must be at most 255 characters"
+
+    def test_device_api_rejects_control_characters_in_note(self, client, app):
+        admin = create_user(username="device-validation-admin")
+        competition = create_competition(name="Device Validation Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        response = client.post(
+            "/api/devices",
+            json={"dev_num": 77, "name": "Valid Device", "note": "bad\x01note"},
+        )
+
+        assert response.status_code == 400
+        assert "note contains invalid control characters" in response.get_json()["detail"]
+
+    def test_checkpoint_bulk_import_rejects_invalid_name(self, client, app):
+        admin = create_user(username="checkpoint-bulk-admin")
+        competition = create_competition(name="Checkpoint Bulk Validation Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        response = client.post(
+            "/api/checkpoints/import",
+            json={"items": [{"name": "N" * 121}]},
+        )
+        body = response.get_json()
+
+        assert response.status_code == 200
+        assert body["summary"]["skipped"] == 1
+        assert body["errors"][0]["detail"] == "name must be at most 120 characters"
+
 
 class TestGroupsAndSheets:
     def test_group_page_uses_current_group_model(self, client, app):
@@ -311,3 +678,49 @@ class TestGroupsAndSheets:
         assert response.status_code == 200
         assert "traceback" not in html
 
+    def test_mark_arrival_checkbox_is_noop_when_sync_disabled(self, app_factory, monkeypatch):
+        application = app_factory(SHEETS_SYNC_ENABLED=False)
+
+        def fail_if_called(*args, **kwargs):
+            raise AssertionError("SheetsClient should not be constructed when sync is disabled")
+
+        monkeypatch.setattr(sheets_sync, "SheetsClient", fail_if_called)
+
+        with application.app_context():
+            competition = create_competition(name="Sheets Guard Race")
+            team = create_team(competition, name="Sheets Team", number=5)
+            checkpoint = create_checkpoint(competition, name="Sheets CP")
+
+            sheets_sync.mark_arrival_checkbox(team.id, checkpoint.id)
+
+
+class TestRegressions:
+    def test_ingest_creates_messages_in_target_competition_only(self, client, app):
+        first = create_competition(name="Msg Race A")
+        second = create_competition(name="Msg Race B")
+        create_checkpoint(first, name="CP A", lora_device=create_device(first, dev_num=44, name="Dev44-A"))
+        create_checkpoint(second, name="CP B", lora_device=create_device(second, dev_num=44, name="Dev44-B"))
+
+        response = client.post(
+            "/api/ingest",
+            json={"competition_id": second.id, "dev_id": 44, "payload": "UNKNOWN"},
+        )
+
+        assert response.status_code == 201
+        assert LoRaMessage.query.filter_by(competition_id=first.id).count() == 0
+        assert LoRaMessage.query.filter_by(competition_id=second.id).count() == 1
+
+    def test_competition_delete_cascades_checkins(self, client, app):
+        user = create_user(username="cascade-super", role="superadmin")
+        competition = create_competition(name="Cascade Race", created_by_user=user)
+        add_membership(user, competition, role="admin")
+        team = create_team(competition, name="Cascade Team", number=1)
+        checkpoint = create_checkpoint(competition, name="Cascade CP")
+        checkin = create_checkin(competition, team, checkpoint)
+        checkin_id = checkin.id
+        login_as(client, user, competition)
+
+        response = client.post("/competition/delete", follow_redirects=True)
+
+        assert response.status_code == 200
+        assert db.session.get(Checkin, checkin_id) is None

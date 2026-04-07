@@ -11,6 +11,7 @@ from app.models import LoRaDevice, Checkpoint
 from app.utils.audit import record_audit_event
 from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.competition import require_current_competition_id
+from app.utils.validators import validate_text
 
 
 def _serialize_device(device: LoRaDevice) -> dict:
@@ -51,15 +52,29 @@ def _parse_device_payload(payload: dict, *, for_update: bool = False) -> tuple[d
 
     if "name" in payload or not for_update:
         name = payload.get("name")
-        data["name"] = name.strip() if isinstance(name, str) else None
+        cleaned_name, name_error = validate_text(name, field_name="name", max_length=120)
+        if name_error:
+            errors.append(name_error)
+        data["name"] = cleaned_name
 
     if "note" in payload or not for_update:
         note = payload.get("note")
-        data["note"] = note.strip() if isinstance(note, str) else None
+        cleaned_note, note_error = validate_text(
+            note,
+            field_name="note",
+            max_length=2000,
+            multiline=True,
+        )
+        if note_error:
+            errors.append(note_error)
+        data["note"] = cleaned_note
 
     if "model" in payload or not for_update:
         model = payload.get("model")
-        data["model"] = model.strip() if isinstance(model, str) else None
+        cleaned_model, model_error = validate_text(model, field_name="model", max_length=64)
+        if model_error:
+            errors.append(model_error)
+        data["model"] = cleaned_model
 
     if "active" in payload:
         data["active"] = bool(payload.get("active"))

@@ -391,10 +391,34 @@ class CheckpointImportResource(Resource):
                 errors.append({"index": idx, "detail": "Item is not an object"})
                 continue
 
-            name = (item.get("name") or "").strip()
-            if not name:
+            name, name_error = validate_text(
+                item.get("name"),
+                field_name="name",
+                max_length=120,
+                required=True,
+            )
+            if name_error:
                 skipped += 1
-                errors.append({"index": idx, "detail": "name is required"})
+                errors.append({"index": idx, "detail": name_error})
+                continue
+            location, location_error = validate_text(
+                item.get("location"),
+                field_name="location",
+                max_length=255,
+            )
+            if location_error:
+                skipped += 1
+                errors.append({"index": idx, "detail": location_error})
+                continue
+            description, description_error = validate_text(
+                item.get("description"),
+                field_name="description",
+                max_length=2000,
+                multiline=True,
+            )
+            if description_error:
+                skipped += 1
+                errors.append({"index": idx, "detail": description_error})
                 continue
 
             action = (item.get("action") or "upsert").lower()
@@ -420,8 +444,10 @@ class CheckpointImportResource(Resource):
                 db.session.flush()
                 is_new = True
 
-            cp.location = (item.get("location") or "").strip() or cp.location
-            cp.description = (item.get("description") or "").strip() or cp.description
+            if location is not None:
+                cp.location = location
+            if description is not None:
+                cp.description = description
 
             if "easting" in item and item["easting"] not in (None, ""):
                 try:

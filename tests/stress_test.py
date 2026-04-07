@@ -36,6 +36,8 @@ Requirements
 """
 
 import argparse
+import hashlib
+import hmac
 import json
 import math
 import os
@@ -83,13 +85,13 @@ except ImportError:
 # Configuration & constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_BASE_URL    = "http://127.0.0.1:5001"
-DEFAULT_WORKERS     = 10
-DEFAULT_INGEST_RPS  = 20       # target requests per second
+DEFAULT_BASE_URL    = "https://brinsoko.duckdns.org"
+DEFAULT_WORKERS     = 30
+DEFAULT_INGEST_RPS  = 150       # target requests per second
 DEFAULT_DURATION    = 30       # seconds of sustained load
 DEFAULT_RAMP_UP     = 5        # seconds to ramp from 0 → target RPS
 DEFAULT_COMPETITION = 1
-DEFAULT_HMAC_LEN    = 8
+DEFAULT_HMAC_LEN    = int(os.getenv("DEVICE_CARD_HMAC_LEN", "12"))
 
 INGEST_PATH  = "/api/ingest"
 VERIFY_PATH  = "/api/rfid/verify"
@@ -189,6 +191,26 @@ def _random_dev_id(pool: List[int]) -> int:
     return random.choice(pool) if pool else random.randint(1, 10)
 
 
+def _default_card_secret() -> str:
+    return (
+        os.getenv("DEVICE_CARD_SECRET")
+        or os.getenv("SECRET_KEY")
+        or "dev-secret"
+    )
+
+
+def _build_verify_payload(uid: str, dev_ids: List[int], card_secret: str, hmac_len: int) -> dict:
+    digests = []
+    for dev_id in dev_ids:
+        raw = hmac.new(
+            card_secret.encode(),
+            f"{dev_id}|{uid}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        digests.append(raw[:hmac_len])
+    return {"uid": uid, "digests": digests, "device_ids": dev_ids}
+
+
 # ---------------------------------------------------------------------------
 # Individual scenario workers
 # ---------------------------------------------------------------------------
@@ -200,7 +222,8 @@ class IngestWorker:
                  competition_id: int, dev_id_pool: List[int],
                  uid_pool: List[str], results: List[RequestResult],
                  lock: threading.Lock, stop_event: threading.Event,
-                 target_interval: float):
+                 target_interval: float,
+                 ingest_password: Optional[str] = None):
         self.base_url        = base_url.rstrip("/")
         self.session         = session
         self.competition_id  = competition_id
@@ -210,6 +233,7 @@ class IngestWorker:
         self.lock            = lock
         self.stop            = stop_event
         self.target_interval = target_interval  # seconds between requests
+        self.ingest_password = ingest_password
 
     def run(self):
         url = self.base_url + INGEST_PATH
@@ -223,6 +247,8 @@ class IngestWorker:
                 "rssi":           round(random.uniform(-120, -40), 1),
                 "snr":            round(random.uniform(-5, 15), 1),
             }
+            if self.ingest_password:
+                payload["ingest_password"] = self.ingest_password
             t0 = time.monotonic()
             try:
                 resp = self.session.post(url, json=payload, timeout=10)
@@ -286,7 +312,9 @@ class VerifyWorker:
                  competition_id: int, dev_id_pool: List[int],
                  uid_pool: List[str], results: List[RequestResult],
                  lock: threading.Lock, stop_event: threading.Event,
-                 interval: float = 1.0):
+                 interval: float = 1.0,
+                 card_secret: str = "dev-secret",
+                 hmac_len: int = DEFAULT_HMAC_LEN):
         self.base_url       = base_url.rstrip("/")
         self.session        = session
         self.competition_id = competition_id
@@ -296,22 +324,15 @@ class VerifyWorker:
         self.lock           = lock
         self.stop           = stop_event
         self.interval       = interval
+        self.card_secret    = card_secret
+        self.hmac_len       = hmac_len
 
     def run(self):
-        import hashlib, hmac as _hmac
-        secret = "card-secret"   # default – override via CLI if different
         url    = self.base_url + VERIFY_PATH
         while not self.stop.is_set():
             uid     = random.choice(self.uid_pool)
             dev_ids = random.sample(self.dev_id_pool, min(3, len(self.dev_id_pool)))
-            digests = []
-            for d in dev_ids:
-                raw = _hmac.new(secret.encode(),
-                                f"{d}|{uid}".encode(),
-                                hashlib.sha256).hexdigest()
-                digests.append(raw[:DEFAULT_HMAC_LEN])
-
-            body = {"uid": uid, "digests": digests, "device_ids": dev_ids}
+            body = _build_verify_payload(uid, dev_ids, self.card_secret, self.hmac_len)
             t0   = time.monotonic()
             try:
                 resp = self.session.post(url, json=body, timeout=10)
@@ -589,6 +610,132 @@ def _preflight(base_url: str, session: requests.Session) -> bool:
         return False
 
 
+def _discover_device_pool(base_url: str, session: requests.Session) -> List[int]:
+    try:
+        resp = session.get(base_url.rstrip("/") + "/api/devices", timeout=8)
+    except Exception as exc:
+        console.print(f"  [yellow]Could not query /api/devices: {exc}[/yellow]")
+        return []
+
+    if resp.status_code != 200:
+        console.print(
+            f"  [yellow]/api/devices preflight returned HTTP {resp.status_code}; "
+            "falling back to configured device IDs.[/yellow]"
+        )
+        return []
+
+    try:
+        payload = resp.json() or {}
+    except Exception:
+        console.print("  [yellow]/api/devices did not return valid JSON; using configured device IDs.[/yellow]")
+        return []
+
+    devices = []
+    for row in payload.get("devices", []):
+        dev_num = row.get("dev_num")
+        try:
+            if dev_num is not None:
+                devices.append(int(dev_num))
+        except Exception:
+            continue
+    return sorted(set(devices))
+
+
+def _warm_verify_scope(
+    base_url: str,
+    session: requests.Session,
+    competition_id: int,
+    dev_id_pool: List[int],
+    uid_pool: List[str],
+    ingest_password: Optional[str] = None,
+) -> None:
+    if not dev_id_pool or not uid_pool:
+        return
+    warm_payload = {
+        "competition_id": competition_id,
+        "dev_id": dev_id_pool[0],
+        "payload": uid_pool[0],
+    }
+    if ingest_password:
+        warm_payload["ingest_password"] = ingest_password
+    try:
+        session.post(base_url.rstrip("/") + INGEST_PATH, json=warm_payload, timeout=8)
+    except Exception as exc:
+        console.print(f"  [yellow]Warm-up ingest failed: {exc}[/yellow]")
+
+
+def _preflight_ingest(
+    base_url: str,
+    session: requests.Session,
+    competition_id: int,
+    dev_id_pool: List[int],
+    uid_pool: List[str],
+    ingest_password: Optional[str] = None,
+) -> tuple[bool, str]:
+    if not dev_id_pool:
+        return False, "No device IDs available for ingest preflight."
+    if not uid_pool:
+        return False, "No UIDs available for ingest preflight."
+
+    body = {
+        "competition_id": competition_id,
+        "dev_id": dev_id_pool[0],
+        "payload": uid_pool[0],
+    }
+    if ingest_password:
+        body["ingest_password"] = ingest_password
+
+    try:
+        resp = session.post(base_url.rstrip("/") + INGEST_PATH, json=body, timeout=10)
+    except Exception as exc:
+        return False, f"Ingest preflight request failed: {exc}"
+
+    if resp.status_code in (200, 201):
+        return True, "ok"
+
+    detail = ""
+    try:
+        payload = resp.json()
+        detail = payload.get("detail") or payload.get("error") or ""
+    except Exception:
+        detail = resp.text[:200].strip()
+    return False, f"HTTP {resp.status_code} {detail}".strip()
+
+
+def _preflight_verify(
+    base_url: str,
+    session: requests.Session,
+    dev_id_pool: List[int],
+    uid_pool: List[str],
+    card_secret: str,
+    hmac_len: int,
+) -> tuple[bool, str]:
+    if not dev_id_pool:
+        return False, "No device IDs available for verify preflight."
+    if not uid_pool:
+        return False, "No UIDs available for verify preflight."
+
+    sample_ids = dev_id_pool[: min(3, len(dev_id_pool))]
+    sample_uid = uid_pool[0]
+    body = _build_verify_payload(sample_uid, sample_ids, card_secret, hmac_len)
+
+    try:
+        resp = session.post(base_url.rstrip("/") + VERIFY_PATH, json=body, timeout=10)
+    except Exception as exc:
+        return False, f"Verify preflight request failed: {exc}"
+
+    if resp.status_code == 200:
+        return True, "ok"
+
+    detail = ""
+    try:
+        payload = resp.json()
+        detail = payload.get("detail") or payload.get("error") or ""
+    except Exception:
+        detail = resp.text[:200].strip()
+    return False, f"HTTP {resp.status_code} {detail}".strip()
+
+
 # ---------------------------------------------------------------------------
 # Seed data helpers (optional – prepopulate fake devices/UIDs when no real data)
 # ---------------------------------------------------------------------------
@@ -620,13 +767,64 @@ def run_stress_test(args):
 
     # ── Pools ──────────────────────────────────────────────────────────────
     uid_pool    = _seed_uid_pool(args.uid_pool_size)
-    dev_id_pool = _seed_dev_id_pool(args.dev_id_start, args.dev_id_count)
+    discovered_dev_ids = _discover_device_pool(args.base_url, session)
+    dev_id_pool = discovered_dev_ids or _seed_dev_id_pool(args.dev_id_start, args.dev_id_count)
+    verify_workers = args.verify_workers
+
+    if discovered_dev_ids:
+        console.print(f"  Discovered device IDs : {discovered_dev_ids}")
+    else:
+        console.print("  Using configured synthetic device IDs for ingest load.")
+
+    ingest_ok, ingest_reason = _preflight_ingest(
+        args.base_url,
+        session,
+        args.competition_id,
+        dev_id_pool,
+        uid_pool,
+        args.ingest_password,
+    )
+    if not ingest_ok:
+        console.print(f"  [red]Ingest preflight failed: {ingest_reason}[/red]")
+        console.print("  [yellow]Check --competition-id, --webhook-secret, and --ingest-password.[/yellow]")
+        sys.exit(2)
+    console.print("  Ingest preflight    : OK")
+
+    if verify_workers > 0:
+        _warm_verify_scope(
+            args.base_url,
+            session,
+            args.competition_id,
+            dev_id_pool,
+            uid_pool,
+            args.ingest_password,
+        )
+        verify_ok, verify_reason = _preflight_verify(
+            args.base_url,
+            session,
+            dev_id_pool,
+            uid_pool,
+            args.card_secret,
+            args.hmac_len,
+        )
+        if verify_ok:
+            console.print("  Verify preflight    : OK")
+        else:
+            verify_workers = 0
+            console.print(
+                "  [yellow]Disabling verify workers: "
+                f"{verify_reason}[/yellow]"
+            )
 
     console.print(f"\n  UIDs in pool    : {len(uid_pool)}")
     console.print(f"  Device IDs      : {dev_id_pool}")
     console.print(f"  Competition ID  : {args.competition_id}")
+    console.print(f"  Card secret     : {args.card_secret}")
+    console.print(f"  HMAC length     : {args.hmac_len}")
+    console.print(f"  Ingest password : {'set' if args.ingest_password else 'not set'}")
     console.print(f"  Target RPS      : {args.ingest_rps}")
     console.print(f"  Workers         : {args.workers}")
+    console.print(f"  Verify workers  : {verify_workers}")
     console.print(f"  Duration        : {args.duration}s  (ramp {args.ramp_up}s)\n")
 
     results: List[RequestResult] = []
@@ -653,6 +851,7 @@ def run_stress_test(args):
             lock=lock,
             stop_event=stop_event,
             target_interval=ingest_interval,
+            ingest_password=args.ingest_password,
         )
         t = threading.Thread(target=worker.run, daemon=True,
                              name=f"ingest-{i}")
@@ -677,8 +876,8 @@ def run_stress_test(args):
 
     # Verify workers
     verify_threads = []
-    if args.verify_workers > 0:
-        for i in range(args.verify_workers):
+    if verify_workers > 0:
+        for i in range(verify_workers):
             w_session = _make_session(args.cookie, args.webhook_secret)
             worker = VerifyWorker(
                 base_url=args.base_url,
@@ -690,6 +889,8 @@ def run_stress_test(args):
                 lock=lock,
                 stop_event=stop_event,
                 interval=1.5,
+                card_secret=args.card_secret,
+                hmac_len=args.hmac_len,
             )
             t = threading.Thread(target=worker.run, daemon=True,
                                  name=f"verify-{i}")
@@ -784,12 +985,25 @@ def run_spike_test(args):
     spike_rps     = args.ingest_rps * 10
     interval      = spike_workers / spike_rps if spike_rps else 0.01
 
+    ingest_ok, ingest_reason = _preflight_ingest(
+        args.base_url,
+        session,
+        args.competition_id,
+        dev_ids,
+        uid_pool,
+        args.ingest_password,
+    )
+    if not ingest_ok:
+        console.print(f"  [red]Ingest preflight failed: {ingest_reason}[/red]")
+        console.print("  [yellow]Check --competition-id, --webhook-secret, and --ingest-password.[/yellow]")
+        sys.exit(2)
+
     threads = []
     for i in range(spike_workers):
         w_sess = _make_session(args.cookie, args.webhook_secret)
         worker = IngestWorker(args.base_url, w_sess, args.competition_id,
                               dev_ids, uid_pool, results, lock, stop_event,
-                              interval)
+                              interval, args.ingest_password)
         t = threading.Thread(target=worker.run, daemon=True)
         threads.append(t)
         t.start()
@@ -833,6 +1047,12 @@ def _build_parser():
                    help="Session cookie  e.g. 'session=<token>'")
     p.add_argument("--webhook-secret", default=None,
                    help="Value for X-Webhook-Secret header")
+    p.add_argument("--ingest-password", default=None,
+                   help="Competition ingest password when protected")
+    p.add_argument("--card-secret",    default=_default_card_secret(),
+                   help="Secret used to build RFID verify digests")
+    p.add_argument("--hmac-len",       type=int, default=DEFAULT_HMAC_LEN,
+                   help="Truncated HMAC length used by RFID verify digests")
     p.add_argument("--competition-id", type=int, default=DEFAULT_COMPETITION,
                    help="Competition ID to target")
     p.add_argument("--workers",        type=int, default=DEFAULT_WORKERS,

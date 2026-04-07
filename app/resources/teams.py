@@ -61,13 +61,10 @@ def _parse_group_ids(raw_ids: Iterable) -> List[int]:
 
 def _apply_group_assignment(team: Team, selected_group_id: Optional[int]) -> tuple[bool, Optional[str]]:
     """Ensure the team is linked to at most one group."""
-    existing_links = {tg.group_id: tg for tg in team.group_assignments}
+    existing_links = {tg.group_id: tg for tg in list(team.group_assignments)}
 
     if selected_group_id is None:
         if existing_links:
-            (db.session.query(TeamGroup)
-             .filter(TeamGroup.team_id == team.id)
-             .delete(synchronize_session=False))
             team.group_assignments[:] = []
         return True, None
 
@@ -86,15 +83,11 @@ def _apply_group_assignment(team: Team, selected_group_id: Optional[int]) -> tup
 
     to_remove = [gid for gid in existing_links if gid != selected_group_id]
     if to_remove:
-        (db.session.query(TeamGroup)
-         .filter(TeamGroup.team_id == team.id, TeamGroup.group_id.in_(to_remove))
-         .delete(synchronize_session=False))
         team.group_assignments[:] = [link for link in team.group_assignments if link.group_id == selected_group_id]
 
-    link = existing_links.get(selected_group_id)
+    link = next((assignment for assignment in team.group_assignments if assignment.group_id == selected_group_id), None)
     if link is None:
-        link = TeamGroup(team_id=team.id, group_id=selected_group_id, active=True)
-        db.session.add(link)
+        link = TeamGroup(group_id=selected_group_id, active=True)
         team.group_assignments.append(link)
     else:
         link.active = True
@@ -382,7 +375,6 @@ class TeamItemResource(Resource):
                     "detail": "Type Delete to confirm deletion.",
                 }, 400
 
-        TeamGroup.query.filter_by(team_id=team.id).delete()
         record_audit_event(
             competition_id=comp_id,
             event_type="team_deleted",
