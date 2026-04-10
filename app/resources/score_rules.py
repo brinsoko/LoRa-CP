@@ -1,22 +1,22 @@
 # app/resources/score_rules.py
 from __future__ import annotations
 
-from flask import request
-from flask_restful import Resource
+from flask import Blueprint, jsonify, request
 
 from app.extensions import db
 from app.models import ScoreRule
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_roles_required
 
+score_rules_api_bp = Blueprint("api_score_rules", __name__)
 
-class ScoreRuleList(Resource):
-    method_decorators = [json_roles_required("admin")]
 
-    def get(self):
+@score_rules_api_bp.get("/api/score-rules")
+@json_roles_required("admin")
+def score_rule_list():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         checkpoint_id = request.args.get("checkpoint_id", type=int)
         group_id = request.args.get("group_id", type=int)
 
@@ -40,10 +40,13 @@ class ScoreRuleList(Resource):
             ]
         }, 200
 
-    def post(self):
+
+@score_rules_api_bp.post("/api/score-rules")
+@json_roles_required("admin")
+def score_rule_create():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         payload = request.get_json(silent=True) or {}
         checkpoint_id = payload.get("checkpoint_id")
         group_id = payload.get("group_id")
@@ -53,7 +56,7 @@ class ScoreRuleList(Resource):
             checkpoint_id = int(checkpoint_id)
             group_id = int(group_id)
         except Exception:
-            return {"error": "invalid_request", "detail": "checkpoint_id and group_id are required."}, 400
+            return jsonify({"error": "invalid_request", "detail": "checkpoint_id and group_id are required."}), 400
 
         existing = (
             ScoreRule.query
@@ -90,32 +93,30 @@ class ScoreRuleList(Resource):
         return {"ok": True, "rule_id": record.id, "created": True}, 201
 
 
-class ScoreRuleItem(Resource):
-    method_decorators = [json_roles_required("admin")]
-
-    def delete(self, rule_id: int):
+@score_rules_api_bp.delete("/api/score-rules/<int:rule_id>")
+@json_roles_required("admin")
+def score_rule_delete(rule_id: int):
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         rule = ScoreRule.query.filter(ScoreRule.competition_id == comp_id, ScoreRule.id == rule_id).first()
         if not rule:
-            return {"error": "not_found"}, 404
+            return jsonify({"error": "not_found"}), 404
         db.session.delete(rule)
         db.session.commit()
         return {"ok": True}, 200
 
 
-class ScoreRuleFields(Resource):
-    method_decorators = [json_roles_required("admin")]
-
-    def get(self):
+@score_rules_api_bp.get("/api/score-rules/fields")
+@json_roles_required("admin")
+def score_rule_fields():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         checkpoint_id = request.args.get("checkpoint_id", type=int)
         group_id = request.args.get("group_id", type=int)
         if not checkpoint_id or not group_id:
-            return {"error": "invalid_request", "detail": "checkpoint_id and group_id are required."}, 400
+            return jsonify({"error": "invalid_request", "detail": "checkpoint_id and group_id are required."}), 400
 
         from app.models import SheetConfig, CheckpointGroup
 

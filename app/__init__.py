@@ -5,11 +5,23 @@ from flask_login import current_user
 from werkzeug.exceptions import HTTPException
 from .extensions import db, login_manager, babel
 from sqlalchemy import inspect, text
-from .resources import register_resources
+from .api.auth import auth_api_bp
+from .api.checkpoints import checkpoints_api_bp
+from .api.groups import groups_api_bp
+from .api.teams import teams_api_bp
+from .api.helpers import json_error
+from .resources.checkins import checkins_api_bp
+from .resources.docs_resource import docs_api_bp
+from .resources.ingest import ingest_api_bp
+from .resources.lora import lora_devices_api_bp
+from .resources.map import map_api_bp
+from .resources.messages import messages_api_bp
+from .resources.rfid import rfid_api_bp
+from .resources.score_rules import score_rules_api_bp
+from .resources.scores import scores_api_bp
 from app.utils.time import to_datetime_local
 from .utils.perms import inject_perms
 from .utils.csrf import protect_request, get_csrf_token, csrf_input
-from .utils.json_api import JsonApi
 from .utils.competition import (
     ensure_default_competition,
     get_current_competition,
@@ -32,9 +44,19 @@ def create_app(config_overrides: dict | None = None) -> Flask:
         db_path = os.path.join(app.instance_path, "app.db")
         app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 
-    # REST API
-    api = JsonApi(app)
-    register_resources(api)
+    app.register_blueprint(auth_api_bp)
+    app.register_blueprint(checkpoints_api_bp)
+    app.register_blueprint(groups_api_bp)
+    app.register_blueprint(teams_api_bp)
+    app.register_blueprint(checkins_api_bp)
+    app.register_blueprint(docs_api_bp)
+    app.register_blueprint(ingest_api_bp)
+    app.register_blueprint(lora_devices_api_bp)
+    app.register_blueprint(map_api_bp)
+    app.register_blueprint(messages_api_bp)
+    app.register_blueprint(rfid_api_bp)
+    app.register_blueprint(score_rules_api_bp)
+    app.register_blueprint(scores_api_bp)
 
     # logging …
     for h in list(app.logger.handlers):
@@ -146,15 +168,6 @@ def create_app(config_overrides: dict | None = None) -> Flask:
         except Exception:
             app.logger.exception("Failed to ensure checkins audit columns")
 
-    def _wants_json_error() -> bool:
-        return request.path.startswith("/api") or request.accept_mimetypes.best == "application/json"
-
-    def _json_error(error: str, status_code: int, detail: str | None = None):
-        body = {"error": error, "code": status_code}
-        if detail:
-            body["detail"] = detail
-        return body, status_code
-
     def _http_detail(e: Exception, default: str) -> str:
         if isinstance(e, HTTPException):
             return getattr(e, "description", None) or default
@@ -162,9 +175,11 @@ def create_app(config_overrides: dict | None = None) -> Flask:
 
     @app.errorhandler(400)
     def bad_request(e):
-        if _wants_json_error():
-            return _json_error("bad_request", 400, _http_detail(e, "Bad request."))
-        return render_template("403.html"), 400
+        return json_error("bad_request", 400, _http_detail(e, "Bad request."))
+
+    @app.errorhandler(401)
+    def unauthorized(e):
+        return json_error("unauthorized", 401, _http_detail(e, "Unauthorized."))
 
     @app.errorhandler(403)
     def forbidden(e):
@@ -174,28 +189,28 @@ def create_app(config_overrides: dict | None = None) -> Flask:
             getattr(current_user, "is_authenticated", False),
             getattr(current_user, "role", None),
         )
-        if _wants_json_error():
-            return _json_error("forbidden", 403, _http_detail(e, "Forbidden."))
-        return render_template("403.html"), 403
+        return json_error("forbidden", 403, _http_detail(e, "Forbidden."))
 
     @app.errorhandler(404)
     def not_found(e):
-        if _wants_json_error():
-            return _json_error("not_found", 404, _http_detail(e, "Not found."))
-        return "Not found.", 404
+        return json_error("not_found", 404, _http_detail(e, "Not found."))
 
     @app.errorhandler(405)
     def method_not_allowed(e):
-        if _wants_json_error():
-            return _json_error("method_not_allowed", 405, _http_detail(e, "Method not allowed."))
-        return "Method not allowed.", 405
+        return json_error("method_not_allowed", 405, _http_detail(e, "Method not allowed."))
+
+    @app.errorhandler(409)
+    def conflict(e):
+        return json_error("conflict", 409, _http_detail(e, "Conflict."))
+
+    @app.errorhandler(422)
+    def unprocessable_entity(e):
+        return json_error("error", 422, _http_detail(e, "Unprocessable entity."))
 
     @app.errorhandler(500)
     def internal_server_error(e):
         current_app.logger.exception("500 Internal Server Error at %s", request.path)
-        if _wants_json_error():
-            return _json_error("internal_server_error", 500, "Internal server error.")
-        return "Internal server error.", 500
+        return json_error("internal_server_error", 500, "Internal server error.")
 
     @app.get("/health")
     def health():

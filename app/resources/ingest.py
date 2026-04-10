@@ -4,20 +4,23 @@ from datetime import datetime
 import hashlib, hmac
 
 from flask import current_app
-from flask import request
+from flask import Blueprint, request
 from flask_login import current_user
 
-from flask_restful import Resource, reqparse
 from sqlalchemy.exc import SQLAlchemyError
+from werkzeug.exceptions import BadRequest
 
 from app.extensions import db
 from app.models import (
     LoRaMessage, RFIDCard, Team, Checkpoint, Checkin, LoRaDevice, Competition
 )
+from app.api.helpers import parse_int
 from app.utils.audit import format_device_label, record_audit_event
 from app.utils.sheets_sync import mark_arrival_checkbox
 from app.utils.payloads import parse_gps_payload
 from app.utils.card_tokens import compute_card_digest
+
+ingest_api_bp = Blueprint("api_ingest", __name__)
 
 def resolve_checkpoint_for_dev(competition_id: int, dev_num: int) -> tuple[Checkpoint, LoRaDevice, bool, bool]:
     device = LoRaDevice.query.filter_by(competition_id=competition_id, dev_num=dev_num).first()
@@ -60,23 +63,58 @@ def resolve_checkpoint_for_dev(competition_id: int, dev_num: int) -> tuple[Check
     return cp, device, created_device, created_checkpoint
 
 
-_parser = reqparse.RequestParser(bundle_errors=True)
-_parser.add_argument("competition_id", type=int, required=True, help="competition_id is required (int).")
-_parser.add_argument("dev_id", type=int, required=False)
-_parser.add_argument("checkpoint_id", type=int, required=False)
-_parser.add_argument("payload", type=str, required=False)  # optional if gps_* provided
-_parser.add_argument("rssi", type=float)
-_parser.add_argument("snr", type=float)
-_parser.add_argument("ts", type=int)  # unix seconds
-_parser.add_argument("source", type=str)  # optional client hint (e.g., mobile)
-_parser.add_argument("ingest_password", type=str)
-_parser.add_argument("password", type=str)
+def _optional_int(payload: dict, key: str):
+    raw = payload.get(key)
+    if raw in (None, ""):
+        return None
+    try:
+        return parse_int(raw, key)
+    except BadRequest as exc:
+        raise BadRequest() from exc
 
-# Optional GPS fields (allow posting structured GPS instead of string payload)
-_parser.add_argument("gps_lat", type=float)
-_parser.add_argument("gps_lon", type=float)
-_parser.add_argument("gps_alt", type=float)
-_parser.add_argument("gps_age_ms", type=int)
+
+def _optional_float(payload: dict, key: str):
+    raw = payload.get(key)
+    if raw in (None, ""):
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError) as exc:
+        raise BadRequest() from exc
+
+
+def _parse_ingest_payload() -> dict:
+    payload = request.get_json(force=True, silent=True)
+    if not isinstance(payload, dict):
+        payload = request.form.to_dict()
+    if not isinstance(payload, dict):
+        payload = {}
+
+    raw_competition_id = payload.get("competition_id")
+    if raw_competition_id in (None, ""):
+        raise BadRequest()
+
+    try:
+        competition_id = parse_int(raw_competition_id, "competition_id")
+    except BadRequest as exc:
+        raise BadRequest() from exc
+
+    return {
+        "competition_id": competition_id,
+        "dev_id": _optional_int(payload, "dev_id"),
+        "checkpoint_id": _optional_int(payload, "checkpoint_id"),
+        "payload": payload.get("payload"),
+        "rssi": _optional_float(payload, "rssi"),
+        "snr": _optional_float(payload, "snr"),
+        "ts": _optional_int(payload, "ts"),
+        "source": payload.get("source"),
+        "ingest_password": payload.get("ingest_password"),
+        "password": payload.get("password"),
+        "gps_lat": _optional_float(payload, "gps_lat"),
+        "gps_lon": _optional_float(payload, "gps_lon"),
+        "gps_alt": _optional_float(payload, "gps_alt"),
+        "gps_age_ms": _optional_int(payload, "gps_age_ms"),
+    }
 
 
 def _card_writeback(uid: str,
@@ -106,8 +144,8 @@ def _card_writeback(uid: str,
         "team": team.name if team else None,
     }
 
-class IngestResource(Resource):
-    def post(self):
+@ingest_api_bp.post("/api/ingest")
+def ingest_post():
         expected_secret = current_app.config.get("LORA_WEBHOOK_SECRET")
         if expected_secret and expected_secret != "CHANGE_LATER":
             provided_secret = request.headers.get("X-Webhook-Secret", "")
@@ -118,7 +156,7 @@ class IngestResource(Resource):
                     "detail": "Invalid webhook secret.",
                 }, 403
 
-        args = _parser.parse_args()  # supports JSON and form bodies
+        args = _parse_ingest_payload()
         competition_id = args["competition_id"]
         dev_id  = args.get("dev_id")
         checkpoint_id = args.get("checkpoint_id")

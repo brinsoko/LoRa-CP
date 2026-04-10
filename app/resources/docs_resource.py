@@ -4,16 +4,17 @@ from __future__ import annotations
 import json
 import os
 
-from flask import current_app
-from flask_restful import Resource
+from flask import Blueprint, current_app
+
+docs_api_bp = Blueprint("api_docs", __name__)
 
 
 def _docs_dir() -> str:
     return os.path.normpath(os.path.join(current_app.root_path, "..", "docs"))
 
 
-class ApiDocsListResource(Resource):
-    def get(self):
+@docs_api_bp.get("/api/docs")
+def api_docs_list():
         docs_dir = _docs_dir()
         specs = []
         for name in ("openapi.json", "openapi.yaml"):
@@ -23,8 +24,8 @@ class ApiDocsListResource(Resource):
         return {"specs": specs}, 200
 
 
-class ApiSpecResource(Resource):
-    def get(self, filename: str):
+@docs_api_bp.get("/api/docs/<string:filename>")
+def api_spec(filename: str):
         docs_dir = _docs_dir()
         safe_name = filename.replace("..", "")
         path = os.path.join(docs_dir, safe_name)

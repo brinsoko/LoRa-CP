@@ -38,7 +38,7 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 ##  Tech Stack
 
 - **Backend:** Flask (Python 3.10+)
-- **API layer:** Flask-RESTful
+- **API layer:** Plain Flask blueprints
 - **Database:** SQLite (SQLAlchemy ORM via Flask-SQLAlchemy)
 - **Frontend:** Bootstrap 5 + Jinja2 templates
 - **Mapping:** Google Maps JavaScript API
@@ -55,7 +55,6 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 The current app actively uses these runtime libraries:
 
 - Flask
-- Flask-RESTful
 - Flask-SQLAlchemy / SQLAlchemy
 - Flask-Login
 - Flask-Babel

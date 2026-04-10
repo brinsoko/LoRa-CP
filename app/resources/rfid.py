@@ -5,9 +5,7 @@ import csv
 import io
 from typing import Optional
 
-from flask import request
-from flask_restful import Resource
-from flask import current_app
+from flask import Blueprint, current_app, jsonify, request
 from flask_babel import gettext as _
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
@@ -23,6 +21,8 @@ from app.utils.card_tokens import match_digests
 BAUD = Config.SERIAL_BAUDRATE
 HINT = Config.SERIAL_HINT
 TIMEOUT = Config.SERIAL_TIMEOUT
+
+rfid_api_bp = Blueprint("api_rfid", __name__)
 
 
 def _serialize_card(card: RFIDCard) -> dict:
@@ -67,13 +67,12 @@ def _parse_card_payload(payload: dict, require_team: bool = True) -> tuple[Optio
     return uid, team_id, number, None
 
 
-class RFIDCardListResource(Resource):
-    method_decorators = [json_login_required]
-
-    def get(self):
+@rfid_api_bp.get("/api/rfid/cards")
+@json_login_required
+def rfid_card_list():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         cards = (
             RFIDCard.query
             .join(Team, RFIDCard.team_id == Team.id)
@@ -84,15 +83,17 @@ class RFIDCardListResource(Resource):
         )
         return {"cards": [_serialize_card(c) for c in cards]}, 200
 
-    @json_roles_required("judge", "admin")
-    def post(self):
+
+@rfid_api_bp.post("/api/rfid/cards")
+@json_roles_required("judge", "admin")
+def rfid_card_create():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         payload = request.get_json(silent=True) or {}
         uid, team_id, number, error = _parse_card_payload(payload)
         if error:
-            return {"error": "validation_error", "detail": error}, 400
+            return jsonify({"error": "validation_error", "detail": error}), 400
 
         team = (
             Team.query
@@ -102,13 +103,13 @@ class RFIDCardListResource(Resource):
             else None
         )
         if not team and team_id is not None:
-            return {"error": "validation_error", "detail": _("Invalid team_id")}, 400
+            return jsonify({"error": "validation_error", "detail": _("Invalid team_id")}), 400
 
         if team and RFIDCard.query.filter_by(team_id=team.id).first():
-            return {
+            return jsonify({
                 "error": "conflict",
                 "detail": _("This team already has an RFID card assigned."),
-            }, 409
+            }), 409
 
         card = RFIDCard(uid=uid, team_id=team_id, number=number)
         db.session.add(card)
@@ -116,18 +117,17 @@ class RFIDCardListResource(Resource):
             db.session.commit()
         except IntegrityError:
             db.session.rollback()
-            return {"error": "conflict", "detail": _("UID already exists.")}, 409
+            return jsonify({"error": "conflict", "detail": _("UID already exists.")}), 409
 
         return {"ok": True, "card": _serialize_card(card)}, 201
 
 
-class RFIDCardItemResource(Resource):
-    method_decorators = [json_login_required]
-
-    def get(self, card_id: int):
+@rfid_api_bp.get("/api/rfid/cards/<int:card_id>")
+@json_login_required
+def rfid_card_get(card_id: int):
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         card = (
             RFIDCard.query
             .join(Team, RFIDCard.team_id == Team.id)
@@ -136,21 +136,14 @@ class RFIDCardItemResource(Resource):
             .first()
         )
         if not card:
-            return {"error": "not_found"}, 404
+            return jsonify({"error": "not_found"}), 404
         return _serialize_card(card), 200
 
-    @json_roles_required("judge", "admin")
-    def patch(self, card_id: int):
-        return self._update(card_id, partial=True)
 
-    @json_roles_required("judge", "admin")
-    def put(self, card_id: int):
-        return self._update(card_id, partial=False)
-
-    def _update(self, card_id: int, partial: bool):
+def _update_card(card_id: int, partial: bool):
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         card = (
             RFIDCard.query
             .join(Team, RFIDCard.team_id == Team.id)
@@ -158,7 +151,7 @@ class RFIDCardItemResource(Resource):
             .first()
         )
         if not card:
-            return {"error": "not_found"}, 404
+            return jsonify({"error": "not_found"}), 404
 
         payload = request.get_json(silent=True) or {}
         uid = payload.get("uid") if "uid" in payload or not partial else card.uid
@@ -170,12 +163,12 @@ class RFIDCardItemResource(Resource):
             require_team=not partial,
         )
         if error:
-            return {"error": "validation_error", "detail": error}, 400
+            return jsonify({"error": "validation_error", "detail": error}), 400
 
         if team_id is not None and not Team.query.filter(
             Team.competition_id == comp_id, Team.id == team_id
         ).first():
-            return {"error": "validation_error", "detail": _("Invalid team_id")}, 400
+            return jsonify({"error": "validation_error", "detail": _("Invalid team_id")}), 400
 
         if team_id is not None:
             exists = (
@@ -184,10 +177,10 @@ class RFIDCardItemResource(Resource):
                 .first()
             )
             if exists:
-                return {
+                return jsonify({
                     "error": "conflict",
                     "detail": _("That team already has an RFID card assigned."),
-                }, 409
+                }), 409
 
         card.uid = uid
         card.team_id = team_id
@@ -197,15 +190,29 @@ class RFIDCardItemResource(Resource):
             db.session.commit()
         except IntegrityError:
             db.session.rollback()
-            return {"error": "conflict", "detail": _("UID already exists.")}, 409
+            return jsonify({"error": "conflict", "detail": _("UID already exists.")}), 409
 
         return {"ok": True, "card": _serialize_card(card)}, 200
 
-    @json_roles_required("admin")
-    def delete(self, card_id: int):
+
+@rfid_api_bp.patch("/api/rfid/cards/<int:card_id>")
+@json_roles_required("judge", "admin")
+def rfid_card_patch(card_id: int):
+    return _update_card(card_id, partial=True)
+
+
+@rfid_api_bp.put("/api/rfid/cards/<int:card_id>")
+@json_roles_required("judge", "admin")
+def rfid_card_put(card_id: int):
+    return _update_card(card_id, partial=False)
+
+
+@rfid_api_bp.delete("/api/rfid/cards/<int:card_id>")
+@json_roles_required("admin")
+def rfid_card_delete(card_id: int):
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         card = (
             RFIDCard.query
             .join(Team, RFIDCard.team_id == Team.id)
@@ -213,16 +220,15 @@ class RFIDCardItemResource(Resource):
             .first()
         )
         if not card:
-            return {"error": "not_found"}, 404
+            return jsonify({"error": "not_found"}), 404
         db.session.delete(card)
         db.session.commit()
         return {"ok": True}, 200
 
 
-class RFIDScanResource(Resource):
-    method_decorators = [json_roles_required("judge", "admin")]
-
-    def post(self):
+@rfid_api_bp.post("/api/rfid/scan")
+@json_roles_required("judge", "admin")
+def rfid_scan():
         uid = read_uid_once(BAUD, HINT, TIMEOUT)
         if not uid:
             return {
@@ -232,17 +238,16 @@ class RFIDScanResource(Resource):
         return {"ok": True, "uid": uid}, 200
 
 
-class RFIDBulkImportResource(Resource):
-    method_decorators = [json_roles_required("admin")]
-
-    def post(self):
+@rfid_api_bp.post("/api/rfid/import")
+@json_roles_required("admin")
+def rfid_bulk_import():
         """
         Accepts multipart/form-data with 'file' (CSV) or JSON body with 'rows'.
         CSV columns: uid, team_id (or team_name), number (optional)
         """
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         rows = []
         if request.files.get("file"):
             file = request.files["file"]
@@ -251,12 +256,12 @@ class RFIDBulkImportResource(Resource):
                 reader = csv.DictReader(stream)
                 rows = list(reader)
             except Exception:
-                return {"error": "validation_error", "detail": "Invalid CSV upload."}, 400
+                return jsonify({"error": "validation_error", "detail": "Invalid CSV upload."}), 400
         else:
             payload = request.get_json(silent=True) or {}
             rows = payload.get("rows") or []
             if not isinstance(rows, list):
-                return {"error": "validation_error", "detail": "rows must be a list."}, 400
+                return jsonify({"error": "validation_error", "detail": "rows must be a list."}), 400
 
         created = updated = skipped = 0
         errors = []
@@ -364,10 +369,9 @@ class RFIDBulkImportResource(Resource):
         }, 200
 
 
-class RFIDVerifyResource(Resource):
-    method_decorators = [json_roles_required("judge", "admin")]
-
-    def post(self):
+@rfid_api_bp.post("/api/rfid/verify")
+@json_roles_required("judge", "admin")
+def rfid_verify():
         payload = request.get_json(silent=True) or {}
         uid = (payload.get("uid") or "").strip()
         digests = payload.get("digests") or []
@@ -375,13 +379,13 @@ class RFIDVerifyResource(Resource):
         checkpoint_ids = payload.get("checkpoint_ids")
 
         if not uid:
-            return {"error": "validation_error", "detail": "uid is required"}, 400
+            return jsonify({"error": "validation_error", "detail": "uid is required"}), 400
         if not isinstance(digests, list):
-            return {"error": "validation_error", "detail": "digests must be a list"}, 400
+            return jsonify({"error": "validation_error", "detail": "digests must be a list"}), 400
 
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         team = (
             db.session.query(Team)
             .join(RFIDCard, RFIDCard.team_id == Team.id)
@@ -403,7 +407,7 @@ class RFIDVerifyResource(Resource):
             try:
                 device_ids = [int(x) for x in device_ids if str(x).strip() != ""]
             except Exception:
-                return {"error": "validation_error", "detail": "device_ids must be integers"}, 400
+                return jsonify({"error": "validation_error", "detail": "device_ids must be integers"}), 400
             if not device_ids:
                 device_ids = None
 
@@ -411,7 +415,7 @@ class RFIDVerifyResource(Resource):
             try:
                 checkpoint_ids = [int(x) for x in checkpoint_ids if str(x).strip() != ""]
             except Exception:
-                return {"error": "validation_error", "detail": "checkpoint_ids must be integers"}, 400
+                return jsonify({"error": "validation_error", "detail": "checkpoint_ids must be integers"}), 400
             if not checkpoint_ids:
                 checkpoint_ids = None
 
@@ -469,7 +473,7 @@ class RFIDVerifyResource(Resource):
             }
 
         if not checkpoint_lookup and not device_lookup:
-            return {"error": "not_found", "detail": "No checkpoints found for verification"}, 404
+            return jsonify({"error": "not_found", "detail": "No checkpoints found for verification"}), 404
 
         candidate_ids = set(checkpoint_lookup.keys()) | set(device_lookup.keys())
         match_rows = match_digests(uid, digests, candidate_ids)

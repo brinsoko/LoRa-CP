@@ -1,35 +1,40 @@
 # app/resources/map.py
 from __future__ import annotations
-from flask_restful import Resource, reqparse
+from flask import Blueprint, jsonify, request
+from werkzeug.exceptions import BadRequest
 from app.extensions import db
 from app.models import LoRaMessage, Team
+from app.api.helpers import parse_int
 from app.utils.payloads import parse_gps_payload
 from app.utils.rest_auth import json_roles_required
 from app.utils.competition import require_current_competition_id
 
 from app.utils.status import all_checkpoints_for_map, compute_team_statuses
 
-_parser = reqparse.RequestParser(trim=True, bundle_errors=True)
-_parser.add_argument("team_id", type=int, required=False, location="args")
+map_api_bp = Blueprint("api_map", __name__)
 
-class MapCheckpoints(Resource):
-    method_decorators = [json_roles_required("judge", "admin")]
-    """
-    GET /api/map/checkpoints
-      - No team_id: returns ALL checkpoints (id, name, easting, northing)
-      - team_id=N: returns ONLY checkpoints that team N has checked in at
-    """
-    def get(self):
+
+def _optional_query_int(name: str):
+    raw = request.args.get(name)
+    if raw in (None, ""):
+        return None
+    try:
+        return parse_int(raw, name)
+    except BadRequest as exc:
+        raise BadRequest() from exc
+
+@map_api_bp.get("/api/map/checkpoints")
+@json_roles_required("judge", "admin")
+def map_checkpoints():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
-        args = _parser.parse_args()
-        team_id = args.get("team_id")
+            return jsonify({"error": "no_competition"}), 400
+        team_id = _optional_query_int("team_id")
 
         if team_id:
             team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
             if not team:
-                return {"error": "not_found", "detail": "Team not found."}, 404
+                return jsonify({"error": "not_found", "detail": "Team not found."}), 404
             status_summary = compute_team_statuses(team_id, comp_id)
             return status_summary.get("checkpoints", []), 200
 
@@ -49,26 +54,16 @@ class MapCheckpoints(Resource):
 
 
 # ---- LoRa GPS points for map ----
-_lora_parser = reqparse.RequestParser(trim=True, bundle_errors=True)
-_lora_parser.add_argument("dev_id", type=int, required=False, location="args")
-_lora_parser.add_argument("limit", type=int, required=False, location="args")
-
-
-class LoRaMapPoints(Resource):
-    method_decorators = [json_roles_required("judge", "admin")]
-    """
-    GET /api/map/lora-points
-      - dev_id omitted: latest GPS point per device that has GPS payloads
-      - dev_id=N: up to `limit` recent points for the given device (default 50)
-    """
-    def get(self):
+@map_api_bp.get("/api/map/lora-points")
+@map_api_bp.get("/api/map/device-points")
+@json_roles_required("judge", "admin")
+def lora_map_points():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
-        args = _lora_parser.parse_args()
-        dev_id = args.get("dev_id")
-        limit = args.get("limit") or 50
-        limit = max(1, min(500, int(limit)))
+            return jsonify({"error": "no_competition"}), 400
+        dev_id = _optional_query_int("dev_id")
+        limit = _optional_query_int("limit") or 50
+        limit = max(1, min(500, limit))
 
         def serialize(msg: LoRaMessage):
             gps = parse_gps_payload(msg.payload)

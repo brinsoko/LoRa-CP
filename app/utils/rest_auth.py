@@ -1,4 +1,5 @@
 # app/utils/rest_auth.py
+from flask import jsonify
 from flask_login import current_user
 from functools import wraps
 from app.utils.competition import get_current_competition_role, require_current_competition_id
@@ -18,7 +19,7 @@ def json_login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated:
-            return {"error": "unauthorized"}, 401
+            return jsonify({"error": "unauthorized", "code": 401}), 401
         return fn(*args, **kwargs)
     return wrapper
 
@@ -30,13 +31,13 @@ def json_roles_required(*roles):
         @wraps(fn)
         def wrapper(*args, **kwargs):
             if not current_user.is_authenticated:
-                return {"error": "unauthorized"}, 401
+                return jsonify({"error": "unauthorized", "code": 401}), 401
             comp_id = require_current_competition_id()
             if not comp_id:
-                return {"error": "no_competition"}, 400
+                return jsonify({"error": "no_competition", "code": 400}), 400
             role_set = _current_role_set()
             if not (role_set & allowed):
-                return {"error": "forbidden", "required": roles}, 403
+                return jsonify({"error": "forbidden", "code": 403, "required": list(roles)}), 403
             return fn(*args, **kwargs)
         return wrapper
     return deco

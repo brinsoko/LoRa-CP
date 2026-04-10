@@ -848,3 +848,227 @@ class TestRegressions:
 
         assert response.status_code == 200
         assert db.session.get(Checkin, checkin_id) is None
+
+
+class TestApiErrorEnvelopes:
+    """Validate that the centralized error handlers return the expected JSON envelope."""
+
+    def test_api_401_uses_json_error_envelope(self, client, app):
+        response = client.get("/api/checkins")
+        body = response.get_json()
+
+        assert response.status_code == 401
+        assert body["error"] == "unauthorized"
+        assert body["code"] == 401
+
+    def test_api_403_uses_json_error_envelope(self, client, app):
+        viewer = create_user(username="403-viewer")
+        competition = create_competition(name="403 Envelope Race")
+        add_membership(viewer, competition, role="viewer")
+        login_as(client, viewer, competition)
+
+        response = client.get("/api/score-rules")
+        body = response.get_json()
+
+        assert response.status_code == 403
+        assert body["error"] == "forbidden"
+        assert body["code"] == 403
+
+    def test_api_checkin_get_without_session_returns_400_no_competition(self, client, app):
+        # checkin_get has no auth decorator — unauthenticated callers get
+        # 400 "no_competition" rather than 401.  Document the actual behaviour.
+        response = client.get("/api/checkins/1")
+        body = response.get_json()
+
+        assert response.status_code == 400
+        assert body["error"] == "no_competition"
+
+    def test_api_checkin_get_returns_404_for_missing(self, client, app):
+        admin = create_user(username="404-checkin-admin")
+        competition = create_competition(name="404 Checkin Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        response = client.get("/api/checkins/999999")
+        body = response.get_json()
+
+        assert response.status_code == 404
+        assert body["error"] == "not_found"
+
+    def test_api_no_competition_session_returns_400(self, client, app):
+        # Logged in but no competition selected.
+        user = create_user(username="no-comp-user")
+        login_as(client, user, competition=None)
+
+        response = client.get("/api/checkins")
+        body = response.get_json()
+
+        assert response.status_code == 400
+        assert body["error"] == "no_competition"
+        assert body["code"] == 400
+
+
+class TestCheckinFilters:
+    """Checkin list filter parameters are exercised but not individually tested."""
+
+    def test_checkin_list_filters_by_team_id(self, client, app):
+        admin = create_user(username="filter-team-admin")
+        competition = create_competition(name="Filter Team Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        cp = create_checkpoint(competition, name="Filter CP")
+        team_a = create_team(competition, name="Wanted Team", number=1)
+        team_b = create_team(competition, name="Unwanted Team", number=2)
+        create_checkin(competition, team_a, cp)
+        create_checkin(competition, team_b, cp)
+
+        response = client.get(f"/api/checkins?team_id={team_a.id}")
+        body = response.get_json()
+
+        assert response.status_code == 200
+        names = [c["team"]["name"] for c in body["checkins"]]
+        assert "Wanted Team" in names
+        assert "Unwanted Team" not in names
+
+    def test_checkin_list_filters_by_checkpoint_id(self, client, app):
+        admin = create_user(username="filter-cp-admin")
+        competition = create_competition(name="Filter CP Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        cp_a = create_checkpoint(competition, name="Wanted CP")
+        cp_b = create_checkpoint(competition, name="Unwanted CP")
+        team = create_team(competition, name="Filter Team", number=1)
+        create_checkin(competition, team, cp_a)
+        create_checkin(competition, team, cp_b)
+
+        response = client.get(f"/api/checkins?checkpoint_id={cp_a.id}")
+        body = response.get_json()
+
+        assert response.status_code == 200
+        cp_names = [c["checkpoint"]["name"] for c in body["checkins"]]
+        assert "Wanted CP" in cp_names
+        assert "Unwanted CP" not in cp_names
+
+    def test_checkin_list_scoped_to_active_competition(self, client, app):
+        user = create_user(username="scope-checkin-user")
+        comp_a = create_competition(name="Scope Checkin A")
+        comp_b = create_competition(name="Scope Checkin B")
+        add_membership(user, comp_a, role="admin")
+        add_membership(user, comp_b, role="admin")
+
+        cp_a = create_checkpoint(comp_a, name="CP A")
+        cp_b = create_checkpoint(comp_b, name="CP B")
+        team_a = create_team(comp_a, name="Team A", number=1)
+        team_b = create_team(comp_b, name="Team B", number=2)
+        create_checkin(comp_a, team_a, cp_a)
+        create_checkin(comp_b, team_b, cp_b)
+
+        login_as(client, user, comp_a)
+        response = client.get("/api/checkins")
+        body = response.get_json()
+
+        assert response.status_code == 200
+        team_names = [c["team"]["name"] for c in body["checkins"]]
+        assert "Team A" in team_names
+        assert "Team B" not in team_names
+
+
+class TestScoreJudgeAccess:
+    """Score resolve/submit enforce judge checkpoint assignment."""
+
+    def test_judge_cannot_submit_score_for_unassigned_checkpoint(self, client, app):
+        judge = create_user(username="score-judge")
+        competition = create_competition(name="Score Guard Race")
+        add_membership(judge, competition, role="judge")
+        allowed_cp = create_checkpoint(competition, name="Allowed Score CP")
+        denied_cp = create_checkpoint(competition, name="Denied Score CP")
+        team = create_team(competition, name="Score Team", number=1)
+        assign_judge_checkpoint(judge, allowed_cp, is_default=True)
+        login_as(client, judge, competition)
+
+        response = client.post(
+            "/api/scores/submit",
+            json={"team_id": team.id, "checkpoint_id": denied_cp.id, "fields": {}},
+        )
+        body = response.get_json()
+
+        assert response.status_code == 403
+        assert body["error"] == "forbidden"
+
+    def test_judge_cannot_resolve_score_for_unassigned_checkpoint(self, client, app):
+        judge = create_user(username="resolve-judge")
+        competition = create_competition(name="Resolve Guard Race")
+        add_membership(judge, competition, role="judge")
+        allowed_cp = create_checkpoint(competition, name="Allowed Resolve CP")
+        denied_cp = create_checkpoint(competition, name="Denied Resolve CP")
+        team = create_team(competition, name="Resolve Team", number=1)
+        assign_judge_checkpoint(judge, allowed_cp, is_default=True)
+        login_as(client, judge, competition)
+
+        response = client.post(
+            "/api/scores/resolve",
+            json={"team_id": team.id, "checkpoint_id": denied_cp.id},
+        )
+        body = response.get_json()
+
+        assert response.status_code == 403
+        assert body["error"] == "forbidden"
+
+    def test_judge_can_submit_score_for_assigned_checkpoint(self, client, app):
+        from app.models import ScoreEntry
+        from app.extensions import db as _db
+
+        admin = create_user(username="score-setup-admin")
+        judge = create_user(username="score-submit-judge")
+        competition = create_competition(name="Score Submit Race")
+        add_membership(admin, competition, role="admin")
+        add_membership(judge, competition, role="judge")
+        cp = create_checkpoint(competition, name="Submit CP")
+        team = create_team(competition, name="Submit Team", number=1)
+        group = create_group(competition, name="Submit Group")
+        assign_team_group(team, group, active=True)
+        assign_judge_checkpoint(judge, cp, is_default=True)
+        login_as(client, judge, competition)
+
+        response = client.post(
+            "/api/scores/submit",
+            json={"team_id": team.id, "checkpoint_id": cp.id, "fields": {}},
+        )
+
+        assert response.status_code in (200, 201)
+
+
+class TestRfidPut:
+    """PUT (full replace) on RFID cards."""
+
+    def test_rfid_put_replaces_card_fields(self, client, app):
+        admin = create_user(username="rfid-put-admin")
+        competition = create_competition(name="RFID PUT Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        team = create_team(competition, name="PUT Card Team", number=1)
+        card = create_rfid_card(team, uid="PUTCARD1", number=10)
+
+        response = client.put(
+            f"/api/rfid/cards/{card.id}",
+            json={"uid": "PUTCARD1", "team_id": team.id, "number": 99},
+        )
+        body = response.get_json()
+
+        assert response.status_code == 200
+        assert body["card"]["number"] == 99
+
+    def test_rfid_put_returns_404_for_missing_card(self, client, app):
+        admin = create_user(username="rfid-put-404-admin")
+        competition = create_competition(name="RFID PUT 404 Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        response = client.put("/api/rfid/cards/999999", json={"uid": "X", "team_id": 1})
+        body = response.get_json()
+
+        assert response.status_code == 404
+        assert body["error"] == "not_found"

@@ -3,9 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from flask import request
+from flask import Blueprint, jsonify, request
 from flask_login import current_user
-from flask_restful import Resource
 from app.extensions import db
 from app.models import (
     Checkin,
@@ -24,6 +23,8 @@ from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_roles_required
 from app.utils.sheets_sync import mark_arrival_checkbox, update_checkpoint_scores
 from app.utils.card_tokens import compute_card_digest
+
+scores_api_bp = Blueprint("api_scores", __name__)
 
 
 def _norm_name(value: str | None) -> str:
@@ -502,13 +503,12 @@ def recompute_scores_for_rule(competition_id: int, checkpoint_id: int, group_id:
     db.session.commit()
 
 
-class ScoreResolve(Resource):
-    method_decorators = [json_roles_required("judge", "admin")]
-
-    def post(self):
+@scores_api_bp.post("/api/scores/resolve")
+@json_roles_required("judge", "admin")
+def score_resolve():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
 
         payload = request.get_json(silent=True) or {}
         uid = (payload.get("uid") or "").strip().upper()
@@ -517,14 +517,14 @@ class ScoreResolve(Resource):
         try:
             checkpoint_id = int(checkpoint_id)
         except Exception:
-            return {"error": "invalid_request", "detail": "checkpoint_id is required."}, 400
+            return jsonify({"error": "invalid_request", "detail": "checkpoint_id is required."}), 400
 
         checkpoint = Checkpoint.query.filter(
             Checkpoint.competition_id == comp_id,
             Checkpoint.id == checkpoint_id,
         ).first()
         if not checkpoint:
-            return {"error": "not_found", "detail": "Checkpoint not found."}, 404
+            return jsonify({"error": "not_found", "detail": "Checkpoint not found."}), 404
 
         # Enforce judge assignment
         if (CompetitionMember.query
@@ -544,33 +544,33 @@ class ScoreResolve(Resource):
                 .first()
             )
             if not assigned:
-                return {"error": "forbidden", "detail": "Checkpoint not assigned."}, 403
+                return jsonify({"error": "forbidden", "detail": "Checkpoint not assigned."}), 403
 
         team = None
         if uid:
             card = RFIDCard.query.filter_by(uid=uid).first()
             if not card:
-                return {"error": "not_found", "detail": "Card not mapped to a team."}, 404
+                return jsonify({"error": "not_found", "detail": "Card not mapped to a team."}), 404
             team = Team.query.filter(Team.competition_id == comp_id, Team.id == card.team_id).first()
         else:
             try:
                 team_id = int(team_id)
             except Exception:
-                return {"error": "invalid_request", "detail": "uid or team_id is required."}, 400
+                return jsonify({"error": "invalid_request", "detail": "uid or team_id is required."}), 400
             team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
         if not team:
-            return {"error": "not_found", "detail": "Team not found."}, 404
+            return jsonify({"error": "not_found", "detail": "Team not found."}), 404
 
         group_link = _get_active_group(team.id)
         group_name = group_link.group.name if group_link and group_link.group else ""
         if not group_name:
-            return {"error": "invalid_request", "detail": "Team has no active group."}, 400
+            return jsonify({"error": "invalid_request", "detail": "Team has no active group."}), 400
         group_id = group_link.group_id if group_link else None
 
         fields_info = _get_checkpoint_fields(comp_id, checkpoint_id, group_name, group_id)
         config = fields_info.get("config")
         if config is None:
-            return {"error": "invalid_request", "detail": "No scoring fields configured for this checkpoint."}, 400
+            return jsonify({"error": "invalid_request", "detail": "No scoring fields configured for this checkpoint."}), 400
         if not fields_info["fields"] and not config.get("dead_time_enabled") and not config.get("time_enabled"):
             # Points-only is allowed; require at least the checkpoint config to exist.
             pass
@@ -619,13 +619,12 @@ class ScoreResolve(Resource):
         }, 200
 
 
-class ScoreSubmit(Resource):
-    method_decorators = [json_roles_required("judge", "admin")]
-
-    def post(self):
+@scores_api_bp.post("/api/scores/submit")
+@json_roles_required("judge", "admin")
+def score_submit():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         payload = request.get_json(silent=True) or {}
         team_id = payload.get("team_id")
         checkpoint_id = payload.get("checkpoint_id")
@@ -636,12 +635,12 @@ class ScoreSubmit(Resource):
             team_id = int(team_id)
             checkpoint_id = int(checkpoint_id)
         except Exception:
-            return {"error": "invalid_request", "detail": "team_id and checkpoint_id are required."}, 400
+            return jsonify({"error": "invalid_request", "detail": "team_id and checkpoint_id are required."}), 400
 
         team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
         checkpoint = Checkpoint.query.filter(Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id).first()
         if not team or not checkpoint:
-            return {"error": "invalid_request", "detail": "Invalid team or checkpoint."}, 400
+            return jsonify({"error": "invalid_request", "detail": "Invalid team or checkpoint."}), 400
 
         if (CompetitionMember.query
             .filter(
@@ -660,12 +659,12 @@ class ScoreSubmit(Resource):
                 .first()
             )
             if not assigned:
-                return {"error": "forbidden", "detail": "Checkpoint not assigned."}, 403
+                return jsonify({"error": "forbidden", "detail": "Checkpoint not assigned."}), 403
 
         group_link = _get_active_group(team.id)
         group_name = group_link.group.name if group_link and group_link.group else ""
         if not group_name:
-            return {"error": "invalid_request", "detail": "Team has no active group."}, 400
+            return jsonify({"error": "invalid_request", "detail": "Team has no active group."}), 400
         group_id = group_link.group_id if group_link else None
         fields_info = _get_checkpoint_fields(comp_id, checkpoint_id, group_name, group_id)
         points_header = (fields_info.get("headers") or {}).get("points")

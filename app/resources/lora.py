@@ -1,9 +1,8 @@
 # app/resources/lora.py
 from __future__ import annotations
 
-from flask import request
+from flask import Blueprint, jsonify, request
 from flask_login import current_user
-from flask_restful import Resource
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
@@ -12,6 +11,8 @@ from app.utils.audit import record_audit_event
 from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.competition import require_current_competition_id
 from app.utils.validators import validate_text
+
+lora_devices_api_bp = Blueprint("api_lora_devices", __name__)
 
 
 def _serialize_device(device: LoRaDevice) -> dict:
@@ -84,13 +85,13 @@ def _parse_device_payload(payload: dict, *, for_update: bool = False) -> tuple[d
     return data, errors
 
 
-class LoRaDeviceListResource(Resource):
-    method_decorators = [json_login_required]
-
-    def get(self):
+@lora_devices_api_bp.get("/api/lora/devices")
+@lora_devices_api_bp.get("/api/devices")
+@json_login_required
+def lora_device_list():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         devices = (
             LoRaDevice.query
             .filter(LoRaDevice.competition_id == comp_id)
@@ -100,15 +101,18 @@ class LoRaDeviceListResource(Resource):
         )
         return {"devices": [_serialize_device(d) for d in devices]}, 200
 
-    @json_roles_required("judge", "admin")
-    def post(self):
+
+@lora_devices_api_bp.post("/api/lora/devices")
+@lora_devices_api_bp.post("/api/devices")
+@json_roles_required("judge", "admin")
+def lora_device_create():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         payload = request.get_json(silent=True) or {}
         data, errors = _parse_device_payload(payload, for_update=False)
         if errors:
-            return {"error": "validation_error", "detail": errors}, 400
+            return jsonify({"error": "validation_error", "detail": errors}), 400
 
         dev_num = data.get("dev_num")
         if (
@@ -116,7 +120,7 @@ class LoRaDeviceListResource(Resource):
             .filter(LoRaDevice.competition_id == comp_id, LoRaDevice.dev_num == dev_num)
             .first()
         ):
-            return {"error": "conflict", "detail": "Device number already exists."}, 409
+            return jsonify({"error": "conflict", "detail": "Device number already exists."}), 409
 
         device = LoRaDevice(
             competition_id=comp_id,
@@ -141,13 +145,13 @@ class LoRaDeviceListResource(Resource):
         return {"ok": True, "device": _serialize_device(device)}, 201
 
 
-class LoRaDeviceItemResource(Resource):
-    method_decorators = [json_login_required]
-
-    def get(self, device_id: int):
+@lora_devices_api_bp.get("/api/lora/devices/<int:device_id>")
+@lora_devices_api_bp.get("/api/devices/<int:device_id>")
+@json_login_required
+def lora_device_get(device_id: int):
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         device = (
             LoRaDevice.query
             .filter(LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id)
@@ -155,44 +159,37 @@ class LoRaDeviceItemResource(Resource):
             .first()
         )
         if not device:
-            return {"error": "not_found"}, 404
+            return jsonify({"error": "not_found"}), 404
         return _serialize_device(device), 200
 
-    @json_roles_required("judge", "admin")
-    def patch(self, device_id: int):
-        return self._update(device_id, partial=True)
 
-    @json_roles_required("judge", "admin")
-    def put(self, device_id: int):
-        return self._update(device_id, partial=False)
-
-    def _update(self, device_id: int, partial: bool):
+def _update_device(device_id: int, partial: bool):
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         device = LoRaDevice.query.filter(
             LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id
         ).first()
         if not device:
-            return {"error": "not_found"}, 404
+            return jsonify({"error": "not_found"}), 404
         before = _device_snapshot(device)
 
         payload = request.get_json(silent=True) or {}
         data, errors = _parse_device_payload(payload, for_update=True)
         if errors:
-            return {"error": "validation_error", "detail": errors}, 400
+            return jsonify({"error": "validation_error", "detail": errors}), 400
 
         if "dev_num" in data:
             dev_num = data["dev_num"]
             if dev_num is None:
-                return {"error": "validation_error", "detail": "dev_num is required"}, 400
+                return jsonify({"error": "validation_error", "detail": "dev_num is required"}), 400
             exists = LoRaDevice.query.filter(
                 LoRaDevice.competition_id == comp_id,
                 LoRaDevice.dev_num == dev_num,
                 LoRaDevice.id != device.id,
             ).first()
             if exists:
-                return {"error": "conflict", "detail": "Device number already exists."}, 409
+                return jsonify({"error": "conflict", "detail": "Device number already exists."}), 409
             device.dev_num = dev_num
 
         for field in ("name", "note", "model", "active"):
@@ -212,16 +209,33 @@ class LoRaDeviceItemResource(Resource):
         db.session.commit()
         return {"ok": True, "device": _serialize_device(device)}, 200
 
-    @json_roles_required("admin")
-    def delete(self, device_id: int):
+
+@lora_devices_api_bp.patch("/api/lora/devices/<int:device_id>")
+@lora_devices_api_bp.patch("/api/devices/<int:device_id>")
+@json_roles_required("judge", "admin")
+def lora_device_patch(device_id: int):
+    return _update_device(device_id, partial=True)
+
+
+@lora_devices_api_bp.put("/api/lora/devices/<int:device_id>")
+@lora_devices_api_bp.put("/api/devices/<int:device_id>")
+@json_roles_required("judge", "admin")
+def lora_device_put(device_id: int):
+    return _update_device(device_id, partial=False)
+
+
+@lora_devices_api_bp.delete("/api/lora/devices/<int:device_id>")
+@lora_devices_api_bp.delete("/api/devices/<int:device_id>")
+@json_roles_required("admin")
+def lora_device_delete(device_id: int):
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         device = LoRaDevice.query.filter(
             LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id
         ).first()
         if not device:
-            return {"error": "not_found"}, 404
+            return jsonify({"error": "not_found"}), 404
 
         checkpoint = device.checkpoint
         if checkpoint:

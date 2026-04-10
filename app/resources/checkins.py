@@ -5,9 +5,8 @@ from datetime import datetime, timedelta
 import io, csv
 from typing import Optional, Tuple
 
-from flask import request, make_response
+from flask import Blueprint, jsonify, make_response, request
 from flask_login import current_user
-from flask_restful import Resource
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
@@ -19,6 +18,8 @@ from app.utils.time import from_datetime_local
 from app.utils.rest_auth import json_roles_required
 from app.utils.competition import require_current_competition_id, get_current_competition_role
 from app.utils.sheets_sync import mark_arrival_checkbox
+
+checkins_api_bp = Blueprint("api_checkins", __name__)
 
 
 # -------- helpers --------
@@ -155,19 +156,12 @@ def _checkin_snapshot(c: Checkin) -> dict:
     }
 
 
-# -------- resources --------
-class CheckinListResource(Resource):
-    """
-    GET  /api/checkins
-    POST /api/checkins
-    """
-
-    method_decorators = [json_roles_required("judge", "admin")]
-
-    def get(self):
+@checkins_api_bp.get("/api/checkins")
+@json_roles_required("judge", "admin")
+def checkin_list():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         # filters & sort
         team_id = request.args.get("team_id", type=int)
         checkpoint_id = request.args.get("checkpoint_id", type=int)
@@ -202,7 +196,10 @@ class CheckinListResource(Resource):
             },
         }, 200
 
-    def post(self):
+
+@checkins_api_bp.post("/api/checkins")
+@json_roles_required("judge", "admin")
+def checkin_create():
         """
         Body (JSON or x-www-form-urlencoded):
           - team_id (int, required)
@@ -212,22 +209,22 @@ class CheckinListResource(Resource):
         """
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         payload = request.get_json(silent=True) or request.form.to_dict()
         try:
             team_id = int(payload.get("team_id"))
             checkpoint_id = int(payload.get("checkpoint_id"))
         except Exception:
-            return {"error": "invalid_request", "detail": "team_id and checkpoint_id are required integers."}, 400
+            return jsonify({"error": "invalid_request", "detail": "team_id and checkpoint_id are required integers."}), 400
 
         team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
         checkpoint = Checkpoint.query.filter(
             Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id
         ).first()
         if not team or not checkpoint:
-            return {"error": "invalid_fk", "detail": "Invalid team or checkpoint."}, 400
+            return jsonify({"error": "invalid_fk", "detail": "Invalid team or checkpoint."}), 400
         if not _judge_can_access_checkpoint(checkpoint_id, comp_id):
-            return {"error": "forbidden", "detail": "Checkpoint is not assigned to the current judge."}, 403
+            return jsonify({"error": "forbidden", "detail": "Checkpoint is not assigned to the current judge."}), 403
 
         ts = _parse_timestamp(payload, datetime.utcnow())
         override = (payload.get("override") or "").strip().lower()
@@ -287,18 +284,11 @@ class CheckinListResource(Resource):
         return {"ok": True, "created": True, "checkin": _serialize_checkin(c)}, 201
 
 
-class CheckinItemResource(Resource):
-    """
-    GET    /api/checkins/<id>
-    PATCH  /api/checkins/<id>
-    PUT    /api/checkins/<id>
-    DELETE /api/checkins/<id>
-    """
-
-    def get(self, checkin_id: int):
+@checkins_api_bp.get("/api/checkins/<int:checkin_id>")
+def checkin_get(checkin_id: int):
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         c = (
             Checkin.query
             .filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
@@ -311,13 +301,13 @@ class CheckinItemResource(Resource):
             .first()
         )
         if not c:
-            return {"error": "not_found"}, 404
+            return jsonify({"error": "not_found"}), 404
         return _serialize_checkin(c), 200
 
-    def _update(self, checkin_id: int, partial: bool):
+def _update_checkin(checkin_id: int, partial: bool):
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         c = (
             Checkin.query
             .filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
@@ -330,7 +320,7 @@ class CheckinItemResource(Resource):
             .first()
         )
         if not c:
-            return {"error": "not_found"}, 404
+            return jsonify({"error": "not_found"}), 404
         before = _checkin_snapshot(c)
 
         payload = request.get_json(silent=True) or request.form.to_dict()
@@ -345,19 +335,19 @@ class CheckinItemResource(Resource):
             if new_cp_id is not None:
                 new_cp_id = int(new_cp_id)
         except Exception:
-            return {"error": "invalid_request", "detail": "team_id/checkpoint_id must be integers."}, 400
+            return jsonify({"error": "invalid_request", "detail": "team_id/checkpoint_id must be integers."}), 400
 
         # validate FKs if provided
         if new_team_id is not None and not Team.query.filter(
             Team.competition_id == comp_id, Team.id == new_team_id
         ).first():
-            return {"error": "invalid_fk", "detail": "Invalid team."}, 400
+            return jsonify({"error": "invalid_fk", "detail": "Invalid team."}), 400
         if new_cp_id is not None and not Checkpoint.query.filter(
             Checkpoint.competition_id == comp_id, Checkpoint.id == new_cp_id
         ).first():
-            return {"error": "invalid_fk", "detail": "Invalid checkpoint."}, 400
+            return jsonify({"error": "invalid_fk", "detail": "Invalid checkpoint."}), 400
         if new_cp_id is not None and not _judge_can_access_checkpoint(new_cp_id, comp_id):
-            return {"error": "forbidden", "detail": "Checkpoint is not assigned to the current judge."}, 403
+            return jsonify({"error": "forbidden", "detail": "Checkpoint is not assigned to the current judge."}), 403
 
         # timestamp
         new_ts = _parse_timestamp(payload, c.timestamp)
@@ -408,16 +398,21 @@ class CheckinItemResource(Resource):
             pass
         return {"ok": True, "updated": True, "checkin": _serialize_checkin(c)}, 200
 
-    def put(self, checkin_id: int):
-        return self._update(checkin_id, partial=False)
+@checkins_api_bp.put("/api/checkins/<int:checkin_id>")
+def checkin_put(checkin_id: int):
+    return _update_checkin(checkin_id, partial=False)
 
-    def patch(self, checkin_id: int):
-        return self._update(checkin_id, partial=True)
 
-    def delete(self, checkin_id: int):
+@checkins_api_bp.patch("/api/checkins/<int:checkin_id>")
+def checkin_patch(checkin_id: int):
+    return _update_checkin(checkin_id, partial=True)
+
+
+@checkins_api_bp.delete("/api/checkins/<int:checkin_id>")
+def checkin_delete(checkin_id: int):
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         c = (
             Checkin.query
             .filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
@@ -430,7 +425,7 @@ class CheckinItemResource(Resource):
             .first()
         )
         if not c:
-            return {"error": "not_found"}, 404
+            return jsonify({"error": "not_found"}), 404
         snapshot = _checkin_snapshot(c)
         record_audit_event(
             competition_id=comp_id,
@@ -447,16 +442,11 @@ class CheckinItemResource(Resource):
         return {"ok": True, "deleted": True}, 200
 
 
-class CheckinExportResource(Resource):
-    """
-    GET /api/checkins/export.csv
-    Returns CSV with same filters/sort as list.
-    """
-
-    def get(self):
+@checkins_api_bp.get("/api/checkins/export.csv")
+def checkin_export():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         team_id = request.args.get("team_id", type=int)
         checkpoint_id = request.args.get("checkpoint_id", type=int)
         date_from = request.args.get("date_from")

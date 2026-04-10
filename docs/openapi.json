@@ -75,6 +75,12 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "session"
+      },
+      "webhookSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Webhook-Secret",
+        "description": "Optional server-level secret for the ingest endpoint. When LORA_WEBHOOK_SECRET is set (and not the default placeholder), every POST /api/ingest must include this header."
       }
     },
     "schemas": {
@@ -3339,6 +3345,17 @@
         ],
         "summary": "Ingest a device message (LoRa or phone) and optionally create a Check-in",
         "description": "Stores the raw message, updates device telemetry, ensures a Checkpoint is linked to the device (dev_num), and if payload matches a known RFID UID, creates a Checkin for that team at the device's checkpoint (only if one doesn't already exist). Returns optional GPS parse and a truncated HMAC payload suitable for writing back to a tag.",
+        "parameters": [
+          {
+            "name": "X-Webhook-Secret",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Server-level webhook secret. Required when `LORA_WEBHOOK_SECRET` is configured and not set to the default placeholder. Checked via constant-time comparison."
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -3430,17 +3447,40 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 },
                 "examples": {
                   "missing_dev_id": {
                     "value": {
-                      "message": {
-                        "dev_id": "dev_id is required (int)."
-                      },
-                      "errors": {
-                        "dev_id": "Missing required parameter in the JSON body or the post body or the query string"
-                      }
+                      "error": "bad_request",
+                      "code": 400,
+                      "detail": "dev_id is required (int)."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid webhook secret or missing ingest password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "bad_webhook_secret": {
+                    "value": {
+                      "ok": false,
+                      "error": "forbidden",
+                      "detail": "Invalid webhook secret."
+                    }
+                  },
+                  "bad_ingest_password": {
+                    "value": {
+                      "ok": false,
+                      "error": "forbidden",
+                      "detail": "Ingest password required."
                     }
                   }
                 }

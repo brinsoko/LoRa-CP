@@ -1,14 +1,15 @@
 # app/resources/messages.py
 from __future__ import annotations
 
-from flask import request
-from flask_restful import Resource
+from flask import Blueprint, jsonify, request
 
 from app.extensions import db
 from app.models import LoRaMessage
 from app.utils.payloads import parse_gps_payload
 from app.utils.rest_auth import json_roles_required
 from app.utils.competition import require_current_competition_id
+
+messages_api_bp = Blueprint("api_device_messages", __name__)
 
 
 def _serialize_message(msg: LoRaMessage) -> dict:
@@ -26,13 +27,13 @@ def _serialize_message(msg: LoRaMessage) -> dict:
     return data
 
 
-class LoRaMessageListResource(Resource):
-    method_decorators = [json_roles_required("admin")]
-
-    def get(self):
+@messages_api_bp.get("/api/lora/messages")
+@messages_api_bp.get("/api/devices/messages")
+@json_roles_required("admin")
+def lora_message_list():
         comp_id = require_current_competition_id()
         if not comp_id:
-            return {"error": "no_competition"}, 400
+            return jsonify({"error": "no_competition"}), 400
         dev_id = request.args.get("dev_id")
         page = request.args.get("page", 1, type=int)
         per_page = min(request.args.get("per_page", 50, type=int), 200)
