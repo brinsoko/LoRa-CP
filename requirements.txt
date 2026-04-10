@@ -9,26 +9,14 @@ flask_restful==0.3.10
 # --- Database / ORM ---
 SQLAlchemy==2.0.31
 Flask-SQLAlchemy==3.1.1
-alembic==1.13.2
 
 # --- Auth & Roles ---
 Flask-Login==0.6.3
-Flask-Principal==0.4.0
 Flask-Babel==4.0.0
-
-# --- Utilities & Helpers ---
-python-dotenv==1.0.1
-pytz==2024.1
 
 # --- Optional Serial / Hardware access ---
 pyserial==3.5
 requests==2.32.5
-
-# --- Data Handling ---
-pandas==3.0.0
-
-# --- CSV / Excel / File parsing ---
-openpyxl==3.1.5
 
 # --- For Gunicorn (production server) ---
 gunicorn==22.0.0
@@ -36,11 +24,3 @@ gunicorn==22.0.0
 # --- Google Sheets ---
 gspread==6.1.2
 google-auth==2.34.0
-
-# --- Dev Tools ---
-black==24.8.0
-flake8==7.1.1
-
-# --- Security / CORS  ---
-Flask-Cors==4.0.1
-cryptography==46.0.3

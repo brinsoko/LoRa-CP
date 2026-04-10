@@ -115,8 +115,10 @@ def list_checkins():
     date_from = request.args.get("date_from") or ""
     date_to = request.args.get("date_to") or ""
     sort = (request.args.get("sort") or "new").lower()
+    page = request.args.get("page", type=int) or 1
+    per_page = request.args.get("per_page", type=int) or 100
 
-    params = {"sort": sort}
+    params = {"sort": sort, "page": page, "per_page": per_page}
     if team_id:
         params["team_id"] = team_id
     if checkpoint_id:
@@ -130,8 +132,17 @@ def list_checkins():
     if resp.status_code != 200:
         flash(payload.get("detail") or payload.get("error") or "Could not load check-ins.", "warning")
         checkins = []
+        pagination = {"page": page, "per_page": per_page, "pages": 0, "total": 0, "has_prev": False, "has_next": False}
     else:
         checkins = _decorate_checkins(payload.get("checkins", []))
+        pagination = payload.get("pagination") or {
+            "page": page,
+            "per_page": per_page,
+            "pages": 1 if checkins else 0,
+            "total": len(checkins),
+            "has_prev": False,
+            "has_next": False,
+        }
 
     teams = _fetch_teams()
     checkpoints = _fetch_checkpoints_for_user(include_checkpoint_id=checkpoint_id)
@@ -146,6 +157,7 @@ def list_checkins():
         selected_date_from=date_from,
         selected_date_to=date_to,
         selected_sort=sort,
+        pagination=pagination,
     )
 
 
@@ -159,6 +171,8 @@ def export_checkins_csv():
             "date_from": request.args.get("date_from"),
             "date_to": request.args.get("date_to"),
             "sort": request.args.get("sort"),
+            "page": request.args.get("page"),
+            "per_page": request.args.get("per_page"),
         }.items()
         if value not in (None, "")
     }

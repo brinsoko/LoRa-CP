@@ -452,6 +452,59 @@ class TestCsvAndIsolation:
         assert rows[1][2] == "'+Malicious"
         assert rows[1][5] == "'=Danger"
 
+    def test_api_checkins_list_is_paginated(self, client, app):
+        admin = create_user(username="pagination-admin")
+        competition = create_competition(name="Pagination Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        checkpoint = create_checkpoint(competition, name="Pagination CP")
+        teams = [
+            create_team(competition, name="Team One", number=1),
+            create_team(competition, name="Team Two", number=2),
+            create_team(competition, name="Team Three", number=3),
+        ]
+        create_checkin(competition, teams[0], checkpoint, timestamp=datetime.utcnow() - timedelta(hours=2))
+        create_checkin(competition, teams[1], checkpoint, timestamp=datetime.utcnow() - timedelta(hours=1))
+        create_checkin(competition, teams[2], checkpoint, timestamp=datetime.utcnow())
+
+        response = client.get("/api/checkins?sort=old&page=2&per_page=2")
+        body = response.get_json()
+
+        assert response.status_code == 200
+        assert body["pagination"] == {
+            "page": 2,
+            "per_page": 2,
+            "pages": 2,
+            "total": 3,
+            "has_prev": True,
+            "has_next": False,
+        }
+        assert [row["team"]["name"] for row in body["checkins"]] == ["Team Three"]
+
+    def test_api_checkin_export_is_paginated(self, client, app):
+        admin = create_user(username="csv-page-admin")
+        competition = create_competition(name="CSV Page Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
+        checkpoint = create_checkpoint(competition, name="CSV Page CP")
+        teams = [
+            create_team(competition, name="CSV Team One", number=1),
+            create_team(competition, name="CSV Team Two", number=2),
+            create_team(competition, name="CSV Team Three", number=3),
+        ]
+        create_checkin(competition, teams[0], checkpoint, timestamp=datetime.utcnow() - timedelta(hours=2))
+        create_checkin(competition, teams[1], checkpoint, timestamp=datetime.utcnow() - timedelta(hours=1))
+        create_checkin(competition, teams[2], checkpoint, timestamp=datetime.utcnow())
+
+        response = client.get("/api/checkins/export.csv?sort=old&page=2&per_page=2")
+        rows = list(csv.reader(response.data.decode("utf-8").splitlines()))
+
+        assert response.status_code == 200
+        assert len(rows) == 2
+        assert rows[1][2] == "CSV Team Three"
+
     def test_viewer_can_read_but_not_write(self, client, app):
         viewer = create_user(username="viewer-user")
         competition = create_competition(name="Viewer Race")
@@ -615,6 +668,77 @@ class TestValidationAndSecurity:
 
         assert response.status_code == 400
         assert response.get_json()["detail"] == "location must be at most 255 characters"
+
+    def test_api_404_uses_json_error_envelope(self, client, app):
+        response = client.get("/api/nope")
+        body = response.get_json()
+
+        assert response.status_code == 404
+        assert body["error"] == "not_found"
+        assert body["code"] == 404
+
+    def test_api_405_uses_json_error_envelope(self, client, app):
+        response = client.open("/api/auth/me", method="TRACE")
+        body = response.get_json()
+
+        assert response.status_code == 405
+        assert body["error"] == "method_not_allowed"
+        assert body["code"] == 405
+
+    def test_html_post_requires_csrf_token(self, app_factory):
+        application = app_factory(WTF_CSRF_ENABLED=True)
+        client = application.test_client()
+        with application.app_context():
+            admin = create_user(username="csrf-form-admin")
+            competition = create_competition(name="CSRF Form Race")
+            add_membership(admin, competition, role="admin")
+            admin_id = admin.id
+            competition_id = competition.id
+
+        with application.app_context():
+            login_as(client, db.session.get(type(admin), admin_id), db.session.get(type(competition), competition_id))
+        seed = client.get("/teams/")
+        assert seed.status_code == 200
+
+        denied = client.post("/logout")
+        with client.session_transaction() as sess:
+            token = sess["_csrf_token"]
+        allowed = client.post("/logout", data={"csrf_token": token}, follow_redirects=False)
+
+        assert denied.status_code == 400
+        assert allowed.status_code == 302
+
+    def test_api_post_requires_csrf_token_header(self, app_factory):
+        application = app_factory(WTF_CSRF_ENABLED=True)
+        client = application.test_client()
+        with application.app_context():
+            admin = create_user(username="csrf-api-admin")
+            competition = create_competition(name="CSRF API Race")
+            add_membership(admin, competition, role="admin")
+            team = create_team(competition, name="CSRF Team", number=7)
+            checkpoint = create_checkpoint(competition, name="CSRF CP")
+            admin_id = admin.id
+            competition_id = competition.id
+            team_id = team.id
+            checkpoint_id = checkpoint.id
+
+        with application.app_context():
+            login_as(client, db.session.get(type(admin), admin_id), db.session.get(type(competition), competition_id))
+        seed = client.get("/teams/")
+        assert seed.status_code == 200
+        with client.session_transaction() as sess:
+            token = sess["_csrf_token"]
+
+        denied = client.post("/api/checkins", json={"team_id": team_id, "checkpoint_id": checkpoint_id})
+        allowed = client.post(
+            "/api/checkins",
+            json={"team_id": team_id, "checkpoint_id": checkpoint_id},
+            headers={"X-CSRF-Token": token},
+        )
+
+        assert denied.status_code == 400
+        assert denied.get_json()["detail"] == "CSRF token missing or invalid."
+        assert allowed.status_code == 201
 
     def test_device_api_rejects_control_characters_in_note(self, client, app):
         admin = create_user(username="device-validation-admin")

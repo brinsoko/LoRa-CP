@@ -150,6 +150,12 @@ class CompetitionMember(db.Model):
         UniqueConstraint("competition_id", "user_id", name="uq_competition_member"),
     )
 
+    def __repr__(self) -> str:
+        return (
+            f"<CompetitionMember id={self.id} competition_id={self.competition_id} "
+            f"user_id={self.user_id} role={self.role!r} active={self.active}>"
+        )
+
 
 class CompetitionInvite(db.Model):
     __tablename__ = "competition_invites"
@@ -178,6 +184,12 @@ class CompetitionInvite(db.Model):
     created_by_user = db.relationship("User", foreign_keys=[created_by_user_id])
     invited_user = db.relationship("User", foreign_keys=[invited_user_id], back_populates="competition_invites")
 
+    def __repr__(self) -> str:
+        return (
+            f"<CompetitionInvite id={self.id} competition_id={self.competition_id} "
+            f"role={self.role!r} invited_email={self.invited_email!r}>"
+        )
+
 
 class JudgeCheckpoint(db.Model):
     __tablename__ = "judge_checkpoints"
@@ -203,6 +215,12 @@ class JudgeCheckpoint(db.Model):
     __table_args__ = (
         UniqueConstraint("user_id", "checkpoint_id", name="uq_judge_checkpoint"),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<JudgeCheckpoint id={self.id} user_id={self.user_id} "
+            f"checkpoint_id={self.checkpoint_id} default={self.is_default}>"
+        )
 
 # =========
 # Team
@@ -390,6 +408,12 @@ class CheckpointGroupLink(db.Model):
         UniqueConstraint("checkpoint_id", "group_id", name="uq_cp_group"),
     )
 
+    def __repr__(self) -> str:
+        return (
+            f"<CheckpointGroupLink checkpoint_id={self.checkpoint_id} "
+            f"group_id={self.group_id} position={self.position}>"
+        )
+
 
 # =========
 # Checkin
@@ -473,6 +497,9 @@ class TeamGroup(db.Model):
         UniqueConstraint("team_id", "group_id", name="uq_team_group"),
     )
 
+    def __repr__(self) -> str:
+        return f"<TeamGroup id={self.id} team_id={self.team_id} group_id={self.group_id} active={self.active}>"
+
 
 # =========================
 # Device (LoRa gateway or phone)
@@ -522,6 +549,9 @@ class LoRaMessage(db.Model):
 
     competition = db.relationship("Competition")
 
+    def __repr__(self) -> str:
+        return f"<LoRaMessage id={self.id} competition_id={self.competition_id} dev_id={self.dev_id!r}>"
+
 
 # =========================
 # Google Sheets config
@@ -547,6 +577,12 @@ class SheetConfig(db.Model):
     __table_args__ = (
         UniqueConstraint("spreadsheet_id", "tab_name", name="uq_sheet_tab"),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<SheetConfig id={self.id} competition_id={self.competition_id} "
+            f"tab_type={self.tab_type!r} tab_name={self.tab_name!r}>"
+        )
 
 
 # =========================
@@ -580,6 +616,12 @@ class ScoreEntry(db.Model):
     checkpoint = db.relationship("Checkpoint")
     judge_user = db.relationship("User")
 
+    def __repr__(self) -> str:
+        return (
+            f"<ScoreEntry id={self.id} competition_id={self.competition_id} "
+            f"team_id={self.team_id} checkpoint_id={self.checkpoint_id}>"
+        )
+
 
 # =========================
 # ScoreRule (scoring logic)
@@ -606,6 +648,12 @@ class ScoreRule(db.Model):
     __table_args__ = (
         UniqueConstraint("competition_id", "checkpoint_id", "group_id", name="uq_score_rule_scope"),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<ScoreRule id={self.id} competition_id={self.competition_id} "
+            f"checkpoint_id={self.checkpoint_id} group_id={self.group_id}>"
+        )
 
 
 # =========================
@@ -637,6 +685,12 @@ class AuditEvent(db.Model):
     actor_user = db.relationship("User", foreign_keys=[actor_user_id])
     actor_device = db.relationship("LoRaDevice", foreign_keys=[actor_device_id])
 
+    def __repr__(self) -> str:
+        return (
+            f"<AuditEvent id={self.id} competition_id={self.competition_id} "
+            f"event_type={self.event_type!r} entity_type={self.entity_type!r}>"
+        )
+
 
 # =========================
 # GlobalScoreRule (group-wide scoring logic)
@@ -659,6 +713,12 @@ class GlobalScoreRule(db.Model):
     __table_args__ = (
         UniqueConstraint("competition_id", "group_id", name="uq_global_score_rule_scope"),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<GlobalScoreRule id={self.id} competition_id={self.competition_id} "
+            f"group_id={self.group_id}>"
+        )
 
 
 def _assign_checkpoint_link_position(link: CheckpointGroupLink) -> None:

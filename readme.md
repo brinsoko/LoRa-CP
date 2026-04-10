@@ -38,11 +38,107 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 ##  Tech Stack
 
 - **Backend:** Flask (Python 3.10+)
-- **Database:** SQLite (SQLAlchemy ORM)
+- **API layer:** Flask-RESTful
+- **Database:** SQLite (SQLAlchemy ORM via Flask-SQLAlchemy)
 - **Frontend:** Bootstrap 5 + Jinja2 templates
 - **Mapping:** Google Maps JavaScript API
-- **Authentication:** Flask-Login, Google OAuth2
+- **Authentication:** Flask-Login, Google OAuth2, Flask-Babel
+- **HTTP integrations:** `requests`
+- **Google Sheets integration:** `gspread`, `google-auth`
+- **Optional hardware access:** `pyserial`
 - **Logging:** Built-in Flask logger with DEBUG output
+
+---
+
+## Dependency Notes
+
+The current app actively uses these runtime libraries:
+
+- Flask
+- Flask-RESTful
+- Flask-SQLAlchemy / SQLAlchemy
+- Flask-Login
+- Flask-Babel
+- requests
+- pyserial
+- gspread
+- google-auth
+
+The repo also contains some packages in `requirements.txt` that are not part of the current documented runtime flow. Those are intentionally not listed here unless they are actually used by the application code.
+
+---
+
+## Local Development
+
+### Requirements
+
+- Python 3.10+
+- `venv` recommended
+- SQLite for local development
+
+### Setup
+
+```bash
+python3 -m venv venv
+. venv/bin/activate
+make install-dev
+```
+
+Create tables and optional demo data:
+
+```bash
+make db-init
+make seed
+```
+
+Run the app locally on `127.0.0.1:5001`:
+
+```bash
+make run
+```
+
+Useful local helpers:
+
+```bash
+make admin                 # create/update admin user
+make seed-fresh            # drop/create local DB, then seed demo data
+make db-rebuild            # interactive local DB rebuild
+make i18n-compile          # compile translations
+make openapi-check         # validate docs/openapi.json
+make stress-help           # show stress test options
+```
+
+### Tests
+
+Run the full suite:
+
+```bash
+make test
+```
+
+Run the main subsets:
+
+```bash
+make test-fast
+make test-extended
+make test-matrix
+make cov
+```
+
+There is also a live-target integer-input smoke script:
+
+```bash
+make smoke-int BASE_URL=http://127.0.0.1:5001
+```
+
+### Docker
+
+```bash
+make build
+make up
+make logs
+make down
+```
 
 ---
 
@@ -69,12 +165,15 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 ### Auth
 Cookie-based session from `/login` (form POST). Many routes are public; judge/admin routes require login. Roles are per competition, and the current competition is selected after login.
 
+For browser-based HTML forms, CSRF protection is enabled. For scripted API calls from a browser session, include the session’s CSRF token header when posting to protected endpoints.
+
 ### Quick Calls
 
 Ingest a device message (JSON):
 ```bash
 curl -X POST /api/ingest \
   -H "Content-Type: application/json" \
+  -H "X-Webhook-Secret: <secret-if-configured>" \
   -d '{"competition_id":1,"dev_id":1,"payload":"A1B2C3D4","rssi":-62.5,"snr":9.0}'
 ```
 
@@ -95,8 +194,11 @@ curl -X POST /api/rfid/verify \
 Export check-ins (CSV):
 
 ```bash
-  curl "/checkins/export.csv?sort=new"
-  ```
+curl "/checkins/export.csv?sort=new"
+```
 
+Paginated check-in API example:
 
-
+```bash
+curl "/api/checkins?sort=new&page=1&per_page=100"
+```

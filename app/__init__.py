@@ -1,13 +1,15 @@
 # app/__init__.py
 from flask import Flask, request, current_app, render_template, session, g
 from flask_babel import get_locale
-from flask_restful import Api
 from flask_login import current_user
+from werkzeug.exceptions import HTTPException
 from .extensions import db, login_manager, babel
 from sqlalchemy import inspect, text
 from .resources import register_resources
 from app.utils.time import to_datetime_local
 from .utils.perms import inject_perms
+from .utils.csrf import protect_request, get_csrf_token, csrf_input
+from .utils.json_api import JsonApi
 from .utils.competition import (
     ensure_default_competition,
     get_current_competition,
@@ -31,7 +33,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
         app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 
     # REST API
-    api = Api(app)
+    api = JsonApi(app)
     register_resources(api)
 
     # logging …
@@ -53,6 +55,10 @@ def create_app(config_overrides: dict | None = None) -> Flask:
             getattr(current_user, "role", None),
             request.headers.get("User-Agent", "")[:80],
         )
+
+    @app.before_request
+    def _csrf_protect():
+        protect_request()
 
     db.init_app(app)
     login_manager.init_app(app)
@@ -140,6 +146,26 @@ def create_app(config_overrides: dict | None = None) -> Flask:
         except Exception:
             app.logger.exception("Failed to ensure checkins audit columns")
 
+    def _wants_json_error() -> bool:
+        return request.path.startswith("/api") or request.accept_mimetypes.best == "application/json"
+
+    def _json_error(error: str, status_code: int, detail: str | None = None):
+        body = {"error": error, "code": status_code}
+        if detail:
+            body["detail"] = detail
+        return body, status_code
+
+    def _http_detail(e: Exception, default: str) -> str:
+        if isinstance(e, HTTPException):
+            return getattr(e, "description", None) or default
+        return default
+
+    @app.errorhandler(400)
+    def bad_request(e):
+        if _wants_json_error():
+            return _json_error("bad_request", 400, _http_detail(e, "Bad request."))
+        return render_template("403.html"), 400
+
     @app.errorhandler(403)
     def forbidden(e):
         app.logger.warning(
@@ -148,9 +174,28 @@ def create_app(config_overrides: dict | None = None) -> Flask:
             getattr(current_user, "is_authenticated", False),
             getattr(current_user, "role", None),
         )
-        if request.path.startswith("/api") or request.accept_mimetypes.best == "application/json":
-            return {"error": "forbidden"}, 403
+        if _wants_json_error():
+            return _json_error("forbidden", 403, _http_detail(e, "Forbidden."))
         return render_template("403.html"), 403
+
+    @app.errorhandler(404)
+    def not_found(e):
+        if _wants_json_error():
+            return _json_error("not_found", 404, _http_detail(e, "Not found."))
+        return "Not found.", 404
+
+    @app.errorhandler(405)
+    def method_not_allowed(e):
+        if _wants_json_error():
+            return _json_error("method_not_allowed", 405, _http_detail(e, "Method not allowed."))
+        return "Method not allowed.", 405
+
+    @app.errorhandler(500)
+    def internal_server_error(e):
+        current_app.logger.exception("500 Internal Server Error at %s", request.path)
+        if _wants_json_error():
+            return _json_error("internal_server_error", 500, "Internal server error.")
+        return "Internal server error.", 500
 
     @app.get("/health")
     def health():
@@ -177,6 +222,8 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     def inject_current_app():
         return dict(
             current_app=current_app,
+            csrf_token=get_csrf_token,
+            csrf_input=csrf_input,
             languages=current_app.config.get("LANGUAGES", {}),
             current_locale=getattr(g, "locale", None) or str(get_locale() or _select_locale()),
             current_competition=getattr(g, "current_competition", None),

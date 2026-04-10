@@ -6,6 +6,8 @@ from urllib.parse import urlencode
 
 from flask import current_app, request, make_response
 
+from app.utils.csrf import get_csrf_token
+
 
 def _server_name() -> str:
     if current_app.config.get("SERVER_NAME"):
@@ -30,13 +32,17 @@ def api_request(method: str,
         for name, value in request.cookies.items():
             client.set_cookie(name, value, domain=server_name, path="/")
 
+        outgoing_headers = dict(headers or {})
+        if method.upper() not in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+            outgoing_headers.setdefault("X-CSRF-Token", get_csrf_token())
+
         response = client.open(
             path,
             method=method.upper(),
             query_string=params,
             json=json,
             data=data,
-            headers=headers,
+            headers=outgoing_headers,
             follow_redirects=False,
         )
 

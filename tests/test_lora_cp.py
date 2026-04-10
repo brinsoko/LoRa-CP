@@ -135,6 +135,27 @@ class TestAuthRoutes:
         response = client.get("/login")
         assert response.status_code == 200
 
+    def test_login_route_shows_invalid_credentials_message(self, client, app):
+        create_user(username="html-login-user", password="correct-password")
+
+        page = client.get("/login")
+        assert page.status_code == 200
+        with client.session_transaction() as sess:
+            token = sess.get("_csrf_token")
+
+        response = client.post(
+            "/login",
+            data={
+                "username": "html-login-user",
+                "password": "wrong-password",
+                "csrf_token": token,
+            },
+        )
+        html = response.data.decode("utf-8", errors="replace")
+
+        assert response.status_code == 200
+        assert "Invalid credentials" in html
+
     def test_login_route_blocks_open_redirects(self, client, app):
         create_user(username="route-user", password="secret123")
         response = client.post(

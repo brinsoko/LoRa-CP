@@ -67,6 +67,14 @@ def _filtered_query(team_id: Optional[int], checkpoint_id: Optional[int],
     return q
 
 
+def _parse_pagination() -> tuple[int, int]:
+    page = request.args.get("page", 1, type=int) or 1
+    per_page = request.args.get("per_page", 100, type=int) or 100
+    page = max(1, page)
+    per_page = max(1, min(per_page, 500))
+    return page, per_page
+
+
 def _parse_timestamp(payload: dict, fallback_dt: Optional[datetime] = None) -> datetime:
     """
     Accepts either:
@@ -166,6 +174,7 @@ class CheckinListResource(Resource):
         date_from = request.args.get("date_from")
         date_to = request.args.get("date_to")
         sort = (request.args.get("sort") or "new").lower()
+        page, per_page = _parse_pagination()
 
         q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
 
@@ -179,8 +188,19 @@ class CheckinListResource(Resource):
         else:
             q = q.order_by(Checkin.timestamp.desc())
 
-        rows = q.all()
-        return {"checkins": [_serialize_checkin(r) for r in rows]}, 200
+        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+        rows = pagination.items
+        return {
+            "checkins": [_serialize_checkin(r) for r in rows],
+            "pagination": {
+                "page": pagination.page,
+                "per_page": pagination.per_page,
+                "pages": pagination.pages,
+                "total": pagination.total,
+                "has_prev": pagination.has_prev,
+                "has_next": pagination.has_next,
+            },
+        }, 200
 
     def post(self):
         """
@@ -442,6 +462,7 @@ class CheckinExportResource(Resource):
         date_from = request.args.get("date_from")
         date_to = request.args.get("date_to")
         sort = (request.args.get("sort") or "new").lower()
+        page, per_page = _parse_pagination()
 
         q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
 
@@ -455,7 +476,8 @@ class CheckinExportResource(Resource):
         else:
             q = q.order_by(Checkin.timestamp.desc())
 
-        rows = q.all()
+        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+        rows = pagination.items
 
         buf = io.StringIO()
         w = csv.writer(buf)

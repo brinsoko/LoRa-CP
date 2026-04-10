@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{% block title %}{{ _('RFID Checkpoint System') }}{% endblock %}</title>
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
 
@@ -217,6 +218,48 @@
           el.checked = (v === 'dark');
         }
       });
+    })();
+  </script>
+  <script>
+    (function () {
+      const tokenMeta = document.querySelector('meta[name="csrf-token"]');
+      const csrfToken = tokenMeta ? tokenMeta.getAttribute('content') : '';
+      if (!csrfToken) return;
+
+      window.__csrfToken = csrfToken;
+
+      const ensureFormToken = (form) => {
+        if (!form) return;
+        const method = (form.getAttribute('method') || 'get').toUpperCase();
+        if (['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method)) return;
+        let input = form.querySelector('input[name="csrf_token"]');
+        if (!input) {
+          input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'csrf_token';
+          form.appendChild(input);
+        }
+        input.value = csrfToken;
+      };
+
+      document.querySelectorAll('form').forEach(ensureFormToken);
+      document.addEventListener('submit', function (event) {
+        ensureFormToken(event.target);
+      }, true);
+
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = function (input, init) {
+        const options = init ? { ...init } : {};
+        const method = (options.method || (input && input.method) || 'GET').toUpperCase();
+        if (!['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method)) {
+          const headers = new Headers(options.headers || (input && input.headers) || {});
+          if (!headers.has('X-CSRF-Token')) {
+            headers.set('X-CSRF-Token', csrfToken);
+          }
+          options.headers = headers;
+        }
+        return originalFetch(input, options);
+      };
     })();
   </script>
 
