@@ -33,19 +33,24 @@
 
       <div class="row g-3 mb-3">
         <div class="col">
-          <label class="form-label">{{ _('NVS partition offset') }}</label>
-          <input class="form-control font-monospace" name="nvs_offset" value="0x9000">
-          <div class="form-text">{{ _('Where NVS starts in flash (default 0x9000)') }}</div>
+          <label class="form-label">{{ _('NVS keys offset') }}</label>
+          <input class="form-control font-monospace" name="nvs_keys_offset" value="0xC000">
+          <div class="form-text">{{ _('nvs_keys partition (0x1000)') }}</div>
+        </div>
+        <div class="col">
+          <label class="form-label">{{ _('Encrypted NVS offset') }}</label>
+          <input class="form-control font-monospace" name="nvs_offset" value="0xD000">
+          <div class="form-text">{{ _('sec_nvs partition start') }}</div>
         </div>
         <div class="col">
           <label class="form-label">{{ _('NVS partition size') }}</label>
-          <input class="form-control font-monospace" name="nvs_size" value="0x5000">
-          <div class="form-text">{{ _('Size of the NVS partition (default 0x5000 on ESP32)') }}</div>
+          <input class="form-control font-monospace" name="nvs_size" value="0x3000">
+          <div class="form-text">{{ _('sec_nvs size (min 0x3000)') }}</div>
         </div>
         <div class="col">
           <label class="form-label">{{ _('App partition offset') }}</label>
           <input class="form-control font-monospace" name="app_offset" value="0x10000">
-          <div class="form-text">{{ _('Where the app binary starts (default 0x10000)') }}</div>
+          <div class="form-text">{{ _('Where the app binary starts') }}</div>
         </div>
       </div>
 

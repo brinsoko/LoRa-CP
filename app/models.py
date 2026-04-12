@@ -573,8 +573,9 @@ class FirmwareFile(db.Model):
     device_type = db.Column(db.String(20), nullable=False)   # "receiver" | "sender"
     version = db.Column(db.String(40), nullable=True)
     filename = db.Column(db.String(255), nullable=False)      # {uuid}_{secure_original}.bin on disk
-    nvs_offset = db.Column(db.Integer, nullable=False, default=0x9000)
-    nvs_size = db.Column(db.Integer, nullable=False, default=0x5000)
+    nvs_offset = db.Column(db.Integer, nullable=False, default=0xD000)      # sec_nvs (encrypted)
+    nvs_size = db.Column(db.Integer, nullable=False, default=0x3000)
+    nvs_keys_offset = db.Column(db.Integer, nullable=False, default=0xC000)  # nvs_keys partition
     app_offset = db.Column(db.Integer, nullable=False, default=0x10000)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     uploaded_by_user_id = db.Column(

@@ -1,6 +1,7 @@
 # app/blueprints/firmware/routes.py
 from __future__ import annotations
 
+import base64
 import io
 import os
 import uuid
@@ -86,8 +87,9 @@ def firmware_upload():
         name = (request.form.get("name") or "").strip()
         device_type = (request.form.get("device_type") or "").strip()
         version = (request.form.get("version") or "").strip() or None
-        nvs_offset_raw = request.form.get("nvs_offset") or "0x9000"
-        nvs_size_raw = request.form.get("nvs_size") or "0x5000"
+        nvs_offset_raw = request.form.get("nvs_offset") or "0xD000"
+        nvs_size_raw = request.form.get("nvs_size") or "0x3000"
+        nvs_keys_offset_raw = request.form.get("nvs_keys_offset") or "0xC000"
         app_offset_raw = request.form.get("app_offset") or "0x10000"
 
         errors = []
@@ -102,17 +104,22 @@ def firmware_upload():
         try:
             nvs_offset = int(nvs_offset_raw, 0)
             nvs_size = int(nvs_size_raw, 0)
+            nvs_keys_offset = int(nvs_keys_offset_raw, 0)
             app_offset = int(app_offset_raw, 0)
         except (ValueError, TypeError):
             errors.append(_("Offsets must be valid integers (e.g. 0x9000 or 36864)."))
-            nvs_offset = nvs_size = app_offset = 0
+            nvs_offset = nvs_size = nvs_keys_offset = app_offset = 0
 
+        if nvs_keys_offset >= nvs_offset:
+            errors.append(_("NVS keys offset must be less than NVS offset."))
         if nvs_offset >= app_offset:
             errors.append(_("NVS offset must be less than app offset."))
         if nvs_size <= 0 or nvs_size % 4096 != 0:
-            errors.append(_("NVS size must be a positive multiple of 4096 (e.g. 0x5000)."))
+            errors.append(_("NVS size must be a positive multiple of 4096 (e.g. 0x3000)."))
         if nvs_offset + nvs_size > app_offset:
             errors.append(_("NVS partition must fit before the app partition offset."))
+        if nvs_keys_offset + 0x1000 > nvs_offset:
+            errors.append(_("NVS keys partition (0x1000) must fit before NVS offset."))
 
         if errors:
             for e in errors:
@@ -132,6 +139,7 @@ def firmware_upload():
             filename=stored_filename,
             nvs_offset=nvs_offset,
             nvs_size=nvs_size,
+            nvs_keys_offset=nvs_keys_offset,
             app_offset=app_offset,
             uploaded_by_user_id=current_user.id,
         )
@@ -262,7 +270,12 @@ def firmware_config_preview(device_id: int, fw_id: int):
         },
         "flash_plan": [
             {
-                "label":  "NVS partition",
+                "label":  "NVS keys partition",
+                "offset": hex(fw.nvs_keys_offset),
+                "source": "generated on server (0x1000)",
+            },
+            {
+                "label":  "Encrypted NVS partition (sec_nvs)",
                 "offset": hex(fw.nvs_offset),
                 "source": f"generated on server ({hex(fw.nvs_size)})",
             },
@@ -278,6 +291,7 @@ def firmware_config_preview(device_id: int, fw_id: int):
 @firmware_bp.route("/api/nvs/<int:device_id>/<int:fw_id>")
 @roles_required("admin")
 def firmware_nvs_binary(device_id: int, fw_id: int):
+    """Return encrypted NVS + keys as JSON with base64-encoded binaries."""
     comp_id, _ = _require_comp()
     if not comp_id:
         return jsonify({"error": "no_competition", "code": 400}), 400
@@ -296,9 +310,9 @@ def firmware_nvs_binary(device_id: int, fw_id: int):
     if fw.nvs_offset + partition_size > fw.app_offset:
         abort(400, f"NVS partition overruns app offset: {fw.nvs_offset + partition_size:#x} > {fw.app_offset:#x}")
 
-    from app.utils.nvs_gen import generate_nvs_partition
+    from app.utils.nvs_gen import generate_encrypted_nvs_partition
     try:
-        nvs_bytes = generate_nvs_partition(
+        result = generate_encrypted_nvs_partition(
             dev_num=device.dev_num,
             competition_id=comp_id,
             card_secret=card_secret,
@@ -310,9 +324,9 @@ def firmware_nvs_binary(device_id: int, fw_id: int):
         current_app.logger.exception("NVS generation failed: %s", exc)
         return jsonify({"error": "nvs_generation_failed", "detail": str(exc)}), 500
 
-    return send_file(
-        io.BytesIO(nvs_bytes),
-        mimetype="application/octet-stream",
-        as_attachment=False,
-        download_name=f"nvs_dev{device.dev_num}.bin",
-    )
+    return jsonify({
+        "nvs_bin": base64.b64encode(result.nvs_bin).decode(),
+        "keys_bin": base64.b64encode(result.keys_bin).decode(),
+        "nvs_offset": fw.nvs_offset,
+        "nvs_keys_offset": fw.nvs_keys_offset,
+    })

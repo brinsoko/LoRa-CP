@@ -252,8 +252,8 @@
     const firmwareId = firmwareSelect ? firmwareSelect.value : '';
     if (!deviceId || !firmwareId || !currentConfig) return;
 
-    const nvsOffset = parseInt(currentConfig.flash_plan[0].offset, 16);
-    const appOffset = parseInt(currentConfig.flash_plan[1].offset, 16);
+    const nvsOffset = parseInt(currentConfig.flash_plan[1].offset, 16);
+    const appOffset = parseInt(currentConfig.flash_plan[2].offset, 16);
 
     flashBtn.disabled = true;
     progressWrap.classList.remove('d-none');
@@ -272,17 +272,22 @@
       const fwData = arrayBufferToBinaryString(fwBuf);
       log(`Firmware: ${fwBuf.byteLength} bytes`);
 
-      // 2. Fetch NVS binary
-      setStatus('Generating NVS…');
-      log('Requesting NVS partition from server…');
+      // 2. Fetch encrypted NVS + keys bundle
+      setStatus('Generating encrypted NVS…');
+      log('Requesting encrypted NVS partition from server…');
       const nvsResp = await fetch(`/firmware/api/nvs/${deviceId}/${firmwareId}`);
       if (!nvsResp.ok) {
         const err = await nvsResp.json().catch(() => ({}));
         throw new Error(`NVS generation failed: ${err.detail || nvsResp.status}`);
       }
-      const nvsBuf = await nvsResp.arrayBuffer();
-      const nvsData = arrayBufferToBinaryString(nvsBuf);
-      log(`NVS partition: ${nvsBuf.byteLength} bytes`);
+      const nvsBundle = await nvsResp.json();
+      const nvsBin = Uint8Array.from(atob(nvsBundle.nvs_bin), c => c.charCodeAt(0));
+      const keysBin = Uint8Array.from(atob(nvsBundle.keys_bin), c => c.charCodeAt(0));
+      const nvsData = arrayBufferToBinaryString(nvsBin.buffer);
+      const keysData = arrayBufferToBinaryString(keysBin.buffer);
+      const keysOffset = nvsBundle.nvs_keys_offset;
+      log(`Encrypted NVS: ${nvsBin.byteLength} bytes`);
+      log(`NVS keys: ${keysBin.byteLength} bytes`);
 
       // 3. Open serial port
       setStatus('Select COM port in the dialog…');
@@ -313,9 +318,27 @@
       log('Connected. Chip: ' + chip);
       setStatus('Connected.');
 
-      // 5. Flash NVS at nvs_offset
-      log(`\nFlashing NVS partition at ${currentConfig.flash_plan[0].offset}…`);
-      setStatus('Flashing NVS…');
+      // 5. Flash NVS keys at nvs_keys_offset
+      log(`\nFlashing NVS keys at 0x${keysOffset.toString(16)}…`);
+      setStatus('Flashing NVS keys…');
+      await loader.writeFlash({
+        fileArray: [{ data: keysData, address: keysOffset }],
+        flashSize: 'keep',
+        flashMode: 'keep',
+        flashFreq: 'keep',
+        eraseAll: false,
+        compress: true,
+        reportProgress(_idx, written, total) {
+          const pct = Math.round(written / total * 15);  // Keys = 0–15%
+          setProgress(pct, `Keys ${Math.round(written / total * 100)}%`);
+        },
+      });
+      log('NVS keys written.');
+      setProgress(15, 'Keys done');
+
+      // 6. Flash encrypted NVS at nvs_offset
+      log(`\nFlashing encrypted NVS at ${currentConfig.flash_plan[1].offset}…`);
+      setStatus('Flashing encrypted NVS…');
       await loader.writeFlash({
         fileArray: [{ data: nvsData, address: nvsOffset }],
         flashSize: 'keep',
@@ -324,15 +347,15 @@
         eraseAll: false,
         compress: true,
         reportProgress(_idx, written, total) {
-          const pct = Math.round(written / total * 50);  // NVS = 0–50%
-          setProgress(pct, `NVS ${pct * 2}%`);
+          const pct = 15 + Math.round(written / total * 25);  // NVS = 15–40%
+          setProgress(pct, `NVS ${Math.round(written / total * 100)}%`);
         },
       });
-      log('NVS partition written.');
-      setProgress(50, 'NVS done');
+      log('Encrypted NVS written.');
+      setProgress(40, 'NVS done');
 
-      // 6. Flash application at app_offset
-      log(`\nFlashing application at ${currentConfig.flash_plan[1].offset}…`);
+      // 7. Flash application at app_offset
+      log(`\nFlashing application at ${currentConfig.flash_plan[2].offset}…`);
       setStatus('Flashing firmware…');
       await loader.writeFlash({
         fileArray: [{ data: fwData, address: appOffset }],
@@ -342,14 +365,14 @@
         eraseAll: false,
         compress: true,
         reportProgress(_idx, written, total) {
-          const pct = 50 + Math.round(written / total * 50);  // App = 50–100%
-          setProgress(pct, `FW ${(pct - 50) * 2}%`);
+          const pct = 40 + Math.round(written / total * 60);  // App = 40–100%
+          setProgress(pct, `FW ${Math.round(written / total * 100)}%`);
         },
       });
       log('Firmware written.');
       setProgress(100, 'Done');
 
-      // 7. Reset
+      // 8. Reset
       log('\nResetting device…');
       await loader.hardReset();
       log('Device reset. Flash complete!');
