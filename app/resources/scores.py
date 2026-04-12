@@ -119,6 +119,20 @@ def _score_entry_snapshot(entry: ScoreEntry) -> dict:
     }
 
 
+def _round_score(value: float | None) -> float | None:
+    """Round score to 2 decimal places. Returns None for None input."""
+    if value is None:
+        return None
+    return round(value, 2)
+
+
+def _clamp_non_negative(value: float | None) -> float | None:
+    """Clamp score to be >= 0. Returns None for None input."""
+    if value is None:
+        return None
+    return max(0.0, value)
+
+
 def _apply_field_rule(value, rule, context: dict) -> float | None:
     if isinstance(rule, list):
         current = value
@@ -130,7 +144,7 @@ def _apply_field_rule(value, rule, context: dict) -> float | None:
     rule_type = (rule.get("type") or "").strip().lower()
     if rule_type == "mapping":
         mapping = rule.get("map") or {}
-        return _to_number(mapping.get(str(value)))
+        return _round_score(_clamp_non_negative(_to_number(mapping.get(str(value)))))
     if rule_type == "interpolate":
         pts = rule.get("points") or []
         try:
@@ -141,22 +155,22 @@ def _apply_field_rule(value, rule, context: dict) -> float | None:
         if x is None or not pts:
             return None
         if x <= pts[0][0]:
-            return pts[0][1]
+            return _round_score(_clamp_non_negative(pts[0][1]))
         if x >= pts[-1][0]:
-            return pts[-1][1]
+            return _round_score(_clamp_non_negative(pts[-1][1]))
         for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
             if x1 <= x <= x2:
                 if x2 == x1:
-                    return y1
+                    return _round_score(_clamp_non_negative(y1))
                 t = (x - x1) / (x2 - x1)
-                return y1 + t * (y2 - y1)
+                return _round_score(_clamp_non_negative(y1 + t * (y2 - y1)))
         return None
     if rule_type == "multiplier":
         factor = _to_number(rule.get("factor"))
         base = _to_number(value)
         if factor is None or base is None:
             return None
-        return base * factor
+        return _round_score(_clamp_non_negative(base * factor))
     if rule_type == "found":
         team_id = context.get("team_id")
         competition_id = context.get("competition_id")
@@ -183,7 +197,7 @@ def _apply_field_rule(value, rule, context: dict) -> float | None:
             .all()
         )
         count = len(found)
-        return points_per * count
+        return _round_score(_clamp_non_negative(points_per * count))
     if value is None or value == "":
         return None
     if rule_type == "deviation":
@@ -193,15 +207,15 @@ def _apply_field_rule(value, rule, context: dict) -> float | None:
         penalty_points = _to_number(rule.get("penalty_points"))
         penalty_distance = _to_number(rule.get("penalty_distance"))
         min_points = _to_number(rule.get("min_points"))
+        if min_points is None:
+            min_points = 0.0
         if base is None or target is None or max_points is None or penalty_points is None or penalty_distance in (None, 0):
             return None
         distance = abs(base - target)
         penalty = (distance / penalty_distance) * penalty_points
-        points = max_points - penalty
-        if min_points is not None:
-            points = max(points, min_points)
-        return points
-    return _to_number(value)
+        points = max(max_points - penalty, min_points)
+        return _round_score(_clamp_non_negative(points))
+    return _round_score(_to_number(value))
 
 
 def _parse_time_to_seconds(value) -> float | None:
@@ -226,14 +240,40 @@ def _parse_time_to_seconds(value) -> float | None:
         return None
 
 
+def _get_team_dead_time_total(competition_id: int, team_id: int) -> float:
+    """Sum all dead_time values from the latest ScoreEntry per checkpoint for a team."""
+    entries = (
+        ScoreEntry.query
+        .filter(
+            ScoreEntry.competition_id == competition_id,
+            ScoreEntry.team_id == team_id,
+        )
+        .order_by(ScoreEntry.created_at.desc())
+        .all()
+    )
+    latest_by_cp: dict[int, ScoreEntry] = {}
+    for entry in entries:
+        if entry.checkpoint_id not in latest_by_cp:
+            latest_by_cp[entry.checkpoint_id] = entry
+    total_dead = 0.0
+    for entry in latest_by_cp.values():
+        raw = entry.raw_fields or {}
+        dead_val = raw.get("dead_time", raw.get("Dead Time"))
+        num = _to_number(dead_val)
+        if num is not None and num > 0:
+            total_dead += num
+    return total_dead
+
+
 def _compute_global_contrib(competition_id: int, team_id: int, group_id: int, global_rule: dict | None) -> dict:
     if not global_rule:
-        return {"total": None, "found_points": None, "time_points": None}
+        return {"total": None, "found_points": None, "time_points": None, "auto_dnf": False}
 
     total = 0.0
     used = False
     found_points = None
     time_points = None
+    auto_dnf = False
 
     found_rule = global_rule.get("found") or {}
     points_per = _to_number(found_rule.get("points_per"))
@@ -280,6 +320,7 @@ def _compute_global_contrib(competition_id: int, team_id: int, group_id: int, gl
     penalty_minutes = _to_number(time_rule.get("penalty_minutes"))
     penalty_points = _to_number(time_rule.get("penalty_points"))
     min_points = _to_number(time_rule.get("min_points")) or 0.0
+    dq_multiplier = _to_number(time_rule.get("dq_multiplier"))
     if start_cp and end_cp and max_points is not None and threshold_minutes is not None and penalty_minutes and penalty_points is not None:
         start_row = (
             Checkin.query
@@ -302,18 +343,31 @@ def _compute_global_contrib(competition_id: int, team_id: int, group_id: int, gl
             .first()
         )
         if start_row and end_row:
-            duration_minutes = (end_row.timestamp - start_row.timestamp).total_seconds() / 60.0
+            raw_duration = (end_row.timestamp - start_row.timestamp).total_seconds() / 60.0
+            # Subtract dead time from elapsed duration
+            dead_time_total = _get_team_dead_time_total(competition_id, team_id)
+            duration_minutes = max(0.0, raw_duration - dead_time_total)
+
+            # Auto-DQ check: if effective time exceeds threshold × dq_multiplier
+            if dq_multiplier is not None and dq_multiplier > 0 and duration_minutes > threshold_minutes * dq_multiplier:
+                auto_dnf = True
+
             if duration_minutes <= threshold_minutes:
                 time_points = max_points
             else:
                 over = max(0.0, duration_minutes - threshold_minutes)
                 time_points = max_points - (over / penalty_minutes) * penalty_points
-            if time_points < min_points:
-                time_points = min_points
+            # Clamp to minimum (never negative), round to 2 decimal places
+            time_points = _round_score(_clamp_non_negative(max(time_points, min_points)))
             total += time_points
             used = True
 
-    return {"total": (total if used else None), "found_points": found_points, "time_points": time_points}
+    return {
+        "total": (_round_score(total) if used else None),
+        "found_points": _round_score(found_points),
+        "time_points": time_points,
+        "auto_dnf": auto_dnf,
+    }
 
 
 def _compute_total(
@@ -357,7 +411,7 @@ def _compute_total(
             used = True
         base_total = total if used else None
 
-    return base_total
+    return _round_score(base_total)
 
 
 def _compute_time_race_scores_from_checkins(
@@ -413,12 +467,12 @@ def _compute_time_race_scores_from_checkins(
     min_d = min(durations.values())
     max_d = max(durations.values())
     if max_d == min_d:
-        return {team_id: max_points for team_id in durations.keys()}
+        return {team_id: _round_score(max_points) for team_id in durations.keys()}
 
     scores = {}
     for team_id, duration in durations.items():
         t = (duration - min_d) / (max_d - min_d)
-        scores[team_id] = max_points - t * (max_points - min_points)
+        scores[team_id] = _round_score(_clamp_non_negative(max_points - t * (max_points - min_points)))
     return scores
 
 
@@ -631,6 +685,13 @@ def score_submit():
         fields = payload.get("fields") or {}
         uid = (payload.get("uid") or "").strip().upper()
 
+        # Validate no negative numeric inputs (dead_time excluded — it's always >= 0)
+        for key, val in fields.items():
+            num = _to_number(val)
+            if num is not None and num < 0 and key != "dead_time":
+                from flask_babel import gettext as _
+                return jsonify({"error": "validation_error", "detail": _("Score cannot be negative.")}), 400
+
         try:
             team_id = int(team_id)
             checkpoint_id = int(checkpoint_id)
@@ -674,7 +735,7 @@ def score_submit():
             competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id
         ).first()
         created_checkin = False
-        if not checkin:
+        if not checkin and not checkpoint.is_virtual:
             checkin = Checkin(
                 competition_id=comp_id,
                 team_id=team.id,
@@ -716,7 +777,7 @@ def score_submit():
         )
         entry = ScoreEntry(
             competition_id=comp_id,
-            checkin_id=checkin.id,
+            checkin_id=checkin.id if checkin else None,
             team_id=team.id,
             checkpoint_id=checkpoint_id,
             judge_user_id=current_user.id,

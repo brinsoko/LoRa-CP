@@ -211,6 +211,7 @@ def save_global_rules():
     time_penalty_minutes = request.form.get("global_time_penalty_minutes", type=float)
     time_penalty_points = request.form.get("global_time_penalty_points", type=float)
     time_min = request.form.get("global_time_min_points", type=float)
+    time_dq_multiplier = request.form.get("global_time_dq_multiplier", type=float)
 
     if not group_id:
         flash(_("Group is required for global rules."), "warning")
@@ -227,7 +228,7 @@ def save_global_rules():
         if not time_start or not time_end:
             flash(_("Global time rule requires start and end checkpoints."), "warning")
             return redirect(url_for("scores.score_rules"))
-        rules["time"] = {
+        time_config = {
             "start_checkpoint_id": time_start,
             "end_checkpoint_id": time_end,
             "max_points": time_max or 0,
@@ -236,6 +237,9 @@ def save_global_rules():
             "penalty_points": time_penalty_points or 0,
             "min_points": time_min or 0,
         }
+        if time_dq_multiplier is not None and time_dq_multiplier > 0:
+            time_config["dq_multiplier"] = time_dq_multiplier
+        rules["time"] = time_config
     if not rules:
         flash(_("Select at least one global rule."), "warning")
         return redirect(url_for("scores.score_rules"))
@@ -435,6 +439,12 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         global_totals[team_id] = global_data["total"] or 0.0
         global_time_points[team_id] = global_data["time_points"] or 0.0
         global_found_points[team_id] = global_data["found_points"] or 0.0
+        # Auto-DQ from timeline
+        if global_data.get("auto_dnf"):
+            team_obj = Team.query.get(team_id)
+            if team_obj and not team_obj.dnf:
+                team_obj.dnf = True
+                db.session.commit()
         if global_rule:
             found_rule = global_rule.get("found") or {}
             time_rule = global_rule.get("time") or {}

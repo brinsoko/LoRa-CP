@@ -303,7 +303,7 @@ def ingest_post():
 
             if card:
                 team = db.session.get(Team, card.team_id)
-                if team and cp and team.competition_id == competition_id and cp.competition_id == competition_id:
+                if team and cp and team.competition_id == competition_id and cp.competition_id == competition_id and not cp.is_virtual:
                     team_obj = team
                     team_name = team.name
                     exists = Checkin.query.filter_by(

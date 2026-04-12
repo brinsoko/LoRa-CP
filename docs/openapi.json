@@ -275,6 +275,11 @@
               "null"
             ]
           },
+          "is_virtual": {
+            "type": "boolean",
+            "default": false,
+            "description": "Virtual checkpoints do not appear on the GPS map, do not generate arrivals, and do not auto-create check-ins. They are used for pre-start tasks like map plotting, topography tests, signaling, etc."
+          },
           "groups": {
             "type": "array",
             "items": {

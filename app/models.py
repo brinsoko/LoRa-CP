@@ -360,6 +360,7 @@ class Checkpoint(db.Model):
     description = db.Column(db.Text)
     easting = db.Column(db.Float)
     northing = db.Column(db.Float)
+    is_virtual = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
 
     # Device mapping (one device ↔ one checkpoint)
     lora_device_id = db.Column(
@@ -641,7 +642,7 @@ class ScoreEntry(db.Model):
         db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     checkin_id = db.Column(
-        db.Integer, db.ForeignKey("checkins.id", ondelete="CASCADE"), nullable=False, index=True
+        db.Integer, db.ForeignKey("checkins.id", ondelete="CASCADE"), nullable=True, index=True
     )
     team_id = db.Column(
         db.Integer, db.ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True

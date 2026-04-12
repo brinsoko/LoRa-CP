@@ -3974,6 +3974,46 @@ msgstr[1] ""
 msgstr[2] ""
 msgstr[3] ""
 
+# Virtual checkpoints
+msgid "Virtual checkpoint (no map, no arrivals, no auto check-in)"
+msgstr "Virtualna kontrolna točka (brez zemljevida, prihodov in samodejnega beleženja)"
+
+msgid "Virtual"
+msgstr "Virtualna"
+
+# Score overwrite warning
+msgid "This field already has a value. Are you sure you want to overwrite it?"
+msgstr "To polje že ima vrednost. Ali ste prepričani, da želite prepisati obstoječo vrednost?"
+
+# Score validation
+msgid "Score cannot be negative."
+msgstr "Rezultat ne more biti negativen."
+
+# Sheets duplicate / delete
+msgid "A config for tab '%(tab)s' already exists. Submit again with overwrite enabled to replace it."
+msgstr "Konfiguracija za zavihek '%(tab)s' že obstaja. Oddajte znova z označeno možnostjo prepisa."
+
+msgid "Tab '%(tab)s' overwritten."
+msgstr "Zavihek '%(tab)s' je bil prepisan."
+
+msgid "Config '%(tab)s' deleted."
+msgstr "Konfiguracija '%(tab)s' je bila izbrisana."
+
+msgid "Remote tab could not be deleted: %(error)s"
+msgstr "Oddaljeni zavihek ni bilo mogoče izbrisati: %(error)s"
+
+msgid "Delete this config?"
+msgstr "Izbriši to konfiguracijo?"
+
+msgid "Overwrite if exists"
+msgstr "Prepiši, če že obstaja"
+
+msgid "Delete config AND remote tab from spreadsheet?"
+msgstr "Izbriši konfiguracijo IN zavihek iz preglednice?"
+
+msgid "Delete + remote"
+msgstr "Izbriši + oddaljeni"
+
 # Base layout / navbar
 #~ msgid "RFID Checkpoint System"
 #~ msgstr "RFID nadzorni sistem"

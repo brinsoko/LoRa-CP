@@ -335,6 +335,13 @@ def build_arrivals_tab(
         .order_by(SheetConfig.tab_name.asc())
         .all()
     )
+    # Exclude virtual checkpoints from arrivals — they have no check-in concept.
+    from app.models import Checkpoint as _CP
+    virtual_cp_ids = {
+        row[0]
+        for row in db.session.query(_CP.id).filter(_CP.is_virtual.is_(True)).all()
+    }
+    cp_configs = [cfg for cfg in cp_configs if cfg.checkpoint_id not in virtual_cp_ids]
     if not cp_configs:
         return "No checkpoint tab configs found."
     if checkpoint_order_override:

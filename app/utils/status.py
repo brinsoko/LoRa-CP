@@ -55,6 +55,8 @@ def compute_team_statuses(team_id: int, competition_id: int) -> Dict:
         }
 
     cps = get_group_checkpoints(group)
+    # Exclude virtual checkpoints from map display
+    cps = [cp for cp in cps if not cp.is_virtual]
     found_ids = set(get_found_checkpoint_ids(team_id, competition_id))
 
     # Decide "next" as the first checkpoint in group order that is not found.
@@ -88,10 +90,16 @@ def compute_team_statuses(team_id: int, competition_id: int) -> Dict:
     }
 
 def all_checkpoints_for_map(competition_id: int) -> List[Dict]:
-    """Return all checkpoints with coords for the public map layer."""
+    """Return all checkpoints with coords for the public map layer.
+
+    Virtual checkpoints are excluded — they have no physical location.
+    """
     cps = (
         db.session.query(Checkpoint)
-        .filter(Checkpoint.competition_id == competition_id)
+        .filter(
+            Checkpoint.competition_id == competition_id,
+            Checkpoint.is_virtual.is_(False),
+        )
         .order_by(Checkpoint.name.asc())
         .all()
     )

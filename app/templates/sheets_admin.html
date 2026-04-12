@@ -295,6 +295,10 @@
             <input class="form-control" name="time_header" value="{{ lang.time_header if lang else 'Čas' }}">
           </div>
 
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="overwrite" value="1" id="overwriteTab">
+            <label class="form-check-label" for="overwriteTab">{{ _('Overwrite if exists') }}</label>
+          </div>
           <button class="btn btn-success" type="submit">{{ _('Add tab') }}</button>
         </form>
       </div>
@@ -332,15 +336,28 @@
                 <td>{{ c.tab_type }}</td>
                 <td>{{ c.checkpoint.name if c.checkpoint else "—" }}</td>
                 <td>
+                  <div class="d-flex gap-1 flex-wrap">
                   {% if c.config and c.config.get("groups") %}
                     <form method="post" action="{{ url_for('sheets_admin.sync_team_numbers', config_id=c.id) }}">
-                  {{ csrf_input() }}
-                  <button class="btn btn-sm btn-outline-primary" type="submit">{{ _('Sync team numbers') }}</button>
-                </form>
-              {% else %}
-                <span class="text-muted">{{ _('—') }}</span>
-              {% endif %}
-            </td>
+                      {{ csrf_input() }}
+                      <button class="btn btn-sm btn-outline-primary" type="submit">{{ _('Sync team numbers') }}</button>
+                    </form>
+                  {% endif %}
+                    <form method="post" action="{{ url_for('sheets_admin.delete_config', config_id=c.id) }}"
+                          onsubmit="return confirm('{{ _('Delete this config?') }}');">
+                      {{ csrf_input() }}
+                      <button class="btn btn-sm btn-outline-danger" type="submit">{{ _('Delete') }}</button>
+                    </form>
+                    {% if not c.spreadsheet_id.startswith('local:') %}
+                    <form method="post" action="{{ url_for('sheets_admin.delete_config', config_id=c.id) }}"
+                          onsubmit="return confirm('{{ _('Delete config AND remote tab from spreadsheet?') }}');">
+                      {{ csrf_input() }}
+                      <input type="hidden" name="delete_remote" value="1">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">{{ _('Delete + remote') }}</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
                 <td>{{ c.created_at }}</td>
               </tr>
             {% endfor %}

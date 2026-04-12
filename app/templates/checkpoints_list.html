@@ -32,7 +32,7 @@
             {% for cp in checkpoints %}
             <tr>
               <td>{{ loop.index }}</td>  {# ← Auto counter from 1 #}
-              <td>{{ cp.name }}</td>
+              <td>{{ cp.name }}{% if cp.is_virtual %} <span class="badge bg-info">{{ _('Virtual') }}</span>{% endif %}</td>
               <td>{{ cp.location or '—' }}</td>
               <td class="text-break" style="max-width: 360px;">{{ cp.description or '—' }}</td>
               <td>

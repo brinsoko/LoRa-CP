@@ -124,6 +124,7 @@
     writebackFailed: "{{ _('Card write-back failed.') }}",
     writebackSkipped: "{{ _('Card write-back skipped.') }}",
     writebackTap: "{{ _('Tap the card to write back.') }}",
+    overwriteConfirm: "{{ _('This field already has a value. Are you sure you want to overwrite it?') }}",
     teamLabel: "{{ _('Team') }}",
     checkpointLabel: "{{ _('Checkpoint') }}",
     groupLabel: "{{ _('Group') }}",
@@ -168,6 +169,9 @@
       input.dataset.key = field.key;
       input.type = field.type === "text" ? "text" : "number";
       input.step = field.type === "text" ? "1" : "any";
+      if (field.type !== "text" && field.key !== "dead_time") {
+        input.min = "0";
+      }
       if (latestValues && latestValues[field.key] !== undefined) {
         input.value = latestValues[field.key];
       }
@@ -347,6 +351,18 @@
     fieldsContainer.querySelectorAll("input").forEach((input) => {
       fields[input.dataset.key] = input.value;
     });
+    // Warn if overwriting existing values
+    if (currentContext && currentContext.latest_score) {
+      const overwritten = [];
+      for (const [key, val] of Object.entries(currentContext.latest_score)) {
+        if (val !== null && val !== "" && val !== undefined && fields[key] !== undefined && fields[key] !== "" && String(fields[key]) !== String(val)) {
+          overwritten.push(key);
+        }
+      }
+      if (overwritten.length > 0 && !confirm(I18N.overwriteConfirm)) {
+        return;
+      }
+    }
     try {
       const data = await submitScore({
         team_id: teamId.value,

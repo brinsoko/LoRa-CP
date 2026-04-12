@@ -25,6 +25,7 @@ def _serialize_checkpoint(cp: Checkpoint) -> dict:
         "description": cp.description,
         "easting": cp.easting,
         "northing": cp.northing,
+        "is_virtual": cp.is_virtual,
         "groups": [
             {
                 "id": link.group_id,
@@ -187,6 +188,7 @@ def checkpoint_create():
         description=description,
         easting=payload.get("easting"),
         northing=payload.get("northing"),
+        is_virtual=bool(payload.get("is_virtual")),
     )
     db.session.add(cp)
     db.session.flush()
@@ -290,6 +292,9 @@ def _update_checkpoint(checkpoint_id: int, partial: bool):
 
     if "northing" in payload or not partial:
         cp.northing = payload.get("northing")
+
+    if "is_virtual" in payload or not partial:
+        cp.is_virtual = bool(payload.get("is_virtual"))
 
     if "group_ids" in payload:
         group_ids = _parse_group_ids(payload.get("group_ids"))
@@ -420,6 +425,9 @@ def checkpoint_import():
             db.session.add(cp)
             db.session.flush()
             is_new = True
+
+        if "is_virtual" in item:
+            cp.is_virtual = bool(item.get("is_virtual"))
 
         if location is not None:
             cp.location = location

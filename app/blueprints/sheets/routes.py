@@ -546,6 +546,41 @@ def sync_team_numbers(config_id: int):
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
+@sheets_bp.route("/delete-config/<int:config_id>", methods=["POST"])
+@roles_required("admin")
+def delete_config(config_id: int):
+    """Delete a single SheetConfig record (and optionally the remote tab)."""
+    comp_id, redirect_resp = _require_competition()
+    if redirect_resp:
+        return redirect_resp
+    cfg = (
+        SheetConfig.query
+        .filter(SheetConfig.competition_id == comp_id, SheetConfig.id == config_id)
+        .first()
+    )
+    if not cfg:
+        flash(_("Config not found."), "warning")
+        return redirect(url_for("sheets_admin.list_sheets"))
+
+    delete_remote = bool(request.form.get("delete_remote"))
+    tab_name = cfg.tab_name
+
+    if delete_remote and sheets_sync_enabled() and not cfg.spreadsheet_id.startswith("local:"):
+        try:
+            client = _get_sheets_client()
+            ss = client.gc.open_by_key(cfg.spreadsheet_id)
+            ws = ss.worksheet(tab_name)
+            ss.del_worksheet(ws)
+        except Exception as exc:
+            current_app.logger.warning("Could not delete remote tab %s: %s", tab_name, exc)
+            flash(_("Remote tab could not be deleted: %(error)s", error=exc), "warning")
+
+    db.session.delete(cfg)
+    db.session.commit()
+    flash(_("Config '%(tab)s' deleted.", tab=tab_name), "success")
+    return redirect(url_for("sheets_admin.list_sheets"))
+
+
 @sheets_bp.route("/add-tab", methods=["POST"])
 @roles_required("admin")
 def add_tab():
@@ -641,27 +676,46 @@ def add_tab():
             flash(msg, "warning")
             return redirect(url_for("sheets_admin.list_sheets"))
 
-    record = SheetConfig(
-        competition_id=comp_id,
-        spreadsheet_id=spreadsheet_id,
-        spreadsheet_name=ws_title or "Local",
-        tab_name=tab_title,
-        tab_type=tab_type,
-        checkpoint_id=checkpoint_id,
-        config={
-            "arrived_header": arrived_header,
-            "dead_time_enabled": dead_time_enabled,
-            "dead_time_header": dead_time_header,
-            "time_enabled": include_time,
-            "time_header": time_header,
-            "points_header": points_header,
-            "groups": groups_with_ids,
-        },
-    )
-    db.session.add(record)
-    db.session.commit()
-    if not use_sheets:
-        flash(_("Added local tab '%(tab)s'.", tab=tab_title), "success")
+    overwrite = bool(request.form.get("overwrite"))
+    existing = SheetConfig.query.filter_by(spreadsheet_id=spreadsheet_id, tab_name=tab_title).first()
+    if existing and not overwrite:
+        flash(
+            _("A config for tab '%(tab)s' already exists. Submit again with overwrite enabled to replace it.", tab=tab_title),
+            "warning",
+        )
+        return redirect(url_for("sheets_admin.list_sheets"))
+
+    new_config = {
+        "arrived_header": arrived_header,
+        "dead_time_enabled": dead_time_enabled,
+        "dead_time_header": dead_time_header,
+        "time_enabled": include_time,
+        "time_header": time_header,
+        "points_header": points_header,
+        "groups": groups_with_ids,
+    }
+
+    if existing and overwrite:
+        existing.tab_type = tab_type
+        existing.checkpoint_id = checkpoint_id
+        existing.config = new_config
+        existing.spreadsheet_name = ws_title or existing.spreadsheet_name
+        db.session.commit()
+        flash(_("Tab '%(tab)s' overwritten.", tab=tab_title), "success")
     else:
-        flash(_("Added tab '%(tab)s' to spreadsheet.", tab=tab_title), "success")
+        record = SheetConfig(
+            competition_id=comp_id,
+            spreadsheet_id=spreadsheet_id,
+            spreadsheet_name=ws_title or "Local",
+            tab_name=tab_title,
+            tab_type=tab_type,
+            checkpoint_id=checkpoint_id,
+            config=new_config,
+        )
+        db.session.add(record)
+        db.session.commit()
+        if not use_sheets:
+            flash(_("Added local tab '%(tab)s'.", tab=tab_title), "success")
+        else:
+            flash(_("Added tab '%(tab)s' to spreadsheet.", tab=tab_title), "success")
     return redirect(url_for("sheets_admin.list_sheets"))

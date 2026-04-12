@@ -85,6 +85,8 @@ def _normalize_checkpoint_form(form):
     lora_device_id, lora_device_error = _parse_optional_int(form.get("lora_device_id"), "Device ID")
     group_ids, group_ids_error = _parse_int_list(form.getlist("group_ids"), "Group ID")
 
+    is_virtual = form.get("is_virtual") in ("on", "true", "True", "1")
+
     return {
         "name": name,
         "location": location,
@@ -93,6 +95,7 @@ def _normalize_checkpoint_form(form):
         "northing": northing,
         "lora_device_id": lora_device_id,
         "group_ids": group_ids,
+        "is_virtual": is_virtual,
     }, lora_device_error or group_ids_error
 
 
