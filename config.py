@@ -49,3 +49,4 @@ class Config:
     GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
     GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
     WTF_CSRF_ENABLED = _env_bool("WTF_CSRF_ENABLED", True)
+    TEMPLATES_AUTO_RELOAD = os.getenv("FLASK_ENV") != "production"

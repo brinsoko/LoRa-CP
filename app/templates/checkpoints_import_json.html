@@ -19,6 +19,7 @@
       </div>
     </div>
     <form method="post" class="mt-3" enctype="multipart/form-data">
+      {{ csrf_input() }}
       <div class="mb-3">
         <label class="form-label">{{ _('Upload JSON file (optional)') }}</label>
         <input class="form-control" type="file" name="file" accept=".json,application/json">

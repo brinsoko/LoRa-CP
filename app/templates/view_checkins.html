@@ -113,6 +113,7 @@
                     action="{{ url_for('checkins.delete_checkin', checkin_id=c.id) }}"
                     class="d-inline"
                     onsubmit="return confirm('{{ _('Delete this check-in?') }}');">
+                {{ csrf_input() }}
                 <button type="submit" class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
               </form>
             </td>

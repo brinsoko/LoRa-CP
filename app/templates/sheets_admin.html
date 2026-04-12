@@ -13,6 +13,7 @@
       </div>
     {% endif %}
     <form method="post" action="{{ url_for('sheets_admin.save_sheets_settings') }}" class="d-flex flex-wrap align-items-center gap-3 mb-3">
+      {{ csrf_input() }}
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" id="sheets_sync_enabled" name="sheets_sync_enabled" value="1"
                {% if sheets_settings and sheets_settings.sync_enabled %}checked{% endif %}>
@@ -109,6 +110,7 @@
     <hr>
     <h6 class="mt-3">{{ _('Wizard: create tabs for all checkpoints') }}</h6>
     <form method="post" action="{{ url_for('sheets_admin.wizard_checkpoints') }}" class="row g-2">
+      {{ csrf_input() }}
       <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
       <input type="hidden" name="local_only" class="local-only-target">
       <input type="hidden" name="group_order" class="group-order-target">
@@ -181,6 +183,7 @@
     </form>
     <hr>
     <form method="post" action="{{ url_for('sheets_admin.build_arrivals') }}" class="row g-2 mb-2">
+      {{ csrf_input() }}
       <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
       <input type="hidden" name="group_order" class="group-order-target">
       <input type="hidden" name="checkpoint_order" class="checkpoint-order-target">
@@ -194,6 +197,7 @@
       </div>
     </form>
     <form method="post" action="{{ url_for('sheets_admin.build_teams') }}" class="row g-2 mb-2">
+      {{ csrf_input() }}
       <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
       <input type="hidden" name="group_order" class="group-order-target">
       <div class="col-md-3">
@@ -209,6 +213,7 @@
       </div>
     </form>
     <form method="post" action="{{ url_for('sheets_admin.build_score') }}" class="row g-2">
+      {{ csrf_input() }}
       <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
       <input type="hidden" name="group_order" class="group-order-target">
       <input type="hidden" name="checkpoint_order" class="checkpoint-order-target">
@@ -237,6 +242,7 @@
       <div class="card-body">
         <h5 class="card-title">{{ _('Add checkpoint tab') }}</h5>
     <form method="post" action="{{ url_for('sheets_admin.add_tab') }}">
+      {{ csrf_input() }}
       <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
       <input type="hidden" name="local_only" class="local-only-target">
 
@@ -302,6 +308,7 @@
     {% if configs %}
       <div class="table-responsive">
         <form method="post" action="{{ url_for('sheets_admin.prune_missing') }}" class="mb-2">
+          {{ csrf_input() }}
           <button class="btn btn-sm btn-outline-danger" type="submit">{{ _('Prune missing tabs') }}</button>
         </form>
         <table class="table table-sm align-middle">
@@ -327,6 +334,7 @@
                 <td>
                   {% if c.config and c.config.get("groups") %}
                     <form method="post" action="{{ url_for('sheets_admin.sync_team_numbers', config_id=c.id) }}">
+                  {{ csrf_input() }}
                   <button class="btn btn-sm btn-outline-primary" type="submit">{{ _('Sync team numbers') }}</button>
                 </form>
               {% else %}

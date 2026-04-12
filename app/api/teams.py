@@ -146,7 +146,6 @@ def team_list():
 
 @teams_api_bp.post("/api/teams")
 @json_roles_required("judge", "admin")
-@json_roles_required("judge", "admin")
 def team_create():
     comp_id = require_current_competition_id()
     if not comp_id:

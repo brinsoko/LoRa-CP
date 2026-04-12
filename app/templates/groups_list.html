@@ -57,6 +57,7 @@
                       method="post"
                       action="{{ url_for('groups.delete_group', group_id=g.id) }}"
                       onsubmit="return confirm('{{ _('Delete group %(name)s?', name=g.name) }}');">
+                  {{ csrf_input() }}
                   <button class="btn btn-sm btn-outline-danger" type="submit">{{ _('Delete') }}</button>
                 </form>
                 {% endif %}

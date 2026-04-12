@@ -35,6 +35,18 @@ def build_test_config(tmp_path: Path) -> dict:
     }
 
 
+def _assert_safe_test_database(application, tmp_path: Path) -> None:
+    uri = str(application.config.get("SQLALCHEMY_DATABASE_URI") or "")
+    tmp_prefix = f"sqlite:///{tmp_path}"
+    if (
+        uri == "sqlite:///:memory:"
+        or uri.startswith(tmp_prefix)
+        or application.config.get("_EPHEMERAL_TEST_DB")
+    ):
+        return
+    raise RuntimeError(f"Refusing to drop tables for unsafe test database URI: {uri}")
+
+
 @pytest.fixture
 def app_factory(tmp_path):
     created_apps = []
@@ -50,6 +62,7 @@ def app_factory(tmp_path):
 
     for application in reversed(created_apps):
         with application.app_context():
+            _assert_safe_test_database(application, tmp_path)
             _db.session.remove()
             _db.drop_all()
 
@@ -59,6 +72,7 @@ def app(tmp_path):
     application = create_app(build_test_config(tmp_path))
     with application.app_context():
         yield application
+        _assert_safe_test_database(application, tmp_path)
         _db.session.remove()
         _db.drop_all()
 

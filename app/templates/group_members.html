@@ -2,6 +2,7 @@
 <h4 class="mb-3">{{ _('Group: %(name)s', name=group.name) }}</h4>
 
 <form method="post" class="card p-3 mb-4">
+  {{ csrf_input() }}
   <input type="hidden" name="action" value="add_cp">
   <div class="row g-2 align-items-end">
     <div class="col-md-6">
@@ -28,16 +29,19 @@
       <td>{{ m.checkpoint.name }}</td>
       <td class="text-end">
         <form method="post" class="d-inline">
+          {{ csrf_input() }}
           <input type="hidden" name="link_id" value="{{ m.id }}">
           <input type="hidden" name="action" value="move_up">
           <button class="btn btn-sm btn-outline-secondary">↑</button>
         </form>
         <form method="post" class="d-inline">
+          {{ csrf_input() }}
           <input type="hidden" name="link_id" value="{{ m.id }}">
           <input type="hidden" name="action" value="move_down">
           <button class="btn btn-sm btn-outline-secondary">↓</button>
         </form>
         <form method="post" class="d-inline" onsubmit="return confirm('{{ _('Remove from group?') }}');">
+          {{ csrf_input() }}
           <input type="hidden" name="link_id" value="{{ m.id }}">
           <input type="hidden" name="action" value="remove_cp">
           <button class="btn btn-sm btn-outline-danger">{{ _('Remove') }}</button>

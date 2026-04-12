@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
-from urllib.parse import urlencode
 
-from flask import current_app, request, make_response
+from flask import current_app, request, session
 
 from app.utils.csrf import get_csrf_token
 
@@ -14,6 +13,14 @@ def _server_name() -> str:
         return current_app.config["SERVER_NAME"].split(":")[0]
     host = request.host.split(":")[0] if request.host else "localhost"
     return host or "localhost"
+
+
+def _base_url() -> str:
+    host_url = (request.host_url or "").rstrip("/")
+    if host_url:
+        return host_url
+    scheme = request.scheme or "http"
+    return f"{scheme}://{_server_name()}"
 
 
 def api_request(method: str,
@@ -28,7 +35,11 @@ def api_request(method: str,
         path = "/" + path
 
     with current_app.test_client() as client:
+        base_url = _base_url()
         server_name = _server_name()
+        with client.session_transaction(base_url=base_url) as nested_session:
+            nested_session.clear()
+            nested_session.update(session)
         for name, value in request.cookies.items():
             client.set_cookie(name, value, domain=server_name, path="/")
 
@@ -43,6 +54,7 @@ def api_request(method: str,
             json=json,
             data=data,
             headers=outgoing_headers,
+            base_url=base_url,
             follow_redirects=False,
         )
 

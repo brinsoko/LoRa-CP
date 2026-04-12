@@ -13,6 +13,7 @@
   <div class="card-body">
     <h6 class="card-title mb-3">{{ _('Add Existing User To This Competition') }}</h6>
     <form method="post" action="{{ url_for('users.attach_user') }}" class="row g-3">
+      {{ csrf_input() }}
       <div class="col-md-6">
         <label class="form-label">{{ _('Username or Email') }}</label>
         <input class="form-control"
@@ -61,6 +62,7 @@
           {% if current_user.id != u.id %}
           <form class="d-inline" method="post" action="{{ url_for('users.delete_user', user_id=u.id) }}"
                 onsubmit="return confirm('{{ _('Remove %(user)s from this competition? This will not affect other competitions.', user=u.username) }}');">
+            {{ csrf_input() }}
             <button class="btn btn-sm btn-outline-danger">{{ _('Remove') }}</button>
           </form>
           {% else %}

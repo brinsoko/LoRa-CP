@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Upload Firmware') }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px;">
+  <div class="card-body">
+    <h5 class="card-title mb-3">{{ _('Upload Firmware') }}</h5>
+    <form method="post" enctype="multipart/form-data">
+      {{ csrf_input() }}
+
+      <div class="mb-3">
+        <label class="form-label">{{ _('Firmware .bin file') }} <span class="text-danger">*</span></label>
+        <input class="form-control" type="file" name="file" accept=".bin" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">{{ _('Name') }} <span class="text-danger">*</span></label>
+        <input class="form-control" name="name" placeholder="{{ _('e.g. Receiver v1.0') }}" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">{{ _('Device type') }} <span class="text-danger">*</span></label>
+        <select class="form-select" name="device_type" required>
+          <option value="">— {{ _('select') }} —</option>
+          <option value="receiver">{{ _('Receiver (LilyGO v1.6)') }}</option>
+          <option value="sender">{{ _('Sender (T-Beam)') }}</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">{{ _('Version') }} <span class="text-muted">({{ _('optional') }})</span></label>
+        <input class="form-control" name="version" placeholder="1.0.0">
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col">
+          <label class="form-label">{{ _('NVS partition offset') }}</label>
+          <input class="form-control font-monospace" name="nvs_offset" value="0x9000">
+          <div class="form-text">{{ _('Where NVS starts in flash (default 0x9000)') }}</div>
+        </div>
+        <div class="col">
+          <label class="form-label">{{ _('App partition offset') }}</label>
+          <input class="form-control font-monospace" name="app_offset" value="0x10000">
+          <div class="form-text">{{ _('Where the app binary starts (default 0x10000)') }}</div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">{{ _('Upload') }}</button>
+        <a class="btn btn-secondary" href="{{ url_for('firmware.firmware_list') }}">{{ _('Cancel') }}</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

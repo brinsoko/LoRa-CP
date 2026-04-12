@@ -31,6 +31,7 @@
         <h5 class="card-title mb-3">{{ _('Assign Checkpoints') }}</h5>
         {% if selected_judge_id %}
           <form method="post" action="{{ url_for('judges.assign_checkpoints') }}">
+            {{ csrf_input() }}
             <input type="hidden" name="judge_id" value="{{ selected_judge_id }}">
             <div class="d-flex flex-wrap gap-2 mb-2">
               <button class="btn btn-sm btn-outline-secondary" type="button" id="selectAllCheckpoints">

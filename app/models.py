@@ -106,6 +106,12 @@ class Competition(db.Model):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    firmware_files = db.relationship(
+        "FirmwareFile",
+        back_populates="competition",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def set_ingest_password(self, raw: str | None) -> None:
         raw = (raw or "").strip()
@@ -551,6 +557,42 @@ class LoRaMessage(db.Model):
 
     def __repr__(self) -> str:
         return f"<LoRaMessage id={self.id} competition_id={self.competition_id} dev_id={self.dev_id!r}>"
+
+
+# =========================
+# Firmware files (for web flasher)
+# =========================
+class FirmwareFile(db.Model):
+    __tablename__ = "firmware_files"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name = db.Column(db.String(120), nullable=False)
+    device_type = db.Column(db.String(20), nullable=False)   # "receiver" | "sender"
+    version = db.Column(db.String(40), nullable=True)
+    filename = db.Column(db.String(255), nullable=False)      # {uuid}_{secure_original}.bin on disk
+    nvs_offset = db.Column(db.Integer, nullable=False, default=0x9000)
+    app_offset = db.Column(db.Integer, nullable=False, default=0x10000)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    uploaded_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    competition = db.relationship("Competition", back_populates="firmware_files")
+    uploaded_by = db.relationship("User", foreign_keys=[uploaded_by_user_id])
+
+    __table_args__ = (
+        UniqueConstraint("competition_id", "filename", name="uq_firmware_comp_filename"),
+        CheckConstraint("device_type IN ('receiver','sender')", name="ck_firmware_device_type"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<FirmwareFile id={self.id} comp={self.competition_id} "
+            f"name={self.name!r} type={self.device_type!r}>"
+        )
 
 
 # =========================

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Firmware') }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5>{{ _('Firmware Files') }}</h5>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('firmware.firmware_upload') }}" class="btn btn-sm btn-primary">{{ _('Upload Firmware') }}</a>
+    <a href="{{ url_for('firmware.firmware_flash') }}" class="btn btn-sm btn-success">{{ _('Flash a Device') }}</a>
+  </div>
+</div>
+
+{% if files %}
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead>
+      <tr>
+        <th>{{ _('Name') }}</th>
+        <th>{{ _('Type') }}</th>
+        <th>{{ _('Version') }}</th>
+        <th>{{ _('NVS offset') }}</th>
+        <th>{{ _('App offset') }}</th>
+        <th>{{ _('Uploaded') }}</th>
+        <th>{{ _('By') }}</th>
+        <th class="text-end" style="width:100px;">{{ _('Actions') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in files %}
+      <tr>
+        <td>{{ f.name }}</td>
+        <td><span class="badge bg-secondary">{{ f.device_type }}</span></td>
+        <td>{{ f.version or '—' }}</td>
+        <td><code>{{ '0x%X' % f.nvs_offset }}</code></td>
+        <td><code>{{ '0x%X' % f.app_offset }}</code></td>
+        <td>{{ f.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>{{ f.uploaded_by.username if f.uploaded_by else '—' }}</td>
+        <td class="text-end">
+          <form class="d-inline" method="post"
+                action="{{ url_for('firmware.firmware_delete', fw_id=f.id) }}"
+                onsubmit="return confirm('{{ _("Delete firmware '%(name)s'?", name=f.name) }}');">
+            {{ csrf_input() }}
+            <button class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  <p class="text-muted">{{ _('No firmware files uploaded yet.') }}</p>
+{% endif %}
+{% endblock %}

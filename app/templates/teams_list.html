@@ -44,6 +44,7 @@
 {% if has_role('judge','admin') %}
   <div class="d-flex justify-content-end mb-3">
     <form method="post" action="{{ url_for('teams.randomize_numbers') }}" id="randomizeForm">
+      {{ csrf_input() }}
       <input type="hidden" name="group_id" id="randomizeGroupId" value="{{ selected_group_id or '' }}">
       <input type="hidden" name="next" value="{{ request.full_path }}">
       <button class="btn btn-outline-warning" type="submit" onclick="return confirm('{{ _('Randomise team numbers for the selected group?') }}');">
@@ -97,6 +98,7 @@
                 <form action="{{ url_for('teams.delete_team', team_id=team.id) }}"
                       method="post" class="d-inline delete-team-form"
                       data-checkins="{{ team.checkins_count or 0 }}">
+                  {{ csrf_input() }}
                   <input type="hidden" name="next" value="{{ request.full_path }}">
                   <input type="hidden" name="force" value="0">
                   <input type="hidden" name="confirm_text" value="">

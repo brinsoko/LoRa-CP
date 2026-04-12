@@ -27,6 +27,7 @@
           {% if has_role('admin') %}
           <form class="d-inline" method="post" action="{{ url_for('lora.delete_device', device_id=d.id) }}"
                 onsubmit="return confirm('{{ _('Delete this device?') }}');">
+            {{ csrf_input() }}
             <button class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
           </form>
           {% endif %}

@@ -23,6 +23,7 @@
                     </div>
                   </div>
                   <form method="post" action="{{ url_for('main.set_competition', competition_id=comp.id) }}">
+                    {{ csrf_input() }}
                     <button class="btn btn-sm btn-outline-primary">
                       {{ _('Select') }}
                     </button>
@@ -44,6 +45,7 @@
         <div class="card-body">
           <h5 class="card-title mb-3">{{ _('Create a Competition') }}</h5>
           <form method="post" action="{{ url_for('main.create_competition') }}">
+            {{ csrf_input() }}
             <div class="mb-3">
               <label class="form-label">{{ _('Competition Name') }}</label>
               <input type="text" name="name" class="form-control" placeholder="{{ _('e.g. Spring Orienteering 2025') }}" required>

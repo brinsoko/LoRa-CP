@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Flash Device') }}{% endblock %}
+
+{% block content %}
+<h5 class="mb-3">{{ _('Flash a Device') }}</h5>
+
+{# Browser compatibility check rendered server-side as a fallback; JS replaces it if supported #}
+<div id="no-serial-warning" class="alert alert-warning d-none">
+  <strong>{{ _('Web Serial not supported.') }}</strong>
+  {{ _('Use Chrome or Edge on desktop. Firefox does not support Web Serial.') }}
+</div>
+
+<div id="flash-ui">
+  <div class="row g-4">
+
+    {# ---- Step 1: device ---- #}
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="card-title">{{ _('1 — Select device') }}</h6>
+          {% if devices %}
+          <select id="device-select" class="form-select">
+            <option value="">— {{ _('choose device') }} —</option>
+            {% for d in devices %}
+            <option value="{{ d.id }}"
+              data-dev-num="{{ d.dev_num }}"
+              data-checkpoint="{{ d.checkpoint.name if d.checkpoint else '—' }}">
+              DEV-{{ d.dev_num }}{% if d.name %} · {{ d.name }}{% endif %}
+              {% if d.checkpoint %} → {{ d.checkpoint.name }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <p class="text-muted mb-0">{{ _('No active devices in this competition. Add one first.') }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# ---- Step 2: firmware ---- #}
+    <div class="col-md-6">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="card-title">{{ _('2 — Select firmware') }}</h6>
+          {% if firmware_files %}
+          <select id="firmware-select" class="form-select">
+            <option value="">— {{ _('choose firmware') }} —</option>
+            {% for f in firmware_files %}
+            <option value="{{ f.id }}"
+              data-type="{{ f.device_type }}"
+              data-nvs-offset="{{ f.nvs_offset }}"
+              data-app-offset="{{ f.app_offset }}">
+              [{{ f.device_type }}] {{ f.name }}{% if f.version %} v{{ f.version }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="mt-2">
+            <a href="{{ url_for('firmware.firmware_list') }}" class="btn btn-sm btn-outline-secondary">
+              {{ _('Manage firmware files') }}
+            </a>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">{{ _('No firmware uploaded yet.') }}
+            <a href="{{ url_for('firmware.firmware_upload') }}">{{ _('Upload one') }}</a>.
+          </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# ---- Step 3: config preview ---- #}
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h6 class="card-title">{{ _('3 — NVS config preview') }}</h6>
+          <div id="config-loading" class="text-muted d-none">{{ _('Loading config…') }}</div>
+          <div id="config-preview" class="d-none">
+            <p class="mb-2 small text-muted">
+              {{ _('These values will be written to the NVS partition of the device.') }}
+            </p>
+            <table class="table table-sm table-bordered mb-0" style="max-width:480px;">
+              <thead><tr><th>{{ _('NVS key') }}</th><th>{{ _('Value') }}</th></tr></thead>
+              <tbody id="config-table-body"></tbody>
+            </table>
+            <div class="mt-2">
+              <strong class="small">{{ _('Flash plan:') }}</strong>
+              <ol id="flash-plan-list" class="mb-0 small"></ol>
+            </div>
+          </div>
+          <div id="config-placeholder" class="text-muted small">
+            {{ _('Select a device and firmware above to preview.') }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ---- Step 4: flash ---- #}
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h6 class="card-title">{{ _('4 — Flash') }}</h6>
+          <button id="flash-btn" class="btn btn-success" disabled>
+            {{ _('Connect & Flash') }}
+          </button>
+          <span id="flash-status" class="ms-2 small text-muted"></span>
+
+          <div class="mt-3 d-none" id="progress-wrapper">
+            <div class="progress" style="height:20px;">
+              <div id="flash-progress" class="progress-bar progress-bar-striped progress-bar-animated"
+                   role="progressbar" style="width:0%;">0%</div>
+            </div>
+          </div>
+
+          <div class="mt-3 d-none" id="log-wrapper">
+            <textarea id="flash-log" class="form-control font-monospace"
+                      rows="10" readonly style="font-size:.8rem;"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>{# /row #}
+</div>{# /flash-ui #}
+
+{% endblock %}
+
+{% block scripts %}
+{# esptool-js — Web Serial ESP32 flasher #}
+<script src="https://unpkg.com/esptool-js@0.4.3/bundle.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // --- browser check ---
+  if (!('serial' in navigator)) {
+    document.getElementById('no-serial-warning').classList.remove('d-none');
+    document.getElementById('flash-ui').classList.add('d-none');
+    return;
+  }
+
+  const deviceSelect   = document.getElementById('device-select');
+  const firmwareSelect = document.getElementById('firmware-select');
+  const flashBtn       = document.getElementById('flash-btn');
+  const flashStatus    = document.getElementById('flash-status');
+  const flashLog       = document.getElementById('flash-log');
+  const progressBar    = document.getElementById('flash-progress');
+  const progressWrap   = document.getElementById('progress-wrapper');
+  const logWrap        = document.getElementById('log-wrapper');
+  const configPreview  = document.getElementById('config-preview');
+  const configLoading  = document.getElementById('config-loading');
+  const configPlaceholder = document.getElementById('config-placeholder');
+  const configTableBody   = document.getElementById('config-table-body');
+  const flashPlanList     = document.getElementById('flash-plan-list');
+
+  let currentConfig = null;
+
+  function log(msg) {
+    flashLog.value += msg + '\n';
+    flashLog.scrollTop = flashLog.scrollTop + 9999;
+  }
+
+  function setProgress(pct, label) {
+    progressBar.style.width = pct + '%';
+    progressBar.textContent = label;
+  }
+
+  function setStatus(msg) {
+    flashStatus.textContent = msg;
+  }
+
+  // --- config preview ---
+  async function loadConfigPreview() {
+    const deviceId   = deviceSelect ? deviceSelect.value : '';
+    const firmwareId = firmwareSelect ? firmwareSelect.value : '';
+    if (!deviceId || !firmwareId) {
+      configPreview.classList.add('d-none');
+      configPlaceholder.classList.remove('d-none');
+      flashBtn.disabled = true;
+      currentConfig = null;
+      return;
+    }
+
+    configPlaceholder.classList.add('d-none');
+    configPreview.classList.add('d-none');
+    configLoading.classList.remove('d-none');
+
+    try {
+      const resp = await fetch(`/firmware/api/config/${deviceId}/${firmwareId}`);
+      if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+      const data = await resp.json();
+      currentConfig = data;
+
+      // render table
+      configTableBody.innerHTML = '';
+      for (const [key, val] of Object.entries(data.entries)) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td><code>${key}</code></td><td>${val}</td>`;
+        configTableBody.appendChild(tr);
+      }
+
+      // render flash plan
+      flashPlanList.innerHTML = '';
+      for (const step of data.flash_plan) {
+        const li = document.createElement('li');
+        li.textContent = `${step.label} — offset ${step.offset} — ${step.source}`;
+        flashPlanList.appendChild(li);
+      }
+
+      configLoading.classList.add('d-none');
+      configPreview.classList.remove('d-none');
+      flashBtn.disabled = false;
+    } catch (e) {
+      configLoading.classList.add('d-none');
+      configPlaceholder.classList.remove('d-none');
+      configPlaceholder.textContent = 'Failed to load config: ' + e.message;
+      flashBtn.disabled = true;
+      currentConfig = null;
+    }
+  }
+
+  if (deviceSelect)   deviceSelect.addEventListener('change', loadConfigPreview);
+  if (firmwareSelect) firmwareSelect.addEventListener('change', loadConfigPreview);
+
+  // --- flash sequence ---
+  flashBtn.addEventListener('click', async () => {
+    const deviceId   = deviceSelect ? deviceSelect.value : '';
+    const firmwareId = firmwareSelect ? firmwareSelect.value : '';
+    if (!deviceId || !firmwareId || !currentConfig) return;
+
+    const nvsOffset = parseInt(currentConfig.flash_plan[0].offset, 16);
+    const appOffset = parseInt(currentConfig.flash_plan[1].offset, 16);
+
+    flashBtn.disabled = true;
+    progressWrap.classList.remove('d-none');
+    logWrap.classList.remove('d-none');
+    flashLog.value = '';
+    setProgress(0, '0%');
+    setStatus('Preparing…');
+
+    try {
+      // 1. Fetch firmware binary
+      setStatus('Fetching firmware…');
+      log('Fetching firmware binary from server…');
+      const fwResp = await fetch(`/firmware/${firmwareId}/download`);
+      if (!fwResp.ok) throw new Error(`Firmware download failed: ${fwResp.status}`);
+      const fwBuf = await fwResp.arrayBuffer();
+      log(`Firmware: ${fwBuf.byteLength} bytes`);
+
+      // 2. Fetch NVS binary
+      setStatus('Generating NVS…');
+      log('Requesting NVS partition from server…');
+      const nvsResp = await fetch(`/firmware/api/nvs/${deviceId}/${firmwareId}`);
+      if (!nvsResp.ok) {
+        const err = await nvsResp.json().catch(() => ({}));
+        throw new Error(`NVS generation failed: ${err.detail || nvsResp.status}`);
+      }
+      const nvsBuf = await nvsResp.arrayBuffer();
+      log(`NVS partition: ${nvsBuf.byteLength} bytes`);
+
+      // 3. Open serial port
+      setStatus('Select COM port in the dialog…');
+      log('Opening port selection dialog…');
+      let port;
+      try {
+        port = await navigator.serial.requestPort();
+      } catch (e) {
+        throw new Error('Port selection cancelled: ' + e.message);
+      }
+
+      // 4. Connect
+      setStatus('Connecting to device…');
+      log('Connecting…');
+      const transport = new window.esptooljs.Transport(port, true);
+      const loader = new window.esptooljs.ESPLoader({
+        transport,
+        baudrate: 921600,
+        terminal: {
+          clean() {},
+          writeLine(d) { log(d); },
+          write(d)     { log(d); },
+        },
+        enableTracing: false,
+      });
+
+      const chip = await loader.main();
+      log('Connected. Chip: ' + chip);
+      setStatus('Connected.');
+
+      // 5. Flash NVS at nvs_offset
+      log(`\nFlashing NVS partition at ${currentConfig.flash_plan[0].offset}…`);
+      setStatus('Flashing NVS…');
+      await loader.writeFlash({
+        fileArray: [{ data: Array.from(new Uint8Array(nvsBuf)), address: nvsOffset }],
+        flashSize: 'keep',
+        flashMode: 'keep',
+        flashFreq: 'keep',
+        eraseAll: false,
+        compress: true,
+        reportProgress(_idx, written, total) {
+          const pct = Math.round(written / total * 50);  // NVS = 0–50%
+          setProgress(pct, `NVS ${pct * 2}%`);
+        },
+      });
+      log('NVS partition written.');
+      setProgress(50, 'NVS done');
+
+      // 6. Flash application at app_offset
+      log(`\nFlashing application at ${currentConfig.flash_plan[1].offset}…`);
+      setStatus('Flashing firmware…');
+      await loader.writeFlash({
+        fileArray: [{ data: Array.from(new Uint8Array(fwBuf)), address: appOffset }],
+        flashSize: 'keep',
+        flashMode: 'keep',
+        flashFreq: 'keep',
+        eraseAll: false,
+        compress: true,
+        reportProgress(_idx, written, total) {
+          const pct = 50 + Math.round(written / total * 50);  // App = 50–100%
+          setProgress(pct, `FW ${(pct - 50) * 2}%`);
+        },
+      });
+      log('Firmware written.');
+      setProgress(100, 'Done');
+
+      // 7. Reset
+      log('\nResetting device…');
+      await loader.hardReset();
+      log('Device reset. Flash complete!');
+      setStatus('Done ✓');
+
+      await transport.disconnect();
+
+    } catch (e) {
+      log('\nERROR: ' + e.message);
+      setStatus('Failed — see log.');
+    } finally {
+      flashBtn.disabled = false;
+    }
+  });
+
+})();
+</script>
+{% endblock %}

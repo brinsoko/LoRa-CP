@@ -8,6 +8,7 @@
       <div class="card-body">
         <h5 class="card-title mb-3">{{ _('Create / Update Rule') }}</h5>
         <form method="post" id="ruleForm">
+          {{ csrf_input() }}
           <div class="mb-3">
             <label class="form-label">{{ _('Checkpoint') }}</label>
             <select class="form-select" name="checkpoint_id" id="checkpointSelect" required>
@@ -93,6 +94,7 @@
         </div>
         <div class="collapse" id="globalRulesCollapse">
           <form method="post" action="{{ url_for('scores.save_global_rules') }}" id="globalRulesForm">
+            {{ csrf_input() }}
             <div class="mb-3">
               <label class="form-label">{{ _('Group') }}</label>
               <select class="form-select" name="global_group_id" id="globalGroupSelect" required>
@@ -203,6 +205,7 @@
                     </button>
                     <form method="post" action="{{ url_for('scores.delete_score_rule', rule_id=r.id) }}" class="d-inline"
                           onsubmit="return confirm('{{ _('Delete this rule?') }}');">
+                      {{ csrf_input() }}
                       <button class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
                     </form>
                   </td>
@@ -248,6 +251,7 @@
                     </button>
                     <form method="post" action="{{ url_for('scores.delete_global_rule', rule_id=r.id) }}" class="d-inline"
                           onsubmit="return confirm('{{ _('Delete this rule?') }}');">
+                      {{ csrf_input() }}
                       <button class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
                     </form>
                   </td>

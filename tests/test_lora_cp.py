@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
 import importlib
+from datetime import datetime
+from pathlib import Path
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -96,7 +97,12 @@ class TestConfigAndFactory:
 
     def test_create_app_builds_default_sqlite_uri_when_missing(self, app_factory):
         application = app_factory(SQLALCHEMY_DATABASE_URI=None)
-        assert application.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite:///")
+        uri = application.config["SQLALCHEMY_DATABASE_URI"]
+        assert uri.startswith("sqlite:///")
+        assert application.config.get("_EPHEMERAL_TEST_DB") is True
+        db_path = Path(uri.removeprefix("sqlite:///"))
+        assert db_path.name == "app.db"
+        assert "instance" not in db_path.parts
 
 
 class TestAuthApi:

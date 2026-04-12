@@ -43,6 +43,7 @@
                   <form method="post" class="d-inline"
                         action="{{ url_for('rfid.delete_rfid', card_id=c.id) }}"
                         onsubmit="return confirm('{{ _('Delete this mapping?') }}');">
+                    {{ csrf_input() }}
                     <button class="btn btn-sm btn-outline-danger">{{ _('Delete') }}</button>
                   </form>
                 {% endif %}

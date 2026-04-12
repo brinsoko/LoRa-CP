@@ -12,6 +12,7 @@
     <p class="text-muted">UID is normalized (colons/hyphens removed, uppercased). Existing UIDs will be reassigned to the specified team.</p>
 
     <form method="post" enctype="multipart/form-data">
+      {{ csrf_input() }}
       <div class="mb-3">
         <input type="file" name="file" accept=".csv,text/csv" class="form-control" required>
       </div>

@@ -49,6 +49,7 @@
     </div>
 
     <form method="post" class="mt-3">
+      {{ csrf_input() }}
       <!-- Hidden payload (escaped so quotes don’t break HTML) -->
       <input type="hidden" name="payload" value="{{ payload_text|e }}">
       <button type="submit" name="action" value="confirm" class="btn btn-primary">{{ _('Confirm Import') }}</button>

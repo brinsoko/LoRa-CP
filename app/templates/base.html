@@ -59,6 +59,7 @@
                 {% for comp in available_competitions %}
                   <li>
                     <form method="post" action="{{ url_for('main.set_competition', competition_id=comp.id) }}">
+                      {{ csrf_input() }}
                       <button class="dropdown-item {% if current_competition and current_competition.id == comp.id %}active{% endif %}">
                         {{ comp.name }}
                       </button>
@@ -78,6 +79,7 @@
             {{ _('Signed in as %(user)s (%(role)s)', user=current_user.username, role=(current_competition_role or _('member'))) }}
           </span>
           <form method="post" action="{{ url_for('auth.logout') }}" class="d-inline">
+            {{ csrf_input() }}
             <button class="btn btn-sm btn-outline-danger">{{ _('Logout') }}</button>
           </form>
           {% if not current_user.google_sub %}
@@ -94,6 +96,7 @@
         {% if current_user.is_authenticated and current_competition_role == 'admin' %}
           <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">{{ _('Users') }}</a>
           <a href="{{ url_for('judges.assign_checkpoints') }}" class="btn btn-sm btn-outline-secondary">{{ _('Judges') }}</a>
+          <a href="{{ url_for('firmware.firmware_list') }}" class="btn btn-sm btn-outline-secondary">{{ _('Firmware') }}</a>
         {% endif %}
 
         <!-- THEME TOGGLE -->

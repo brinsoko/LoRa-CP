@@ -30,6 +30,7 @@ from .utils.competition import (
 )
 import logging
 import os
+import tempfile
 
 def create_app(config_overrides: dict | None = None) -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -41,7 +42,12 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     os.makedirs(app.instance_path, exist_ok=True)
 
     if not app.config.get("SQLALCHEMY_DATABASE_URI"):
-        db_path = os.path.join(app.instance_path, "app.db")
+        if app.config.get("TESTING"):
+            test_db_dir = tempfile.mkdtemp(prefix="lora-kt-test-db-")
+            db_path = os.path.join(test_db_dir, "app.db")
+            app.config["_EPHEMERAL_TEST_DB"] = True
+        else:
+            db_path = os.path.join(app.instance_path, "app.db")
         app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 
     app.register_blueprint(auth_api_bp)
@@ -117,6 +123,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     from app.blueprints.scores.routes import scores_bp
     from app.blueprints.sheets.routes import sheets_bp
     from app.blueprints.audit.routes import audit_bp
+    from app.blueprints.firmware.routes import firmware_bp
 
     app.register_blueprint(users_bp, url_prefix="/users")
     app.register_blueprint(judges_bp, url_prefix="/judges")
@@ -134,6 +141,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.register_blueprint(checkins_bp,     url_prefix="/checkins")
     app.register_blueprint(rfid_bp,         url_prefix="/rfid")
     app.register_blueprint(sheets_bp,       url_prefix="/sheets")
+    app.register_blueprint(firmware_bp,     url_prefix="/firmware")
 
     with app.app_context():
         db.create_all()
