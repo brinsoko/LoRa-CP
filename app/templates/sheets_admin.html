@@ -27,7 +27,7 @@
       </div>
       <div class="mb-3 flex-grow-1 ms-3">
         <label class="form-label">{{ _('Spreadsheet ID') }}</label>
-        <input class="form-control" id="global_spreadsheet_id" placeholder="{{ _('Spreadsheet ID (used below)') }}">
+        <input class="form-control" id="global_spreadsheet_id" placeholder="{{ _('Spreadsheet ID (used below)') }}" value="{{ remembered_spreadsheet_id or '' }}">
         <div class="form-check mt-2">
           <input class="form-check-input" type="checkbox" id="global_local_only"
                  {% if sheets_settings and not sheets_settings.sync_enabled %}checked{% endif %}>

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from typing import List
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, session
 from flask_babel import gettext as _
 
 from app.extensions import db
@@ -24,6 +24,17 @@ from app.utils.sheets_settings import (
 )
 
 sheets_bp = Blueprint("sheets_admin", __name__, template_folder="../../templates")
+
+SESSION_KEY_SPREADSHEET_ID = "sheets_spreadsheet_id"
+
+
+@sheets_bp.before_request
+def _remember_spreadsheet_id():
+    """Persist the spreadsheet ID in the session so the field survives redirects."""
+    if request.method == "POST":
+        sid = (request.form.get("spreadsheet_id") or "").strip()
+        if sid:
+            session[SESSION_KEY_SPREADSHEET_ID] = sid
 
 
 def _get_sheets_client() -> SheetsClient:
@@ -107,6 +118,7 @@ def list_sheets():
         groups=groups,
         lang=lang,
         sheets_settings=sheets_settings,
+        remembered_spreadsheet_id=session.get(SESSION_KEY_SPREADSHEET_ID, ""),
     )
 
 

@@ -17,6 +17,7 @@ import pytest
 
 from app.extensions import db
 from app.models import ScoreEntry, SheetConfig
+from app.models import CheckpointGroupLink  # used in _seeded fixture
 from tests.support import (
     add_membership,
     create_checkpoint,
@@ -29,23 +30,15 @@ from tests.support import (
     login_as,
 )
 
-
-# Register the marker
-def pytest_configure(config):
-    config.addinivalue_line("markers", "sheets: requires Google Sheets API access (set TEST_SPREADSHEET_ID)")
-
-
 SPREADSHEET_ID = os.environ.get("TEST_SPREADSHEET_ID", "")
+SA_FILE = os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE", "")
+SA_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
 
 
 def _sheets_available() -> bool:
-    """Check if sheets credentials and spreadsheet ID are configured."""
     if not SPREADSHEET_ID:
         return False
-    # Check if service account credentials exist
-    sa_file = os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE", "")
-    sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
-    return bool(sa_file or sa_json)
+    return bool(SA_FILE or SA_JSON)
 
 
 skip_no_sheets = pytest.mark.skipif(
@@ -55,8 +48,29 @@ skip_no_sheets = pytest.mark.skipif(
 
 
 @pytest.fixture
-def _seeded(app, client):
-    """Seed a competition with teams, groups, checkpoints, and scores."""
+def sheets_app(app_factory):
+    """App with sheets sync enabled and service account configured."""
+    overrides = {"SHEETS_SYNC_ENABLED": True}
+    if SA_FILE:
+        overrides["GOOGLE_SERVICE_ACCOUNT_FILE"] = (
+            os.path.abspath(SA_FILE) if not os.path.isabs(SA_FILE) else SA_FILE
+        )
+    if SA_JSON:
+        overrides["GOOGLE_SERVICE_ACCOUNT_JSON"] = SA_JSON
+    application = app_factory(**overrides)
+    with application.app_context():
+        from app.utils.sheets_settings import save_settings
+        save_settings({"sync_enabled": True})
+        yield application
+
+
+@pytest.fixture
+def sheets_client(sheets_app):
+    return sheets_app.test_client()
+
+
+@pytest.fixture
+def _seeded(sheets_app, sheets_client):
     user = create_user(username="sheets-admin", role="admin")
     comp = create_competition(name="Sheets Race")
     add_membership(user, comp, role="admin")
@@ -72,11 +86,15 @@ def _seeded(app, client):
     assign_team_group(t2, group)
     assign_team_group(t3, group)
 
+    # Link checkpoints to group (required for wizard tab creation)
+    db.session.add(CheckpointGroupLink(group_id=group.id, checkpoint_id=cp1.id, position=0))
+    db.session.add(CheckpointGroupLink(group_id=group.id, checkpoint_id=cp2.id, position=1))
+    db.session.commit()
+
     ci1 = create_checkin(comp, t1, cp1)
     ci2 = create_checkin(comp, t2, cp1)
     ci3 = create_checkin(comp, t3, cp2)
 
-    # Add scores
     for ci, team, cp, total in [
         (ci1, t1, cp1, 25),
         (ci2, t2, cp1, 30),
@@ -93,167 +111,184 @@ def _seeded(app, client):
         ))
     db.session.commit()
 
-    login_as(client, user, comp)
+    login_as(sheets_client, user, comp)
     return comp, user, group, [cp1, cp2], [t1, t2, t3]
 
 
-def _get_sheets_client():
-    """Create a gspread client for test assertions."""
+def _get_gc():
     try:
         import gspread
         from google.oauth2.service_account import Credentials
     except ImportError:
         pytest.skip("gspread or google-auth not installed")
 
-    sa_file = os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE", "")
-    sa_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
-
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-
-    if sa_file and os.path.isfile(sa_file):
-        creds = Credentials.from_service_account_file(sa_file, scopes=scopes)
-    elif sa_json:
-        import json
-        info = json.loads(sa_json)
-        creds = Credentials.from_service_account_info(info, scopes=scopes)
+    sa = os.path.abspath(SA_FILE) if SA_FILE else None
+    if sa and os.path.isfile(sa):
+        creds = Credentials.from_service_account_file(sa, scopes=scopes)
+    elif SA_JSON:
+        import json as _json
+        creds = Credentials.from_service_account_info(_json.loads(SA_JSON), scopes=scopes)
     else:
         pytest.skip("No service account credentials found")
-
     return gspread.authorize(creds)
+
+
+def _cleanup_tabs(spreadsheet, prefix: str):
+    time.sleep(2)
+    for ws in spreadsheet.worksheets():
+        if ws.title.startswith(prefix):
+            try:
+                spreadsheet.del_worksheet(ws)
+                time.sleep(2)
+            except Exception:
+                pass
+
+
+def _run_wizard(sheets_client, checkpoints, prefix="test_"):
+    """Run the checkpoint wizard to create checkpoint tab configs + remote tabs."""
+    form_data = {
+        "spreadsheet_id": SPREADSHEET_ID,
+        "create_remote": "1",
+    }
+    for cp in checkpoints:
+        form_data[f"create_cp_{cp.id}"] = "1"
+        form_data[f"tab_name_cp_{cp.id}"] = f"{prefix}{cp.name}"
+    resp = sheets_client.post("/sheets/wizard/checkpoints", data=form_data)
+    assert resp.status_code in (200, 302)
+    time.sleep(3)
+    return resp
 
 
 @pytest.mark.sheets
 @skip_no_sheets
 class TestBuildCheckpointTabs:
-    def test_build_checkpoint_tabs(self, client, _seeded):
+    def test_build_checkpoint_tabs(self, sheets_client, _seeded):
         comp, _, group, checkpoints, teams = _seeded
-        gc = _get_sheets_client()
+        gc = _get_gc()
         spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+        _cleanup_tabs(spreadsheet, "test_")
 
-        # Build checkpoint tabs via the sheets wizard
-        cp_ids = [cp.id for cp in checkpoints]
-        resp = client.post("/sheets/wizard/checkpoints", data={
-            "spreadsheet_id": SPREADSHEET_ID,
-            "checkpoint_ids": cp_ids,
-            "tab_prefix": "test_",
-            "create_remote": "1",
-        })
-        assert resp.status_code in (200, 302)
-        time.sleep(2)
+        _run_wizard(sheets_client, checkpoints, "test_")
 
-        # Verify tabs were created
+        spreadsheet = gc.open_by_key(SPREADSHEET_ID)
         sheet_titles = [ws.title for ws in spreadsheet.worksheets()]
         created_tabs = [t for t in sheet_titles if t.startswith("test_")]
-        assert len(created_tabs) >= 1
-
-        # Cleanup
-        for tab_title in created_tabs:
-            try:
-                ws = spreadsheet.worksheet(tab_title)
-                spreadsheet.del_worksheet(ws)
-                time.sleep(2)
-            except Exception:
-                pass
+        try:
+            assert len(created_tabs) >= 1, f"Expected tabs starting with 'test_', got: {sheet_titles}"
+            # Check headers exist
+            ws = spreadsheet.worksheet(created_tabs[0])
+            header_row = ws.row_values(1)
+            assert len(header_row) >= 1
+        finally:
+            _cleanup_tabs(spreadsheet, "test_")
 
 
 @pytest.mark.sheets
 @skip_no_sheets
 class TestBuildArrivalsMatrix:
-    def test_build_arrivals_matrix(self, client, _seeded):
-        comp, _, _, _, _ = _seeded
-        gc = _get_sheets_client()
+    def test_build_arrivals_matrix(self, sheets_client, _seeded):
+        comp, _, _, checkpoints, _ = _seeded
+        gc = _get_gc()
         spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+        _cleanup_tabs(spreadsheet, "test_")
+
+        # Must create checkpoint tabs first (arrivals depends on them)
+        _run_wizard(sheets_client, checkpoints, "test_")
 
         tab_name = "test_arrivals"
-        resp = client.post("/sheets/build-arrivals", data={
+        resp = sheets_client.post("/sheets/build-arrivals", data={
             "spreadsheet_id": SPREADSHEET_ID,
             "tab_name": tab_name,
         })
         assert resp.status_code in (200, 302)
-        time.sleep(2)
+        time.sleep(3)
 
-        try:
-            ws = spreadsheet.worksheet(tab_name)
-            rows = ws.get_all_values()
-            assert len(rows) >= 2  # header + at least 1 data row
-        finally:
-            try:
-                spreadsheet.del_worksheet(ws)
-                time.sleep(2)
-            except Exception:
-                pass
-
-
-@pytest.mark.sheets
-@skip_no_sheets
-class TestBuildTeamsRoster:
-    def test_build_teams_roster(self, client, _seeded):
-        comp, _, _, _, teams = _seeded
-        gc = _get_sheets_client()
         spreadsheet = gc.open_by_key(SPREADSHEET_ID)
-
-        tab_name = "test_teams"
-        resp = client.post("/sheets/build-teams", data={
-            "spreadsheet_id": SPREADSHEET_ID,
-            "tab_name": tab_name,
-        })
-        assert resp.status_code in (200, 302)
-        time.sleep(2)
-
-        try:
-            ws = spreadsheet.worksheet(tab_name)
-            rows = ws.get_all_values()
-            # Header + 3 teams
-            assert len(rows) >= 4
-        finally:
-            try:
-                spreadsheet.del_worksheet(ws)
-                time.sleep(2)
-            except Exception:
-                pass
-
-
-@pytest.mark.sheets
-@skip_no_sheets
-class TestBuildScoreSheet:
-    def test_build_score_sheet(self, client, _seeded):
-        comp, _, group, checkpoints, teams = _seeded
-        gc = _get_sheets_client()
-        spreadsheet = gc.open_by_key(SPREADSHEET_ID)
-
-        tab_name = "test_scores"
-        resp = client.post("/sheets/build-score", data={
-            "spreadsheet_id": SPREADSHEET_ID,
-            "tab_name": tab_name,
-            "group_id": group.id,
-        })
-        assert resp.status_code in (200, 302)
-        time.sleep(2)
-
         try:
             ws = spreadsheet.worksheet(tab_name)
             rows = ws.get_all_values()
             assert len(rows) >= 2
         finally:
-            try:
-                spreadsheet.del_worksheet(ws)
-                time.sleep(2)
-            except Exception:
-                pass
+            _cleanup_tabs(spreadsheet, "test_")
+
+
+@pytest.mark.sheets
+@skip_no_sheets
+class TestBuildTeamsRoster:
+    def test_build_teams_roster(self, sheets_client, _seeded):
+        comp, _, _, _, teams = _seeded
+        gc = _get_gc()
+        spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+        _cleanup_tabs(spreadsheet, "test_")
+
+        tab_name = "test_teams"
+        resp = sheets_client.post("/sheets/build-teams", data={
+            "spreadsheet_id": SPREADSHEET_ID,
+            "tab_name": tab_name,
+        })
+        assert resp.status_code in (200, 302)
+        time.sleep(3)
+
+        spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+        try:
+            ws = spreadsheet.worksheet(tab_name)
+            rows = ws.get_all_values()
+            assert len(rows) >= 4  # header + 3 teams
+        finally:
+            _cleanup_tabs(spreadsheet, "test_")
+
+
+@pytest.mark.sheets
+@skip_no_sheets
+class TestBuildScoreSheet:
+    def test_build_score_sheet(self, sheets_client, _seeded):
+        comp, _, group, checkpoints, teams = _seeded
+        gc = _get_gc()
+        spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+        _cleanup_tabs(spreadsheet, "test_")
+
+        # Must create checkpoint tabs first
+        _run_wizard(sheets_client, checkpoints, "test_")
+
+        tab_name = "test_scores"
+        resp = sheets_client.post("/sheets/build-score", data={
+            "spreadsheet_id": SPREADSHEET_ID,
+            "tab_name": tab_name,
+            "group_id": group.id,
+        })
+        assert resp.status_code in (200, 302)
+        time.sleep(3)
+
+        spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+        try:
+            ws = spreadsheet.worksheet(tab_name)
+            rows = ws.get_all_values()
+            assert len(rows) >= 2
+        finally:
+            _cleanup_tabs(spreadsheet, "test_")
 
 
 @pytest.mark.sheets
 @skip_no_sheets
 class TestSyncTeamNumbers:
-    def test_sync_team_numbers(self, client, _seeded):
-        comp, _, _, _, teams = _seeded
-        # Find a sheet config to sync
+    def test_sync_team_numbers(self, sheets_client, _seeded):
+        comp, _, _, checkpoints, teams = _seeded
+        # Create checkpoint tabs first
+        _run_wizard(sheets_client, checkpoints, "test_")
+        time.sleep(2)
+
         config = SheetConfig.query.filter_by(competition_id=comp.id).first()
         if not config:
             pytest.skip("No SheetConfig available to sync")
 
-        resp = client.post(f"/sheets/sync-team-numbers/{config.id}")
+        resp = sheets_client.post(f"/sheets/sync-team-numbers/{config.id}")
         assert resp.status_code in (200, 302)
+
+        # Cleanup
+        gc = _get_gc()
+        spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+        _cleanup_tabs(spreadsheet, "test_")
