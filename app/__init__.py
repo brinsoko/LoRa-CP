@@ -175,6 +175,15 @@ def create_app(config_overrides: dict | None = None) -> Flask:
                     conn.execute(text("ALTER TABLE checkins ADD COLUMN created_by_device_id INTEGER"))
         except Exception:
             app.logger.exception("Failed to ensure checkins audit columns")
+        try:
+            insp = inspect(db.engine)
+            cols = {c["name"] for c in insp.get_columns("firmware_files")}
+            if cols and "nvs_size" not in cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE firmware_files ADD COLUMN nvs_size INTEGER DEFAULT 20480"))
+                    conn.execute(text("UPDATE firmware_files SET nvs_size = 20480 WHERE nvs_size IS NULL"))
+        except Exception:
+            app.logger.exception("Failed to ensure firmware_files.nvs_size column")
 
     def _http_detail(e: Exception, default: str) -> str:
         if isinstance(e, HTTPException):

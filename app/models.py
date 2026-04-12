@@ -574,6 +574,7 @@ class FirmwareFile(db.Model):
     version = db.Column(db.String(40), nullable=True)
     filename = db.Column(db.String(255), nullable=False)      # {uuid}_{secure_original}.bin on disk
     nvs_offset = db.Column(db.Integer, nullable=False, default=0x9000)
+    nvs_size = db.Column(db.Integer, nullable=False, default=0x5000)
     app_offset = db.Column(db.Integer, nullable=False, default=0x10000)
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     uploaded_by_user_id = db.Column(

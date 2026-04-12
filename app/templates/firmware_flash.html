@@ -125,11 +125,31 @@
 {% endblock %}
 
 {% block scripts %}
-{# esptool-js — Web Serial ESP32 flasher #}
-<script src="https://unpkg.com/esptool-js@0.4.3/bundle.js"></script>
-<script>
-(function () {
-  'use strict';
+<script type="module">
+(async function () {
+  let BufferCtor;
+  let Transport;
+  let ESPLoader;
+
+  try {
+    ({ Buffer: BufferCtor } = await import('https://cdn.jsdelivr.net/npm/buffer@6.0.3/+esm'));
+    if (!globalThis.Buffer) {
+      globalThis.Buffer = BufferCtor;
+    }
+    ({ Transport, ESPLoader } = await import('https://unpkg.com/esptool-js@0.4.3/bundle.js'));
+  } catch (error) {
+    const status = document.getElementById('flash-status');
+    const warning = document.getElementById('no-serial-warning');
+    if (warning) {
+      warning.classList.remove('d-none');
+      warning.innerHTML = '<strong>Flasher library failed to load.</strong> Check network access to the JavaScript CDNs and reload the page.';
+    }
+    if (status) {
+      status.textContent = 'Flasher library unavailable.';
+    }
+    console.error('Failed to load esptool-js module:', error);
+    return;
+  }
 
   // --- browser check ---
   if (!('serial' in navigator)) {
@@ -151,6 +171,7 @@
   const configPlaceholder = document.getElementById('config-placeholder');
   const configTableBody   = document.getElementById('config-table-body');
   const flashPlanList     = document.getElementById('flash-plan-list');
+  const FLASH_BAUDRATE = 460800;
 
   let currentConfig = null;
 
@@ -166,6 +187,10 @@
 
   function setStatus(msg) {
     flashStatus.textContent = msg;
+  }
+
+  function arrayBufferToBinaryString(buffer) {
+    return Buffer.from(buffer).toString('latin1');
   }
 
   // --- config preview ---
@@ -244,6 +269,7 @@
       const fwResp = await fetch(`/firmware/${firmwareId}/download`);
       if (!fwResp.ok) throw new Error(`Firmware download failed: ${fwResp.status}`);
       const fwBuf = await fwResp.arrayBuffer();
+      const fwData = arrayBufferToBinaryString(fwBuf);
       log(`Firmware: ${fwBuf.byteLength} bytes`);
 
       // 2. Fetch NVS binary
@@ -255,6 +281,7 @@
         throw new Error(`NVS generation failed: ${err.detail || nvsResp.status}`);
       }
       const nvsBuf = await nvsResp.arrayBuffer();
+      const nvsData = arrayBufferToBinaryString(nvsBuf);
       log(`NVS partition: ${nvsBuf.byteLength} bytes`);
 
       // 3. Open serial port
@@ -270,10 +297,10 @@
       // 4. Connect
       setStatus('Connecting to device…');
       log('Connecting…');
-      const transport = new window.esptooljs.Transport(port, true);
-      const loader = new window.esptooljs.ESPLoader({
+      const transport = new Transport(port, true);
+      const loader = new ESPLoader({
         transport,
-        baudrate: 921600,
+        baudrate: FLASH_BAUDRATE,
         terminal: {
           clean() {},
           writeLine(d) { log(d); },
@@ -290,7 +317,7 @@
       log(`\nFlashing NVS partition at ${currentConfig.flash_plan[0].offset}…`);
       setStatus('Flashing NVS…');
       await loader.writeFlash({
-        fileArray: [{ data: Array.from(new Uint8Array(nvsBuf)), address: nvsOffset }],
+        fileArray: [{ data: nvsData, address: nvsOffset }],
         flashSize: 'keep',
         flashMode: 'keep',
         flashFreq: 'keep',
@@ -308,7 +335,7 @@
       log(`\nFlashing application at ${currentConfig.flash_plan[1].offset}…`);
       setStatus('Flashing firmware…');
       await loader.writeFlash({
-        fileArray: [{ data: Array.from(new Uint8Array(fwBuf)), address: appOffset }],
+        fileArray: [{ data: fwData, address: appOffset }],
         flashSize: 'keep',
         flashMode: 'keep',
         flashFreq: 'keep',

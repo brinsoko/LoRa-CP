@@ -87,6 +87,7 @@ def firmware_upload():
         device_type = (request.form.get("device_type") or "").strip()
         version = (request.form.get("version") or "").strip() or None
         nvs_offset_raw = request.form.get("nvs_offset") or "0x9000"
+        nvs_size_raw = request.form.get("nvs_size") or "0x5000"
         app_offset_raw = request.form.get("app_offset") or "0x10000"
 
         errors = []
@@ -100,13 +101,18 @@ def firmware_upload():
             errors.append(_("Device type must be 'receiver' or 'sender'."))
         try:
             nvs_offset = int(nvs_offset_raw, 0)
+            nvs_size = int(nvs_size_raw, 0)
             app_offset = int(app_offset_raw, 0)
         except (ValueError, TypeError):
             errors.append(_("Offsets must be valid integers (e.g. 0x9000 or 36864)."))
-            nvs_offset = app_offset = 0
+            nvs_offset = nvs_size = app_offset = 0
 
         if nvs_offset >= app_offset:
             errors.append(_("NVS offset must be less than app offset."))
+        if nvs_size <= 0 or nvs_size % 4096 != 0:
+            errors.append(_("NVS size must be a positive multiple of 4096 (e.g. 0x5000)."))
+        if nvs_offset + nvs_size > app_offset:
+            errors.append(_("NVS partition must fit before the app partition offset."))
 
         if errors:
             for e in errors:
@@ -125,6 +131,7 @@ def firmware_upload():
             version=version,
             filename=stored_filename,
             nvs_offset=nvs_offset,
+            nvs_size=nvs_size,
             app_offset=app_offset,
             uploaded_by_user_id=current_user.id,
         )
@@ -257,7 +264,7 @@ def firmware_config_preview(device_id: int, fw_id: int):
             {
                 "label":  "NVS partition",
                 "offset": hex(fw.nvs_offset),
-                "source": "generated on server",
+                "source": f"generated on server ({hex(fw.nvs_size)})",
             },
             {
                 "label":  "Application firmware",
@@ -283,11 +290,11 @@ def firmware_nvs_binary(device_id: int, fw_id: int):
     webhook_secret = cfg.get("LORA_WEBHOOK_SECRET") or ""
     hmac_len = int(cfg.get("DEVICE_CARD_HMAC_LEN", 12))
 
-    # Partition size = gap between NVS and app partition.
-    # Must be a multiple of 4096; the library reserves the last page internally.
-    partition_size = fw.app_offset - fw.nvs_offset
+    partition_size = int(fw.nvs_size or 0)
     if partition_size <= 0 or partition_size % 4096 != 0:
-        abort(400, f"Invalid partition size derived from offsets: {partition_size:#x}")
+        abort(400, f"Invalid NVS partition size: {partition_size:#x}")
+    if fw.nvs_offset + partition_size > fw.app_offset:
+        abort(400, f"NVS partition overruns app offset: {fw.nvs_offset + partition_size:#x} > {fw.app_offset:#x}")
 
     from app.utils.nvs_gen import generate_nvs_partition
     try:

@@ -18,6 +18,7 @@
         <th>{{ _('Type') }}</th>
         <th>{{ _('Version') }}</th>
         <th>{{ _('NVS offset') }}</th>
+        <th>{{ _('NVS size') }}</th>
         <th>{{ _('App offset') }}</th>
         <th>{{ _('Uploaded') }}</th>
         <th>{{ _('By') }}</th>
@@ -31,6 +32,7 @@
         <td><span class="badge bg-secondary">{{ f.device_type }}</span></td>
         <td>{{ f.version or '—' }}</td>
         <td><code>{{ '0x%X' % f.nvs_offset }}</code></td>
+        <td><code>{{ '0x%X' % (f.nvs_size or 0x5000) }}</code></td>
         <td><code>{{ '0x%X' % f.app_offset }}</code></td>
         <td>{{ f.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</td>
         <td>{{ f.uploaded_by.username if f.uploaded_by else '—' }}</td>

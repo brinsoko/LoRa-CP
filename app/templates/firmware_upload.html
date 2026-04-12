@@ -38,6 +38,11 @@
           <div class="form-text">{{ _('Where NVS starts in flash (default 0x9000)') }}</div>
         </div>
         <div class="col">
+          <label class="form-label">{{ _('NVS partition size') }}</label>
+          <input class="form-control font-monospace" name="nvs_size" value="0x5000">
+          <div class="form-text">{{ _('Size of the NVS partition (default 0x5000 on ESP32)') }}</div>
+        </div>
+        <div class="col">
           <label class="form-label">{{ _('App partition offset') }}</label>
           <input class="form-control font-monospace" name="app_offset" value="0x10000">
           <div class="form-text">{{ _('Where the app binary starts (default 0x10000)') }}</div>
