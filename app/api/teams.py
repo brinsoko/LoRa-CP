@@ -487,7 +487,7 @@ def team_randomize_numbers():
             )
             continue
 
-        range_start, range_end = parsed
+        start, end = parsed
 
         # Get all active teams in this group
         all_group_teams = (
@@ -499,7 +499,8 @@ def team_randomize_numbers():
             )
             .all()
         )
-        if not all_group_teams:
+        total_teams = len(all_group_teams)
+        if total_teams <= 0:
             results.append(
                 {
                     "group_id": group.id,
@@ -510,8 +511,13 @@ def team_randomize_numbers():
             )
             continue
 
-        # Teams that already have a number within the prefix range don't need a new one.
-        # Teams with a number outside the range or no number need assignment.
+        # The usable range is start+1 .. start+total_teams (capped at end).
+        # E.g. 3xx with 3 teams → 301-303; with 100 teams → 301-399.
+        range_start = start + 1
+        range_end = min(end, start + total_teams)
+
+        # Teams that already have a number within the range don't need a new one.
+        # Teams with no number or a number outside the range need assignment.
         teams_needing_number = []
         for team in all_group_teams:
             if team.number is not None and range_start <= team.number <= range_end:
@@ -530,7 +536,7 @@ def team_randomize_numbers():
             )
             continue
 
-        # Find all numbers already used in the full prefix range across the competition
+        # Find all numbers already used in the range across the competition
         used_numbers = (
             db.session.query(Team.number)
             .filter(Team.competition_id == comp_id)
