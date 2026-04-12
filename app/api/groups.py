@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
 from typing import Iterable, List
 
 from flask import Blueprint, jsonify, request
+from flask_babel import gettext as _
 from flask_login import current_user
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -14,6 +16,53 @@ from app.utils.audit import record_audit_event
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_roles_required
 from app.utils.validators import validate_text
+
+
+_PREFIX_RE = re.compile(r"^(\d+)(x+)$", re.IGNORECASE)
+
+
+def _validate_prefix_format(prefix: str | None) -> tuple[bool, str | None]:
+    """Validate that prefix matches the digits+x pattern. Returns (ok, error_message)."""
+    if not prefix:
+        return True, None
+    text = prefix.strip().lower()
+    if not _PREFIX_RE.match(text):
+        return False, _("Prefix must be digits followed by one or more 'x' characters (e.g. 3xx, 01xx).")
+    return True, None
+
+
+def _validate_prefix_overlap(prefix: str | None, comp_id: int, exclude_group_id: int | None = None) -> tuple[bool, str | None]:
+    """Check that the new prefix doesn't overlap with existing group prefixes in the same competition."""
+    if not prefix:
+        return True, None
+    text = prefix.strip().lower()
+    match = _PREFIX_RE.match(text)
+    if not match:
+        return True, None  # format validation handled separately
+    new_digits = match.group(1)
+
+    query = db.session.query(CheckpointGroup).filter(CheckpointGroup.competition_id == comp_id)
+    if exclude_group_id:
+        query = query.filter(CheckpointGroup.id != exclude_group_id)
+
+    for group in query.all():
+        existing_prefix = (group.prefix or "").strip().lower()
+        if not existing_prefix:
+            continue
+        existing_match = _PREFIX_RE.match(existing_prefix)
+        if not existing_match:
+            continue
+        existing_digits = existing_match.group(1)
+
+        # Neither digit portion should be a prefix of the other
+        if new_digits.startswith(existing_digits) or existing_digits.startswith(new_digits):
+            return False, _(
+                "Prefix conflicts with existing group '%(group)s' (prefix: %(prefix)s).",
+                group=group.name,
+                prefix=group.prefix,
+            )
+
+    return True, None
 
 groups_api_bp = Blueprint("api_groups", __name__)
 
@@ -117,8 +166,18 @@ def group_create():
         return jsonify({"error": "validation_error", "detail": prefix_error}), 400
     if description_error:
         return jsonify({"error": "validation_error", "detail": description_error}), 400
+
+    # Validate prefix format and overlap
+    if prefix:
+        fmt_ok, fmt_err = _validate_prefix_format(prefix)
+        if not fmt_ok:
+            return jsonify({"error": "validation_error", "detail": fmt_err}), 400
+        overlap_ok, overlap_err = _validate_prefix_overlap(prefix, comp_id)
+        if not overlap_ok:
+            return jsonify({"error": "validation_error", "detail": overlap_err}), 409
+
     if _group_query(comp_id).filter(CheckpointGroup.name == name).first():
-        return jsonify({"error": "duplicate", "detail": "Group name already exists."}), 409
+        return jsonify({"error": "duplicate", "detail": _("Group name already exists.")}), 409
 
     max_position = _group_query(comp_id).with_entities(func.max(CheckpointGroup.position)).scalar()
     next_position = (max_position if max_position is not None else -1) + 1
@@ -190,6 +249,13 @@ def _update_group(group_id: int, partial: bool):
         prefix, prefix_error = validate_text(payload.get("prefix"), field_name="prefix", max_length=20)
         if prefix_error:
             return jsonify({"error": "validation_error", "detail": prefix_error}), 400
+        if prefix:
+            fmt_ok, fmt_err = _validate_prefix_format(prefix)
+            if not fmt_ok:
+                return jsonify({"error": "validation_error", "detail": fmt_err}), 400
+            overlap_ok, overlap_err = _validate_prefix_overlap(prefix, comp_id, exclude_group_id=group_id)
+            if not overlap_ok:
+                return jsonify({"error": "validation_error", "detail": overlap_err}), 409
         group.prefix = prefix or None
 
     if "description" in payload or not partial:

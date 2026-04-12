@@ -76,11 +76,11 @@ def list_teams():
     groups_resp, groups_payload = api_json("GET", "/api/groups")
 
     if team_resp.status_code != 200:
-        flash("Could not load teams.", "warning")
+        flash(_("Could not load teams."), "warning")
     teams = [_transform_team_payload(t) for t in team_payload.get("teams", [])]
 
     if groups_resp.status_code != 200:
-        flash("Could not load groups.", "warning")
+        flash(_("Could not load groups."), "warning")
     groups = groups_payload.get("groups", [])
     if group_id_error:
         flash(group_id_error, "warning")
@@ -121,7 +121,7 @@ def add_team():
             )
 
         if not name:
-            flash("Team name is required.", "warning")
+            flash(_("Team name is required."), "warning")
             return render_template(
                 "add_team.html",
                 groups=groups,
@@ -152,10 +152,10 @@ def add_team():
                     flash(_tr("RFID mapping created."), "success")
                 else:
                     flash(rfid_payload.get("detail") or rfid_payload.get("error") or _tr("Could not create RFID mapping."), "warning")
-            flash("Team created.", "success")
+            flash(_("Team created."), "success")
             return redirect(url_for("teams.list_teams"))
 
-        flash(payload.get("error") or "Could not create team.", "warning")
+        flash(payload.get("error") or _("Could not create team."), "warning")
 
     return render_template(
         "add_team.html",
@@ -171,7 +171,7 @@ def edit_team(team_id: int):
     next_url = (request.args.get("next") or request.form.get("next") or "").strip()
     team_resp, team_payload = api_json("GET", f"/api/teams/{team_id}")
     if team_resp.status_code != 200:
-        flash("Team not found.", "warning")
+        flash(_("Team not found."), "warning")
         return redirect(url_for("teams.list_teams"))
 
     team = _transform_team_payload(team_payload.get("team", team_payload))
@@ -216,7 +216,7 @@ def edit_team(team_id: int):
             )
 
         if not name:
-            flash("Team name is required.", "warning")
+            flash(_("Team name is required."), "warning")
             team["name"] = name
             team["number"] = number
             team["organization"] = organization
@@ -272,10 +272,10 @@ def edit_team(team_id: int):
                     else:
                         flash(rfid_payload.get("detail") or rfid_payload.get("error") or _tr("Could not save RFID mapping."), "warning")
 
-            flash("Team updated.", "success")
+            flash(_("Team updated."), "success")
             return redirect(_safe_next_url(url_for("teams.list_teams")))
 
-        flash(payload.get("error") or "Could not update team.", "warning")
+        flash(payload.get("error") or _("Could not update team."), "warning")
         team["name"] = name
         team["number"] = number
         grp = next((g for g in groups if g.get("id") == selected_group_id), None)
@@ -310,9 +310,9 @@ def delete_team(team_id: int):
     resp, payload = api_json("DELETE", f"/api/teams/{team_id}", json=json_payload)
 
     if resp.status_code == 200:
-        flash("Team deleted.", "success")
+        flash(_("Team deleted."), "success")
     else:
-        flash(payload.get("detail") or payload.get("error") or "Could not delete team.", "warning")
+        flash(payload.get("detail") or payload.get("error") or _("Could not delete team."), "warning")
 
     return redirect(_safe_next_url(url_for("teams.list_teams")))
 
@@ -327,21 +327,25 @@ def randomize_numbers():
 
     resp, data = api_json("POST", "/api/teams/randomize", json=payload)
     if resp.status_code != 200:
-        flash(data.get("detail") or data.get("error") or "Could not randomize team numbers.", "warning")
+        flash(data.get("detail") or data.get("error") or _("Could not randomize team numbers."), "warning")
         return redirect(_safe_next_url(url_for("teams.list_teams")))
 
     assigned_total = data.get("assigned_total", 0)
     if assigned_total:
-        flash(f"Randomized team numbers. Assigned {assigned_total}.", "success")
+        flash(_("Randomized team numbers. Assigned %(count)s.", count=assigned_total), "success")
     else:
-        flash("No team numbers were assigned.", "info")
+        flash(_("No team numbers were assigned."), "info")
 
     for res in data.get("results", []):
         status = res.get("status")
-        name = res.get("group_name") or f"Group {res.get('group_id')}"
+        name = res.get("group_name") or _("Group %(id)s", id=res.get("group_id"))
         if status == "insufficient_numbers":
-            flash(f"{name}: not enough numbers in range.", "warning")
+            r = res.get("range", [0, 0])
+            flash(_(
+                "Not enough numbers available in range %(min)s\u2013%(max)s. %(available)s available, %(needed)s needed.",
+                min=r[0], max=r[1], available=res.get("available", 0), needed=res.get("needed", 0),
+            ), "warning")
         elif status == "skipped":
-            flash(f"{name}: invalid or missing prefix.", "warning")
+            flash(_("%(group)s: invalid or missing prefix.", group=name), "warning")
 
     return redirect(_safe_next_url(url_for("teams.list_teams")))

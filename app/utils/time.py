@@ -3,14 +3,14 @@ from zoneinfo import ZoneInfo
 
 DEFAULT_TZ = ZoneInfo("Europe/Ljubljana")
 
-def to_datetime_local(dt: datetime, tz: ZoneInfo = DEFAULT_TZ) -> str:
+def to_datetime_local(dt: datetime, tz: ZoneInfo | None = None) -> str:
     if not dt:
         return ""
     # If naive, assume UTC (DB stores UTC)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    local_dt = dt.astimezone(tz)
-    return local_dt.strftime("%d-%m-%Y %H:%M:%S")
+    utc_dt = dt.astimezone(timezone.utc)
+    return utc_dt.strftime("%d-%m-%Y %H:%M:%S") + " UTC"
 
 def from_datetime_local(s: str | None, tz_name: str | None = None) -> datetime | None:
     if not s:

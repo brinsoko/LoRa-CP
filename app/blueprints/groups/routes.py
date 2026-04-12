@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import List, Tuple
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask_babel import gettext as _
 
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
@@ -53,7 +54,7 @@ def _partition_checkpoints(all_checkpoints: List[dict], ordered_ids: List[int]) 
 def _fetch_checkpoints() -> List[dict]:
     resp, payload = api_json("GET", "/api/checkpoints")
     if resp.status_code != 200:
-        flash("Could not load checkpoints.", "warning")
+        flash(_("Could not load checkpoints."), "warning")
         return []
     return payload.get("checkpoints", [])
 
@@ -63,7 +64,7 @@ def _fetch_checkpoints() -> List[dict]:
 def list_groups():
     resp, payload = api_json("GET", "/api/groups")
     if resp.status_code != 200:
-        flash("Could not load groups.", "warning")
+        flash(_("Could not load groups."), "warning")
         groups = []
     else:
         groups = payload.get("groups", [])
@@ -84,7 +85,7 @@ def add_group():
         desc = (request.form.get("description") or "").strip() or None
 
         if not name:
-            flash("Group name is required.", "warning")
+            flash(_("Group name is required."), "warning")
             return render_template(
                 "group_edit.html",
                 mode="add",
@@ -106,10 +107,10 @@ def add_group():
         )
 
         if resp.status_code == 201:
-            flash("Group created.", "success")
+            flash(_("Group created."), "success")
             return redirect(url_for("groups.list_groups"))
 
-        flash(payload.get("error") or payload.get("detail") or "Could not create group.", "warning")
+        flash(payload.get("error") or payload.get("detail") or _("Could not create group."), "warning")
 
     return render_template(
         "group_edit.html",
@@ -142,7 +143,7 @@ def edit_group(group_id: int):
         desc = (request.form.get("description") or "").strip() or None
 
         if not name:
-            flash("Group name is required.", "warning")
+            flash(_("Group name is required."), "warning")
             group["name"] = name
             group["description"] = desc
             group["checkpoints"] = [
@@ -170,10 +171,10 @@ def edit_group(group_id: int):
         )
 
         if resp.status_code == 200:
-            flash("Group updated.", "success")
+            flash(_("Group updated."), "success")
             return redirect(url_for("groups.list_groups"))
 
-        flash(payload.get("error") or payload.get("detail") or "Could not update group.", "warning")
+        flash(payload.get("error") or payload.get("detail") or _("Could not update group."), "warning")
         group["name"] = name
         group["prefix"] = prefix
         group["description"] = desc
@@ -203,9 +204,9 @@ def edit_group(group_id: int):
 def delete_group(group_id: int):
     resp, payload = api_json("DELETE", f"/api/groups/{group_id}")
     if resp.status_code == 200:
-        flash("Group deleted.", "success")
+        flash(_("Group deleted."), "success")
     else:
-        flash(payload.get("detail") or payload.get("error") or "Could not delete group.", "warning")
+        flash(payload.get("detail") or payload.get("error") or _("Could not delete group."), "warning")
     return redirect(url_for("groups.list_groups"))
 
 
@@ -216,12 +217,12 @@ def set_active_group_for_team():
     group_id = request.form.get("group_id")
 
     if not team_id or not group_id:
-        flash("team_id and group_id are required.", "warning")
+        flash(_("team_id and group_id are required."), "warning")
         return redirect(url_for("groups.list_groups"))
 
     parsed_group_id = _parse_int(group_id)
     if parsed_group_id is None:
-        flash("group_id must be an integer.", "warning")
+        flash(_("group_id must be an integer."), "warning")
         return redirect(url_for("groups.list_groups"))
 
     resp, payload = api_json(
@@ -231,7 +232,7 @@ def set_active_group_for_team():
     )
 
     if resp.status_code == 200:
-        flash("Active group updated.", "success")
+        flash(_("Active group updated."), "success")
     else:
-        flash(payload.get("detail") or payload.get("error") or "Could not set active group.", "warning")
+        flash(payload.get("detail") or payload.get("error") or _("Could not set active group."), "warning")
     return redirect(url_for("groups.list_groups"))

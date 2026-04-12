@@ -35,14 +35,14 @@
         </div>
 
         <div class="col-md-4">
-          <label class="form-label">{{ _('Local time') }}</label>
+          <label class="form-label">{{ _('Time') }}</label>
           {# 'timestamp_local' is precomputed in the route using to_datetime_local(c.timestamp) #}
           <input type="datetime-local"
                  name="timestamp_local"
                  class="form-control"
                  step="1"
                  value="{{ timestamp_local }}">
-          <div class="form-text">{{ _('Edit using your local time (with seconds).') }}</div>
+          <div class="form-text">{{ _('Enter time with seconds. Will be converted to UTC using the selected timezone.') }}</div>
         </div>
 
         <div class="col-md-4">
@@ -57,7 +57,7 @@
             <option value="Europe/Berlin" {% if tz_current=='Europe/Berlin' %}selected{% endif %}>Europe/Berlin</option>
             <option value="Europe/Paris" {% if tz_current=='Europe/Paris' %}selected{% endif %}>Europe/Paris</option>
           </select>
-          <div class="form-text">{{ _('Used to convert local time → UTC in the database.') }}</div>
+          <div class="form-text">{{ _('Used to convert the entered time to UTC in the database.') }}</div>
         </div>
       </div>
 

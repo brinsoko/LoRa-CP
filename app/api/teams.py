@@ -9,6 +9,9 @@ from flask_login import current_user
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
+from flask_babel import gettext as _
+from sqlalchemy.exc import IntegrityError
+
 from app.api.helpers import json_ok
 from app.extensions import db
 from app.models import CheckpointGroup, Team, TeamGroup
@@ -167,9 +170,12 @@ def team_create():
         team.dnf = bool(payload.get("dnf"))
     if number is not None:
         try:
-            team.number = int(number)
+            num_val = int(number)
         except Exception:
-            return jsonify({"error": "validation_error", "detail": "number must be integer"}), 400
+            return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
+        if num_val <= 0:
+            return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
+        team.number = num_val
 
     db.session.add(team)
     db.session.flush()
@@ -202,17 +208,21 @@ def team_create():
             db.session.rollback()
             return jsonify({"error": "validation_error", "detail": err}), 400
 
-    db.session.flush()
-    record_audit_event(
-        competition_id=comp_id,
-        event_type="team_created",
-        entity_type="team",
-        entity_id=team.id,
-        actor_user=current_user if current_user.is_authenticated else None,
-        summary=f"Team {team.name} created.",
-        details=_team_snapshot(team),
-    )
-    db.session.commit()
+    try:
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="team_created",
+            entity_type="team",
+            entity_id=team.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Team {team.name} created.",
+            details=_team_snapshot(team),
+        )
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
     try:
         sync_all_checkpoint_tabs(competition_id=comp_id)
     except Exception:
@@ -266,9 +276,12 @@ def _update_team(team_id: int, partial: bool):
             team.number = None
         else:
             try:
-                team.number = int(number)
+                num_val = int(number)
             except Exception:
-                return jsonify({"error": "validation_error", "detail": "number must be integer"}), 400
+                return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
+            if num_val <= 0:
+                return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
+            team.number = num_val
 
     if "organization" in payload or not partial:
         org, org_error = validate_text(payload.get("organization"), field_name="organization", max_length=120)
@@ -320,17 +333,21 @@ def _update_team(team_id: int, partial: bool):
             db.session.rollback()
             return jsonify({"error": "validation_error", "detail": err}), 400
 
-    db.session.flush()
-    record_audit_event(
-        competition_id=comp_id,
-        event_type="team_updated",
-        entity_type="team",
-        entity_id=team.id,
-        actor_user=current_user if current_user.is_authenticated else None,
-        summary=f"Team {team.name} updated.",
-        details={"before": before, "after": _team_snapshot(team)},
-    )
-    db.session.commit()
+    try:
+        db.session.flush()
+        record_audit_event(
+            competition_id=comp_id,
+            event_type="team_updated",
+            entity_type="team",
+            entity_id=team.id,
+            actor_user=current_user if current_user.is_authenticated else None,
+            summary=f"Team {team.name} updated.",
+            details={"before": before, "after": _team_snapshot(team)},
+        )
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
     try:
         sync_all_checkpoint_tabs(competition_id=comp_id)
     except Exception:
@@ -470,17 +487,19 @@ def team_randomize_numbers():
             )
             continue
 
-        start, end = parsed
-        total_teams = (
+        range_start, range_end = parsed
+
+        # Get all active teams in this group
+        all_group_teams = (
             Team.query.join(TeamGroup, TeamGroup.team_id == Team.id)
             .filter(
                 Team.competition_id == comp_id,
                 TeamGroup.group_id == group.id,
                 TeamGroup.active.is_(True),
             )
-            .count()
+            .all()
         )
-        if total_teams <= 0:
+        if not all_group_teams:
             results.append(
                 {
                     "group_id": group.id,
@@ -490,28 +509,16 @@ def team_randomize_numbers():
                 }
             )
             continue
-        range_start = start + 1
-        range_end = min(end, start + total_teams)
-        used_numbers = (
-            db.session.query(Team.number)
-            .filter(Team.competition_id == comp_id)
-            .filter(Team.number.isnot(None))
-            .filter(Team.number >= range_start, Team.number <= range_end)
-            .all()
-        )
-        used_set = {n[0] for n in used_numbers}
 
-        teams = (
-            Team.query.join(TeamGroup, TeamGroup.team_id == Team.id)
-            .filter(
-                Team.competition_id == comp_id,
-                TeamGroup.group_id == group.id,
-                TeamGroup.active.is_(True),
-                Team.number.is_(None),
-            )
-            .all()
-        )
-        needed = len(teams)
+        # Teams that already have a number within the prefix range don't need a new one.
+        # Teams with a number outside the range or no number need assignment.
+        teams_needing_number = []
+        for team in all_group_teams:
+            if team.number is not None and range_start <= team.number <= range_end:
+                continue  # already has a valid number in range
+            teams_needing_number.append(team)
+
+        needed = len(teams_needing_number)
         if needed == 0:
             results.append(
                 {
@@ -522,6 +529,16 @@ def team_randomize_numbers():
                 }
             )
             continue
+
+        # Find all numbers already used in the full prefix range across the competition
+        used_numbers = (
+            db.session.query(Team.number)
+            .filter(Team.competition_id == comp_id)
+            .filter(Team.number.isnot(None))
+            .filter(Team.number >= range_start, Team.number <= range_end)
+            .all()
+        )
+        used_set = {n[0] for n in used_numbers}
 
         available = [n for n in range(range_start, range_end + 1) if n not in used_set]
         if len(available) < needed:
@@ -538,7 +555,7 @@ def team_randomize_numbers():
             continue
 
         random.shuffle(available)
-        for team, number in zip(teams, available):
+        for team, number in zip(teams_needing_number, available):
             team.number = number
         assigned_total += needed
         results.append(

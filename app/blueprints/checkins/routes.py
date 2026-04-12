@@ -5,6 +5,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
+from flask_babel import gettext as _
 from flask_login import current_user
 from app.models import JudgeCheckpoint, Checkpoint
 from app.utils.competition import get_current_competition_id, get_current_competition_role
@@ -21,7 +22,7 @@ DEFAULT_TIMEZONE = ZoneInfo("Europe/Ljubljana")
 def _fetch_teams():
     resp, payload = api_json("GET", "/api/teams", params={"sort": "name_asc"})
     if resp.status_code != 200:
-        flash("Could not load teams.", "warning")
+        flash(_("Could not load teams."), "warning")
         return []
     return payload.get("teams", [])
 
@@ -29,7 +30,7 @@ def _fetch_teams():
 def _fetch_checkpoints():
     resp, payload = api_json("GET", "/api/checkpoints")
     if resp.status_code != 200:
-        flash("Could not load checkpoints.", "warning")
+        flash(_("Could not load checkpoints."), "warning")
         return []
     return payload.get("checkpoints", [])
 
@@ -224,12 +225,11 @@ def add_checkin():
         resp, body = api_json("POST", "/api/checkins", json=payload)
 
         if resp.status_code in (200, 201):
-            message = "Existing check-in replaced." if resp.status_code == 200 else "Check-in recorded."
+            message = _("Existing check-in replaced.") if resp.status_code == 200 else _("Check-in recorded.")
             flash(message, "success")
             return redirect(url_for("checkins.list_checkins"))
 
         if resp.status_code == 409 and body.get("error") == "duplicate":
-            flash("This team has already checked in at this checkpoint. Submit again to replace the timestamp.", "warning")
             context.update(
                 {
                     "dup_team_id": team_id,
@@ -240,7 +240,7 @@ def add_checkin():
             )
             return render_template("add_checkin.html", **context)
 
-        flash(body.get("detail") or body.get("error") or "Could not record check-in.", "warning")
+        flash(body.get("detail") or body.get("error") or _("Could not record check-in."), "warning")
 
     return render_template("add_checkin.html", **context)
 
@@ -270,7 +270,7 @@ def _load_checkin(checkin_id: int):
 def edit_checkin(checkin_id: int):
     raw_checkin, decorated = _load_checkin(checkin_id)
     if not raw_checkin:
-        flash("Check-in not found.", "warning")
+        flash(_("Check-in not found."), "warning")
         return redirect(url_for("checkins.list_checkins"))
 
     teams = _fetch_teams()
@@ -310,11 +310,10 @@ def edit_checkin(checkin_id: int):
         resp, body = api_json("PATCH", f"/api/checkins/{checkin_id}", json=payload)
 
         if resp.status_code == 200:
-            flash("Check-in updated.", "success")
+            flash(_("Check-in updated."), "success")
             return redirect(url_for("checkins.list_checkins"))
 
         if resp.status_code == 409 and body.get("error") == "duplicate":
-            flash("Another check-in exists for that team and checkpoint. Submit again to replace it.", "warning")
             context["c"]["team_id"] = team_id
             context["c"]["checkpoint_id"] = checkpoint_id
             context["timestamp_local"] = request.form.get("timestamp_local") or context.get("timestamp_local")
@@ -327,7 +326,7 @@ def edit_checkin(checkin_id: int):
             )
             return render_template("checkin_edit.html", **context)
 
-        flash(body.get("detail") or body.get("error") or "Could not update check-in.", "warning")
+        flash(body.get("detail") or body.get("error") or _("Could not update check-in."), "warning")
         decorated.update(
             {
                 "team_id": team_id,
@@ -346,9 +345,9 @@ def delete_checkin(checkin_id: int):
     resp, body = api_json("DELETE", f"/api/checkins/{checkin_id}")
 
     if resp.status_code == 200:
-        flash("Check-in deleted.", "success")
+        flash(_("Check-in deleted."), "success")
     else:
-        flash(body.get("detail") or body.get("error") or "Could not delete check-in.", "warning")
+        flash(body.get("detail") or body.get("error") or _("Could not delete check-in."), "warning")
 
     return redirect(url_for("checkins.list_checkins"))
 
@@ -356,5 +355,5 @@ def delete_checkin(checkin_id: int):
 @checkins_bp.route("/import_json", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def import_checkins_json():
-    flash("JSON import via UI is disabled. Use the /api/checkins endpoint instead.", "warning")
+    flash(_("JSON import via UI is disabled. Use the /api/checkins endpoint instead."), "warning")
     return redirect(url_for("checkins.list_checkins"))
