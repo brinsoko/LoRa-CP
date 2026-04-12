@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LoRa KT\n"
 "Report-Msgid-Bugs-To: brin.soko@gmail.com\n"
-"POT-Creation-Date: 2026-04-12 16:09+0200\n"
+"POT-Creation-Date: 2026-04-12 16:42+0200\n"
 "PO-Revision-Date: 2025-12-04 00:00+0100\n"
 "Last-Translator: Brin Soko <brin.soko@gmail.com>\n"
 "Language: sl\n"
@@ -26,7 +26,9 @@ msgstr ""
 #: app/api/groups.py:60
 #, python-format
 msgid "Prefix conflicts with existing group '%(group)s' (prefix: %(prefix)s)."
-msgstr "Predpona je v konfliktu z obstoječo skupino '%(group)s' (predpona: %(prefix)s)."
+msgstr ""
+"Predpona je v konfliktu z obstoječo skupino '%(group)s' (predpona: "
+"%(prefix)s)."
 
 #: app/api/groups.py:180
 msgid "Group name already exists."
@@ -82,7 +84,7 @@ msgstr "Uporabnik %(user)s je bil odstranjen iz tekmovanja."
 msgid "Competition %(name)s created."
 msgstr "Tekmovanje %(name)s je bilo ustvarjeno."
 
-#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:330
+#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:333
 msgid "Competition settings updated."
 msgstr "Nastavitve tekmovanja so posodobljene."
 
@@ -166,14 +168,15 @@ msgstr "Naprava %(name)s je bila izbrisana."
 
 #: app/blueprints/audit/routes.py:115 app/blueprints/firmware/routes.py:41
 #: app/blueprints/judges/routes.py:18 app/blueprints/main/routes.py:157
-#: app/blueprints/main/routes.py:194 app/blueprints/main/routes.py:368
-#: app/blueprints/main/routes.py:409 app/blueprints/scores/routes.py:82
-#: app/blueprints/scores/routes.py:180 app/blueprints/scores/routes.py:198
-#: app/blueprints/scores/routes.py:273 app/blueprints/scores/routes.py:560
-#: app/blueprints/scores/routes.py:587 app/blueprints/scores/routes.py:796
-#: app/blueprints/sheets/routes.py:40 app/blueprints/users/routes.py:39
-#: app/blueprints/users/routes.py:63 app/blueprints/users/routes.py:133
-#: app/blueprints/users/routes.py:199 app/blueprints/users/routes.py:283
+#: app/blueprints/main/routes.py:194 app/blueprints/main/routes.py:371
+#: app/blueprints/main/routes.py:412 app/blueprints/main/routes.py:440
+#: app/blueprints/scores/routes.py:82 app/blueprints/scores/routes.py:180
+#: app/blueprints/scores/routes.py:198 app/blueprints/scores/routes.py:273
+#: app/blueprints/scores/routes.py:560 app/blueprints/scores/routes.py:587
+#: app/blueprints/scores/routes.py:796 app/blueprints/sheets/routes.py:40
+#: app/blueprints/users/routes.py:39 app/blueprints/users/routes.py:63
+#: app/blueprints/users/routes.py:133 app/blueprints/users/routes.py:199
+#: app/blueprints/users/routes.py:283
 msgid "Select a competition first."
 msgstr "Najprej izberi tekmovanje."
 
@@ -212,7 +215,9 @@ msgstr "Prihoda ni bilo mogoče izbrisati."
 
 #: app/blueprints/checkins/routes.py:358
 msgid "JSON import via UI is disabled. Use the /api/checkins endpoint instead."
-msgstr "Uvoz JSON prek vmesnika je onemogočen. Uporabite končno točko /api/checkins."
+msgstr ""
+"Uvoz JSON prek vmesnika je onemogočen. Uporabite končno točko "
+"/api/checkins."
 
 #: app/blueprints/checkpoints/routes.py:20
 #, python-format
@@ -367,7 +372,7 @@ msgstr "Neveljavna izbira sodnika."
 msgid "Judge checkpoints updated."
 msgstr "Dodelitve sodnika posodobljene."
 
-#: app/blueprints/main/routes.py:59 app/blueprints/main/routes.py:302
+#: app/blueprints/main/routes.py:59 app/blueprints/main/routes.py:303
 msgid "A competition with that name already exists."
 msgstr "Tekmovanje s tem imenom že obstaja."
 
@@ -383,7 +388,8 @@ msgstr "Nimaš dostopa do tega tekmovanja."
 msgid "Competition selected."
 msgstr "Tekmovanje izbrano."
 
-#: app/blueprints/main/routes.py:199 app/blueprints/main/routes.py:414
+#: app/blueprints/main/routes.py:199 app/blueprints/main/routes.py:417
+#: app/blueprints/main/routes.py:445
 msgid "Competition not found."
 msgstr "Tekmovanje ni bilo najdeno."
 
@@ -403,19 +409,19 @@ msgstr "Aktivno povabilo za ta e-poštni naslov že obstaja."
 msgid "Invite saved."
 msgstr "Povabilo shranjeno."
 
-#: app/blueprints/main/routes.py:380
+#: app/blueprints/main/routes.py:383
 msgid "Invite not found."
 msgstr "Povabilo ni bilo najdeno."
 
-#: app/blueprints/main/routes.py:400
+#: app/blueprints/main/routes.py:403
 msgid "Invite revoked."
 msgstr "Povabilo preklicano."
 
-#: app/blueprints/main/routes.py:425
+#: app/blueprints/main/routes.py:428
 msgid "Competition deleted."
 msgstr "Tekmovanje je izbrisano."
 
-#: app/blueprints/main/routes.py:428
+#: app/blueprints/main/routes.py:431
 msgid "Could not delete competition."
 msgstr "Tekmovanja ni bilo mogoče izbrisati."
 
@@ -1072,7 +1078,7 @@ msgstr "Dodeli ekipo → skupini"
 msgid "Assign"
 msgstr "Dodeli"
 
-#: app/templates/audit_list.html:2 app/templates/base.html:172
+#: app/templates/audit_list.html:2 app/templates/base.html:174
 msgid "Audit"
 msgstr "Revizija"
 
@@ -1092,7 +1098,7 @@ msgstr "Vrsta entitete"
 msgid "All entity types"
 msgstr "Vse vrste entitet"
 
-#: app/templates/audit_list.html:27 app/templates/audit_list.html:59
+#: app/templates/audit_list.html:27 app/templates/audit_list.html:61
 msgid "Actor"
 msgstr "Akter"
 
@@ -1119,33 +1125,57 @@ msgstr "Ponastavi"
 msgid "Audit Trail"
 msgstr "Revizijska sled"
 
-#: app/templates/audit_list.html:50
-msgid "Showing up to 500 newest events."
-msgstr "Prikazanih je največ 500 najnovejših dogodkov."
+#: app/templates/audit_list.html:51
+#, python-format
+msgid "Showing %(count)s of %(total)s events"
+msgstr ""
 
-#: app/templates/audit_list.html:56
+#: app/templates/audit_list.html:58
 msgid "When"
 msgstr "Kdaj"
 
-#: app/templates/audit_list.html:57
+#: app/templates/audit_list.html:59
 msgid "Event"
 msgstr "Dogodek"
 
-#: app/templates/audit_list.html:58
+#: app/templates/audit_list.html:60
 msgid "Entity"
 msgstr "Entiteta"
 
-#: app/templates/audit_list.html:60
+#: app/templates/audit_list.html:62
 msgid "Summary"
 msgstr "Povzetek"
 
-#: app/templates/audit_list.html:61
+#: app/templates/audit_list.html:63
 msgid "Details"
 msgstr "Podrobnosti"
 
-#: app/templates/audit_list.html:87
+#: app/templates/audit_list.html:89
 msgid "No audit events match your filters."
 msgstr "Noben revizijski dogodek ne ustreza vašim filtrom."
+
+#: app/templates/audit_list.html:99 app/templates/view_checkins.html:138
+#, python-format
+msgid "Page %(page)s of %(pages)s"
+msgstr ""
+
+#: app/templates/audit_list.html:105
+msgid "First"
+msgstr "Prva"
+
+#: app/templates/audit_list.html:109 app/templates/view_checkins.html:136
+#, fuzzy
+msgid "Previous"
+msgstr "Predogled"
+
+#: app/templates/audit_list.html:115 app/templates/view_checkins.html:141
+#, fuzzy
+msgid "Next"
+msgstr "naslednja"
+
+#: app/templates/audit_list.html:119
+msgid "Last"
+msgstr "Zadnja"
 
 #: app/templates/base.html:7 app/templates/base.html:44
 msgid "RFID Checkpoint System"
@@ -1265,23 +1295,23 @@ msgstr "Naprave"
 msgid "Messages"
 msgstr "Sporočila"
 
-#: app/templates/base.html:167
+#: app/templates/base.html:168
 msgid "Map"
 msgstr "Zemljevid"
 
-#: app/templates/base.html:168 app/templates/lora_map.html:2
+#: app/templates/base.html:169 app/templates/lora_map.html:2
 msgid "Device Map"
 msgstr "Zemljevid naprav"
 
-#: app/templates/base.html:170
+#: app/templates/base.html:172
 msgid "Sheets"
 msgstr "Preglednice"
 
-#: app/templates/base.html:171 app/templates/score_rules.html:2
+#: app/templates/base.html:173 app/templates/score_rules.html:2
 msgid "Score Rules"
 msgstr "Pravila točkovanja"
 
-#: app/templates/base.html:173
+#: app/templates/base.html:175
 msgid "Settings"
 msgstr "Nastavitve"
 
@@ -1329,7 +1359,7 @@ msgid ""
 msgstr "Za isto ekipo in točko že obstaja prihod. Pošlji za zamenjavo časa."
 
 #: app/templates/checkin_edit.html:75 app/templates/checkpoint_edit.html:72
-#: app/templates/competition_settings.html:54 app/templates/group_edit.html:70
+#: app/templates/competition_settings.html:61 app/templates/group_edit.html:70
 #: app/templates/lora_add.html:21 app/templates/lora_edit.html:25
 #: app/templates/sheets_admin.html:22 app/templates/team_edit.html:71
 #: app/templates/user_edit.html:43
@@ -1422,6 +1452,7 @@ msgid "Skip: %(count)s"
 msgstr "Preskoči: %(count)s"
 
 #: app/templates/checkpoints_import_preview.html:20
+#: app/templates/competition_transfer.html:144
 msgid "Action"
 msgstr "Dejanje"
 
@@ -1451,7 +1482,7 @@ msgid "No rows to preview."
 msgstr "Ni vrstic za predogled."
 
 #: app/templates/checkpoints_list.html:27
-#: app/templates/competition_settings.html:93
+#: app/templates/competition_settings.html:101
 #: app/templates/firmware_list.html:25 app/templates/group_members.html:24
 #: app/templates/groups_list.html:35 app/templates/lora_list.html:13
 #: app/templates/rfid_list.html:28 app/templates/score_rules.html:190
@@ -1489,8 +1520,8 @@ msgid "Your Competitions"
 msgstr "Tvoja tekmovanja"
 
 #: app/templates/competition_select.html:19
-#: app/templates/competition_settings.html:71
-#: app/templates/competition_settings.html:90 app/templates/users_list.html:29
+#: app/templates/competition_settings.html:79
+#: app/templates/competition_settings.html:98 app/templates/users_list.html:29
 #: app/templates/users_list.html:50
 msgid "Role"
 msgstr "Vloga"
@@ -1546,8 +1577,8 @@ msgid "Competition ID"
 msgstr "Tekmovanje"
 
 #: app/templates/competition_settings.html:20
-#: app/templates/competition_settings.html:49
-#: app/templates/competition_settings.html:154 app/templates/rfid_judge.html:56
+#: app/templates/competition_settings.html:56
+#: app/templates/competition_settings.html:162 app/templates/rfid_judge.html:56
 msgid "Copy"
 msgstr "Kopiraj"
 
@@ -1581,97 +1612,248 @@ msgstr "Javni rezultati"
 msgid "Allow anyone with the link to view results."
 msgstr "Omogoči ogled rezultatov vsem z povezavo."
 
-#: app/templates/competition_settings.html:46
+#: app/templates/competition_settings.html:48
+msgid "Hide GPS map"
+msgstr "Skrij GPS zemljevid"
+
+#: app/templates/competition_settings.html:49
+msgid "Hide the GPS map buttons from the navigation bar."
+msgstr "Skrij gumbe GPS zemljevida iz navigacijske vrstice."
+
+#: app/templates/competition_settings.html:53
 msgid "Public results link"
 msgstr "Povezava do javnih rezultatov"
 
 #: app/templates/competition_settings.html:62
+msgid "Export / Import / Merge"
+msgstr "Izvoz / Uvoz / Združitev"
+
+#: app/templates/competition_settings.html:70
 msgid "Invite by email"
 msgstr "Povabi po e-pošti"
 
-#: app/templates/competition_settings.html:67
-#: app/templates/competition_settings.html:89
+#: app/templates/competition_settings.html:75
+#: app/templates/competition_settings.html:97
 msgid "Email"
 msgstr "E-pošta"
 
-#: app/templates/competition_settings.html:73 app/templates/register.html:24
+#: app/templates/competition_settings.html:81 app/templates/register.html:24
 #: app/templates/users_list.html:31
 msgid "viewer"
 msgstr "gledalec"
 
-#: app/templates/competition_settings.html:74 app/templates/register.html:25
+#: app/templates/competition_settings.html:82 app/templates/register.html:25
 #: app/templates/users_list.html:32
 msgid "judge"
 msgstr "sodnik"
 
-#: app/templates/competition_settings.html:75 app/templates/register.html:26
+#: app/templates/competition_settings.html:83 app/templates/register.html:26
 #: app/templates/users_list.html:33
 msgid "admin"
 msgstr "admin"
 
-#: app/templates/competition_settings.html:79
+#: app/templates/competition_settings.html:87
 msgid "Save invite"
 msgstr "Shrani povabilo"
 
-#: app/templates/competition_settings.html:83
+#: app/templates/competition_settings.html:91
 #, fuzzy
 msgid "Invites"
 msgstr "Povabilo shranjeno."
 
-#: app/templates/competition_settings.html:91 app/templates/map.html:43
+#: app/templates/competition_settings.html:99 app/templates/map.html:43
 msgid "Status"
 msgstr "Status"
 
-#: app/templates/competition_settings.html:92
+#: app/templates/competition_settings.html:100
 msgid "Expires"
 msgstr "Poteče"
 
-#: app/templates/competition_settings.html:103
+#: app/templates/competition_settings.html:111
 msgid "Used"
 msgstr "Uporabljeno"
 
-#: app/templates/competition_settings.html:105
+#: app/templates/competition_settings.html:113
 msgid "Expired"
 msgstr "Pretečeno"
 
-#: app/templates/competition_settings.html:107
+#: app/templates/competition_settings.html:115
 msgid "Pending"
 msgstr "Čaka"
 
-#: app/templates/competition_settings.html:114
+#: app/templates/competition_settings.html:122
 msgid "Revoke this invite?"
 msgstr "Preklicem to povabilo?"
 
-#: app/templates/competition_settings.html:116
+#: app/templates/competition_settings.html:124
 msgid "Revoke"
 msgstr "Prekliči"
 
-#: app/templates/competition_settings.html:125
+#: app/templates/competition_settings.html:133
 msgid "No invites yet."
 msgstr "Še ni povabil."
 
-#: app/templates/competition_settings.html:134
+#: app/templates/competition_settings.html:142
 msgid "Danger Zone"
 msgstr "Nevarno območje"
 
-#: app/templates/competition_settings.html:135
+#: app/templates/competition_settings.html:143
 msgid "Delete this competition and all related data. This cannot be undone."
 msgstr ""
 "Izbriši to tekmovanje in vse povezane podatke. Tega ni mogoče "
 "razveljaviti."
 
-#: app/templates/competition_settings.html:137
+#: app/templates/competition_settings.html:145
 msgid "Delete this competition? This cannot be undone."
 msgstr "Izbrišem to tekmovanje? Tega ni mogoče razveljaviti."
 
-#: app/templates/competition_settings.html:139
+#: app/templates/competition_settings.html:147
 msgid "Delete Competition"
 msgstr "Izbriši tekmovanje"
 
-#: app/templates/competition_settings.html:152
-#: app/templates/competition_settings.html:170
+#: app/templates/competition_settings.html:160
+#: app/templates/competition_settings.html:178
 msgid "Copied"
 msgstr "Kopirano"
+
+#: app/templates/competition_transfer.html:2
+msgid "Transfer"
+msgstr "Prenos"
+
+#: app/templates/competition_transfer.html:6
+msgid ""
+"Experimental feature — merging data from different sources may cause "
+"inconsistencies. Always backup your data before importing or merging. "
+"Version mismatches between export files and the current system may cause "
+"unexpected behavior."
+msgstr ""
+
+#: app/templates/competition_transfer.html:12
+msgid "Export Competition"
+msgstr "Izvoz tekmovanja"
+
+#: app/templates/competition_transfer.html:13
+msgid "Download the entire competition as a JSON file."
+msgstr "Prenesi celotno tekmovanje kot datoteko JSON."
+
+#: app/templates/competition_transfer.html:15
+msgid "Export competition"
+msgstr "Izvozi tekmovanje"
+
+#: app/templates/competition_transfer.html:22
+msgid "Import as New Competition"
+msgstr "Uvozi kot novo tekmovanje"
+
+#: app/templates/competition_transfer.html:23
+msgid "Upload a JSON export file to create a new competition."
+msgstr "Naloži izvoženo datoteko JSON za ustvarjanje novega tekmovanja."
+
+#: app/templates/competition_transfer.html:29
+msgid "Import as new competition"
+msgstr "Uvozi kot novo tekmovanje"
+
+#: app/templates/competition_transfer.html:38
+msgid "Merge into Current Competition"
+msgstr "Združi v trenutno tekmovanje"
+
+#: app/templates/competition_transfer.html:39
+msgid "Upload a JSON export file to merge data into the current competition."
+msgstr "Naloži izvoženo datoteko JSON za združitev podatkov v trenutno tekmovanje."
+
+#: app/templates/competition_transfer.html:45
+msgid "Analyze for merge"
+msgstr "Analiziraj za združitev"
+
+#: app/templates/competition_transfer.html:49
+msgid "Merge Analysis"
+msgstr "Analiza združitve"
+
+#: app/templates/competition_transfer.html:52
+msgid "Apply merge"
+msgstr "Uporabi združitev"
+
+#: app/templates/competition_transfer.html:68
+#, fuzzy
+msgid "Importing..."
+msgstr "Uvozi"
+
+#: app/templates/competition_transfer.html:79
+msgid "Competition imported successfully."
+msgstr "Tekmovanje uspešno uvoženo."
+
+#: app/templates/competition_transfer.html:81
+#: app/templates/competition_transfer.html:131
+msgid "Warnings:"
+msgstr ""
+
+#: app/templates/competition_transfer.html:88
+msgid "Import failed."
+msgstr "Uvoz ni uspel."
+
+#: app/templates/competition_transfer.html:106
+msgid "Analyzing..."
+msgstr ""
+
+#: app/templates/competition_transfer.html:112
+#, python-format
+msgid "Invalid JSON file."
+msgstr "Neveljavna datoteka JSON."
+
+#: app/templates/competition_transfer.html:141
+msgid "No conflicts found — ready to merge."
+msgstr "Brez konfliktov — pripravljeno za združitev."
+
+#: app/templates/competition_transfer.html:144
+#: app/templates/firmware_list.html:18 app/templates/sheets_admin.html:320
+msgid "Type"
+msgstr "Tip"
+
+#: app/templates/competition_transfer.html:144
+msgid "Identifier"
+msgstr "Identifikator"
+
+#: app/templates/competition_transfer.html:144
+msgid "Local"
+msgstr "Lokalno"
+
+#: app/templates/competition_transfer.html:144
+msgid "Imported"
+msgstr "Uvoženo"
+
+#: app/templates/competition_transfer.html:155
+msgid "Keep local"
+msgstr "Ohrani lokalno"
+
+#: app/templates/competition_transfer.html:156
+msgid "Use imported"
+msgstr "Uporabi uvoženo"
+
+#: app/templates/competition_transfer.html:157
+msgid "Skip"
+msgstr "Preskoči"
+
+#: app/templates/competition_transfer.html:183
+msgid "Merging..."
+msgstr ""
+
+#: app/templates/competition_transfer.html:194
+msgid "Merge complete."
+msgstr "Združitev končana."
+
+#: app/templates/competition_transfer.html:195
+#, fuzzy
+msgid "Added:"
+msgstr "Dodaj"
+
+#: app/templates/competition_transfer.html:196
+#, fuzzy
+msgid "Updated:"
+msgstr "Posodobljeno"
+
+#: app/templates/competition_transfer.html:197
+#, fuzzy
+msgid "Skipped:"
+msgstr "preskoči"
 
 #: app/templates/firmware_flash.html:2
 msgid "Flash Device"
@@ -1796,10 +1978,6 @@ msgstr "Firmware datoteke"
 #: app/templates/firmware_upload.html:6
 msgid "Upload Firmware"
 msgstr "Naloži firmware"
-
-#: app/templates/firmware_list.html:18 app/templates/sheets_admin.html:320
-msgid "Type"
-msgstr "Tip"
 
 #: app/templates/firmware_list.html:19 app/templates/firmware_upload.html:30
 msgid "Version"
@@ -3447,21 +3625,6 @@ msgstr "Izbrišem ta prihod?"
 msgid "Showing %(count)s of %(total)s check-ins"
 msgstr ""
 
-#: app/templates/view_checkins.html:136
-#, fuzzy
-msgid "Previous"
-msgstr "Predogled"
-
-#: app/templates/view_checkins.html:138
-#, python-format
-msgid "Page %(page)s of %(pages)s"
-msgstr ""
-
-#: app/templates/view_checkins.html:141
-#, fuzzy
-msgid "Next"
-msgstr "naslednja"
-
 #: app/templates/view_checkins.html:147
 msgid "No check-ins match your filters."
 msgstr "Nobena prihod ne ustreza filtrom."
@@ -4013,4 +4176,7 @@ msgstr[3] ""
 
 #~ msgid "Where NVS starts in flash (default 0x9000)"
 #~ msgstr "Kje se NVS začne v pomnilniku (privzeto 0x9000)"
+
+#~ msgid "Showing up to 500 newest events."
+#~ msgstr "Prikazanih je največ 500 najnovejših dogodkov."
 

@@ -19,6 +19,7 @@ from .resources.messages import messages_api_bp
 from .resources.rfid import rfid_api_bp
 from .resources.score_rules import score_rules_api_bp
 from .resources.scores import scores_api_bp
+from .api.transfer import transfer_api_bp
 from app.utils.time import to_datetime_local
 from .utils.perms import inject_perms
 from .utils.csrf import protect_request, get_csrf_token, csrf_input
@@ -63,6 +64,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.register_blueprint(rfid_api_bp)
     app.register_blueprint(score_rules_api_bp)
     app.register_blueprint(scores_api_bp)
+    app.register_blueprint(transfer_api_bp)
 
     # logging …
     for h in list(app.logger.handlers):
@@ -175,6 +177,14 @@ def create_app(config_overrides: dict | None = None) -> Flask:
                     conn.execute(text("ALTER TABLE checkins ADD COLUMN created_by_device_id INTEGER"))
         except Exception:
             app.logger.exception("Failed to ensure checkins audit columns")
+        try:
+            insp = inspect(db.engine)
+            cols = {c["name"] for c in insp.get_columns("competitions")}
+            if "hide_gps_map" not in cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE competitions ADD COLUMN hide_gps_map BOOLEAN NOT NULL DEFAULT 0"))
+        except Exception:
+            app.logger.exception("Failed to ensure competitions.hide_gps_map column")
         try:
             insp = inspect(db.engine)
             cols = {c["name"] for c in insp.get_columns("firmware_files")}

@@ -7,6 +7,7 @@ Jinja2==3.1.4
 # --- Database / ORM ---
 SQLAlchemy==2.0.31
 Flask-SQLAlchemy==3.1.1
+alembic>=1.13.0
 
 # --- Auth & Roles ---
 Flask-Login==0.6.3

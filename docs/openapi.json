@@ -61,6 +61,10 @@
     {
       "name": "scores",
       "description": "Judge scoring and score rules"
+    },
+    {
+      "name": "transfer",
+      "description": "Competition export, import, and merge"
     }
   ],
   "servers": [
@@ -814,6 +818,80 @@
           },
           "detail": {
             "type": "string"
+          }
+        }
+      },
+      "CompetitionExport": {
+        "type": "object",
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "example": "1.0.0"
+          },
+          "exported_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "competition": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "settings": {
+                "type": "object",
+                "properties": {
+                  "public_results": {
+                    "type": "boolean"
+                  },
+                  "hide_gps_map": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "checkpoints": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "checkins": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "scores": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "rfid_cards": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           }
         }
       }
@@ -4256,6 +4334,212 @@
         "responses": {
           "200": {
             "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/api/competition/{comp_id}/export": {
+      "get": {
+        "tags": [
+          "transfer"
+        ],
+        "summary": "Export competition as JSON",
+        "description": "Download the full competition data as a JSON file. Admin only.",
+        "parameters": [
+          {
+            "name": "comp_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON export file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompetitionExport"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden — admin role required"
+          },
+          "404": {
+            "description": "Competition not found"
+          }
+        }
+      }
+    },
+    "/api/competition/import": {
+      "post": {
+        "tags": [
+          "transfer"
+        ],
+        "summary": "Import competition from JSON",
+        "description": "Create a new competition from an exported JSON file. Admin only.",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JSON export file"
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompetitionExport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Competition created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "competition_id": {
+                      "type": "integer"
+                    },
+                    "competition_name": {
+                      "type": "string"
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON or validation error"
+          },
+          "403": {
+            "description": "Forbidden — admin role required"
+          }
+        }
+      }
+    },
+    "/api/competition/{comp_id}/merge": {
+      "post": {
+        "tags": [
+          "transfer"
+        ],
+        "summary": "Merge data into competition",
+        "description": "Two-step merge: without 'resolutions' key → dry run (returns conflicts). With 'resolutions' → apply merge.",
+        "parameters": [
+          {
+            "name": "comp_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/CompetitionExport"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "resolutions": {
+                        "type": "object",
+                        "description": "Conflict resolution map. Keys: 'entity_type:identifier', values: 'keep_local', 'use_imported', 'skip'.",
+                        "additionalProperties": {
+                          "type": "string",
+                          "enum": [
+                            "keep_local",
+                            "use_imported",
+                            "skip"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dry run result (conflicts) or merge applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "dry_run": {
+                      "type": "boolean"
+                    },
+                    "conflicts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "summary": {
+                      "type": "object"
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Competition not found"
           }
         }
       }

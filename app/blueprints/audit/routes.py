@@ -125,6 +125,9 @@ def list_audit_events():
     selected_date_to = request.args.get("date_to") or ""
     date_from, date_to = _parse_date_range(selected_date_from, selected_date_to)
 
+    page = max(1, request.args.get("page", 1, type=int))
+    per_page = 50
+
     query = (
         AuditEvent.query
         .filter(AuditEvent.competition_id == comp_id)
@@ -145,7 +148,8 @@ def list_audit_events():
     if date_to:
         query = query.filter(AuditEvent.created_at < date_to)
 
-    rows = query.limit(500).all()
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    rows = pagination.items
 
     events = []
     for row in rows:
@@ -202,4 +206,12 @@ def list_audit_events():
         selected_actor=actor,
         selected_date_from=selected_date_from,
         selected_date_to=selected_date_to,
+        pagination={
+            "page": pagination.page,
+            "per_page": pagination.per_page,
+            "pages": pagination.pages,
+            "total": pagination.total,
+            "has_prev": pagination.has_prev,
+            "has_next": pagination.has_next,
+        },
     )

@@ -13,7 +13,7 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 - **RFID cards:** Map RFID chips to teams, with optional numeric identifiers  
 - **Devices (LoRa or phones):** Manage device IDs and link each to a checkpoint; ingest accepts `/api/devices` (alias of legacy LoRa endpoints)  
 - **Web NFC judge tools:** Android Chrome can read a tag UID, call ingest, and append a truncated HMAC payload to the tag for offline proof  
-- **Finish-line verifier:** Web NFC page reads tag digests, recomputes HMACs for known devices, and highlights mismatches vs the team’s recorded check-ins  
+- **Finish-line verifier:** Web NFC page reads tag digests, recomputes HMACs for known devices, and highlights mismatches vs the team's recorded check-ins  
 - **Checkpoints:**  
   - Import from JSON files  
   - Assign to multiple groups  
@@ -22,16 +22,21 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
   - Manage checkpoint groups  
   - Assign checkpoints and teams to multiple groups  
   - Display relationships dynamically  
+  - Randomize team numbers by group prefix  
 - **Check-ins:**  
   - Record RFID-based or manual check-ins  
   - Export to CSV for analysis  
+  - Paginated audit views  
+- **Export / Import / Merge competitions:** Full JSON-based competition transfer with conflict resolution (experimental)  
+- **Hide GPS map toggle:** Per-competition setting to hide the GPS map view  
 - **Map view:**  
   - Visualize checkpoints on Google Maps  
   - Show status per team (found, next, not found)  
   - Auto-color based on progress  
 - **Google Sheets automation:** Admin UI to build checkpoint tabs, arrivals matrix, teams roster, and scoreboards in a shared spreadsheet (per competition)  
 - **Dark/Light mode:** Follows system preference or user toggle  
-- **Audit logs:** Console-based logging for debugging and traceability  
+- **Audit logs:** Append-only audit trail with paginated UI  
+- **i18n:** English and Slovenian (Flask-Babel)  
 
 ---
 
@@ -40,6 +45,7 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 - **Backend:** Flask (Python 3.10+)
 - **API layer:** Plain Flask blueprints
 - **Database:** SQLite (SQLAlchemy ORM via Flask-SQLAlchemy)
+- **Migrations:** Alembic (batch mode for SQLite)
 - **Frontend:** Bootstrap 5 + Jinja2 templates
 - **Mapping:** Google Maps JavaScript API
 - **Authentication:** Flask-Login, Google OAuth2, Flask-Babel
@@ -47,6 +53,91 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 - **Google Sheets integration:** `gspread`, `google-auth`
 - **Optional hardware access:** `pyserial`
 - **Logging:** Built-in Flask logger with DEBUG output
+
+---
+
+## Quick Start
+
+```bash
+# 1. Clone
+git clone https://github.com/brinsoko/LoRa-CP.git lora-kt
+cd lora-kt
+
+# 2. Virtual environment
+python3 -m venv venv
+. venv/bin/activate
+
+# 3. Install dependencies
+make install          # runtime only
+make install-dev      # runtime + dev/test
+
+# 4. Configure environment variables (minimal)
+export SECRET_KEY="change-me"
+export LORA_WEBHOOK_SECRET="change-me"
+
+# 5. Initialize database and seed demo data
+make db-init
+make seed
+
+# 6. Run
+make run              # starts on http://127.0.0.1:5001
+```
+
+Default admin credentials after seeding: `admin` / `admin123` (change immediately).
+
+See [docs/setup.md](docs/setup.md) for the full installation guide and
+[docs/deploy.md](docs/deploy.md) for production deployment.
+
+---
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `SECRET_KEY` | Yes (prod) | `dev-secret` | Flask session secret |
+| `DATABASE_URL` | No | `sqlite:///instance/app.db` | SQLAlchemy database URI |
+| `LORA_WEBHOOK_SECRET` | Yes (prod) | `CHANGE_LATER` | HMAC secret for `/api/ingest` |
+| `GOOGLE_OAUTH_CLIENT_ID` | No | - | Google OAuth client ID |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | No | - | Google OAuth client secret |
+| `GOOGLE_SERVICE_ACCOUNT_FILE` | No | - | Path to service account JSON |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | No | - | Raw service account JSON string |
+| `GOOGLE_SHEETS_SPREADSHEET_ID` | No | - | Default spreadsheet ID |
+| `SHEETS_SYNC_ENABLED` | No | `true` | Enable/disable Sheets sync |
+| `SERIAL_BAUDRATE` | No | `9600` | Serial port baud rate |
+| `SERIAL_HINT` | No | - | Hint for serial port discovery |
+| `SERIAL_TIMEOUT` | No | `8.0` | Serial read timeout (seconds) |
+| `SEED_ADMIN_USER` | No | `admin` | Admin username for seeding |
+| `SEED_ADMIN_PASS` | No | `admin123` | Admin password for seeding |
+
+---
+
+## Alembic Migration Workflow
+
+The project uses Alembic for database migrations with batch mode enabled for
+SQLite compatibility.
+
+```bash
+# Generate a new migration after changing models
+alembic revision --autogenerate -m "describe your change"
+
+# Apply all pending migrations
+alembic upgrade head
+
+# Check current revision
+alembic current
+
+# View migration history
+alembic history
+
+# Downgrade one step
+alembic downgrade -1
+```
+
+Alembic reads the database URL from Flask's config (via `alembic/env.py`),
+so make sure your environment variables are set before running migration
+commands.
+
+See [docs/setup.md](docs/setup.md) for more details.
 
 ---
 
@@ -58,6 +149,7 @@ The current app actively uses these runtime libraries:
 - Flask-SQLAlchemy / SQLAlchemy
 - Flask-Login
 - Flask-Babel
+- Alembic
 - requests
 - pyserial
 - gspread
@@ -145,10 +237,10 @@ make down
 
 - Prereqs: enable Google Sheets API, create a service account, and share the target spreadsheet with the service account email (Editor).  
 - Config: set either `GOOGLE_SERVICE_ACCOUNT_FILE` (path to JSON) **or** `GOOGLE_SERVICE_ACCOUNT_JSON` (raw JSON).  
-- Access: log in as an Admin and open `/sheets` (navbar “Sheets” button). Paste the spreadsheet ID in the top field so all actions target the same sheet.  
+- Access: log in as an Admin and open `/sheets` (navbar "Sheets" button). Paste the spreadsheet ID in the top field so all actions target the same sheet.  
 - Wizard: builds checkpoint tabs for every checkpoint with arrived/points/dead time/time columns, optional extra fields per CP, and per-group ordering/exclusions.  
 - Build buttons: regenerate Arrivals (matrix of arrivals across checkpoint tabs), Teams (grouped roster), and Score (per-group totals, optional dead time sum).  
-- Add tab: create a single checkpoint tab with custom headers/fields. “Sync team numbers” keeps team lists aligned with DB; “Prune missing tabs” removes stale configs if the tab was deleted.  
+- Add tab: create a single checkpoint tab with custom headers/fields. "Sync team numbers" keeps team lists aligned with DB; "Prune missing tabs" removes stale configs if the tab was deleted.  
 - Language pack: `/sheets/lang` lets you override tab/column labels for non-English sheets.
 
 ![Architecture](docs/architecture.svg)
@@ -160,11 +252,12 @@ make down
 
 - Swagger UI: `/docs`
 - Raw spec: `/docs/openapi.json`
+- Detailed API guide: [docs/api.md](docs/api.md)
 
 ### Auth
 Cookie-based session from `/login` (form POST). Many routes are public; judge/admin routes require login. Roles are per competition, and the current competition is selected after login.
 
-For browser-based HTML forms, CSRF protection is enabled. For scripted API calls from a browser session, include the session’s CSRF token header when posting to protected endpoints.
+For browser-based HTML forms, CSRF protection is enabled. For scripted API calls from a browser session, include the session's CSRF token header when posting to protected endpoints.
 
 ### Quick Calls
 
@@ -185,7 +278,7 @@ curl -X POST /api/rfid/verify \
 
 ### Judge/Finish Web NFC flows
 - `/rfid/judge-console`: tap a tag with Android Chrome Web NFC; reads UID, calls ingest for the selected device, and appends the truncated HMAC to the tag as text.
-- `/rfid/finish`: tap a tag; reads UID + all text records (digests), recomputes truncated HMACs for known devices, shows matches, collisions, and warns if a digest refers to a checkpoint the team hasn’t checked in at.
+- `/rfid/finish`: tap a tag; reads UID + all text records (digests), recomputes truncated HMACs for known devices, shows matches, collisions, and warns if a digest refers to a checkpoint the team hasn't checked in at.
 
 ### Admin: judge checkpoint assignment
 - `/judges/assign`: select a judge, choose allowed checkpoints, and set a default checkpoint.
@@ -201,3 +294,35 @@ Paginated check-in API example:
 ```bash
 curl "/api/checkins?sort=new&page=1&per_page=100"
 ```
+
+---
+
+## Further Documentation
+
+- [docs/setup.md](docs/setup.md) -- Detailed installation guide
+- [docs/api.md](docs/api.md) -- API usage with curl examples
+- [docs/architecture.md](docs/architecture.md) -- System architecture and data model
+- [docs/export-import.md](docs/export-import.md) -- Export/Import/Merge guide
+- [docs/deploy.md](docs/deploy.md) -- Production deployment
+- [docs/test-spreadsheet-setup.md](docs/test-spreadsheet-setup.md) -- Google Sheets test setup
+
+---
+
+## Contributing
+
+1. Fork the repository and create a feature branch from `master`.
+2. Install dev dependencies: `make install-dev`.
+3. Run the test suite before submitting: `make test`.
+4. If you change models, generate an Alembic migration:
+   ```bash
+   alembic revision --autogenerate -m "describe change"
+   ```
+5. Update translations if you add user-facing strings:
+   ```bash
+   pybabel extract -F babel.cfg -o messages.pot .
+   pybabel update -i messages.pot -d app/translations
+   # edit .po files
+   make i18n-compile
+   ```
+6. Keep commits focused. One logical change per commit.
+7. Open a pull request against `master` with a clear description.

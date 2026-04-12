@@ -282,6 +282,7 @@ def competition_settings():
         before = {
             "name": competition.name,
             "public_results": competition.public_results,
+            "hide_gps_map": competition.hide_gps_map,
             "has_ingest_password": bool(competition.ingest_password_hash),
         }
         new_name, name_error = validate_text(
@@ -303,6 +304,7 @@ def competition_settings():
             return redirect(url_for("main.competition_settings"))
         competition.name = new_name
         competition.public_results = bool(request.form.get("public_results"))
+        competition.hide_gps_map = bool(request.form.get("hide_gps_map"))
         if request.form.get("clear_ingest_password"):
             competition.set_ingest_password(None)
         else:
@@ -322,6 +324,7 @@ def competition_settings():
                 "after": {
                     "name": competition.name,
                     "public_results": competition.public_results,
+                    "hide_gps_map": competition.hide_gps_map,
                     "has_ingest_password": bool(competition.ingest_password_hash),
                 },
             },
@@ -427,3 +430,19 @@ def delete_competition():
         db.session.rollback()
         flash(_("Could not delete competition."), "warning")
     return redirect(url_for("main.select_competition"))
+
+
+@main_bp.route("/competition/transfer", methods=["GET"])
+@roles_required("admin")
+def competition_transfer():
+    comp_id = get_current_competition_id()
+    if not comp_id:
+        flash(_("Select a competition first."), "warning")
+        return redirect(url_for("main.select_competition"))
+
+    competition = Competition.query.filter(Competition.id == comp_id).first()
+    if not competition:
+        flash(_("Competition not found."), "warning")
+        return redirect(url_for("main.select_competition"))
+
+    return render_template("competition_transfer.html", competition=competition)

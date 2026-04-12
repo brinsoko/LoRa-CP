@@ -38,6 +38,7 @@ from app.models import (
     CheckpointGroupLink,
     Competition,
     CompetitionMember,
+    ScoreEntry,
 )
 from app.utils.competition import ensure_default_competition, DEFAULT_COMPETITION_NAME
 
@@ -120,6 +121,7 @@ def get_or_create_group(
     competition_id: int,
     name: str,
     desc: str | None = None,
+    prefix: str | None = None,
 ) -> CheckpointGroup:
     g = CheckpointGroup.query.filter(
         CheckpointGroup.competition_id == competition_id,
@@ -130,12 +132,15 @@ def get_or_create_group(
             competition_id=competition_id,
             name=name,
             description=desc or None,
+            prefix=prefix,
         )
         db.session.add(g)
         db.session.flush()
     else:
         if desc and not g.description:
             g.description = desc
+        if prefix and not g.prefix:
+            g.prefix = prefix
     return g
 
 def assign_team_to_groups(team: Team, group_ids: list[int]):
@@ -332,28 +337,48 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
 
         if not skip_demo:
             print("Seeding demo groups...")
-            g_alpha = get_or_create_group(competition.id, "Alpha", "Alpha route")
-            g_bravo = get_or_create_group(competition.id, "Bravo", "Bravo route")
-            g_charlie = get_or_create_group(competition.id, "Charlie", "Optional challenge")
+            # Groups WITH prefixes
+            g_alpha = get_or_create_group(competition.id, "Alpha", "Alpha route", prefix="3xx")
+            g_bravo = get_or_create_group(competition.id, "Bravo", "Bravo route", prefix="4xx")
+            g_charlie = get_or_create_group(competition.id, "Charlie", "Leading-zero prefix test", prefix="01xx")
+            # Group WITHOUT prefix
+            g_delta = get_or_create_group(competition.id, "Delta", "No prefix group")
 
             print("Seeding demo teams...")
-            t1 = get_or_create_team(competition.id, "Wolves", 11)
-            t2 = get_or_create_team(competition.id, "Eagles", 21)
-            t3 = get_or_create_team(competition.id, "Foxes", 31)
-            t4 = get_or_create_team(competition.id, "Badgers", 41)
-            t5 = get_or_create_team(competition.id, "Otters", 51)
-            t6 = get_or_create_team(competition.id, "Hawks", 61)
+            # Alpha teams (prefix 3xx → range 300-399)
+            t1 = get_or_create_team(competition.id, "Wolves", 301)
+            t2 = get_or_create_team(competition.id, "Eagles", 302)
+            t3 = get_or_create_team(competition.id, "Foxes", 303)
+            t4 = get_or_create_team(competition.id, "Hawks", 304)
+            # Bravo teams (prefix 4xx → range 400-499) — some with numbers, some without
+            t5 = get_or_create_team(competition.id, "Badgers", 401)
+            t6 = get_or_create_team(competition.id, "Otters", 402)
+            t7 = get_or_create_team(competition.id, "Ravens", None)
+            t8 = get_or_create_team(competition.id, "Lynxes", None)
+            # Charlie teams (prefix 01xx → range 100-199)
+            t9 = get_or_create_team(competition.id, "Bears", 100)
+            t10 = get_or_create_team(competition.id, "Deer", 101)
+            t11 = get_or_create_team(competition.id, "Rabbits", 102)
+            # Delta teams (no prefix — arbitrary numbers)
+            t12 = get_or_create_team(competition.id, "Falcons", 7)
+            t13 = get_or_create_team(competition.id, "Squirrels", 15)
 
             print("Assigning demo teams to groups...")
             assign_team_to_groups(t1, [g_alpha.id])
             assign_team_to_groups(t2, [g_alpha.id])
-            assign_team_to_groups(t3, [g_bravo.id])
-            assign_team_to_groups(t4, [g_bravo.id])
-            assign_team_to_groups(t5, [g_alpha.id, g_charlie.id])  # multi-group team
-            assign_team_to_groups(t6, [g_bravo.id, g_charlie.id])
+            assign_team_to_groups(t3, [g_alpha.id])
+            assign_team_to_groups(t4, [g_alpha.id])
+            assign_team_to_groups(t5, [g_bravo.id])
+            assign_team_to_groups(t6, [g_bravo.id])
+            assign_team_to_groups(t7, [g_bravo.id])
+            assign_team_to_groups(t8, [g_bravo.id])
+            assign_team_to_groups(t9, [g_charlie.id])
+            assign_team_to_groups(t10, [g_charlie.id])
+            assign_team_to_groups(t11, [g_charlie.id])
+            assign_team_to_groups(t12, [g_delta.id])
+            assign_team_to_groups(t13, [g_delta.id])
 
             print("Seeding demo checkpoints...")
-            # Simple grid around a base point; replace with real coords later
             base_e, base_n = 10000.0, 5000.0
             cps = []
             for i in range(1, 11):
@@ -370,30 +395,24 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
                 )
                 cps.append(cp)
 
-            # Group composition (many-to-many)
-            # Alpha: CP-01..CP-05
+            # Group → checkpoint composition
             set_group_checkpoints(g_alpha, [c for c in cps if 1 <= int(c.name.split("-")[1]) <= 5])
-            # Bravo: CP-06..CP-10
             set_group_checkpoints(g_bravo, [c for c in cps if 6 <= int(c.name.split("-")[1]) <= 10])
-            # Charlie overlaps a few special points
             set_group_checkpoints(g_charlie, [cps[1], cps[4], cps[7]])  # CP-02, CP-05, CP-08
+            set_group_checkpoints(g_delta, [cps[0], cps[2], cps[5]])    # CP-01, CP-03, CP-06
 
             print("Seeding demo RFID cards...")
-            ensure_rfid(t1, "A1B2C3D4", 101)
-            ensure_rfid(t2, "A1B2C3D5", 102)
-            ensure_rfid(t3, "A1B2C3D6", 103)
-            ensure_rfid(t4, "A1B2C3D7", 104)
-            ensure_rfid(t5, "A1B2C3D8", 105)
-            ensure_rfid(t6, "A1B2C3D9", 106)
+            all_teams = [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13]
+            for idx, t in enumerate(all_teams, start=1):
+                ensure_rfid(t, f"SEED{idx:04X}0000", 100 + idx)
 
             print("Seeding demo check-ins...")
             now = datetime.utcnow()
-            # Helper: only pick checkpoints that belong to any of a team's groups
+
             def checkpoints_for_team(team: Team) -> list[Checkpoint]:
                 group_ids = [tg.group_id for tg in team.group_assignments]
                 if not group_ids:
                     return []
-                # Union of checkpoints in those groups
                 q = (Checkpoint.query
                      .join(Checkpoint.groups)
                      .filter(CheckpointGroup.id.in_(group_ids))
@@ -401,15 +420,41 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
                      .order_by(Checkpoint.name.asc()))
                 return q.all()
 
-            for t in [t1, t2, t3, t4, t5, t6]:
+            for t in all_teams:
                 pool = checkpoints_for_team(t)
                 if not pool:
                     continue
                 sample = random.sample(pool, k=min(3, len(pool)))
-                # Spread timestamps over last 24h
                 for k, cp in enumerate(sample):
                     ts = now - timedelta(hours=(24 - (k * 3 + random.randint(0, 2))))
                     add_checkin(t, cp, ts, competition.id)
+
+            print("Seeding demo scores...")
+            scored_teams = [t1, t2, t3, t5, t9]
+            for t in scored_teams:
+                team_cps = checkpoints_for_team(t)
+                if not team_cps:
+                    continue
+                cp = team_cps[0]
+                checkin = Checkin.query.filter_by(team_id=t.id, checkpoint_id=cp.id).first()
+                if not checkin:
+                    continue
+                existing_score = ScoreEntry.query.filter_by(
+                    competition_id=competition.id,
+                    team_id=t.id,
+                    checkpoint_id=cp.id,
+                ).first()
+                if not existing_score:
+                    score = ScoreEntry(
+                        competition_id=competition.id,
+                        checkin_id=checkin.id,
+                        team_id=t.id,
+                        checkpoint_id=cp.id,
+                        judge_user_id=judge.id,
+                        raw_fields={"task1": random.randint(5, 20), "task2": random.randint(3, 15)},
+                        total=random.randint(10, 35),
+                    )
+                    db.session.add(score)
 
         # Import real teams from CSV if provided or auto-detected
         csv_candidate = teams_csv

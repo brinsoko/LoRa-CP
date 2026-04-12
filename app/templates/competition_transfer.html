@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Transfer') }}{% endblock %}
+{% block content %}
+
+<div class="alert alert-warning">
+  {{ _('Experimental feature — merging data from different sources may cause inconsistencies. Always backup your data before importing or merging. Version mismatches between export files and the current system may cause unexpected behavior.') }}
+</div>
+
+{# ── Export ── #}
+<div class="card mb-3">
+  <div class="card-body">
+    <h5 class="card-title">{{ _('Export Competition') }}</h5>
+    <p class="text-muted">{{ _('Download the entire competition as a JSON file.') }}</p>
+    <a href="{{ url_for('api_transfer.export_competition', comp_id=competition.id) }}"
+       class="btn btn-primary">{{ _('Export competition') }}</a>
+  </div>
+</div>
+
+{# ── Import ── #}
+<div class="card mb-3">
+  <div class="card-body">
+    <h5 class="card-title">{{ _('Import as New Competition') }}</h5>
+    <p class="text-muted">{{ _('Upload a JSON export file to create a new competition.') }}</p>
+    <form id="importForm" enctype="multipart/form-data">
+      {{ csrf_input() }}
+      <div class="mb-3">
+        <input type="file" class="form-control" name="file" accept=".json" required>
+      </div>
+      <button type="submit" class="btn btn-success">{{ _('Import as new competition') }}</button>
+    </form>
+    <div id="importResult" class="mt-3" style="display:none;"></div>
+  </div>
+</div>
+
+{# ── Merge ── #}
+<div class="card mb-3">
+  <div class="card-body">
+    <h5 class="card-title">{{ _('Merge into Current Competition') }}</h5>
+    <p class="text-muted">{{ _('Upload a JSON export file to merge data into the current competition.') }}</p>
+    <form id="mergeAnalyzeForm" enctype="multipart/form-data">
+      {{ csrf_input() }}
+      <div class="mb-3">
+        <input type="file" class="form-control" name="file" id="mergeFile" accept=".json" required>
+      </div>
+      <button type="submit" class="btn btn-warning">{{ _('Analyze for merge') }}</button>
+    </form>
+
+    <div id="mergeAnalysis" class="mt-3" style="display:none;">
+      <h6>{{ _('Merge Analysis') }}</h6>
+      <div id="mergeWarnings"></div>
+      <div id="mergeConflicts"></div>
+      <button id="applyMergeBtn" class="btn btn-danger mt-2" style="display:none;">{{ _('Apply merge') }}</button>
+    </div>
+
+    <div id="mergeResult" class="mt-3" style="display:none;"></div>
+  </div>
+</div>
+
+<script>
+const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+
+// ── Import ──
+document.getElementById('importForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  const resultDiv = document.getElementById('importResult');
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '<span class="text-muted">{{ _("Importing...") }}</span>';
+
+  try {
+    const resp = await fetch('{{ url_for("api_transfer.import_competition") }}', {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrfToken},
+      body: formData,
+    });
+    const data = await resp.json();
+    if (resp.ok && data.ok) {
+      let html = '<div class="alert alert-success">';
+      html += `{{ _("Competition imported successfully.") }} ID: ${data.competition_id}, Name: ${data.competition_name}`;
+      if (data.warnings && data.warnings.length) {
+        html += '<br><strong>{{ _("Warnings:") }}</strong><ul>';
+        data.warnings.forEach(w => html += `<li>${w}</li>`);
+        html += '</ul>';
+      }
+      html += '</div>';
+      resultDiv.innerHTML = html;
+    } else {
+      resultDiv.innerHTML = `<div class="alert alert-danger">${data.detail || data.error || '{{ _("Import failed.") }}'}</div>`;
+    }
+  } catch (err) {
+    resultDiv.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+  }
+});
+
+// ── Merge (analyze) ──
+let mergeData = null;
+let mergeConflicts = [];
+
+document.getElementById('mergeAnalyzeForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const file = document.getElementById('mergeFile').files[0];
+  if (!file) return;
+
+  const analysisDiv = document.getElementById('mergeAnalysis');
+  analysisDiv.style.display = 'block';
+  document.getElementById('mergeConflicts').innerHTML = '<span class="text-muted">{{ _("Analyzing...") }}</span>';
+
+  try {
+    const text = await file.text();
+    mergeData = JSON.parse(text);
+  } catch (err) {
+    document.getElementById('mergeConflicts').innerHTML = `<div class="alert alert-danger">{{ _("Invalid JSON file.") }}</div>`;
+    return;
+  }
+
+  try {
+    const resp = await fetch('{{ url_for("api_transfer.merge_competition", comp_id=competition.id) }}', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+      body: JSON.stringify(mergeData),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) {
+      document.getElementById('mergeConflicts').innerHTML = `<div class="alert alert-danger">${data.detail || data.error}</div>`;
+      return;
+    }
+
+    // Show warnings
+    const warnDiv = document.getElementById('mergeWarnings');
+    if (data.warnings && data.warnings.length) {
+      warnDiv.innerHTML = '<div class="alert alert-warning"><strong>{{ _("Warnings:") }}</strong><ul>' +
+        data.warnings.map(w => `<li>${w}</li>`).join('') + '</ul></div>';
+    } else {
+      warnDiv.innerHTML = '';
+    }
+
+    mergeConflicts = data.conflicts || [];
+    const conflictsDiv = document.getElementById('mergeConflicts');
+
+    if (mergeConflicts.length === 0) {
+      conflictsDiv.innerHTML = '<div class="alert alert-info">{{ _("No conflicts found — ready to merge.") }}</div>';
+    } else {
+      let html = '<table class="table table-bordered"><thead><tr>';
+      html += '<th>{{ _("Type") }}</th><th>{{ _("Identifier") }}</th><th>{{ _("Local") }}</th><th>{{ _("Imported") }}</th><th>{{ _("Action") }}</th>';
+      html += '</tr></thead><tbody>';
+      mergeConflicts.forEach((c, i) => {
+        const key = `${c.entity_type}:${c.identifier}`;
+        html += `<tr>`;
+        html += `<td><code>${c.entity_type}</code></td>`;
+        html += `<td>${c.identifier}</td>`;
+        html += `<td><pre class="small mb-0">${JSON.stringify(c.local, null, 1)}</pre></td>`;
+        html += `<td><pre class="small mb-0">${JSON.stringify(c.imported, null, 1)}</pre></td>`;
+        html += `<td>
+          <select class="form-select form-select-sm merge-resolution" data-key="${key}">
+            <option value="keep_local" selected>{{ _('Keep local') }}</option>
+            <option value="use_imported">{{ _('Use imported') }}</option>
+            <option value="skip">{{ _('Skip') }}</option>
+          </select></td>`;
+        html += `</tr>`;
+      });
+      html += '</tbody></table>';
+      conflictsDiv.innerHTML = html;
+    }
+
+    document.getElementById('applyMergeBtn').style.display = 'inline-block';
+  } catch (err) {
+    document.getElementById('mergeConflicts').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+  }
+});
+
+// ── Merge (apply) ──
+document.getElementById('applyMergeBtn').addEventListener('click', async () => {
+  if (!mergeData) return;
+
+  const resolutions = {};
+  document.querySelectorAll('.merge-resolution').forEach(sel => {
+    resolutions[sel.dataset.key] = sel.value;
+  });
+
+  mergeData.resolutions = resolutions;
+  const resultDiv = document.getElementById('mergeResult');
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '<span class="text-muted">{{ _("Merging...") }}</span>';
+
+  try {
+    const resp = await fetch('{{ url_for("api_transfer.merge_competition", comp_id=competition.id) }}', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+      body: JSON.stringify(mergeData),
+    });
+    const data = await resp.json();
+    if (resp.ok && data.ok) {
+      const s = data.summary || {};
+      let html = '<div class="alert alert-success"><strong>{{ _("Merge complete.") }}</strong><br>';
+      html += `{{ _("Added:") }} ${JSON.stringify(s.added)}<br>`;
+      html += `{{ _("Updated:") }} ${JSON.stringify(s.updated)}<br>`;
+      html += `{{ _("Skipped:") }} ${s.skipped}`;
+      html += '</div>';
+      resultDiv.innerHTML = html;
+    } else {
+      resultDiv.innerHTML = `<div class="alert alert-danger">${data.detail || data.error}</div>`;
+    }
+  } catch (err) {
+    resultDiv.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+  }
+});
+</script>
+
+{% endblock %}

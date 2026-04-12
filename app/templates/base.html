@@ -164,8 +164,10 @@
           <a class="btn btn-outline-secondary" href="{{ url_for('messages.list_messages') }}">{{ _('Messages') }}</a>
 
       {% endif %}
+      {% if not current_competition.hide_gps_map %}
       <a href="{{ url_for('maps.index') }}" class="btn btn-outline-primary">{{ _('Map') }}</a>
       <a href="{{ url_for('maps.lora_map') }}" class="btn btn-outline-primary">{{ _('Device Map') }}</a>
+      {% endif %}
       {% if current_user.is_authenticated and current_competition_role == 'admin' %}
       <a href="{{ url_for('sheets_admin.list_sheets') }}" class="btn btn-outline-secondary">{{ _('Sheets') }}</a>
       <a href="{{ url_for('scores.score_rules') }}" class="btn btn-outline-secondary">{{ _('Score Rules') }}</a>
