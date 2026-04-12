@@ -434,7 +434,7 @@ def build_arrivals_tab(
     except Exception:
         ws = ss.add_worksheet(title=tab_name, rows=500, cols=100)
     ws.update("A1", values, value_input_option="USER_ENTERED")
-    # Apply conditional formatting: TRUE green, FALSE red
+    # Apply conditional formatting: non-empty (arrived) → green, empty (not arrived) → red
     try:
         last_row = len(values)
         last_col = max((len(r) for r in values), default=1)
@@ -450,7 +450,10 @@ def build_arrivals_tab(
                             "endColumnIndex": last_col,
                         }],
                         "booleanRule": {
-                            "condition": {"type": "BOOLEAN"},
+                            "condition": {
+                                "type": "CUSTOM_FORMULA",
+                                "values": [{"userEnteredValue": "=NOT(ISBLANK(B2))"}],
+                            },
                             "format": {"backgroundColor": {"red": 0.8, "green": 1, "blue": 0.8}},
                         }
                     },
@@ -470,7 +473,7 @@ def build_arrivals_tab(
                         "booleanRule": {
                             "condition": {
                                 "type": "CUSTOM_FORMULA",
-                                "values": [{"userEnteredValue": "=FALSE"}],
+                                "values": [{"userEnteredValue": "=ISBLANK(B2)"}],
                             },
                             "format": {"backgroundColor": {"red": 1, "green": 0.8, "blue": 0.8}},
                         },
