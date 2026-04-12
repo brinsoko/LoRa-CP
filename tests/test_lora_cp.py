@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -263,7 +264,11 @@ class TestIngestApi:
             "snr": 7,
         }
         first = client.post("/api/ingest", json=payload)
-        second = client.post("/api/ingest", json=payload)
+        # Use a timestamp >10 s later so the ingest dedup window does not
+        # treat this as a duplicate LoRa packet (dedup is for the serial+WiFi
+        # dual-write scenario, not intentional re-scans).
+        payload_later = {**payload, "ts": int(time.time()) + 15}
+        second = client.post("/api/ingest", json=payload_later)
 
         assert first.status_code == 201
         assert second.status_code == 201

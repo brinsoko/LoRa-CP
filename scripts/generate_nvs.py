@@ -8,9 +8,9 @@ Usage
     python scripts/generate_nvs.py devices.csv -o output/
 
 Input CSV format (header required):
-    dev_num,competition_id,card_secret,hmac_len,webhook_secret
-    1,1,my_card_secret,12,my_webhook_secret
-    2,1,my_card_secret,12,my_webhook_secret
+    dev_num,competition_id,card_secret,hmac_len,webhook_secret[,wifi_ssid,wifi_pass,ingest_url]
+    1,1,my_card_secret,12,my_webhook_secret,MySSID,MyPass,http://10.0.0.1:5001/api/ingest
+    2,1,my_card_secret,12,my_webhook_secret,MySSID,MyPass,http://10.0.0.1:5001/api/ingest
 
 Output (per row):
     output/dev<dev_num>_nvs_enc.bin   — encrypted NVS partition  (flash at sec_nvs offset, default 0xD000)
@@ -51,6 +51,9 @@ def generate_device(
     card_secret: str,
     hmac_len: int,
     webhook_secret: str,
+    wifi_ssid: str = "",
+    wifi_pass: str = "",
+    ingest_url: str = "",
     outdir: str,
     partition_size: int = DEFAULT_PARTITION_SIZE,
 ) -> tuple[str, str]:
@@ -65,6 +68,12 @@ def generate_device(
         ["hmac_len",       "data", "i32",    str(hmac_len)],
         ["webhook_secret", "data", "string", webhook_secret],
     ]
+    if wifi_ssid:
+        rows.append(["wifi_ssid",  "data", "string", wifi_ssid])
+    if wifi_pass:
+        rows.append(["wifi_pass",  "data", "string", wifi_pass])
+    if ingest_url:
+        rows.append(["ingest_url", "data", "string", ingest_url])
 
     nvs_out = os.path.join(outdir, f"dev{dev_num}_nvs_enc.bin")
     keys_out = os.path.join(outdir, f"dev{dev_num}_keys.bin")
@@ -130,6 +139,9 @@ def main() -> None:
                 card_secret=row["card_secret"],
                 hmac_len=int(row["hmac_len"]),
                 webhook_secret=row["webhook_secret"],
+                wifi_ssid=row.get("wifi_ssid", ""),
+                wifi_pass=row.get("wifi_pass", ""),
+                ingest_url=row.get("ingest_url", ""),
                 outdir=args.outdir,
                 partition_size=partition_size,
             )

@@ -39,9 +39,12 @@ def _build_csv_rows(
     card_secret: str,
     hmac_len: int,
     webhook_secret: str,
+    wifi_ssid: str = "",
+    wifi_pass: str = "",
+    ingest_url: str = "",
 ) -> list[list[str]]:
     """Return CSV rows for the NVS partition (shared by plain and encrypted)."""
-    return [
+    rows = [
         ["key", "type", "encoding", "value"],
         [NVS_NAMESPACE, "namespace", "", ""],
         ["dev_num",        "data", "i32",    str(dev_num)],
@@ -50,6 +53,14 @@ def _build_csv_rows(
         ["hmac_len",       "data", "i32",    str(hmac_len)],
         ["webhook_secret", "data", "string", webhook_secret],
     ]
+    # WiFi / receiver fields — only written when non-empty to save NVS space
+    if wifi_ssid:
+        rows.append(["wifi_ssid",  "data", "string", wifi_ssid])
+    if wifi_pass:
+        rows.append(["wifi_pass",  "data", "string", wifi_pass])
+    if ingest_url:
+        rows.append(["ingest_url", "data", "string", ingest_url])
+    return rows
 
 
 def generate_nvs_partition(
@@ -59,6 +70,9 @@ def generate_nvs_partition(
     card_secret: str,
     hmac_len: int,
     webhook_secret: str,
+    wifi_ssid: str = "",
+    wifi_pass: str = "",
+    ingest_url: str = "",
     partition_size: int = 0x6000,
 ) -> bytes:
     """
@@ -76,6 +90,9 @@ def generate_nvs_partition(
         card_secret=card_secret,
         hmac_len=hmac_len,
         webhook_secret=webhook_secret,
+        wifi_ssid=wifi_ssid,
+        wifi_pass=wifi_pass,
+        ingest_url=ingest_url,
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -108,6 +125,9 @@ def generate_encrypted_nvs_partition(
     card_secret: str,
     hmac_len: int,
     webhook_secret: str,
+    wifi_ssid: str = "",
+    wifi_pass: str = "",
+    ingest_url: str = "",
     partition_size: int = 0x3000,
 ) -> EncryptedNVS:
     """
@@ -131,6 +151,9 @@ def generate_encrypted_nvs_partition(
         card_secret=card_secret,
         hmac_len=hmac_len,
         webhook_secret=webhook_secret,
+        wifi_ssid=wifi_ssid,
+        wifi_pass=wifi_pass,
+        ingest_url=ingest_url,
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:

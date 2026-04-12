@@ -21,7 +21,7 @@ env/
 # OS files
 .DS_Store
 Thumbs.db
-ESP_TEST/
+ESP_*/
 
 #
 2025_data/

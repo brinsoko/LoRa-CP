@@ -288,10 +288,16 @@ def firmware_config_preview(device_id: int, fw_id: int):
     })
 
 
-@firmware_bp.route("/api/nvs/<int:device_id>/<int:fw_id>")
+@firmware_bp.route("/api/nvs/<int:device_id>/<int:fw_id>", methods=["GET", "POST"])
 @roles_required("admin")
 def firmware_nvs_binary(device_id: int, fw_id: int):
-    """Return encrypted NVS + keys as JSON with base64-encoded binaries."""
+    """Return encrypted NVS + keys as JSON with base64-encoded binaries.
+
+    For receiver devices the caller may POST a JSON body with optional WiFi
+    configuration that will be baked into the NVS partition::
+
+        {"wifi_ssid": "...", "wifi_pass": "...", "ingest_url": "..."}
+    """
     comp_id, _ = _require_comp()
     if not comp_id:
         return jsonify({"error": "no_competition", "code": 400}), 400
@@ -303,6 +309,15 @@ def firmware_nvs_binary(device_id: int, fw_id: int):
     card_secret = cfg.get("DEVICE_CARD_SECRET") or ""
     webhook_secret = cfg.get("LORA_WEBHOOK_SECRET") or ""
     hmac_len = int(cfg.get("DEVICE_CARD_HMAC_LEN", 12))
+
+    # WiFi params from POST body (receiver devices)
+    wifi_ssid = ""
+    wifi_pass = ""
+    ingest_url = ""
+    if request.is_json and request.json:
+        wifi_ssid = (request.json.get("wifi_ssid") or "").strip()
+        wifi_pass = (request.json.get("wifi_pass") or "").strip()
+        ingest_url = (request.json.get("ingest_url") or "").strip()
 
     partition_size = int(fw.nvs_size or 0)
     if partition_size <= 0 or partition_size % 4096 != 0:
@@ -318,6 +333,9 @@ def firmware_nvs_binary(device_id: int, fw_id: int):
             card_secret=card_secret,
             hmac_len=hmac_len,
             webhook_secret=webhook_secret,
+            wifi_ssid=wifi_ssid,
+            wifi_pass=wifi_pass,
+            ingest_url=ingest_url,
             partition_size=partition_size,
         )
     except Exception as exc:

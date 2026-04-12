@@ -1,6 +1,6 @@
 # app/resources/ingest.py
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib, hmac
 
 from flask import current_app
@@ -213,9 +213,23 @@ def ingest_post():
 
         card_writeback = None
 
+        # Dedup: if the same (competition, dev_id, payload) arrived within 10 s,
+        # return the existing message instead of creating a duplicate.  This
+        # prevents double-writes when both serial bridge and WiFi forward the
+        # same LoRa packet.
+        dev_id_str = str(dev_id) if dev_id is not None else f"checkpoint:{checkpoint_id}"
+        cutoff = received_at - timedelta(seconds=10)
+        dup = LoRaMessage.query.filter(
+            LoRaMessage.competition_id == competition_id,
+            LoRaMessage.dev_id == dev_id_str,
+            LoRaMessage.payload == str(payload),
+            LoRaMessage.received_at >= cutoff,
+        ).first()
+        if dup:
+            return {"ok": True, "message_id": dup.id, "duplicate": True}, 200
+
         try:
             # 1) Store raw message
-            dev_id_str = str(dev_id) if dev_id is not None else f"checkpoint:{checkpoint_id}"
             msg = LoRaMessage(
                 competition_id=competition_id,
                 dev_id=dev_id_str,

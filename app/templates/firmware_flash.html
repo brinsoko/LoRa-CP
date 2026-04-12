@@ -68,11 +68,37 @@
       </div>
     </div>
 
-    {# ---- Step 3: config preview ---- #}
+    {# ---- Step 3: WiFi config (receiver only) ---- #}
+    <div class="col-12 d-none" id="wifi-config-card">
+      <div class="card">
+        <div class="card-body">
+          <h6 class="card-title">{{ _('3 — WiFi configuration') }}
+            <span class="badge bg-info">{{ _('receiver') }}</span>
+          </h6>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">{{ _('WiFi SSID') }}</label>
+              <input id="wifi-ssid" class="form-control" type="text" maxlength="32">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">{{ _('WiFi Password') }}</label>
+              <input id="wifi-pass" class="form-control" type="password" maxlength="63">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">{{ _('Ingest URL') }}</label>
+              <input id="ingest-url" class="form-control font-monospace" type="url">
+              <div class="form-text">{{ _('Defaults to this server.') }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ---- Step 4: config preview ---- #}
     <div class="col-12">
       <div class="card">
         <div class="card-body">
-          <h6 class="card-title">{{ _('3 — NVS config preview') }}</h6>
+          <h6 class="card-title">{{ _('4 — NVS config preview') }}</h6>
           <div id="config-loading" class="text-muted d-none">{{ _('Loading config…') }}</div>
           <div id="config-preview" class="d-none">
             <p class="mb-2 small text-muted">
@@ -94,11 +120,11 @@
       </div>
     </div>
 
-    {# ---- Step 4: flash ---- #}
+    {# ---- Step 5: flash ---- #}
     <div class="col-12">
       <div class="card">
         <div class="card-body">
-          <h6 class="card-title">{{ _('4 — Flash') }}</h6>
+          <h6 class="card-title">{{ _('5 — Flash') }}</h6>
           <button id="flash-btn" class="btn btn-success" disabled>
             {{ _('Connect & Flash') }}
           </button>
@@ -171,9 +197,27 @@
   const configPlaceholder = document.getElementById('config-placeholder');
   const configTableBody   = document.getElementById('config-table-body');
   const flashPlanList     = document.getElementById('flash-plan-list');
+  const wifiConfigCard = document.getElementById('wifi-config-card');
+  const wifiSsidInput  = document.getElementById('wifi-ssid');
+  const wifiPassInput  = document.getElementById('wifi-pass');
+  const ingestUrlInput = document.getElementById('ingest-url');
   const FLASH_BAUDRATE = 460800;
 
+  // Default ingest URL = this server
+  if (ingestUrlInput) {
+    ingestUrlInput.value = window.location.origin + '/api/ingest';
+  }
+
   let currentConfig = null;
+
+  // Show/hide WiFi card when firmware selection changes
+  function updateWifiCardVisibility() {
+    if (!firmwareSelect || !wifiConfigCard) return;
+    const opt = firmwareSelect.selectedOptions[0];
+    const isReceiver = opt && opt.dataset.type === 'receiver';
+    wifiConfigCard.classList.toggle('d-none', !isReceiver);
+  }
+  if (firmwareSelect) firmwareSelect.addEventListener('change', updateWifiCardVisibility);
 
   function log(msg) {
     flashLog.value += msg + '\n';
@@ -221,6 +265,19 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `<td><code>${key}</code></td><td>${val}</td>`;
         configTableBody.appendChild(tr);
+      }
+      // Append WiFi entries for receiver firmware
+      const fwOpt = firmwareSelect && firmwareSelect.selectedOptions[0];
+      if (fwOpt && fwOpt.dataset.type === 'receiver') {
+        const ssid = wifiSsidInput ? wifiSsidInput.value : '';
+        const pass = wifiPassInput ? wifiPassInput.value : '';
+        const url  = ingestUrlInput ? ingestUrlInput.value : '';
+        const masked = pass ? pass.substring(0, 2) + '***' : '(empty)';
+        for (const [k, v] of [['wifi_ssid', ssid || '(empty)'], ['wifi_pass', masked], ['ingest_url', url || '(empty)']]) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td><code>${k}</code></td><td>${v}</td>`;
+          configTableBody.appendChild(tr);
+        }
       }
 
       // render flash plan
@@ -272,10 +329,21 @@
       const fwData = arrayBufferToBinaryString(fwBuf);
       log(`Firmware: ${fwBuf.byteLength} bytes`);
 
-      // 2. Fetch encrypted NVS + keys bundle
+      // 2. Fetch encrypted NVS + keys bundle (POST with WiFi params for receivers)
       setStatus('Generating encrypted NVS…');
       log('Requesting encrypted NVS partition from server…');
-      const nvsResp = await fetch(`/firmware/api/nvs/${deviceId}/${firmwareId}`);
+      const nvsBody = {};
+      const selOpt = firmwareSelect && firmwareSelect.selectedOptions[0];
+      if (selOpt && selOpt.dataset.type === 'receiver') {
+        nvsBody.wifi_ssid  = wifiSsidInput ? wifiSsidInput.value : '';
+        nvsBody.wifi_pass  = wifiPassInput ? wifiPassInput.value : '';
+        nvsBody.ingest_url = ingestUrlInput ? ingestUrlInput.value : '';
+      }
+      const nvsResp = await fetch(`/firmware/api/nvs/${deviceId}/${firmwareId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(nvsBody),
+      });
       if (!nvsResp.ok) {
         const err = await nvsResp.json().catch(() => ({}));
         throw new Error(`NVS generation failed: ${err.detail || nvsResp.status}`);
