@@ -255,6 +255,28 @@ class TestWebhookSecurity:
         assert response.status_code == 201
         assert response.get_json()["ok"] is True
 
+    def test_ingest_authenticated_user_bypasses_webhook_secret(self, app_factory):
+        application = app_factory(LORA_WEBHOOK_SECRET="webhook-secret")
+        client = application.test_client()
+        with application.app_context():
+            competition = create_competition(name="Webhook Bypass Race")
+            judge = create_user(username="webhook-bypass-judge")
+            add_membership(judge, competition, role="judge")
+            competition_id = competition.id
+            judge_id = judge.id
+
+        with client.session_transaction() as sess:
+            sess["_user_id"] = str(judge_id)
+            sess["competition_id"] = competition_id
+
+        response = client.post(
+            "/api/ingest",
+            json={"competition_id": competition_id, "dev_id": 44, "payload": "AABBCCDD"},
+        )
+
+        assert response.status_code == 201
+        assert response.get_json()["ok"] is True
+
 
 class TestVerificationAndMessages:
     def test_rfid_verify_matches_known_device(self, client, app):

@@ -147,7 +147,7 @@ def _card_writeback(uid: str,
 @ingest_api_bp.post("/api/ingest")
 def ingest_post():
         expected_secret = current_app.config.get("LORA_WEBHOOK_SECRET")
-        if expected_secret and expected_secret != "CHANGE_LATER":
+        if expected_secret and expected_secret != "CHANGE_LATER" and not current_user.is_authenticated:
             provided_secret = request.headers.get("X-Webhook-Secret", "")
             if not hmac.compare_digest(provided_secret, expected_secret):
                 return {
