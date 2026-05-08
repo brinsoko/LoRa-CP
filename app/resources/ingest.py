@@ -12,7 +12,8 @@ from werkzeug.exceptions import BadRequest
 
 from app.extensions import db
 from app.models import (
-    LoRaMessage, RFIDCard, Team, Checkpoint, Checkin, LoRaDevice, Competition
+    LoRaMessage, RFIDCard, Team, Checkpoint, Checkin, LoRaDevice, Competition,
+    CompetitionMember,
 )
 from app.api.helpers import parse_int
 from app.utils.audit import format_device_label, record_audit_event
@@ -144,20 +145,44 @@ def _card_writeback(uid: str,
         "team": team.name if team else None,
     }
 
+def _ingest_member_can_bypass_secret(user, competition_id: int) -> bool:
+    """A logged-in user may skip the webhook secret only if they are an
+    active admin or judge of the target competition. Viewers are read-only."""
+    if not user or not user.is_authenticated:
+        return False
+    membership = CompetitionMember.query.filter_by(
+        competition_id=competition_id,
+        user_id=user.id,
+        active=True,
+    ).first()
+    if not membership:
+        return False
+    return (membership.role or "").strip().lower() in {"admin", "judge"}
+
+
 @ingest_api_bp.post("/api/ingest")
 def ingest_post():
+        args = _parse_ingest_payload()
+        competition_id = args["competition_id"]
+
+        # Auth model:
+        # - In dev (LORA_WEBHOOK_SECRET unset or "CHANGE_LATER") the endpoint is
+        #   open. Production startup refuses to boot with the default value, so
+        #   this branch only ever runs in dev/test.
+        # - With a real secret set, callers must either present X-Webhook-Secret
+        #   or be a logged-in admin/judge of the target competition. Authenticated
+        #   viewers and non-members are NOT trusted to skip the secret.
         expected_secret = current_app.config.get("LORA_WEBHOOK_SECRET")
-        if expected_secret and expected_secret != "CHANGE_LATER" and not current_user.is_authenticated:
+        secret_configured = bool(expected_secret) and expected_secret != "CHANGE_LATER"
+        if secret_configured:
             provided_secret = request.headers.get("X-Webhook-Secret", "")
-            if not hmac.compare_digest(provided_secret, expected_secret):
+            secret_ok = hmac.compare_digest(provided_secret, expected_secret)
+            if not secret_ok and not _ingest_member_can_bypass_secret(current_user, competition_id):
                 return {
                     "ok": False,
                     "error": "forbidden",
                     "detail": "Invalid webhook secret.",
                 }, 403
-
-        args = _parse_ingest_payload()
-        competition_id = args["competition_id"]
         dev_id  = args.get("dev_id")
         checkpoint_id = args.get("checkpoint_id")
         payload = args.get("payload")

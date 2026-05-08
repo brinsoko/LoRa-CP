@@ -127,13 +127,21 @@ class TestDocsAndConfig:
     def test_translation_directory_is_absolute(self, app):
         assert app.config["BABEL_TRANSLATION_DIRECTORIES"].startswith("/")
 
+    def _login_for_docs(self, client):
+        admin = create_user(username="docs-admin")
+        competition = create_competition(name="Docs Race")
+        add_membership(admin, competition, role="admin")
+        login_as(client, admin, competition)
+
     def test_api_docs_list_exposes_openapi(self, client, app):
+        self._login_for_docs(client)
         response = client.get("/api/docs")
         body = response.get_json()
         assert response.status_code == 200
         assert any(spec["name"] == "openapi.json" for spec in body["specs"])
 
     def test_docs_openapi_proxy_returns_json(self, client, app):
+        self._login_for_docs(client)
         response = client.get("/docs/openapi.json")
         spec = response.get_json()
         assert response.status_code == 200
@@ -141,12 +149,14 @@ class TestDocsAndConfig:
         assert "/api/ingest" in spec["paths"]
 
     def test_docs_swagger_page_renders(self, client, app):
+        self._login_for_docs(client)
         response = client.get("/docs/")
         assert response.status_code == 200
         data = response.data.lower()
         assert b"swagger" in data or b"openapi" in data
 
     def test_openapi_structure_includes_core_paths_and_schemas(self, client, app):
+        self._login_for_docs(client)
         response = client.get("/docs/openapi.json")
         spec = response.get_json()
 
@@ -276,6 +286,51 @@ class TestWebhookSecurity:
 
         assert response.status_code == 201
         assert response.get_json()["ok"] is True
+
+    def test_ingest_authenticated_non_member_rejected(self, app_factory):
+        application = app_factory(LORA_WEBHOOK_SECRET="webhook-secret")
+        client = application.test_client()
+        with application.app_context():
+            target = create_competition(name="Closed Race")
+            other = create_competition(name="Other Race")
+            user = create_user(username="non-member-poster")
+            # Member of `other` only — NOT of the competition we're posting into.
+            add_membership(user, other, role="admin")
+            target_id = target.id
+            user_id = user.id
+
+        with client.session_transaction() as sess:
+            sess["_user_id"] = str(user_id)
+            sess["competition_id"] = target_id
+
+        response = client.post(
+            "/api/ingest",
+            json={"competition_id": target_id, "dev_id": 55, "payload": "AABBCCDD"},
+        )
+
+        assert response.status_code == 403
+        assert response.get_json()["error"] == "forbidden"
+
+    def test_ingest_authenticated_viewer_rejected(self, app_factory):
+        application = app_factory(LORA_WEBHOOK_SECRET="webhook-secret")
+        client = application.test_client()
+        with application.app_context():
+            competition = create_competition(name="Viewer-Only Race")
+            viewer = create_user(username="viewer-poster")
+            add_membership(viewer, competition, role="viewer")
+            competition_id = competition.id
+            viewer_id = viewer.id
+
+        with client.session_transaction() as sess:
+            sess["_user_id"] = str(viewer_id)
+            sess["competition_id"] = competition_id
+
+        response = client.post(
+            "/api/ingest",
+            json={"competition_id": competition_id, "dev_id": 66, "payload": "AABBCCDD"},
+        )
+
+        assert response.status_code == 403
 
 
 class TestVerificationAndMessages:
@@ -896,14 +951,14 @@ class TestApiErrorEnvelopes:
         assert body["error"] == "forbidden"
         assert body["code"] == 403
 
-    def test_api_checkin_get_without_session_returns_400_no_competition(self, client, app):
-        # checkin_get has no auth decorator — unauthenticated callers get
-        # 400 "no_competition" rather than 401.  Document the actual behaviour.
+    def test_api_checkin_get_unauthenticated_returns_401(self, client, app):
+        # checkin_get is now gated behind @json_roles_required; unauth callers
+        # get 401 before the no_competition check fires.
         response = client.get("/api/checkins/1")
         body = response.get_json()
 
-        assert response.status_code == 400
-        assert body["error"] == "no_competition"
+        assert response.status_code == 401
+        assert body["error"] == "unauthorized"
 
     def test_api_checkin_get_returns_404_for_missing(self, client, app):
         admin = create_user(username="404-checkin-admin")
