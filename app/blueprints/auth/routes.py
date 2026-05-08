@@ -296,9 +296,10 @@ def change_password():
 
         if resp.status_code == 200:
             flash("Password changed successfully.", "success")
-        return redirect(url_for("main.select_competition"))
+            return redirect(url_for("main.select_competition"))
 
         flash(payload.get("error") or "Could not change password.", "warning")
+        return render_template("change_password.html")
 
     return render_template("change_password.html")
 

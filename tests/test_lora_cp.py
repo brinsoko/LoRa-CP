@@ -220,6 +220,30 @@ class TestAuthRoutes:
         assert response.status_code == 200
         assert user.check_password("newsecret123") is True
 
+    def test_change_password_route_keeps_user_on_form_when_current_password_wrong(self, client, app):
+        user = create_user(username="password-fail-user", password="oldsecret")
+        competition = create_competition(name="Password Fail Race")
+        add_membership(user, competition, role="admin")
+        login_as(client, user, competition)
+
+        response = client.post(
+            "/change_password",
+            data={
+                "current_password": "wrongpassword",
+                "new_password": "newsecret123",
+                "confirm_password": "newsecret123",
+            },
+            follow_redirects=False,
+        )
+
+        db.session.refresh(user)
+        # The fix: failure must NOT redirect (the dead code used to send the
+        # user away with a misleading "success" flash). They should still be
+        # on the form, and their password must be unchanged.
+        assert response.status_code == 200
+        assert user.check_password("oldsecret") is True
+        assert b"change_password" in response.data.lower() or b"current password" in response.data.lower()
+
 
 class TestIngestApi:
     def test_ingest_creates_checkin_for_known_uid(self, client, app):
