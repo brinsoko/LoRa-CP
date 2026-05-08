@@ -3,6 +3,7 @@ from flask import Flask, request, current_app, render_template, session, g
 from flask_babel import get_locale
 from flask_login import current_user
 from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.proxy_fix import ProxyFix
 from .extensions import db, login_manager, babel
 from sqlalchemy import inspect, text
 from .api.auth import auth_api_bp
@@ -40,6 +41,12 @@ def create_app(config_overrides: dict | None = None) -> Flask:
         app.config.update(config_overrides)
     app.jinja_env.filters["local_dt"] = to_datetime_local
 
+    # Trust X-Forwarded-* headers from a single reverse proxy hop (Caddy in
+    # prod). Without this, OAuth redirect_uri uses the internal scheme/host
+    # (`http://web:5000/...`) which Google rejects as a redirect mismatch.
+    # Safe in dev too: it's a no-op when no proxy headers are present.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     os.makedirs(app.instance_path, exist_ok=True)
 
     if not app.config.get("SQLALCHEMY_DATABASE_URI"):
@@ -66,25 +73,29 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.register_blueprint(scores_api_bp)
     app.register_blueprint(transfer_api_bp)
 
-    # logging …
+    # logging — DEBUG only when the app is in debug/testing mode, INFO otherwise.
+    # Production logs every request at INFO via werkzeug; the per-request DEBUG
+    # line below would otherwise log header/role info on every hit.
+    log_level = logging.DEBUG if (app.debug or app.config.get("TESTING")) else logging.INFO
     for h in list(app.logger.handlers):
         app.logger.removeHandler(h)
     handler = logging.StreamHandler()
-    handler.setLevel(logging.DEBUG)
+    handler.setLevel(log_level)
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s"))
     app.logger.addHandler(handler)
-    app.logger.setLevel(logging.DEBUG)
+    app.logger.setLevel(log_level)
     logging.getLogger("werkzeug").setLevel(logging.INFO)
 
-    @app.before_request
-    def _log_req():
-        app.logger.debug(
-            "REQ %s %s endpoint=%s auth=%s role=%s ua=%s",
-            request.method, request.path, request.endpoint,
-            getattr(current_user, "is_authenticated", False),
-            getattr(current_user, "role", None),
-            request.headers.get("User-Agent", "")[:80],
-        )
+    if log_level == logging.DEBUG:
+        @app.before_request
+        def _log_req():
+            app.logger.debug(
+                "REQ %s %s endpoint=%s auth=%s role=%s ua=%s",
+                request.method, request.path, request.endpoint,
+                getattr(current_user, "is_authenticated", False),
+                getattr(current_user, "role", None),
+                request.headers.get("User-Agent", "")[:80],
+            )
 
     @app.before_request
     def _csrf_protect():
@@ -241,7 +252,19 @@ def create_app(config_overrides: dict | None = None) -> Flask:
 
     @app.get("/health")
     def health():
+        # Cheap liveness probe — if the process responds, it's up.
         return {"ok": True}, 200
+
+    @app.get("/ready")
+    def ready():
+        # Readiness probe — also exercises the DB so a locked or missing
+        # SQLite file shows up as 503 instead of pretending to be healthy.
+        try:
+            db.session.execute(text("SELECT 1"))
+            return {"ok": True}, 200
+        except Exception as exc:
+            current_app.logger.exception("readiness probe failed")
+            return {"ok": False, "error": exc.__class__.__name__}, 503
 
     @app.get("/api")
     def api_root():
