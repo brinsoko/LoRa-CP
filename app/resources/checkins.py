@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 
 from flask import Blueprint, jsonify, make_response, request
 from flask_login import current_user
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
@@ -276,8 +277,25 @@ def checkin_create():
             timestamp=ts,
             created_by_user_id=current_user.id if current_user.is_authenticated else None,
         )
-        db.session.add(c)
-        db.session.flush()
+        # SAVEPOINT around the insert: a concurrent caller may have raced past
+        # the existence check above and inserted first. Treat the resulting
+        # uq_team_checkpoint violation as a regular duplicate (409) instead of
+        # bubbling up as a 500 the caller would just retry on.
+        try:
+            with db.session.begin_nested():
+                db.session.add(c)
+        except IntegrityError:
+            db.session.rollback()
+            existing = (
+                Checkin.query
+                .filter_by(team_id=team_id, checkpoint_id=checkpoint_id, competition_id=comp_id)
+                .first()
+            )
+            return {
+                "error": "duplicate",
+                "detail": "Check-in for this team and checkpoint already exists. Use override=replace to update its timestamp.",
+                "checkin": _serialize_checkin(existing) if existing else None,
+            }, 409
         record_audit_event(
             competition_id=comp_id,
             event_type="checkin_created",

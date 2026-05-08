@@ -7,7 +7,7 @@ from flask import current_app
 from flask import Blueprint, request
 from flask_login import current_user
 
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.exceptions import BadRequest
 
 from app.extensions import db
@@ -331,44 +331,58 @@ def ingest_post():
                 if team and cp and team.competition_id == competition_id and cp.competition_id == competition_id and not cp.is_virtual:
                     team_obj = team
                     team_name = team.name
+                    arrived_at = received_at
                     exists = Checkin.query.filter_by(
                         team_id=team.id,
                         checkpoint_id=cp.id,
                         competition_id=competition_id,
                     ).first()
-                    arrived_at = received_at
-                    if not exists:
-                        created = Checkin(
-                            team_id=team.id,
-                            checkpoint_id=cp.id,
-                            competition_id=competition_id,
-                            timestamp=received_at,
-                            created_by_device_id=device.id if device else None,
-                        )
-                        db.session.add(created)
-                        db.session.flush()
-                        record_audit_event(
-                            competition_id=competition_id,
-                            event_type="checkin_created",
-                            entity_type="checkin",
-                            entity_id=created.id,
-                            actor_type="device" if device else "system",
-                            actor_device=device,
-                            summary=f"Check-in recorded for team {team.name} at {cp.name}.",
-                            details={
-                                "id": created.id,
-                                "team_id": team.id,
-                                "team_name": team.name,
-                                "checkpoint_id": cp.id,
-                                "checkpoint_name": cp.name,
-                                "timestamp": received_at.isoformat(),
-                                "source": "ingest",
-                            },
-                            created_at=received_at,
-                        )
-                        created_checkin = True
-                    else:
+                    if exists:
                         arrived_at = exists.timestamp or received_at
+                    else:
+                        # Use a SAVEPOINT around the insert so a concurrent
+                        # ingest racing on the same (team, checkpoint) hits the
+                        # uq_team_checkpoint constraint cleanly: we roll back
+                        # just the savepoint, re-read the existing row, and
+                        # continue treating this packet as a duplicate (200).
+                        try:
+                            with db.session.begin_nested():
+                                created = Checkin(
+                                    team_id=team.id,
+                                    checkpoint_id=cp.id,
+                                    competition_id=competition_id,
+                                    timestamp=received_at,
+                                    created_by_device_id=device.id if device else None,
+                                )
+                                db.session.add(created)
+                            record_audit_event(
+                                competition_id=competition_id,
+                                event_type="checkin_created",
+                                entity_type="checkin",
+                                entity_id=created.id,
+                                actor_type="device" if device else "system",
+                                actor_device=device,
+                                summary=f"Check-in recorded for team {team.name} at {cp.name}.",
+                                details={
+                                    "id": created.id,
+                                    "team_id": team.id,
+                                    "team_name": team.name,
+                                    "checkpoint_id": cp.id,
+                                    "checkpoint_name": cp.name,
+                                    "timestamp": received_at.isoformat(),
+                                    "source": "ingest",
+                                },
+                                created_at=received_at,
+                            )
+                            created_checkin = True
+                        except IntegrityError:
+                            existing = Checkin.query.filter_by(
+                                team_id=team.id,
+                                checkpoint_id=cp.id,
+                                competition_id=competition_id,
+                            ).first()
+                            if existing:
+                                arrived_at = existing.timestamp or received_at
 
                     try:
                         mark_arrival_checkbox(team.id, cp.id, arrived_at)
