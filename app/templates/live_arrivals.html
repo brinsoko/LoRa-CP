@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Live Arrivals') }}{% endblock %}
+
+{% macro status_badge(status) -%}
+  {% if status == 'finished' %}
+    <span class="badge text-bg-success">{{ _('Finished') }}</span>
+  {% elif status == 'dnf' %}
+    <span class="badge text-bg-danger">{{ _('DNF') }}</span>
+  {% elif status == 'on_course' %}
+    <span class="badge text-bg-primary">{{ _('On course') }}</span>
+  {% elif status == 'started' %}
+    <span class="badge text-bg-primary">{{ _('Started') }}</span>
+  {% elif status == 'not_started' %}
+    <span class="badge text-bg-secondary">{{ _('Not started') }}</span>
+  {% else %}
+    <span class="badge text-bg-warning">{{ _('Not routed') }}</span>
+  {% endif %}
+{%- endmacro %}
+
+{% block content %}
+<div id="liveArrivalsRoot"
+     data-live-url="{% if selected_group_id %}{{ url_for('api_checkins.checkin_live_arrivals', group_id=selected_group_id, sort=selected_sort) }}{% else %}{{ url_for('api_checkins.checkin_live_arrivals', sort=selected_sort) }}{% endif %}"
+     data-refresh-seconds="{{ refresh_seconds }}">
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+      <h1 class="h3 mb-1">{{ _('Live Arrivals') }}</h1>
+      <div class="text-muted small">
+        {{ _('Last updated') }}:
+        <span id="liveUpdatedAt">{{ live_arrivals.generated_at_label }}</span>
+        <span id="liveStatus" class="ms-2"></span>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('checkins.list_checkins') }}">{{ _('View Check-ins') }}</a>
+      {% if has_role('judge','admin') %}
+        <a class="btn btn-success" href="{{ url_for('checkins.add_checkin') }}">{{ _('Add Check-in') }}</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+          <label class="form-label">{{ _('Group') }}</label>
+          <select name="group_id" class="form-select">
+            <option value="">— {{ _('All groups') }} —</option>
+            {% for g in groups %}
+              <option value="{{ g.id }}" {% if selected_group_id == g.id %}selected{% endif %}>{{ g.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">{{ _('Sort teams') }}</label>
+          <select name="sort" class="form-select">
+            <option value="number_asc" {% if selected_sort == 'number_asc' %}selected{% endif %}>{{ _('Number (↑)') }}</option>
+            <option value="number_desc" {% if selected_sort == 'number_desc' %}selected{% endif %}>{{ _('Number (↓)') }}</option>
+            <option value="name_asc" {% if selected_sort == 'name_asc' %}selected{% endif %}>{{ _('Name (A→Z)') }}</option>
+            <option value="name_desc" {% if selected_sort == 'name_desc' %}selected{% endif %}>{{ _('Name (Z→A)') }}</option>
+            <option value="status" {% if selected_sort == 'status' %}selected{% endif %}>{{ _('Status') }}</option>
+            <option value="latest" {% if selected_sort == 'latest' %}selected{% endif %}>{{ _('Latest arrival') }}</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-4 d-flex gap-2 justify-content-md-end">
+          <button class="btn btn-primary" type="submit">{{ _('Apply') }}</button>
+          <a class="btn btn-outline-secondary" href="{{ url_for('checkins.live_arrivals') }}">{{ _('Reset') }}</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-2">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">{{ _('Teams') }}</div>
+          <div id="liveTeamsCount" class="h3 mb-0">{{ live_arrivals.summary.teams_count }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-2">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">{{ _('Started') }}</div>
+          <div id="liveStartedCount" class="h3 mb-0">{{ live_arrivals.summary.started_count }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-2">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">{{ _('Finished') }}</div>
+          <div id="liveFinishedCount" class="h3 mb-0">{{ live_arrivals.summary.finished_count }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-2">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">{{ _('Not finished') }}</div>
+          <div id="liveNotFinishedCount" class="h3 mb-0">{{ live_arrivals.summary.not_finished_count }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-2">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">{{ _('DNF') }}</div>
+          <div id="liveDnfCount" class="h3 mb-0">{{ live_arrivals.summary.dnf_count }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-2">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body">
+          <div class="text-muted small">{{ _('Check-ins') }}</div>
+          <div id="liveCheckinsCount" class="h3 mb-0">{{ live_arrivals.summary.checkins_count }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h2 class="h5 mb-3">{{ _('Checkpoint arrivals') }}</h2>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>{{ _('Checkpoint') }}</th>
+              <th class="text-end">{{ _('Expected') }}</th>
+              <th class="text-end">{{ _('Arrived') }}</th>
+              <th class="text-end">{{ _('Missing') }}</th>
+              <th style="min-width: 160px;">{{ _('Progress') }}</th>
+              <th>{{ _('Latest arrival') }}</th>
+            </tr>
+          </thead>
+          <tbody id="checkpointArrivalRows">
+            {% for cp in live_arrivals.checkpoints %}
+              <tr>
+                <td>
+                  {{ cp.name }}
+                  {% if cp.extra_count %}
+                    <span class="badge text-bg-warning ms-1">{{ _('Extra') }} {{ cp.extra_count }}</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">{{ cp.expected_count }}</td>
+                <td class="text-end">{{ cp.arrived_count }}</td>
+                <td class="text-end">{{ cp.missing_count }}</td>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="progress flex-grow-1" style="height: .5rem;">
+                      <div class="progress-bar" role="progressbar" style="width: {{ cp.progress }}%;"
+                           aria-valuenow="{{ cp.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <span class="small text-muted">{{ cp.progress }}%</span>
+                  </div>
+                </td>
+                <td>
+                  {% if cp.latest_team %}
+                    {{ cp.latest_team }}
+                    <div class="small text-muted">{{ cp.latest_at_label }}</div>
+                  {% else %}
+                    <span class="text-muted">{{ _('None yet') }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="6" class="text-muted">{{ _('No checkpoints to show.') }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h2 class="h5 mb-3">{{ _('Team timing') }}</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th>{{ _('Team') }}</th>
+              <th>{{ _('Group') }}</th>
+              <th>{{ _('Status') }}</th>
+              <th>{{ _('Started') }}</th>
+              <th>{{ _('Finished') }}</th>
+              <th>{{ _('Elapsed') }}</th>
+              <th>{{ _('Latest checkpoint') }}</th>
+              <th>{{ _('Latest time') }}</th>
+            </tr>
+          </thead>
+          <tbody id="teamTimingRows">
+            {% for team in live_arrivals.teams %}
+              <tr>
+                <td>{{ team.name }}{% if team.number is not none %} ({{ team.number }}){% endif %}</td>
+                <td>{{ team.group or '-' }}</td>
+                <td>{{ status_badge(team.status) }}</td>
+                <td>{{ team.started_at_label or '-' }}</td>
+                <td>{{ team.finished_at_label or '-' }}</td>
+                <td>{{ team.elapsed_label or '-' }}</td>
+                <td>{{ team.latest_checkpoint or '-' }}</td>
+                <td>{{ team.latest_at_label or '-' }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="8" class="text-muted">{{ _('No teams to show.') }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  (function () {
+    const root = document.getElementById("liveArrivalsRoot");
+    if (!root) return;
+
+    const labels = {
+      refreshFailed: "{{ _('Refresh failed') }}",
+      noneYet: "{{ _('None yet') }}",
+      noCheckpoints: "{{ _('No checkpoints to show.') }}",
+      noTeams: "{{ _('No teams to show.') }}",
+      extra: "{{ _('Extra') }}",
+      finished: "{{ _('Finished') }}",
+      dnf: "{{ _('DNF') }}",
+      on_course: "{{ _('On course') }}",
+      started: "{{ _('Started') }}",
+      not_started: "{{ _('Not started') }}",
+      not_routed: "{{ _('Not routed') }}",
+    };
+    const statusClasses = {
+      finished: "text-bg-success",
+      dnf: "text-bg-danger",
+      on_course: "text-bg-primary",
+      started: "text-bg-primary",
+      not_started: "text-bg-secondary",
+      not_routed: "text-bg-warning",
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value ?? "";
+    }
+
+    function statusBadge(status) {
+      const key = status || "not_routed";
+      return `<span class="badge ${statusClasses[key] || statusClasses.not_routed}">${escapeHtml(labels[key] || labels.not_routed)}</span>`;
+    }
+
+    function renderCheckpointRows(rows) {
+      const body = document.getElementById("checkpointArrivalRows");
+      if (!body) return;
+      if (!rows || rows.length === 0) {
+        body.innerHTML = `<tr><td colspan="6" class="text-muted">${escapeHtml(labels.noCheckpoints)}</td></tr>`;
+        return;
+      }
+      body.innerHTML = rows.map((row) => {
+        const progress = Math.max(0, Math.min(100, Number(row.progress || 0)));
+        const extra = Number(row.extra_count || 0) > 0
+          ? `<span class="badge text-bg-warning ms-1">${escapeHtml(labels.extra)} ${escapeHtml(row.extra_count)}</span>`
+          : "";
+        const latest = row.latest_team
+          ? `${escapeHtml(row.latest_team)}<div class="small text-muted">${escapeHtml(row.latest_at_label)}</div>`
+          : `<span class="text-muted">${escapeHtml(labels.noneYet)}</span>`;
+        return `
+          <tr>
+            <td>${escapeHtml(row.name)} ${extra}</td>
+            <td class="text-end">${escapeHtml(row.expected_count)}</td>
+            <td class="text-end">${escapeHtml(row.arrived_count)}</td>
+            <td class="text-end">${escapeHtml(row.missing_count)}</td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height: .5rem;">
+                  <div class="progress-bar" role="progressbar" style="width: ${progress}%;" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <span class="small text-muted">${progress}%</span>
+              </div>
+            </td>
+            <td>${latest}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderTeamRows(rows) {
+      const body = document.getElementById("teamTimingRows");
+      if (!body) return;
+      if (!rows || rows.length === 0) {
+        body.innerHTML = `<tr><td colspan="8" class="text-muted">${escapeHtml(labels.noTeams)}</td></tr>`;
+        return;
+      }
+      body.innerHTML = rows.map((row) => {
+        const teamNumber = row.number === null || row.number === undefined ? "" : ` (${escapeHtml(row.number)})`;
+        return `
+          <tr>
+            <td>${escapeHtml(row.name)}${teamNumber}</td>
+            <td>${escapeHtml(row.group || "-")}</td>
+            <td>${statusBadge(row.status)}</td>
+            <td>${escapeHtml(row.started_at_label || "-")}</td>
+            <td>${escapeHtml(row.finished_at_label || "-")}</td>
+            <td>${escapeHtml(row.elapsed_label || "-")}</td>
+            <td>${escapeHtml(row.latest_checkpoint || "-")}</td>
+            <td>${escapeHtml(row.latest_at_label || "-")}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function update(data) {
+      const summary = data.summary || {};
+      setText("liveUpdatedAt", data.generated_at_label || "");
+      setText("liveTeamsCount", summary.teams_count);
+      setText("liveStartedCount", summary.started_count);
+      setText("liveFinishedCount", summary.finished_count);
+      setText("liveNotFinishedCount", summary.not_finished_count);
+      setText("liveDnfCount", summary.dnf_count);
+      setText("liveCheckinsCount", summary.checkins_count);
+      setText("liveStatus", "");
+      renderCheckpointRows(data.checkpoints || []);
+      renderTeamRows(data.teams || []);
+    }
+
+    async function refreshLiveArrivals() {
+      try {
+        const response = await fetch(root.dataset.liveUrl, { credentials: "same-origin" });
+        if (!response.ok) throw new Error("refresh failed");
+        update(await response.json());
+      } catch (error) {
+        setText("liveStatus", labels.refreshFailed);
+      }
+    }
+
+    const refreshSeconds = Math.max(5, Number(root.dataset.refreshSeconds || 15));
+    window.setInterval(refreshLiveArrivals, refreshSeconds * 1000);
+  })();
+</script>
+{% endblock %}

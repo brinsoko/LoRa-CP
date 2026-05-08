@@ -43,20 +43,14 @@
                  class="form-control"
                  step="1"
                  value="{{ timestamp_prefill or (now.strftime('%Y-%m-%dT%H:%M:%S') if now else '') }}">
-          <div class="form-text">{{ _('Leave blank to use current time (UTC now).') }}</div>
+          <div class="form-text">{{ _('Leave blank to use current time (GMT now).') }}</div>
         </div>
 
         <div class="col-md-4">
-          <label class="form-label">{{ _('Timezone') }}</label>
-          {% set tz_default = 'Europe/Ljubljana' %}
-          {% set tz_current = request.form.get('timezone') or tz_default %}
-          <select name="timezone" class="form-select">
-            <option value="Europe/Ljubljana" {% if tz_current=='Europe/Ljubljana' %}selected{% endif %}>Europe/Ljubljana</option>
-            <option value="UTC" {% if tz_current=='UTC' %}selected{% endif %}>UTC</option>
-            <option value="Europe/Vienna" {% if tz_current=='Europe/Vienna' %}selected{% endif %}>Europe/Vienna</option>
-            <option value="Europe/Berlin" {% if tz_current=='Europe/Berlin' %}selected{% endif %}>Europe/Berlin</option>
-            <option value="Europe/Paris" {% if tz_current=='Europe/Paris' %}selected{% endif %}>Europe/Paris</option>
-          </select>
+          <label class="form-label">{{ _('Time zone') }}</label>
+          <input type="hidden" name="timezone" value="UTC">
+          <input type="text" class="form-control" value="GMT" disabled>
+          <div class="form-text">{{ _('Times are recorded in GMT for now.') }}</div>
         </div>
       </div>
 

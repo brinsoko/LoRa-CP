@@ -2,21 +2,22 @@
 from __future__ import annotations
 
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
 from flask_babel import gettext as _
 from flask_login import current_user
-from app.models import JudgeCheckpoint, Checkpoint
+from app.models import JudgeCheckpoint, Checkpoint, CheckpointGroup
 from app.utils.competition import get_current_competition_id, get_current_competition_role
 
 from app.utils.frontend_api import api_json, api_request
+from app.utils.live_arrivals import build_live_arrivals
 from app.utils.perms import roles_required
+from app.utils.time import DEFAULT_TZ_NAME, format_datetime_input_gmt, get_timezone
 
 checkins_bp = Blueprint("checkins", __name__, template_folder="../../templates")
 
 
-DEFAULT_TIMEZONE = ZoneInfo("Europe/Ljubljana")
+DEFAULT_TIMEZONE_NAME = DEFAULT_TZ_NAME
 
 
 def _fetch_teams():
@@ -66,7 +67,7 @@ def _fetch_checkpoints_for_user(include_checkpoint_id: int | None = None):
 
 def _parse_timestamp_from_form(fallback: datetime | None = None) -> datetime:
     ts_str = (request.form.get("timestamp") or request.form.get("timestamp_local") or "").strip()
-    tz_name = (request.form.get("timezone") or request.form.get("tz") or "").strip()
+    tz_name = (request.form.get("timezone") or request.form.get("tz") or DEFAULT_TIMEZONE_NAME).strip()
     default_dt = fallback or datetime.utcnow()
 
     if not ts_str:
@@ -78,12 +79,12 @@ def _parse_timestamp_from_form(fallback: datetime | None = None) -> datetime:
         return default_dt
 
     try:
-        tz = ZoneInfo(tz_name) if tz_name else DEFAULT_TIMEZONE
+        tz = get_timezone(tz_name)
     except Exception:
-        tz = DEFAULT_TIMEZONE
+        tz = get_timezone(DEFAULT_TIMEZONE_NAME)
 
     aware_local = local_dt.replace(tzinfo=tz)
-    utc_dt = aware_local.astimezone(ZoneInfo("UTC"))
+    utc_dt = aware_local.astimezone(get_timezone("UTC"))
     return utc_dt.replace(tzinfo=None)
 
 
@@ -162,6 +163,36 @@ def list_checkins():
     )
 
 
+@checkins_bp.route("/live", methods=["GET"])
+@roles_required("judge", "admin")
+def live_arrivals():
+    comp_id = get_current_competition_id()
+    if not comp_id:
+        flash(_("Select a competition first."), "warning")
+        return redirect(url_for("main.select_competition"))
+
+    selected_group_id = request.args.get("group_id", type=int)
+    selected_sort = (request.args.get("sort") or "number_asc").strip().lower()
+    groups = (
+        CheckpointGroup.query
+        .filter(CheckpointGroup.competition_id == comp_id)
+        .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
+        .all()
+    )
+    if selected_group_id and all(group.id != selected_group_id for group in groups):
+        flash(_("Group not found."), "warning")
+        selected_group_id = None
+
+    return render_template(
+        "live_arrivals.html",
+        live_arrivals=build_live_arrivals(comp_id, group_id=selected_group_id, sort=selected_sort),
+        groups=groups,
+        selected_group_id=selected_group_id,
+        selected_sort=selected_sort,
+        refresh_seconds=15,
+    )
+
+
 @checkins_bp.route("/export.csv", methods=["GET"])
 def export_checkins_csv():
     params = {
@@ -205,7 +236,7 @@ def add_checkin():
         "dup_team_id": None,
         "dup_checkpoint_id": None,
         "selected_checkpoint_id": default_checkpoint_id,
-        "timestamp_prefill": request.form.get("timestamp_local") if request.method == "POST" else now.astimezone(DEFAULT_TIMEZONE).strftime("%Y-%m-%dT%H:%M:%S"),
+        "timestamp_prefill": request.form.get("timestamp_local") if request.method == "POST" else format_datetime_input_gmt(now),
         "suggest_override": request.form.get("override") == "replace",
     }
 
@@ -252,7 +283,7 @@ def _load_checkin(checkin_id: int):
     decorated = _decorate_checkins([payload])[0]
     timestamp_local_value = ""
     if decorated["timestamp"]:
-        timestamp_local_value = decorated["timestamp"].strftime("%Y-%m-%dT%H:%M:%S")
+        timestamp_local_value = format_datetime_input_gmt(decorated["timestamp"])
     team = payload.get("team") or {}
     checkpoint = payload.get("checkpoint") or {}
     decorated.update(

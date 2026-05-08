@@ -36,28 +36,19 @@
 
         <div class="col-md-4">
           <label class="form-label">{{ _('Time') }}</label>
-          {# 'timestamp_local' is precomputed in the route using to_datetime_local(c.timestamp) #}
           <input type="datetime-local"
                  name="timestamp_local"
                  class="form-control"
                  step="1"
                  value="{{ timestamp_local }}">
-          <div class="form-text">{{ _('Enter time with seconds. Will be converted to UTC using the selected timezone.') }}</div>
+          <div class="form-text">{{ _('Enter time with seconds in GMT.') }}</div>
         </div>
 
         <div class="col-md-4">
-          <label class="form-label">{{ _('Timezone') }}</label>
-          <select name="timezone" class="form-select">
-            {# Pick whatever makes sense as your default; Ljubljana shown here #}
-            {% set tz_default = 'Europe/Ljubljana' %}
-            {% set tz_current = request.form.get('timezone') or tz_default %}
-            <option value="Europe/Ljubljana" {% if tz_current=='Europe/Ljubljana' %}selected{% endif %}>Europe/Ljubljana</option>
-            <option value="UTC" {% if tz_current=='UTC' %}selected{% endif %}>UTC</option>
-            <option value="Europe/Vienna" {% if tz_current=='Europe/Vienna' %}selected{% endif %}>Europe/Vienna</option>
-            <option value="Europe/Berlin" {% if tz_current=='Europe/Berlin' %}selected{% endif %}>Europe/Berlin</option>
-            <option value="Europe/Paris" {% if tz_current=='Europe/Paris' %}selected{% endif %}>Europe/Paris</option>
-          </select>
-          <div class="form-text">{{ _('Used to convert the entered time to UTC in the database.') }}</div>
+          <label class="form-label">{{ _('Time zone') }}</label>
+          <input type="hidden" name="timezone" value="UTC">
+          <input type="text" class="form-control" value="GMT" disabled>
+          <div class="form-text">{{ _('Times are recorded in GMT for now.') }}</div>
         </div>
       </div>
 

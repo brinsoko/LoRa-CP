@@ -17,6 +17,7 @@ from app.utils.time import from_datetime_local
 
 from app.utils.rest_auth import json_roles_required
 from app.utils.competition import require_current_competition_id, get_current_competition_role
+from app.utils.live_arrivals import build_live_arrivals
 from app.utils.sheets_sync import mark_arrival_checkbox
 
 checkins_api_bp = Blueprint("api_checkins", __name__)
@@ -195,6 +196,17 @@ def checkin_list():
                 "has_next": pagination.has_next,
             },
         }, 200
+
+
+@checkins_api_bp.get("/api/checkins/live-arrivals")
+@json_roles_required("judge", "admin")
+def checkin_live_arrivals():
+        comp_id = require_current_competition_id()
+        if not comp_id:
+            return jsonify({"error": "no_competition"}), 400
+        group_id = request.args.get("group_id", type=int)
+        sort = (request.args.get("sort") or "number_asc").strip().lower()
+        return build_live_arrivals(comp_id, group_id=group_id, sort=sort), 200
 
 
 @checkins_api_bp.post("/api/checkins")
