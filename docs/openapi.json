@@ -956,7 +956,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_auth_auth_login"
+        "operationId": "post_api_auth_login"
       }
     },
     "/api/auth/logout": {
@@ -983,7 +983,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_auth_auth_logout"
+        "operationId": "post_api_auth_logout"
       }
     },
     "/api/auth/me": {
@@ -1010,7 +1010,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_auth_auth_me"
+        "operationId": "get_api_auth_me"
       }
     },
     "/api/auth/password": {
@@ -1066,7 +1066,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_auth_auth_change_password"
+        "operationId": "post_api_auth_password"
       }
     },
     "/api/checkins": {
@@ -1144,7 +1144,7 @@
             }
           }
         },
-        "operationId": "api_checkins_checkin_list"
+        "operationId": "get_api_checkins"
       },
       "post": {
         "tags": [
@@ -1236,7 +1236,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_checkins_checkin_create"
+        "operationId": "post_api_checkins"
       }
     },
     "/api/checkins/export.csv": {
@@ -1264,13 +1264,13 @@
           }
         },
         "parameters": [],
-        "operationId": "api_checkins_checkin_export"
+        "operationId": "get_api_checkins_export_csv"
       }
     },
     "/api/checkins/live-arrivals": {
       "get": {
         "parameters": [],
-        "operationId": "api_checkins_checkin_live_arrivals",
+        "operationId": "get_api_checkins_live_arrivals",
         "summary": "",
         "responses": {
           "default": {
@@ -1323,7 +1323,7 @@
             }
           }
         ],
-        "operationId": "api_checkins_checkin_get"
+        "operationId": "get_api_checkins_checkin_id"
       },
       "patch": {
         "tags": [
@@ -1379,7 +1379,7 @@
             }
           }
         ],
-        "operationId": "api_checkins_checkin_patch"
+        "operationId": "patch_api_checkins_checkin_id"
       },
       "delete": {
         "tags": [
@@ -1407,7 +1407,7 @@
             }
           }
         ],
-        "operationId": "api_checkins_checkin_delete"
+        "operationId": "delete_api_checkins_checkin_id"
       },
       "put": {
         "tags": [
@@ -1463,7 +1463,7 @@
             }
           }
         ],
-        "operationId": "api_checkins_checkin_put"
+        "operationId": "put_api_checkins_checkin_id"
       }
     },
     "/api/checkpoints": {
@@ -1498,7 +1498,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_checkpoints_checkpoint_list"
+        "operationId": "get_api_checkpoints"
       },
       "post": {
         "tags": [
@@ -1526,7 +1526,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_checkpoints_checkpoint_create"
+        "operationId": "post_api_checkpoints"
       }
     },
     "/api/checkpoints/import": {
@@ -1567,7 +1567,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_checkpoints_checkpoint_import"
+        "operationId": "post_api_checkpoints_import"
       }
     },
     "/api/checkpoints/{checkpoint_id}": {
@@ -1614,7 +1614,7 @@
             }
           }
         ],
-        "operationId": "api_checkpoints_checkpoint_get"
+        "operationId": "get_api_checkpoints_checkpoint_id"
       },
       "patch": {
         "tags": [
@@ -1652,7 +1652,7 @@
             }
           }
         ],
-        "operationId": "api_checkpoints_checkpoint_patch"
+        "operationId": "patch_api_checkpoints_checkpoint_id"
       },
       "delete": {
         "tags": [
@@ -1683,7 +1683,7 @@
             }
           }
         ],
-        "operationId": "api_checkpoints_checkpoint_delete"
+        "operationId": "delete_api_checkpoints_checkpoint_id"
       },
       "put": {
         "tags": [
@@ -1721,7 +1721,7 @@
             }
           }
         ],
-        "operationId": "api_checkpoints_checkpoint_put"
+        "operationId": "put_api_checkpoints_checkpoint_id"
       }
     },
     "/api/competition/import": {
@@ -1788,7 +1788,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_transfer_import_competition"
+        "operationId": "post_api_competition_import"
       }
     },
     "/api/competition/{comp_id}/export": {
@@ -1827,7 +1827,7 @@
             "description": "Competition not found"
           }
         },
-        "operationId": "api_transfer_export_competition"
+        "operationId": "get_api_competition_comp_id_export"
       }
     },
     "/api/competition/{comp_id}/merge": {
@@ -1933,7 +1933,7 @@
             "description": "Competition not found"
           }
         },
-        "operationId": "api_transfer_merge_competition"
+        "operationId": "post_api_competition_comp_id_merge"
       }
     },
     "/api/devices": {
@@ -1968,7 +1968,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_lora_devices_lora_device_list"
+        "operationId": "get_api_devices"
       },
       "post": {
         "tags": [
@@ -1996,7 +1996,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_lora_devices_lora_device_create"
+        "operationId": "post_api_devices"
       }
     },
     "/api/devices/messages": {
@@ -2070,7 +2070,7 @@
             }
           }
         },
-        "operationId": "api_device_messages_lora_message_list"
+        "operationId": "get_api_devices_messages"
       }
     },
     "/api/devices/{device_id}": {
@@ -2117,7 +2117,7 @@
             }
           }
         ],
-        "operationId": "api_lora_devices_lora_device_get"
+        "operationId": "get_api_devices_device_id"
       },
       "patch": {
         "tags": [
@@ -2155,7 +2155,7 @@
             }
           }
         ],
-        "operationId": "api_lora_devices_lora_device_patch"
+        "operationId": "patch_api_devices_device_id"
       },
       "delete": {
         "tags": [
@@ -2183,7 +2183,7 @@
             }
           }
         ],
-        "operationId": "api_lora_devices_lora_device_delete"
+        "operationId": "delete_api_devices_device_id"
       },
       "put": {
         "tags": [
@@ -2221,7 +2221,7 @@
             }
           }
         ],
-        "operationId": "api_lora_devices_lora_device_put"
+        "operationId": "put_api_devices_device_id"
       }
     },
     "/api/docs": {
@@ -2259,7 +2259,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_docs_api_docs_list"
+        "operationId": "get_api_docs"
       }
     },
     "/api/docs/{filename}": {
@@ -2286,7 +2286,7 @@
             "description": "Not found"
           }
         },
-        "operationId": "api_docs_api_spec"
+        "operationId": "get_api_docs_filename"
       }
     },
     "/api/groups": {
@@ -2321,7 +2321,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_groups_group_list"
+        "operationId": "get_api_groups"
       },
       "post": {
         "tags": [
@@ -2375,7 +2375,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_groups_group_create"
+        "operationId": "post_api_groups"
       }
     },
     "/api/groups/order": {
@@ -2417,7 +2417,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_groups_group_order"
+        "operationId": "post_api_groups_order"
       }
     },
     "/api/groups/{group_id}": {
@@ -2464,7 +2464,7 @@
             }
           }
         ],
-        "operationId": "api_groups_group_get"
+        "operationId": "get_api_groups_group_id"
       },
       "patch": {
         "tags": [
@@ -2525,7 +2525,7 @@
             }
           }
         ],
-        "operationId": "api_groups_group_patch"
+        "operationId": "patch_api_groups_group_id"
       },
       "delete": {
         "tags": [
@@ -2556,7 +2556,7 @@
             }
           }
         ],
-        "operationId": "api_groups_group_delete"
+        "operationId": "delete_api_groups_group_id"
       },
       "put": {
         "tags": [
@@ -2617,7 +2617,7 @@
             }
           }
         ],
-        "operationId": "api_groups_group_put"
+        "operationId": "put_api_groups_group_id"
       }
     },
     "/api/ingest": {
@@ -2789,7 +2789,7 @@
             }
           }
         },
-        "operationId": "api_ingest_ingest_post"
+        "operationId": "post_api_ingest"
       }
     },
     "/api/lora/devices": {
@@ -2824,7 +2824,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_lora_devices_lora_device_list"
+        "operationId": "get_api_lora_devices"
       },
       "post": {
         "tags": [
@@ -2852,7 +2852,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_lora_devices_lora_device_create"
+        "operationId": "post_api_lora_devices"
       }
     },
     "/api/lora/devices/{device_id}": {
@@ -2899,7 +2899,7 @@
             }
           }
         ],
-        "operationId": "api_lora_devices_lora_device_get"
+        "operationId": "get_api_lora_devices_device_id"
       },
       "patch": {
         "tags": [
@@ -2937,7 +2937,7 @@
             }
           }
         ],
-        "operationId": "api_lora_devices_lora_device_patch"
+        "operationId": "patch_api_lora_devices_device_id"
       },
       "delete": {
         "tags": [
@@ -2965,7 +2965,7 @@
             }
           }
         ],
-        "operationId": "api_lora_devices_lora_device_delete"
+        "operationId": "delete_api_lora_devices_device_id"
       },
       "put": {
         "tags": [
@@ -3003,7 +3003,7 @@
             }
           }
         ],
-        "operationId": "api_lora_devices_lora_device_put"
+        "operationId": "put_api_lora_devices_device_id"
       }
     },
     "/api/lora/messages": {
@@ -3077,7 +3077,7 @@
             }
           }
         },
-        "operationId": "api_device_messages_lora_message_list"
+        "operationId": "get_api_lora_messages"
       }
     },
     "/api/map/checkpoints": {
@@ -3115,7 +3115,7 @@
             }
           }
         },
-        "operationId": "api_map_map_checkpoints"
+        "operationId": "get_api_map_checkpoints"
       }
     },
     "/api/map/device-points": {
@@ -3160,7 +3160,7 @@
             }
           }
         },
-        "operationId": "api_map_lora_map_points"
+        "operationId": "get_api_map_device_points"
       }
     },
     "/api/map/lora-points": {
@@ -3205,7 +3205,7 @@
             }
           }
         },
-        "operationId": "api_map_lora_map_points"
+        "operationId": "get_api_map_lora_points"
       }
     },
     "/api/rfid/cards": {
@@ -3240,7 +3240,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_rfid_rfid_card_list"
+        "operationId": "get_api_rfid_cards"
       },
       "post": {
         "tags": [
@@ -3268,7 +3268,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_rfid_rfid_card_create"
+        "operationId": "post_api_rfid_cards"
       }
     },
     "/api/rfid/cards/{card_id}": {
@@ -3315,7 +3315,7 @@
             }
           }
         ],
-        "operationId": "api_rfid_rfid_card_get"
+        "operationId": "get_api_rfid_cards_card_id"
       },
       "patch": {
         "tags": [
@@ -3353,7 +3353,7 @@
             }
           }
         ],
-        "operationId": "api_rfid_rfid_card_patch"
+        "operationId": "patch_api_rfid_cards_card_id"
       },
       "delete": {
         "tags": [
@@ -3381,7 +3381,7 @@
             }
           }
         ],
-        "operationId": "api_rfid_rfid_card_delete"
+        "operationId": "delete_api_rfid_cards_card_id"
       },
       "put": {
         "tags": [
@@ -3419,7 +3419,7 @@
             }
           }
         ],
-        "operationId": "api_rfid_rfid_card_put"
+        "operationId": "put_api_rfid_cards_card_id"
       }
     },
     "/api/rfid/import": {
@@ -3468,7 +3468,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_rfid_rfid_bulk_import"
+        "operationId": "post_api_rfid_import"
       }
     },
     "/api/rfid/scan": {
@@ -3488,7 +3488,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_rfid_rfid_scan"
+        "operationId": "post_api_rfid_scan"
       }
     },
     "/api/rfid/verify": {
@@ -3639,7 +3639,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_rfid_rfid_verify"
+        "operationId": "post_api_rfid_verify"
       }
     },
     "/api/score-rules": {
@@ -3674,7 +3674,7 @@
             "description": "Rules"
           }
         },
-        "operationId": "api_score_rules_score_rule_list"
+        "operationId": "get_api_score_rules"
       },
       "post": {
         "tags": [
@@ -3754,7 +3754,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_score_rules_score_rule_create"
+        "operationId": "post_api_score_rules"
       }
     },
     "/api/score-rules/fields": {
@@ -3789,7 +3789,7 @@
             "description": "Available scoring fields"
           }
         },
-        "operationId": "api_score_rules_score_rule_fields"
+        "operationId": "get_api_score_rules_fields"
       }
     },
     "/api/score-rules/{rule_id}": {
@@ -3829,7 +3829,7 @@
             }
           }
         ],
-        "operationId": "api_score_rules_score_rule_delete"
+        "operationId": "delete_api_score_rules_rule_id"
       }
     },
     "/api/scores/resolve": {
@@ -3968,7 +3968,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_scores_score_resolve"
+        "operationId": "post_api_scores_resolve"
       }
     },
     "/api/scores/submit": {
@@ -4043,7 +4043,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_scores_score_submit"
+        "operationId": "post_api_scores_submit"
       }
     },
     "/api/teams": {
@@ -4106,7 +4106,7 @@
             }
           }
         },
-        "operationId": "api_teams_team_list"
+        "operationId": "get_api_teams"
       },
       "post": {
         "tags": [
@@ -4162,7 +4162,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_teams_team_create"
+        "operationId": "post_api_teams"
       }
     },
     "/api/teams/randomize": {
@@ -4245,7 +4245,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_teams_team_randomize_numbers"
+        "operationId": "post_api_teams_randomize"
       }
     },
     "/api/teams/{team_id}": {
@@ -4292,7 +4292,7 @@
             }
           }
         ],
-        "operationId": "api_teams_team_get"
+        "operationId": "get_api_teams_team_id"
       },
       "patch": {
         "tags": [
@@ -4330,7 +4330,7 @@
             }
           }
         ],
-        "operationId": "api_teams_team_patch"
+        "operationId": "patch_api_teams_team_id"
       },
       "delete": {
         "tags": [
@@ -4361,7 +4361,7 @@
             }
           }
         ],
-        "operationId": "api_teams_team_delete"
+        "operationId": "delete_api_teams_team_id"
       },
       "put": {
         "tags": [
@@ -4399,7 +4399,7 @@
             }
           }
         ],
-        "operationId": "api_teams_team_put"
+        "operationId": "put_api_teams_team_id"
       }
     },
     "/api/teams/{team_id}/active-group": {
@@ -4447,7 +4447,7 @@
             "description": "Activated"
           }
         },
-        "operationId": "api_teams_team_active_group"
+        "operationId": "post_api_teams_team_id_active_group"
       }
     },
     "/api/users": {
@@ -4502,7 +4502,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_auth_users_list"
+        "operationId": "get_api_users"
       },
       "post": {
         "tags": [
@@ -4555,7 +4555,7 @@
           }
         },
         "parameters": [],
-        "operationId": "api_auth_users_create"
+        "operationId": "post_api_users"
       }
     },
     "/api/users/{user_id}": {
@@ -4602,7 +4602,7 @@
             }
           }
         ],
-        "operationId": "api_auth_users_get"
+        "operationId": "get_api_users_user_id"
       },
       "patch": {
         "tags": [
@@ -4661,7 +4661,7 @@
             }
           }
         ],
-        "operationId": "api_auth_users_patch"
+        "operationId": "patch_api_users_user_id"
       },
       "delete": {
         "tags": [
@@ -4689,7 +4689,7 @@
             }
           }
         ],
-        "operationId": "api_auth_users_delete"
+        "operationId": "delete_api_users_user_id"
       }
     },
     "/health": {
@@ -4716,13 +4716,13 @@
           }
         },
         "parameters": [],
-        "operationId": "health"
+        "operationId": "get_health"
       }
     },
     "/ready": {
       "get": {
         "parameters": [],
-        "operationId": "ready",
+        "operationId": "get_ready",
         "summary": "",
         "responses": {
           "default": {

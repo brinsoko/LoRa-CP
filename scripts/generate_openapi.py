@@ -73,11 +73,23 @@ def _build_test_app():
 
 
 _PARAM_RE = re.compile(r"<(?:(?P<conv>[^:>]+):)?(?P<name>[^>]+)>")
+_NON_ALNUM_RE = re.compile(r"[^a-zA-Z0-9]+")
 
 
 def _spec_path(rule: str) -> str:
     """Convert /api/teams/<int:team_id> to /api/teams/{team_id}."""
     return _PARAM_RE.sub(lambda m: "{" + m.group("name") + "}", rule)
+
+
+def _operation_id(verb: str, spec_path: str) -> str:
+    """Derive a unique operationId from verb + path.
+
+    Different routes that share an endpoint name (e.g. /api/devices and
+    /api/lora/devices, both registered to lora_device_list) must get
+    distinct operationIds — OpenAPI 3.0 requires global uniqueness.
+    """
+    slug = _NON_ALNUM_RE.sub("_", spec_path).strip("_")
+    return f"{verb}_{slug}"
 
 
 def _path_parameters(rule: str) -> list[dict]:
@@ -154,8 +166,9 @@ def _merge(existing: dict, wired: dict[str, dict[str, dict]]) -> dict:
             ]
             entry["parameters"] = info["parameters"] + existing_params
 
-            # Stub the rest if it's a brand-new entry.
-            entry.setdefault("operationId", info["endpoint"].replace(".", "_"))
+            # operationId must be globally unique per OpenAPI 3.0; derive
+            # from verb + path so aliased endpoints get distinct IDs.
+            entry["operationId"] = _operation_id(verb_lower, path)
             entry.setdefault("summary", "")
             entry.setdefault("responses", {
                 "default": {"description": ""},
