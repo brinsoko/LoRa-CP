@@ -38,7 +38,8 @@ help:
 	@echo "  make test-extended     - run extended regression suite"
 	@echo "  make cov               - run tests with coverage"
 	@echo "  make i18n-compile      - compile translations (.po -> .mo)"
-	@echo "  make openapi-check     - validate docs/openapi.json parses"
+	@echo "  make openapi           - regenerate docs/openapi.json from live url_map"
+	@echo "  make openapi-check     - fail if openapi.json is out of sync (CI use)"
 	@echo "  make smoke-int         - run integer-input smoke script"
 	@echo "  make stress-help       - show stress test script options"
 	@echo "  make erd               - render ERD"
@@ -104,11 +105,15 @@ test-extended:
 cov:
 	$(PYTEST) --cov=app --cov-report=term-missing tests $(TEST_ARGS)
 
-.PHONY: i18n-compile openapi-check smoke-int stress-help
+.PHONY: i18n-compile openapi openapi-check smoke-int stress-help
 i18n-compile:
 	$(PYBABEL) compile -d app/translations
 
+openapi:
+	$(PYTHON) scripts/generate_openapi.py
+
 openapi-check:
+	$(PYTHON) scripts/generate_openapi.py --check
 	@printf '%s\n' "import json, pathlib" \
 	               "json.loads(pathlib.Path('docs/openapi.json').read_text())" \
 	               "print('docs/openapi.json OK')" | $(PYTHON) -

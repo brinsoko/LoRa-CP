@@ -903,31 +903,6 @@
     }
   },
   "paths": {
-    "/health": {
-      "get": {
-        "tags": [
-          "system"
-        ],
-        "summary": "Health probe",
-        "responses": {
-          "200": {
-            "description": "Healthy",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/auth/login": {
       "post": {
         "tags": [
@@ -979,7 +954,9 @@
           "401": {
             "description": "Invalid credentials"
           }
-        }
+        },
+        "parameters": [],
+        "operationId": "api_auth_auth_login"
       }
     },
     "/api/auth/logout": {
@@ -1004,7 +981,36 @@
               }
             }
           }
-        }
+        },
+        "parameters": [],
+        "operationId": "api_auth_auth_logout"
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Current user profile",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUser"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "operationId": "api_auth_auth_me"
       }
     },
     "/api/auth/password": {
@@ -1058,1064 +1064,9 @@
               }
             }
           }
-        }
-      }
-    },
-    "/api/auth/me": {
-      "get": {
-        "tags": [
-          "auth"
-        ],
-        "summary": "Current user profile",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Current user",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthUser"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/users": {
-      "get": {
-        "tags": [
-          "users"
-        ],
-        "summary": "List users",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Users",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "users": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "integer"
-                          },
-                          "username": {
-                            "type": "string"
-                          },
-                          "role": {
-                            "type": "string"
-                          },
-                          "membership_role": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "username",
-                          "role",
-                          "membership_role"
-                        ]
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Create user",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "username",
-                  "password",
-                  "role"
-                ],
-                "properties": {
-                  "username": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string",
-                    "format": "password"
-                  },
-                  "role": {
-                    "type": "string",
-                    "enum": [
-                      "viewer",
-                      "judge",
-                      "admin"
-                    ]
-                  },
-                  "email": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
         },
-        "responses": {
-          "201": {
-            "description": "Created user"
-          }
-        }
-      }
-    },
-    "/api/users/{user_id}": {
-      "parameters": [
-        {
-          "name": "user_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "integer"
-          }
-        }
-      ],
-      "get": {
-        "tags": [
-          "users"
-        ],
-        "summary": "User detail",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "User",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthUser"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Update user",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "username": {
-                    "type": "string"
-                  },
-                  "role": {
-                    "type": "string",
-                    "enum": [
-                      "viewer",
-                      "judge",
-                      "admin"
-                    ]
-                  },
-                  "new_password": {
-                    "type": "string",
-                    "format": "password"
-                  },
-                  "confirm_password": {
-                    "type": "string",
-                    "format": "password"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated user"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Delete user",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Deleted"
-          }
-        }
-      }
-    },
-    "/api/groups/order": {
-      "post": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Update group order",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "group_ids"
-                ],
-                "properties": {
-                  "group_ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer"
-                    },
-                    "description": "Ordered list of all group IDs."
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Order updated"
-          }
-        }
-      }
-    },
-    "/api/teams": {
-      "get": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "List teams",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "q",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "group_id",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "sort",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "name_asc",
-                "name_desc",
-                "number_asc",
-                "number_desc"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Teams",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "teams": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Team"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Create team",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "name"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "organization": {
-                    "type": "string",
-                    "description": "Rod / organization the team belongs to"
-                  },
-                  "dnf": {
-                    "type": "boolean",
-                    "description": "Did not finish; admin-only."
-                  },
-                  "number": {
-                    "type": "integer"
-                  },
-                  "group_ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer"
-                    }
-                  },
-                  "active_group_id": {
-                    "type": "integer"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created team"
-          }
-        }
-      }
-    },
-    "/api/teams/{team_id}": {
-      "parameters": [
-        {
-          "name": "team_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "integer"
-          }
-        }
-      ],
-      "get": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Team detail",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Team",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Team"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Update team",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Team"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated team"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Delete team",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Deleted"
-          },
-          "409": {
-            "description": "Conflict"
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Replace team",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Team"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Replaced team"
-          }
-        }
-      }
-    },
-    "/api/teams/{team_id}/active-group": {
-      "post": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Activate a group for the team",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "group_id"
-                ],
-                "properties": {
-                  "group_id": {
-                    "type": "integer"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Activated"
-          }
-        }
-      }
-    },
-    "/api/teams/randomize": {
-      "post": {
-        "tags": [
-          "teams"
-        ],
-        "summary": "Randomize team numbers by group prefix",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "group_id": {
-                    "type": "integer",
-                    "description": "Optional group id. If omitted, randomize for all groups."
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Randomized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "assigned_total": {
-                      "type": "integer"
-                    },
-                    "results": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "group_id": {
-                            "type": "integer"
-                          },
-                          "group_name": {
-                            "type": "string"
-                          },
-                          "status": {
-                            "type": "string"
-                          },
-                          "assigned": {
-                            "type": "integer"
-                          },
-                          "needed": {
-                            "type": "integer"
-                          },
-                          "available": {
-                            "type": "integer"
-                          },
-                          "range": {
-                            "type": "array",
-                            "items": {
-                              "type": "integer"
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/groups": {
-      "get": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "List checkpoint groups",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Groups",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "groups": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/CheckpointGroup"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Create group",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "name"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "prefix": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "description": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "checkpoint_ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created group"
-          }
-        }
-      }
-    },
-    "/api/groups/{group_id}": {
-      "parameters": [
-        {
-          "name": "group_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "integer"
-          }
-        }
-      ],
-      "get": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Group detail",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Group",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CheckpointGroup"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Update group",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "prefix": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "description": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "checkpoint_ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated group"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Delete group",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Deleted"
-          },
-          "409": {
-            "description": "Conflict"
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "groups"
-        ],
-        "summary": "Replace group",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "prefix": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "description": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "checkpoint_ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Replaced group"
-          }
-        }
-      }
-    },
-    "/api/checkpoints": {
-      "get": {
-        "tags": [
-          "checkpoints"
-        ],
-        "summary": "List checkpoints",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Checkpoints",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "checkpoints": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Checkpoint"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "checkpoints"
-        ],
-        "summary": "Create checkpoint",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Checkpoint"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created checkpoint"
-          }
-        }
-      }
-    },
-    "/api/checkpoints/{checkpoint_id}": {
-      "parameters": [
-        {
-          "name": "checkpoint_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "integer"
-          }
-        }
-      ],
-      "get": {
-        "tags": [
-          "checkpoints"
-        ],
-        "summary": "Checkpoint detail",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Checkpoint",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Checkpoint"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "checkpoints"
-        ],
-        "summary": "Update checkpoint",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Checkpoint"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated checkpoint"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "checkpoints"
-        ],
-        "summary": "Delete checkpoint",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Deleted"
-          },
-          "409": {
-            "description": "Conflict"
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "checkpoints"
-        ],
-        "summary": "Replace checkpoint",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Checkpoint"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Replaced checkpoint"
-          }
-        }
-      }
-    },
-    "/api/checkpoints/import": {
-      "post": {
-        "tags": [
-          "checkpoints"
-        ],
-        "summary": "Bulk import checkpoints",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "items": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/Checkpoint"
-                    }
-                  }
-                },
-                "required": [
-                  "items"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Import summary"
-          }
-        }
+        "parameters": [],
+        "operationId": "api_auth_auth_change_password"
       }
     },
     "/api/checkins": {
@@ -2192,7 +1143,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "api_checkins_checkin_list"
       },
       "post": {
         "tags": [
@@ -2282,6 +1234,48 @@
           "409": {
             "description": "Duplicate"
           }
+        },
+        "parameters": [],
+        "operationId": "api_checkins_checkin_create"
+      }
+    },
+    "/api/checkins/export.csv": {
+      "get": {
+        "tags": [
+          "checkins"
+        ],
+        "summary": "Export check-ins CSV",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV stream",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "operationId": "api_checkins_checkin_export"
+      }
+    },
+    "/api/checkins/live-arrivals": {
+      "get": {
+        "parameters": [],
+        "operationId": "api_checkins_checkin_live_arrivals",
+        "summary": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
         }
       }
     },
@@ -2317,7 +1311,19 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "checkin_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_checkins_checkin_get"
       },
       "patch": {
         "tags": [
@@ -2361,7 +1367,19 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "checkin_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_checkins_checkin_patch"
       },
       "delete": {
         "tags": [
@@ -2377,7 +1395,19 @@
           "200": {
             "description": "Deleted"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "checkin_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_checkins_checkin_delete"
       },
       "put": {
         "tags": [
@@ -2421,53 +1451,30 @@
               }
             }
           }
-        }
-      }
-    },
-    "/api/checkins/export.csv": {
-      "get": {
-        "tags": [
-          "checkins"
-        ],
-        "summary": "Export check-ins CSV",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "CSV stream",
-            "content": {
-              "text/csv": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/map/checkpoints": {
-      "get": {
-        "tags": [
-          "map"
-        ],
-        "summary": "Map checkpoints (all or filtered by team)",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
+        },
         "parameters": [
           {
-            "name": "team_id",
-            "in": "query",
+            "name": "checkin_id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "type": "integer"
+              "type": "integer",
+              "format": "int32"
             }
+          }
+        ],
+        "operationId": "api_checkins_checkin_put"
+      }
+    },
+    "/api/checkpoints": {
+      "get": {
+        "tags": [
+          "checkpoints"
+        ],
+        "summary": "List checkpoints",
+        "security": [
+          {
+            "cookieAuth": []
           }
         ],
         "responses": {
@@ -2476,128 +1483,12 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MapCheckpoint"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/map/lora-points": {
-      "get": {
-        "tags": [
-          "map"
-        ],
-        "summary": "LoRa GPS points for the map",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "dev_id",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "GPS points",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LoRaMapPoint"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/map/device-points": {
-      "get": {
-        "tags": [
-          "map"
-        ],
-        "summary": "LoRa GPS points for the map (alias of /api/map/lora-points)",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "dev_id",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "GPS points",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LoRaMapPoint"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/rfid/cards": {
-      "get": {
-        "tags": [
-          "rfid"
-        ],
-        "summary": "List RFID cards",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Cards",
-            "content": {
-              "application/json": {
-                "schema": {
                   "type": "object",
                   "properties": {
-                    "cards": {
+                    "checkpoints": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/RFIDCard"
+                        "$ref": "#/components/schemas/Checkpoint"
                       }
                     }
                   }
@@ -2605,13 +1496,15 @@
               }
             }
           }
-        }
+        },
+        "parameters": [],
+        "operationId": "api_checkpoints_checkpoint_list"
       },
       "post": {
         "tags": [
-          "rfid"
+          "checkpoints"
         ],
-        "summary": "Create RFID card mapping",
+        "summary": "Create checkpoint",
         "security": [
           {
             "cookieAuth": []
@@ -2622,22 +1515,65 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RFIDCard"
+                "$ref": "#/components/schemas/Checkpoint"
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "Created card"
+            "description": "Created checkpoint"
           }
-        }
+        },
+        "parameters": [],
+        "operationId": "api_checkpoints_checkpoint_create"
       }
     },
-    "/api/rfid/cards/{card_id}": {
+    "/api/checkpoints/import": {
+      "post": {
+        "tags": [
+          "checkpoints"
+        ],
+        "summary": "Bulk import checkpoints",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Checkpoint"
+                    }
+                  }
+                },
+                "required": [
+                  "items"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import summary"
+          }
+        },
+        "parameters": [],
+        "operationId": "api_checkpoints_checkpoint_import"
+      }
+    },
+    "/api/checkpoints/{checkpoint_id}": {
       "parameters": [
         {
-          "name": "card_id",
+          "name": "checkpoint_id",
           "in": "path",
           "required": true,
           "schema": {
@@ -2647,9 +1583,9 @@
       ],
       "get": {
         "tags": [
-          "rfid"
+          "checkpoints"
         ],
-        "summary": "RFID card detail",
+        "summary": "Checkpoint detail",
         "security": [
           {
             "cookieAuth": []
@@ -2657,22 +1593,34 @@
         ],
         "responses": {
           "200": {
-            "description": "Card",
+            "description": "Checkpoint",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RFIDCard"
+                  "$ref": "#/components/schemas/Checkpoint"
                 }
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "checkpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_checkpoints_checkpoint_get"
       },
       "patch": {
         "tags": [
-          "rfid"
+          "checkpoints"
         ],
-        "summary": "Update card",
+        "summary": "Update checkpoint",
         "security": [
           {
             "cookieAuth": []
@@ -2683,22 +1631,34 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RFIDCard"
+                "$ref": "#/components/schemas/Checkpoint"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Updated card"
+            "description": "Updated checkpoint"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "checkpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_checkpoints_checkpoint_patch"
       },
       "delete": {
         "tags": [
-          "rfid"
+          "checkpoints"
         ],
-        "summary": "Delete card",
+        "summary": "Delete checkpoint",
         "security": [
           {
             "cookieAuth": []
@@ -2707,14 +1667,29 @@
         "responses": {
           "200": {
             "description": "Deleted"
+          },
+          "409": {
+            "description": "Conflict"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "checkpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_checkpoints_checkpoint_delete"
       },
       "put": {
         "tags": [
-          "rfid"
+          "checkpoints"
         ],
-        "summary": "Replace RFID card",
+        "summary": "Replace checkpoint",
         "security": [
           {
             "cookieAuth": []
@@ -2725,49 +1700,155 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RFIDCard"
+                "$ref": "#/components/schemas/Checkpoint"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Replaced card"
+            "description": "Replaced checkpoint"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "checkpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_checkpoints_checkpoint_put"
       }
     },
-    "/api/rfid/scan": {
+    "/api/competition/import": {
       "post": {
         "tags": [
-          "rfid"
+          "transfer"
         ],
-        "summary": "Scan single RFID card via serial bridge",
-        "security": [
+        "summary": "Import competition from JSON",
+        "description": "Create a new competition from an exported JSON file. Admin only.",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JSON export file"
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompetitionExport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Competition created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "competition_id": {
+                      "type": "integer"
+                    },
+                    "competition_name": {
+                      "type": "string"
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid JSON or validation error"
+          },
+          "403": {
+            "description": "Forbidden — admin role required"
+          }
+        },
+        "parameters": [],
+        "operationId": "api_transfer_import_competition"
+      }
+    },
+    "/api/competition/{comp_id}/export": {
+      "get": {
+        "tags": [
+          "transfer"
+        ],
+        "summary": "Export competition as JSON",
+        "description": "Download the full competition data as a JSON file. Admin only.",
+        "parameters": [
           {
-            "cookieAuth": []
+            "name": "comp_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Scan result"
+            "description": "JSON export file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompetitionExport"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden — admin role required"
+          },
+          "404": {
+            "description": "Competition not found"
           }
-        }
+        },
+        "operationId": "api_transfer_export_competition"
       }
     },
-    "/api/rfid/import": {
+    "/api/competition/{comp_id}/merge": {
       "post": {
         "tags": [
-          "rfid"
+          "transfer"
         ],
-        "summary": "Bulk import RFID mappings",
-        "security": [
+        "summary": "Merge data into competition",
+        "description": "Two-step merge: without 'resolutions' key → dry run (returns conflicts). With 'resolutions' → apply merge.",
+        "parameters": [
           {
-            "cookieAuth": []
+            "name": "comp_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
@@ -2782,73 +1863,27 @@
             },
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "rows": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/RFIDCard"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/CompetitionExport"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "resolutions": {
+                        "type": "object",
+                        "description": "Conflict resolution map. Keys: 'entity_type:identifier', values: 'keep_local', 'use_imported', 'skip'.",
+                        "additionalProperties": {
+                          "type": "string",
+                          "enum": [
+                            "keep_local",
+                            "use_imported",
+                            "skip"
+                          ]
+                        }
+                      }
                     }
                   }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Import summary"
-          }
-        }
-      }
-    },
-    "/api/rfid/verify": {
-      "post": {
-        "tags": [
-          "rfid"
-        ],
-        "summary": "Verify tag digests against checkpoints/devices and team check-ins",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "uid": {
-                    "type": "string",
-                    "description": "Card UID"
-                  },
-                  "digests": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "List of truncated HMAC strings read from the tag"
-                  },
-                  "device_ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer"
-                    },
-                    "description": "Optional: limit verification to these device IDs"
-                  },
-                  "checkpoint_ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "integer"
-                    },
-                    "description": "Optional: limit verification to these checkpoint IDs"
-                  }
-                },
-                "required": [
-                  "uid",
-                  "digests"
                 ]
               }
             }
@@ -2856,7 +1891,7 @@
         },
         "responses": {
           "200": {
-            "description": "Verification result",
+            "description": "Dry run result (conflicts) or merge applied",
             "content": {
               "application/json": {
                 "schema": {
@@ -2865,79 +1900,19 @@
                     "ok": {
                       "type": "boolean"
                     },
-                    "uid": {
-                      "type": "string"
+                    "dry_run": {
+                      "type": "boolean"
                     },
-                    "device_ids": {
+                    "conflicts": {
                       "type": "array",
                       "items": {
-                        "type": "integer"
+                        "type": "object"
                       }
                     },
-                    "checkpoint_ids": {
-                      "type": "array",
-                      "items": {
-                        "type": "integer"
-                      }
+                    "summary": {
+                      "type": "object"
                     },
-                    "team": {
-                      "type": "object",
-                      "nullable": true,
-                      "properties": {
-                        "id": {
-                          "type": "integer"
-                        },
-                        "name": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "has_mismatch": {
-                      "type": "boolean",
-                      "description": "True if any digest matched a checkpoint the team has not checked in at"
-                    },
-                    "results": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "digest": {
-                            "type": "string"
-                          },
-                          "collision": {
-                            "type": "boolean"
-                          },
-                          "matches": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "device_id": {
-                                  "type": "integer"
-                                },
-                                "device_name": {
-                                  "type": "string",
-                                  "nullable": true
-                                },
-                                "checkpoint": {
-                                  "type": "string",
-                                  "nullable": true
-                                },
-                                "checkpoint_id": {
-                                  "type": "integer",
-                                  "nullable": true
-                                },
-                                "checked_in": {
-                                  "type": "boolean",
-                                  "nullable": true
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    },
-                    "unknown": {
+                    "warnings": {
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -2947,243 +1922,18 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/lora/devices": {
-      "get": {
-        "tags": [
-          "lora"
-        ],
-        "summary": "List LoRa devices",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Devices",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "devices": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/LoRaDevice"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "lora"
-        ],
-        "summary": "Create LoRa device",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoRaDevice"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created device"
-          }
-        }
-      }
-    },
-    "/api/lora/devices/{device_id}": {
-      "parameters": [
-        {
-          "name": "device_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "integer"
-          }
-        }
-      ],
-      "get": {
-        "tags": [
-          "lora"
-        ],
-        "summary": "Device detail",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Device",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LoRaDevice"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "lora"
-        ],
-        "summary": "Update device",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoRaDevice"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated device"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "lora"
-        ],
-        "summary": "Delete device",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Deleted"
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "lora"
-        ],
-        "summary": "Replace LoRa device",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoRaDevice"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Replaced device"
-          }
-        }
-      }
-    },
-    "/api/lora/messages": {
-      "get": {
-        "tags": [
-          "lora"
-        ],
-        "summary": "List LoRa uplink messages",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "dev_id",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
           },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
+          "400": {
+            "description": "Invalid request"
           },
-          {
-            "name": "per_page",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Competition not found"
           }
-        ],
-        "responses": {
-          "200": {
-            "description": "Messages",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "messages": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/LoRaMessage"
-                      }
-                    },
-                    "meta": {
-                      "type": "object",
-                      "properties": {
-                        "page": {
-                          "type": "integer"
-                        },
-                        "per_page": {
-                          "type": "integer"
-                        },
-                        "total": {
-                          "type": "integer"
-                        },
-                        "pages": {
-                          "type": "integer"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+        },
+        "operationId": "api_transfer_merge_competition"
       }
     },
     "/api/devices": {
@@ -3216,7 +1966,9 @@
               }
             }
           }
-        }
+        },
+        "parameters": [],
+        "operationId": "api_lora_devices_lora_device_list"
       },
       "post": {
         "tags": [
@@ -3242,110 +1994,9 @@
           "201": {
             "description": "Created device"
           }
-        }
-      }
-    },
-    "/api/devices/{device_id}": {
-      "parameters": [
-        {
-          "name": "device_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "integer"
-          }
-        }
-      ],
-      "get": {
-        "tags": [
-          "lora"
-        ],
-        "summary": "Device detail (alias of /api/lora/devices/{device_id})",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Device",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LoRaDevice"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "lora"
-        ],
-        "summary": "Update device (alias)",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoRaDevice"
-              }
-            }
-          }
         },
-        "responses": {
-          "200": {
-            "description": "Updated device"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "lora"
-        ],
-        "summary": "Delete device (alias)",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Deleted"
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "lora"
-        ],
-        "summary": "Replace device",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoRaDevice"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Replaced device"
-          }
-        }
+        "parameters": [],
+        "operationId": "api_lora_devices_lora_device_create"
       }
     },
     "/api/devices/messages": {
@@ -3418,7 +2069,555 @@
               }
             }
           }
+        },
+        "operationId": "api_device_messages_lora_message_list"
+      }
+    },
+    "/api/devices/{device_id}": {
+      "parameters": [
+        {
+          "name": "device_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
         }
+      ],
+      "get": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Device detail (alias of /api/lora/devices/{device_id})",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoRaDevice"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_lora_devices_lora_device_get"
+      },
+      "patch": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Update device (alias)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoRaDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated device"
+          }
+        },
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_lora_devices_lora_device_patch"
+      },
+      "delete": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Delete device (alias)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        },
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_lora_devices_lora_device_delete"
+      },
+      "put": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Replace device",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoRaDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced device"
+          }
+        },
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_lora_devices_lora_device_put"
+      }
+    },
+    "/api/docs": {
+      "get": {
+        "tags": [
+          "docs"
+        ],
+        "summary": "List documentation artifacts",
+        "responses": {
+          "200": {
+            "description": "Docs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "specs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "operationId": "api_docs_api_docs_list"
+      }
+    },
+    "/api/docs/{filename}": {
+      "get": {
+        "tags": [
+          "docs"
+        ],
+        "summary": "Fetch a documentation artifact by filename",
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Spec or documentation artifact"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "operationId": "api_docs_api_spec"
+      }
+    },
+    "/api/groups": {
+      "get": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "List checkpoint groups",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CheckpointGroup"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "operationId": "api_groups_group_list"
+      },
+      "post": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Create group",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "prefix": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "checkpoint_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created group"
+          }
+        },
+        "parameters": [],
+        "operationId": "api_groups_group_create"
+      }
+    },
+    "/api/groups/order": {
+      "post": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Update group order",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "group_ids"
+                ],
+                "properties": {
+                  "group_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Ordered list of all group IDs."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order updated"
+          }
+        },
+        "parameters": [],
+        "operationId": "api_groups_group_order"
+      }
+    },
+    "/api/groups/{group_id}": {
+      "parameters": [
+        {
+          "name": "group_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Group detail",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckpointGroup"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_groups_group_get"
+      },
+      "patch": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Update group",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "prefix": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "checkpoint_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated group"
+          }
+        },
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_groups_group_patch"
+      },
+      "delete": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Delete group",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_groups_group_delete"
+      },
+      "put": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Replace group",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "prefix": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "checkpoint_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced group"
+          }
+        },
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_groups_group_put"
       }
     },
     "/api/ingest": {
@@ -3589,34 +2788,286 @@
               }
             }
           }
-        }
+        },
+        "operationId": "api_ingest_ingest_post"
       }
     },
-    "/api/docs": {
+    "/api/lora/devices": {
       "get": {
         "tags": [
-          "docs"
+          "lora"
         ],
-        "summary": "List documentation artifacts",
+        "summary": "List LoRa devices",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Docs",
+            "description": "Devices",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "specs": {
+                    "devices": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "name": {
-                            "type": "string"
-                          },
-                          "path": {
-                            "type": "string"
-                          }
+                        "$ref": "#/components/schemas/LoRaDevice"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "operationId": "api_lora_devices_lora_device_list"
+      },
+      "post": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Create LoRa device",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoRaDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created device"
+          }
+        },
+        "parameters": [],
+        "operationId": "api_lora_devices_lora_device_create"
+      }
+    },
+    "/api/lora/devices/{device_id}": {
+      "parameters": [
+        {
+          "name": "device_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Device detail",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoRaDevice"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_lora_devices_lora_device_get"
+      },
+      "patch": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Update device",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoRaDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated device"
+          }
+        },
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_lora_devices_lora_device_patch"
+      },
+      "delete": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Delete device",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        },
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_lora_devices_lora_device_delete"
+      },
+      "put": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "Replace LoRa device",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoRaDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced device"
+          }
+        },
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_lora_devices_lora_device_put"
+      }
+    },
+    "/api/lora/messages": {
+      "get": {
+        "tags": [
+          "lora"
+        ],
+        "summary": "List LoRa uplink messages",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dev_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LoRaMessage"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "pages": {
+                          "type": "integer"
                         }
                       }
                     }
@@ -3625,318 +3076,16 @@
               }
             }
           }
-        }
+        },
+        "operationId": "api_device_messages_lora_message_list"
       }
     },
-    "/api/docs/{filename}": {
+    "/api/map/checkpoints": {
       "get": {
         "tags": [
-          "docs"
+          "map"
         ],
-        "summary": "Fetch a documentation artifact by filename",
-        "parameters": [
-          {
-            "name": "filename",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Spec or documentation artifact"
-          },
-          "404": {
-            "description": "Not found"
-          }
-        }
-      }
-    },
-    "/sheets/": {
-      "get": {
-        "tags": [
-          "sheets"
-        ],
-        "summary": "Sheets admin UI",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "HTML page"
-          },
-          "302": {
-            "description": "Redirect to login if not authenticated"
-          }
-        }
-      }
-    },
-    "/sheets/build-arrivals": {
-      "post": {
-        "tags": [
-          "sheets"
-        ],
-        "summary": "Build or refresh arrivals tab",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "spreadsheet_id": {
-                    "type": "string"
-                  },
-                  "tab_name": {
-                    "type": "string",
-                    "default": "Prihodi"
-                  }
-                },
-                "required": [
-                  "spreadsheet_id"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "302": {
-            "description": "Redirect back to admin page"
-          }
-        }
-      }
-    },
-    "/sheets/build-teams": {
-      "post": {
-        "tags": [
-          "sheets"
-        ],
-        "summary": "Build or refresh teams tab",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "spreadsheet_id": {
-                    "type": "string"
-                  },
-                  "tab_name": {
-                    "type": "string",
-                    "default": "Ekipe"
-                  },
-                  "teams_headers": {
-                    "type": "string",
-                    "description": "Comma-separated headers"
-                  },
-                  "group_order": {
-                    "type": "string",
-                    "description": "Comma-separated group order"
-                  }
-                },
-                "required": [
-                  "spreadsheet_id"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "302": {
-            "description": "Redirect back to admin page"
-          }
-        }
-      }
-    },
-    "/sheets/build-score": {
-      "post": {
-        "tags": [
-          "sheets"
-        ],
-        "summary": "Build or refresh total score tab",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "spreadsheet_id": {
-                    "type": "string"
-                  },
-                  "tab_name": {
-                    "type": "string",
-                    "default": "Skupni seštevek"
-                  },
-                  "include_dead_time_sum": {
-                    "type": "boolean",
-                    "default": true
-                  },
-                  "group_order": {
-                    "type": "string"
-                  },
-                  "checkpoint_order": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "spreadsheet_id"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "302": {
-            "description": "Redirect back to admin page"
-          }
-        }
-      }
-    },
-    "/sheets/wizard/checkpoints": {
-      "post": {
-        "tags": [
-          "sheets"
-        ],
-        "summary": "Run checkpoint tab wizard",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "spreadsheet_id": {
-                    "type": "string"
-                  },
-                  "arrived_header": {
-                    "type": "string"
-                  },
-                  "points_header": {
-                    "type": "string"
-                  },
-                  "dead_time_header": {
-                    "type": "string"
-                  },
-                  "group_order": {
-                    "type": "string"
-                  },
-                  "checkpoint_order": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "spreadsheet_id"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "302": {
-            "description": "Redirect back to admin page"
-          }
-        }
-      }
-    },
-    "/sheets/add-tab": {
-      "post": {
-        "tags": [
-          "sheets"
-        ],
-        "summary": "Add a single checkpoint tab",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "spreadsheet_id": {
-                    "type": "string"
-                  },
-                  "tab_title": {
-                    "type": "string"
-                  },
-                  "checkpoint_id": {
-                    "type": "integer",
-                    "nullable": true
-                  },
-                  "groups_raw": {
-                    "type": "string",
-                    "description": "Lines Group|field1,field2"
-                  }
-                },
-                "required": [
-                  "spreadsheet_id",
-                  "tab_title",
-                  "groups_raw"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "302": {
-            "description": "Redirect back to admin page"
-          }
-        }
-      }
-    },
-    "/sheets/prune-missing": {
-      "post": {
-        "tags": [
-          "sheets"
-        ],
-        "summary": "Delete stored sheet configs whose tabs are gone",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "responses": {
-          "302": {
-            "description": "Redirect back to admin page"
-          }
-        }
-      }
-    },
-    "/sheets/sync-team-numbers/{config_id}": {
-      "post": {
-        "tags": [
-          "sheets"
-        ],
-        "summary": "Sync team numbers for a checkpoint tab",
+        "summary": "Map checkpoints (all or filtered by team)",
         "security": [
           {
             "cookieAuth": []
@@ -3944,19 +3093,743 @@
         ],
         "parameters": [
           {
-            "name": "config_id",
-            "in": "path",
-            "required": true,
+            "name": "team_id",
+            "in": "query",
             "schema": {
               "type": "integer"
             }
           }
         ],
         "responses": {
-          "302": {
-            "description": "Redirect back to admin page"
+          "200": {
+            "description": "Checkpoints",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MapCheckpoint"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "api_map_map_checkpoints"
+      }
+    },
+    "/api/map/device-points": {
+      "get": {
+        "tags": [
+          "map"
+        ],
+        "summary": "LoRa GPS points for the map (alias of /api/map/lora-points)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dev_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GPS points",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LoRaMapPoint"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "api_map_lora_map_points"
+      }
+    },
+    "/api/map/lora-points": {
+      "get": {
+        "tags": [
+          "map"
+        ],
+        "summary": "LoRa GPS points for the map",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dev_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "GPS points",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LoRaMapPoint"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "api_map_lora_map_points"
+      }
+    },
+    "/api/rfid/cards": {
+      "get": {
+        "tags": [
+          "rfid"
+        ],
+        "summary": "List RFID cards",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cards",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cards": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RFIDCard"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "operationId": "api_rfid_rfid_card_list"
+      },
+      "post": {
+        "tags": [
+          "rfid"
+        ],
+        "summary": "Create RFID card mapping",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RFIDCard"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created card"
+          }
+        },
+        "parameters": [],
+        "operationId": "api_rfid_rfid_card_create"
+      }
+    },
+    "/api/rfid/cards/{card_id}": {
+      "parameters": [
+        {
+          "name": "card_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
           }
         }
+      ],
+      "get": {
+        "tags": [
+          "rfid"
+        ],
+        "summary": "RFID card detail",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Card",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RFIDCard"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "card_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_rfid_rfid_card_get"
+      },
+      "patch": {
+        "tags": [
+          "rfid"
+        ],
+        "summary": "Update card",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RFIDCard"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated card"
+          }
+        },
+        "parameters": [
+          {
+            "name": "card_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_rfid_rfid_card_patch"
+      },
+      "delete": {
+        "tags": [
+          "rfid"
+        ],
+        "summary": "Delete card",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        },
+        "parameters": [
+          {
+            "name": "card_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_rfid_rfid_card_delete"
+      },
+      "put": {
+        "tags": [
+          "rfid"
+        ],
+        "summary": "Replace RFID card",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RFIDCard"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced card"
+          }
+        },
+        "parameters": [
+          {
+            "name": "card_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_rfid_rfid_card_put"
+      }
+    },
+    "/api/rfid/import": {
+      "post": {
+        "tags": [
+          "rfid"
+        ],
+        "summary": "Bulk import RFID mappings",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rows": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/RFIDCard"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Import summary"
+          }
+        },
+        "parameters": [],
+        "operationId": "api_rfid_rfid_bulk_import"
+      }
+    },
+    "/api/rfid/scan": {
+      "post": {
+        "tags": [
+          "rfid"
+        ],
+        "summary": "Scan single RFID card via serial bridge",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scan result"
+          }
+        },
+        "parameters": [],
+        "operationId": "api_rfid_rfid_scan"
+      }
+    },
+    "/api/rfid/verify": {
+      "post": {
+        "tags": [
+          "rfid"
+        ],
+        "summary": "Verify tag digests against checkpoints/devices and team check-ins",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "uid": {
+                    "type": "string",
+                    "description": "Card UID"
+                  },
+                  "digests": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "List of truncated HMAC strings read from the tag"
+                  },
+                  "device_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Optional: limit verification to these device IDs"
+                  },
+                  "checkpoint_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Optional: limit verification to these checkpoint IDs"
+                  }
+                },
+                "required": [
+                  "uid",
+                  "digests"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "uid": {
+                      "type": "string"
+                    },
+                    "device_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    },
+                    "checkpoint_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    },
+                    "team": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "has_mismatch": {
+                      "type": "boolean",
+                      "description": "True if any digest matched a checkpoint the team has not checked in at"
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "digest": {
+                            "type": "string"
+                          },
+                          "collision": {
+                            "type": "boolean"
+                          },
+                          "matches": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "device_id": {
+                                  "type": "integer"
+                                },
+                                "device_name": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "checkpoint": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "checkpoint_id": {
+                                  "type": "integer",
+                                  "nullable": true
+                                },
+                                "checked_in": {
+                                  "type": "boolean",
+                                  "nullable": true
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "unknown": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "operationId": "api_rfid_rfid_verify"
+      }
+    },
+    "/api/score-rules": {
+      "get": {
+        "tags": [
+          "scores"
+        ],
+        "summary": "List score rules",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "checkpoint_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rules"
+          }
+        },
+        "operationId": "api_score_rules_score_rule_list"
+      },
+      "post": {
+        "tags": [
+          "scores"
+        ],
+        "summary": "Create or update a score rule",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "checkpoint_id",
+                  "group_id",
+                  "rules"
+                ],
+                "properties": {
+                  "checkpoint_id": {
+                    "type": "integer"
+                  },
+                  "group_id": {
+                    "type": "integer"
+                  },
+                  "rules": {
+                    "type": "object",
+                    "description": "Rule object with optional field_rules and time_race. field_rules maps field keys to a rule or list of rules: mapping {type:'mapping', map:{input:output}}, interpolate {type:'interpolate', points:[[x,y],...]}, multiplier {type:'multiplier', factor}, found {type:'found', checkpoint_ids:[int], points_per:number}, deviation {type:'deviation', target, max_points, penalty_points, penalty_distance, min_points}. time_race uses checkin times between checkpoints: {start_checkpoint_id, end_checkpoint_id, min_points, max_points}.",
+                    "example": {
+                      "field_rules": {
+                        "Distance": [
+                          {
+                            "type": "deviation",
+                            "target": 0,
+                            "max_points": 100,
+                            "penalty_points": 1,
+                            "penalty_distance": 1,
+                            "min_points": 0
+                          }
+                        ],
+                        "Found": {
+                          "type": "found",
+                          "checkpoint_ids": [
+                            12,
+                            14
+                          ],
+                          "points_per": 5
+                        }
+                      },
+                      "total_fields": [
+                        "Distance",
+                        "Found"
+                      ],
+                      "time_race": {
+                        "start_checkpoint_id": 3,
+                        "end_checkpoint_id": 7,
+                        "min_points": 10,
+                        "max_points": 100
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated rule"
+          },
+          "201": {
+            "description": "Created rule"
+          }
+        },
+        "parameters": [],
+        "operationId": "api_score_rules_score_rule_create"
+      }
+    },
+    "/api/score-rules/fields": {
+      "get": {
+        "tags": [
+          "scores"
+        ],
+        "summary": "Get score rule fields",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "checkpoint_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available scoring fields"
+          }
+        },
+        "operationId": "api_score_rules_score_rule_fields"
+      }
+    },
+    "/api/score-rules/{rule_id}": {
+      "parameters": [
+        {
+          "name": "rule_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "delete": {
+        "tags": [
+          "scores"
+        ],
+        "summary": "Delete a score rule",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        },
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_score_rules_score_rule_delete"
       }
     },
     "/api/scores/resolve": {
@@ -4093,7 +3966,9 @@
               }
             }
           }
-        }
+        },
+        "parameters": [],
+        "operationId": "api_scores_score_resolve"
       }
     },
     "/api/scores/submit": {
@@ -4166,15 +4041,17 @@
               }
             }
           }
-        }
+        },
+        "parameters": [],
+        "operationId": "api_scores_score_submit"
       }
     },
-    "/api/score-rules": {
+    "/api/teams": {
       "get": {
         "tags": [
-          "scores"
+          "teams"
         ],
-        "summary": "List score rules",
+        "summary": "List teams",
         "security": [
           {
             "cookieAuth": []
@@ -4182,10 +4059,10 @@
         ],
         "parameters": [
           {
-            "name": "checkpoint_id",
+            "name": "q",
             "in": "query",
             "schema": {
-              "type": "integer"
+              "type": "string"
             }
           },
           {
@@ -4194,19 +4071,48 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "name_asc",
+                "name_desc",
+                "number_asc",
+                "number_desc"
+              ]
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Rules"
+            "description": "Teams",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "teams": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Team"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
-        }
+        },
+        "operationId": "api_teams_team_list"
       },
       "post": {
         "tags": [
-          "scores"
+          "teams"
         ],
-        "summary": "Create or update a score rule",
+        "summary": "Create team",
         "security": [
           {
             "cookieAuth": []
@@ -4219,52 +4125,67 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "checkpoint_id",
-                  "group_id",
-                  "rules"
+                  "name"
                 ],
                 "properties": {
-                  "checkpoint_id": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "organization": {
+                    "type": "string",
+                    "description": "Rod / organization the team belongs to"
+                  },
+                  "dnf": {
+                    "type": "boolean",
+                    "description": "Did not finish; admin-only."
+                  },
+                  "number": {
                     "type": "integer"
                   },
-                  "group_id": {
-                    "type": "integer"
-                  },
-                  "rules": {
-                    "type": "object",
-                    "description": "Rule object with optional field_rules and time_race. field_rules maps field keys to a rule or list of rules: mapping {type:'mapping', map:{input:output}}, interpolate {type:'interpolate', points:[[x,y],...]}, multiplier {type:'multiplier', factor}, found {type:'found', checkpoint_ids:[int], points_per:number}, deviation {type:'deviation', target, max_points, penalty_points, penalty_distance, min_points}. time_race uses checkin times between checkpoints: {start_checkpoint_id, end_checkpoint_id, min_points, max_points}.",
-                    "example": {
-                      "field_rules": {
-                        "Distance": [
-                          {
-                            "type": "deviation",
-                            "target": 0,
-                            "max_points": 100,
-                            "penalty_points": 1,
-                            "penalty_distance": 1,
-                            "min_points": 0
-                          }
-                        ],
-                        "Found": {
-                          "type": "found",
-                          "checkpoint_ids": [
-                            12,
-                            14
-                          ],
-                          "points_per": 5
-                        }
-                      },
-                      "total_fields": [
-                        "Distance",
-                        "Found"
-                      ],
-                      "time_race": {
-                        "start_checkpoint_id": 3,
-                        "end_checkpoint_id": 7,
-                        "min_points": 10,
-                        "max_points": 100
-                      }
+                  "group_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
                     }
+                  },
+                  "active_group_id": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created team"
+          }
+        },
+        "parameters": [],
+        "operationId": "api_teams_team_create"
+      }
+    },
+    "/api/teams/randomize": {
+      "post": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Randomize team numbers by group prefix",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "group_id": {
+                    "type": "integer",
+                    "description": "Optional group id. If omitted, randomize for all groups."
                   }
                 }
               }
@@ -4273,52 +4194,64 @@
         },
         "responses": {
           "200": {
-            "description": "Updated rule"
-          },
-          "201": {
-            "description": "Created rule"
+            "description": "Randomized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "assigned_total": {
+                      "type": "integer"
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "group_id": {
+                            "type": "integer"
+                          },
+                          "group_name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "assigned": {
+                            "type": "integer"
+                          },
+                          "needed": {
+                            "type": "integer"
+                          },
+                          "available": {
+                            "type": "integer"
+                          },
+                          "range": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters": [],
+        "operationId": "api_teams_team_randomize_numbers"
       }
     },
-    "/api/score-rules/fields": {
-      "get": {
-        "tags": [
-          "scores"
-        ],
-        "summary": "Get score rule fields",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "checkpoint_id",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "group_id",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Available scoring fields"
-          }
-        }
-      }
-    },
-    "/api/score-rules/{rule_id}": {
+    "/api/teams/{team_id}": {
       "parameters": [
         {
-          "name": "rule_id",
+          "name": "team_id",
           "in": "path",
           "required": true,
           "schema": {
@@ -4326,11 +4259,415 @@
           }
         }
       ],
+      "get": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Team detail",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Team",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_teams_team_get"
+      },
+      "patch": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Update team",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Team"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated team"
+          }
+        },
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_teams_team_patch"
+      },
       "delete": {
         "tags": [
-          "scores"
+          "teams"
         ],
-        "summary": "Delete a score rule",
+        "summary": "Delete team",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_teams_team_delete"
+      },
+      "put": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Replace team",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Team"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaced team"
+          }
+        },
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_teams_team_put"
+      }
+    },
+    "/api/teams/{team_id}/active-group": {
+      "post": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Activate a group for the team",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "group_id"
+                ],
+                "properties": {
+                  "group_id": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Activated"
+          }
+        },
+        "operationId": "api_teams_team_active_group"
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "List users",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          },
+                          "membership_role": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "username",
+                          "role",
+                          "membership_role"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "operationId": "api_auth_users_list"
+      },
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Create user",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "username",
+                  "password",
+                  "role"
+                ],
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "viewer",
+                      "judge",
+                      "admin"
+                    ]
+                  },
+                  "email": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created user"
+          }
+        },
+        "parameters": [],
+        "operationId": "api_auth_users_create"
+      }
+    },
+    "/api/users/{user_id}": {
+      "parameters": [
+        {
+          "name": "user_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "User detail",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUser"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_auth_users_get"
+      },
+      "patch": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Update user",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "viewer",
+                      "judge",
+                      "admin"
+                    ]
+                  },
+                  "new_password": {
+                    "type": "string",
+                    "format": "password"
+                  },
+                  "confirm_password": {
+                    "type": "string",
+                    "format": "password"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated user"
+          }
+        },
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_auth_users_patch"
+      },
+      "delete": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Delete user",
         "security": [
           {
             "cookieAuth": []
@@ -4340,77 +4677,30 @@
           "200": {
             "description": "Deleted"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "api_auth_users_delete"
       }
     },
-    "/api/competition/{comp_id}/export": {
+    "/health": {
       "get": {
         "tags": [
-          "transfer"
+          "system"
         ],
-        "summary": "Export competition as JSON",
-        "description": "Download the full competition data as a JSON file. Admin only.",
-        "parameters": [
-          {
-            "name": "comp_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
+        "summary": "Health probe",
         "responses": {
           "200": {
-            "description": "JSON export file",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CompetitionExport"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden — admin role required"
-          },
-          "404": {
-            "description": "Competition not found"
-          }
-        }
-      }
-    },
-    "/api/competition/import": {
-      "post": {
-        "tags": [
-          "transfer"
-        ],
-        "summary": "Import competition from JSON",
-        "description": "Create a new competition from an exported JSON file. Admin only.",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary",
-                    "description": "JSON export file"
-                  }
-                }
-              }
-            },
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CompetitionExport"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Competition created",
+            "description": "Healthy",
             "content": {
               "application/json": {
                 "schema": {
@@ -4418,133 +4708,25 @@
                   "properties": {
                     "ok": {
                       "type": "boolean"
-                    },
-                    "competition_id": {
-                      "type": "integer"
-                    },
-                    "competition_name": {
-                      "type": "string"
-                    },
-                    "warnings": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
                     }
                   }
                 }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid JSON or validation error"
-          },
-          "403": {
-            "description": "Forbidden — admin role required"
-          }
-        }
-      }
-    },
-    "/api/competition/{comp_id}/merge": {
-      "post": {
-        "tags": [
-          "transfer"
-        ],
-        "summary": "Merge data into competition",
-        "description": "Two-step merge: without 'resolutions' key → dry run (returns conflicts). With 'resolutions' → apply merge.",
-        "parameters": [
-          {
-            "name": "comp_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            },
-            "application/json": {
-              "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/CompetitionExport"
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "resolutions": {
-                        "type": "object",
-                        "description": "Conflict resolution map. Keys: 'entity_type:identifier', values: 'keep_local', 'use_imported', 'skip'.",
-                        "additionalProperties": {
-                          "type": "string",
-                          "enum": [
-                            "keep_local",
-                            "use_imported",
-                            "skip"
-                          ]
-                        }
-                      }
-                    }
-                  }
-                ]
               }
             }
           }
         },
+        "parameters": [],
+        "operationId": "health"
+      }
+    },
+    "/ready": {
+      "get": {
+        "parameters": [],
+        "operationId": "ready",
+        "summary": "",
         "responses": {
-          "200": {
-            "description": "Dry run result (conflicts) or merge applied",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean"
-                    },
-                    "dry_run": {
-                      "type": "boolean"
-                    },
-                    "conflicts": {
-                      "type": "array",
-                      "items": {
-                        "type": "object"
-                      }
-                    },
-                    "summary": {
-                      "type": "object"
-                    },
-                    "warnings": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Competition not found"
+          "default": {
+            "description": ""
           }
         }
       }
