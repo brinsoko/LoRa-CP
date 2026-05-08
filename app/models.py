@@ -6,7 +6,7 @@ from app.utils.time import utcnow_naive
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 
-from sqlalchemy import CheckConstraint, UniqueConstraint, event
+from sqlalchemy import CheckConstraint, Index, UniqueConstraint, event
 from sqlalchemy.ext.associationproxy import association_proxy
 from app.extensions import db
 
@@ -557,6 +557,19 @@ class LoRaMessage(db.Model):
     received_at = db.Column(db.DateTime, default=utcnow_naive, index=True)
 
     competition = db.relationship("Competition")
+
+    # The 10-second dedup query in /api/ingest filters on
+    # (competition_id, dev_id, received_at >= cutoff) on every packet.
+    # A composite index makes that lookup an O(log n) seek instead of
+    # touching every recent row per dev_id.
+    __table_args__ = (
+        Index(
+            "ix_lora_messages_dedup",
+            "competition_id",
+            "dev_id",
+            "received_at",
+        ),
+    )
 
     def __repr__(self) -> str:
         return f"<LoRaMessage id={self.id} competition_id={self.competition_id} dev_id={self.dev_id!r}>"

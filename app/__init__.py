@@ -211,6 +211,16 @@ def create_app(config_overrides: dict | None = None) -> Flask:
                     conn.execute(text("UPDATE firmware_files SET nvs_size = 20480 WHERE nvs_size IS NULL"))
         except Exception:
             app.logger.exception("Failed to ensure firmware_files.nvs_size column")
+        try:
+            # db.create_all() only creates indexes for tables it creates fresh;
+            # existing DBs need the new composite index added explicitly.
+            with db.engine.begin() as conn:
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_lora_messages_dedup "
+                    "ON lora_messages (competition_id, dev_id, received_at)"
+                ))
+        except Exception:
+            app.logger.exception("Failed to ensure lora_messages dedup index")
 
     def _http_detail(e: Exception, default: str) -> str:
         if isinstance(e, HTTPException):
