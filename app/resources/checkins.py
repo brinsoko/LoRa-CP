@@ -297,6 +297,7 @@ def checkin_create():
 
 
 @checkins_api_bp.get("/api/checkins/<int:checkin_id>")
+@json_roles_required("judge", "admin")
 def checkin_get(checkin_id: int):
         comp_id = require_current_competition_id()
         if not comp_id:
@@ -411,16 +412,19 @@ def _update_checkin(checkin_id: int, partial: bool):
         return {"ok": True, "updated": True, "checkin": _serialize_checkin(c)}, 200
 
 @checkins_api_bp.put("/api/checkins/<int:checkin_id>")
+@json_roles_required("judge", "admin")
 def checkin_put(checkin_id: int):
     return _update_checkin(checkin_id, partial=False)
 
 
 @checkins_api_bp.patch("/api/checkins/<int:checkin_id>")
+@json_roles_required("judge", "admin")
 def checkin_patch(checkin_id: int):
     return _update_checkin(checkin_id, partial=True)
 
 
 @checkins_api_bp.delete("/api/checkins/<int:checkin_id>")
+@json_roles_required("admin")
 def checkin_delete(checkin_id: int):
         comp_id = require_current_competition_id()
         if not comp_id:
@@ -455,6 +459,7 @@ def checkin_delete(checkin_id: int):
 
 
 @checkins_api_bp.get("/api/checkins/export.csv")
+@json_roles_required("judge", "admin")
 def checkin_export():
         comp_id = require_current_competition_id()
         if not comp_id:

@@ -453,6 +453,34 @@ def test_checkin_item_endpoints(client, app, seeded_state):
     assert deleted.status_code == 200
 
 
+def test_checkin_item_endpoints_require_auth(client, app, seeded_state):
+    path = f"/api/checkins/{seeded_state.checkin_id}"
+    assert client.get(path).status_code == 401
+    assert client.patch(path, json={}).status_code == 401
+    assert client.put(path, json={}).status_code == 401
+    assert client.delete(path).status_code == 401
+
+
+def test_checkin_item_endpoints_block_viewer(client, app, seeded_state):
+    _login(client, seeded_state, "viewer")
+    path = f"/api/checkins/{seeded_state.checkin_id}"
+    assert client.get(path).status_code == 403
+    assert client.patch(path, json={}).status_code == 403
+    assert client.put(path, json={}).status_code == 403
+    assert client.delete(path).status_code == 403
+
+
+def test_checkin_delete_requires_admin(client, app, seeded_state):
+    _login(client, seeded_state, "judge")
+    judge_delete_checkin = create_checkin(
+        db.session.get(Team, seeded_state.team_id).competition,
+        db.session.get(Team, seeded_state.second_team_id),
+        db.session.get(Checkpoint, seeded_state.second_checkpoint_id),
+    )
+    response = client.delete(f"/api/checkins/{judge_delete_checkin.id}")
+    assert response.status_code == 403
+
+
 def test_score_api_and_rule_endpoints(client, app, seeded_state):
     _login(client, seeded_state, "admin")
 
