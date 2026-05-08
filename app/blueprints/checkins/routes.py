@@ -12,7 +12,7 @@ from app.utils.competition import get_current_competition_id, get_current_compet
 from app.utils.frontend_api import api_json, api_request
 from app.utils.live_arrivals import build_live_arrivals
 from app.utils.perms import roles_required
-from app.utils.time import DEFAULT_TZ_NAME, format_datetime_input_gmt, get_timezone
+from app.utils.time import DEFAULT_TZ_NAME, format_datetime_input_local, get_timezone
 
 checkins_bp = Blueprint("checkins", __name__, template_folder="../../templates")
 
@@ -236,7 +236,7 @@ def add_checkin():
         "dup_team_id": None,
         "dup_checkpoint_id": None,
         "selected_checkpoint_id": default_checkpoint_id,
-        "timestamp_prefill": request.form.get("timestamp_local") if request.method == "POST" else format_datetime_input_gmt(now),
+        "timestamp_prefill": request.form.get("timestamp_local") if request.method == "POST" else format_datetime_input_local(now),
         "suggest_override": request.form.get("override") == "replace",
     }
 
@@ -283,7 +283,7 @@ def _load_checkin(checkin_id: int):
     decorated = _decorate_checkins([payload])[0]
     timestamp_local_value = ""
     if decorated["timestamp"]:
-        timestamp_local_value = format_datetime_input_gmt(decorated["timestamp"])
+        timestamp_local_value = format_datetime_input_local(decorated["timestamp"])
     team = payload.get("team") or {}
     checkpoint = payload.get("checkpoint") or {}
     decorated.update(

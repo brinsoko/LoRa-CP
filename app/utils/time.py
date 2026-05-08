@@ -1,16 +1,21 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-DISPLAY_TIME_MODE = "gmt"
-DISPLAY_TIME_LABEL = "GMT"
-DEFAULT_TZ_NAME = "UTC"
-DEFAULT_TZ = ZoneInfo(DEFAULT_TZ_NAME)
+# Storage stays UTC everywhere in the database.
+# Display happens in this single timezone (server-side conversion).
+STORAGE_TZ = timezone.utc
+DISPLAY_TZ_NAME = "Europe/Ljubljana"
+DISPLAY_TZ = ZoneInfo(DISPLAY_TZ_NAME)
+
+# Default timezone used when interpreting form-submitted local times.
+DEFAULT_TZ_NAME = DISPLAY_TZ_NAME
+DEFAULT_TZ = DISPLAY_TZ
 
 
 def get_timezone(tz_name: str | None = None) -> ZoneInfo:
     name = (tz_name or DEFAULT_TZ_NAME).strip()
     if name.upper() in {"GMT", "UTC", "ETC/GMT"}:
-        return DEFAULT_TZ
+        return ZoneInfo("UTC")
     return ZoneInfo(name)
 
 
@@ -20,16 +25,20 @@ def _as_aware_utc(dt: datetime) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
-def format_datetime_gmt(dt: datetime | None) -> str:
-    if not dt:
-        return ""
-    return _as_aware_utc(dt).strftime("%Y-%m-%d %H:%M:%S") + f" {DISPLAY_TIME_LABEL}"
+def _as_display(dt: datetime) -> datetime:
+    return _as_aware_utc(dt).astimezone(DISPLAY_TZ)
 
 
-def format_datetime_input_gmt(dt: datetime | None) -> str:
+def format_datetime_display(dt: datetime | None) -> str:
     if not dt:
         return ""
-    return _as_aware_utc(dt).strftime("%Y-%m-%dT%H:%M:%S")
+    return _as_display(dt).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def format_datetime_input_local(dt: datetime | None) -> str:
+    if not dt:
+        return ""
+    return _as_display(dt).strftime("%Y-%m-%dT%H:%M:%S")
 
 
 def _parse_datetime_value(s: str) -> datetime | None:
@@ -44,13 +53,13 @@ def _parse_datetime_value(s: str) -> datetime | None:
             continue
     return None
 
+
 def to_datetime_local(dt: datetime, tz: ZoneInfo | None = None) -> str:
     if not dt:
         return ""
-    # Legacy template filter. For now the application displays database
-    # timestamps in GMT; keep the function name so local-time support can
-    # later branch here without touching every template.
-    return _as_aware_utc(dt).strftime("%d-%m-%Y %H:%M:%S") + f" {DISPLAY_TIME_LABEL}"
+    target = tz or DISPLAY_TZ
+    return _as_aware_utc(dt).astimezone(target).strftime("%d-%m-%Y %H:%M:%S")
+
 
 def from_datetime_local(s: str | None, tz_name: str | None = None) -> datetime | None:
     if not s:

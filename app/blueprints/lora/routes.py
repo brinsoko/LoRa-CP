@@ -7,6 +7,7 @@ from datetime import datetime
 
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
+from app.utils.time import format_datetime_display
 
 
 lora_bp = Blueprint("lora", __name__, template_folder="../../templates")
@@ -19,7 +20,7 @@ def _decorate_devices(devices):
         if last_seen:
             try:
                 dt = datetime.fromisoformat(last_seen)
-                display_last_seen = dt.strftime("%Y-%m-%d %H:%M:%S")
+                display_last_seen = format_datetime_display(dt)
             except Exception:
                 display_last_seen = last_seen
         else:

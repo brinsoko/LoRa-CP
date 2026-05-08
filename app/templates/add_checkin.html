@@ -43,14 +43,14 @@
                  class="form-control"
                  step="1"
                  value="{{ timestamp_prefill or (now.strftime('%Y-%m-%dT%H:%M:%S') if now else '') }}">
-          <div class="form-text">{{ _('Leave blank to use current time (GMT now).') }}</div>
+          <div class="form-text">{{ _('Leave blank to use the current time.') }}</div>
         </div>
 
         <div class="col-md-4">
           <label class="form-label">{{ _('Time zone') }}</label>
-          <input type="hidden" name="timezone" value="UTC">
-          <input type="text" class="form-control" value="GMT" disabled>
-          <div class="form-text">{{ _('Times are recorded in GMT for now.') }}</div>
+          <input type="hidden" name="timezone" value="Europe/Ljubljana">
+          <input type="text" class="form-control" value="Europe/Ljubljana" disabled>
+          <div class="form-text">{{ _('Times are entered in local time and stored in UTC.') }}</div>
         </div>
       </div>
 

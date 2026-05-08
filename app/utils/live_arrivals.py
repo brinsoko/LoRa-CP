@@ -13,7 +13,7 @@ from app.models import (
     Team,
     TeamGroup,
 )
-from app.utils.time import format_datetime_gmt
+from app.utils.time import format_datetime_display
 
 
 VALID_TEAM_SORTS = {"number_asc", "number_desc", "name_asc", "name_desc", "status", "latest"}
@@ -26,7 +26,7 @@ def _iso_dt(value: datetime | None) -> str | None:
 
 
 def _display_dt(value: datetime | None) -> str:
-    return format_datetime_gmt(value)
+    return format_datetime_display(value)
 
 
 def _safe_int(value) -> int | None:

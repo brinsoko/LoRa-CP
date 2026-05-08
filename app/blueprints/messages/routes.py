@@ -8,6 +8,7 @@ from flask import Blueprint, render_template, request, url_for, flash
 
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
+from app.utils.time import format_datetime_display
 
 messages_bp = Blueprint("messages", __name__, template_folder="../../templates")
 
@@ -42,7 +43,7 @@ def _decorate_messages(messages: list[dict]) -> list[dict]:
             dt = datetime.fromisoformat(ts) if ts else None
         except Exception:
             dt = None
-        display_ts = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else (ts or "—")
+        display_ts = format_datetime_display(dt) if dt else (ts or "—")
         decorated.append({
             "dev_id": msg.get("dev_id"),
             "payload": msg.get("payload"),
