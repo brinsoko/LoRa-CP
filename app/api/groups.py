@@ -14,7 +14,7 @@ from app.extensions import db
 from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, TeamGroup
 from app.utils.audit import record_audit_event
 from app.utils.competition import require_current_competition_id
-from app.utils.rest_auth import json_roles_required
+from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.validators import validate_text
 
 
@@ -130,6 +130,7 @@ def _group_query(comp_id: int):
 
 
 @groups_api_bp.get("/api/groups")
+@json_login_required
 def group_list():
     comp_id = require_current_competition_id()
     if not comp_id:
@@ -209,6 +210,7 @@ def group_create():
 
 
 @groups_api_bp.get("/api/groups/<int:group_id>")
+@json_login_required
 def group_get(group_id: int):
     comp_id = require_current_competition_id()
     if not comp_id:

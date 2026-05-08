@@ -461,6 +461,19 @@ def test_checkin_item_endpoints_require_auth(client, app, seeded_state):
     assert client.delete(path).status_code == 401
 
 
+def test_team_get_endpoints_require_auth(client, app, seeded_state):
+    """GET endpoints fall back to @json_login_required so anon callers get
+    a clean 401 instead of relying on require_current_competition_id()
+    happening to return None (which is a fragile defense in depth)."""
+    assert client.get("/api/teams").status_code == 401
+    assert client.get(f"/api/teams/{seeded_state.team_id}").status_code == 401
+
+
+def test_group_get_endpoints_require_auth(client, app, seeded_state):
+    assert client.get("/api/groups").status_code == 401
+    assert client.get(f"/api/groups/{seeded_state.group_id}").status_code == 401
+
+
 def test_checkin_item_endpoints_block_viewer(client, app, seeded_state):
     _login(client, seeded_state, "viewer")
     path = f"/api/checkins/{seeded_state.checkin_id}"

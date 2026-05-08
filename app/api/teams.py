@@ -17,7 +17,7 @@ from app.extensions import db
 from app.models import CheckpointGroup, Team, TeamGroup
 from app.utils.audit import record_audit_event
 from app.utils.competition import get_current_competition_role, require_current_competition_id
-from app.utils.rest_auth import json_roles_required
+from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.sheets_sync import sync_all_checkpoint_tabs
 from app.utils.validators import validate_text
 
@@ -102,6 +102,7 @@ def _team_query(comp_id: int):
 
 
 @teams_api_bp.get("/api/teams")
+@json_login_required
 def team_list():
     q = (request.args.get("q") or "").strip()
     group_id = request.args.get("group_id", type=int)
@@ -238,6 +239,7 @@ def _team_for_competition(comp_id: int, team_id: int, with_groups: bool = True) 
 
 
 @teams_api_bp.get("/api/teams/<int:team_id>")
+@json_login_required
 def team_get(team_id: int):
     comp_id = require_current_competition_id()
     if not comp_id:
