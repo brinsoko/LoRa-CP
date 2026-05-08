@@ -6,6 +6,7 @@ from app.utils.time import utcnow_naive
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user
+from sqlalchemy.exc import IntegrityError
 from app.extensions import db
 from app.models import (
     Checkin,
@@ -737,38 +738,52 @@ def score_submit():
         ).first()
         created_checkin = False
         if not checkin and not checkpoint.is_virtual:
-            checkin = Checkin(
+            new_checkin = Checkin(
                 competition_id=comp_id,
                 team_id=team.id,
                 checkpoint_id=checkpoint_id,
                 timestamp=utcnow_naive(),
                 created_by_user_id=current_user.id,
             )
-            db.session.add(checkin)
-            db.session.flush()
-            record_audit_event(
-                competition_id=comp_id,
-                event_type="checkin_created",
-                entity_type="checkin",
-                entity_id=checkin.id,
-                actor_user=current_user,
-                summary=f"Check-in auto-created during scoring for team {team.name} at {checkpoint.name}.",
-                details={
-                    "id": checkin.id,
-                    "team_id": team.id,
-                    "team_name": team.name,
-                    "checkpoint_id": checkpoint.id,
-                    "checkpoint_name": checkpoint.name,
-                    "timestamp": checkin.timestamp.isoformat() if checkin.timestamp else None,
-                },
-                created_at=checkin.timestamp,
-            )
-            db.session.commit()
-            created_checkin = True
+            # SAVEPOINT: another judge submitting a score for the same
+            # team/checkpoint at the same moment may have inserted the
+            # checkin row first. Treat the uq_team_checkpoint violation as
+            # "use the existing checkin" instead of leaking a 500.
             try:
-                mark_arrival_checkbox(team.id, checkpoint_id, checkin.timestamp)
-            except Exception:
-                pass
+                with db.session.begin_nested():
+                    db.session.add(new_checkin)
+            except IntegrityError:
+                checkin = (
+                    Checkin.query
+                    .filter_by(competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id)
+                    .first()
+                )
+            else:
+                checkin = new_checkin
+                record_audit_event(
+                    competition_id=comp_id,
+                    event_type="checkin_created",
+                    entity_type="checkin",
+                    entity_id=checkin.id,
+                    actor_user=current_user,
+                    summary=f"Check-in auto-created during scoring for team {team.name} at {checkpoint.name}.",
+                    details={
+                        "id": checkin.id,
+                        "team_id": team.id,
+                        "team_name": team.name,
+                        "checkpoint_id": checkpoint.id,
+                        "checkpoint_name": checkpoint.name,
+                        "timestamp": checkin.timestamp.isoformat() if checkin.timestamp else None,
+                    },
+                    created_at=checkin.timestamp,
+                )
+                created_checkin = True
+            db.session.commit()
+            if created_checkin:
+                try:
+                    mark_arrival_checkbox(team.id, checkpoint_id, checkin.timestamp)
+                except Exception:
+                    pass
 
         total = _compute_total(
             fields,
