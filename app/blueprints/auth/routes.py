@@ -7,6 +7,7 @@ import requests
 import secrets
 import re
 from datetime import datetime
+from app.utils.time import utcnow_naive
 
 from app.models import User, CompetitionInvite, CompetitionMember
 from app.extensions import db, limiter
@@ -38,7 +39,7 @@ def _normalize_username(value: str) -> str:
 def _accept_pending_invites(user: User) -> None:
     if not user.email:
         return
-    now = datetime.utcnow()
+    now = utcnow_naive()
     invites = (
         CompetitionInvite.query
         .filter(

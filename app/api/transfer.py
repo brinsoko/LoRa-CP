@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from app.utils.time import utcnow_naive
 
 from flask import Blueprint, jsonify, request, make_response
 from flask_babel import gettext as _
@@ -63,7 +64,7 @@ def _export_competition(comp: Competition) -> dict:
 
     return {
         "schema_version": SCHEMA_VERSION,
-        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "exported_at": utcnow_naive().isoformat() + "Z",
         "competition": {
             "name": comp.name,
             "settings": {
@@ -182,7 +183,7 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
     # Ensure unique name
     existing = Competition.query.filter_by(name=comp_name).first()
     if existing:
-        comp_name = f"{comp_name} (imported {datetime.utcnow().strftime('%Y%m%d-%H%M%S')})"
+        comp_name = f"{comp_name} (imported {utcnow_naive().strftime('%Y%m%d-%H%M%S')})"
 
     settings = comp_data.get("settings", {})
     comp = Competition(
@@ -303,12 +304,12 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                 try:
                     ts = datetime.fromisoformat(ci_data["timestamp"])
                 except Exception:
-                    ts = datetime.utcnow()
+                    ts = utcnow_naive()
             db.session.add(Checkin(
                 competition_id=comp.id,
                 team_id=team.id,
                 checkpoint_id=cp.id,
-                timestamp=ts or datetime.utcnow(),
+                timestamp=ts or utcnow_naive(),
             ))
 
     # Scores
@@ -503,7 +504,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                 team_id=team.id, checkpoint_id=cp.id, competition_id=comp.id,
             ).first()
             if not existing:
-                ts = datetime.utcnow()
+                ts = utcnow_naive()
                 if ci_data.get("timestamp"):
                     try:
                         ts = datetime.fromisoformat(ci_data["timestamp"])

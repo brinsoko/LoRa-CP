@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from app.utils.time import utcnow_naive
 from typing import Optional
 from types import SimpleNamespace
 import secrets
@@ -210,7 +211,7 @@ def create_invite(
         competition_id=competition_id,
         token=token,
         role=role,
-        expires_at=datetime.utcnow() + timedelta(days=INVITE_EXPIRY_DAYS),
+        expires_at=utcnow_naive() + timedelta(days=INVITE_EXPIRY_DAYS),
         created_by_user_id=created_by_user_id,
         invited_email=invited_email,
     )

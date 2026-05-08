@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from app.utils.time import utcnow_naive
 import itertools
 
 from app.extensions import db
@@ -160,7 +161,7 @@ def create_checkin(
         competition_id=competition.id,
         team_id=team.id,
         checkpoint_id=checkpoint.id,
-        timestamp=timestamp or datetime.utcnow(),
+        timestamp=timestamp or utcnow_naive(),
         created_by_user_id=created_by_user.id if created_by_user else None,
         created_by_device_id=created_by_device.id if created_by_device else None,
     )

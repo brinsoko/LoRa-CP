@@ -1,6 +1,7 @@
 # app/models.py
 from __future__ import annotations
 from datetime import datetime
+from app.utils.time import utcnow_naive
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
@@ -56,7 +57,7 @@ class Competition(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(160), nullable=False, unique=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
     public_results = db.Column(db.Boolean, nullable=False, default=False)
     hide_gps_map = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     ingest_password_hash = db.Column(db.String(255), nullable=True)
@@ -148,7 +149,7 @@ class CompetitionMember(db.Model):
     )
     role = db.Column(db.String(20), nullable=False, default="judge")  # admin|judge|viewer
     active = db.Column(db.Boolean, nullable=False, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
 
     competition = db.relationship("Competition", back_populates="members")
     user = db.relationship("User", back_populates="competition_memberships")
@@ -178,7 +179,7 @@ class CompetitionInvite(db.Model):
     role = db.Column(db.String(20), nullable=False, default="judge")  # admin|judge|viewer
     expires_at = db.Column(db.DateTime, nullable=False)
     used_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
     created_by_user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -439,7 +440,7 @@ class Checkin(db.Model):
     checkpoint_id = db.Column(
         db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False
     )
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
     created_by_user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -553,7 +554,7 @@ class LoRaMessage(db.Model):
     payload = db.Column(db.Text, nullable=False)
     rssi = db.Column(db.Float)
     snr = db.Column(db.Float)
-    received_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    received_at = db.Column(db.DateTime, default=utcnow_naive, index=True)
 
     competition = db.relationship("Competition")
 
@@ -579,7 +580,7 @@ class FirmwareFile(db.Model):
     nvs_size = db.Column(db.Integer, nullable=False, default=0x3000)
     nvs_keys_offset = db.Column(db.Integer, nullable=False, default=0xC000)  # nvs_keys partition
     app_offset = db.Column(db.Integer, nullable=False, default=0x10000)
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
     uploaded_by_user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -615,7 +616,7 @@ class SheetConfig(db.Model):
     tab_type = db.Column(db.String(50), nullable=False, default="checkpoint")  # root|teams|arrivals|total|checkpoint
     checkpoint_id = db.Column(db.Integer, db.ForeignKey("checkpoints.id", ondelete="SET NULL"), nullable=True)
     config = db.Column(db.JSON, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
 
     competition = db.relationship("Competition", back_populates="sheets")
     checkpoint = db.relationship("Checkpoint")
@@ -655,7 +656,7 @@ class ScoreEntry(db.Model):
     )
     raw_fields = db.Column(db.JSON, nullable=False, default=dict)
     total = db.Column(db.Float, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False, index=True)
 
     checkin = db.relationship("Checkin", back_populates="scores")
     team = db.relationship("Team")
@@ -686,7 +687,7 @@ class ScoreRule(db.Model):
         db.Integer, db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"), nullable=False, index=True
     )
     rules = db.Column(db.JSON, nullable=False, default=dict)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False, index=True)
 
     checkpoint = db.relationship("Checkpoint")
     group = db.relationship("CheckpointGroup")
@@ -725,7 +726,7 @@ class AuditEvent(db.Model):
     actor_label = db.Column(db.String(255), nullable=True)
     summary = db.Column(db.String(255), nullable=False)
     details = db.Column(db.JSON, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False, index=True)
 
     competition = db.relationship("Competition")
     actor_user = db.relationship("User", foreign_keys=[actor_user_id])
@@ -752,7 +753,7 @@ class GlobalScoreRule(db.Model):
         db.Integer, db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"), nullable=False, index=True
     )
     rules = db.Column(db.JSON, nullable=False, default=dict)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False, index=True)
 
     group = db.relationship("CheckpointGroup")
 

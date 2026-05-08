@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import time
 from datetime import datetime
+from app.utils.time import utcnow_naive
 from pathlib import Path
 
 import pytest
@@ -66,7 +67,7 @@ class TestModels:
             competition_id=competition.id,
             team_id=team.id,
             checkpoint_id=checkpoint.id,
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow_naive(),
         )
         db.session.add(duplicate)
         with pytest.raises(IntegrityError):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import importlib
 from datetime import datetime, timedelta
+from app.utils.time import utcnow_naive
 from types import SimpleNamespace
 
 import pytest
@@ -488,13 +489,13 @@ class TestCsvAndIsolation:
             competition,
             older_team,
             checkpoint,
-            timestamp=datetime.utcnow() - timedelta(hours=1),
+            timestamp=utcnow_naive() - timedelta(hours=1),
         )
         create_checkin(
             competition,
             newer_team,
             checkpoint,
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow_naive(),
         )
 
         response = client.get("/api/checkins/export.csv?sort=old")
@@ -541,9 +542,9 @@ class TestCsvAndIsolation:
             create_team(competition, name="Team Two", number=2),
             create_team(competition, name="Team Three", number=3),
         ]
-        create_checkin(competition, teams[0], checkpoint, timestamp=datetime.utcnow() - timedelta(hours=2))
-        create_checkin(competition, teams[1], checkpoint, timestamp=datetime.utcnow() - timedelta(hours=1))
-        create_checkin(competition, teams[2], checkpoint, timestamp=datetime.utcnow())
+        create_checkin(competition, teams[0], checkpoint, timestamp=utcnow_naive() - timedelta(hours=2))
+        create_checkin(competition, teams[1], checkpoint, timestamp=utcnow_naive() - timedelta(hours=1))
+        create_checkin(competition, teams[2], checkpoint, timestamp=utcnow_naive())
 
         response = client.get("/api/checkins?sort=old&page=2&per_page=2")
         body = response.get_json()
@@ -571,9 +572,9 @@ class TestCsvAndIsolation:
             create_team(competition, name="CSV Team Two", number=2),
             create_team(competition, name="CSV Team Three", number=3),
         ]
-        create_checkin(competition, teams[0], checkpoint, timestamp=datetime.utcnow() - timedelta(hours=2))
-        create_checkin(competition, teams[1], checkpoint, timestamp=datetime.utcnow() - timedelta(hours=1))
-        create_checkin(competition, teams[2], checkpoint, timestamp=datetime.utcnow())
+        create_checkin(competition, teams[0], checkpoint, timestamp=utcnow_naive() - timedelta(hours=2))
+        create_checkin(competition, teams[1], checkpoint, timestamp=utcnow_naive() - timedelta(hours=1))
+        create_checkin(competition, teams[2], checkpoint, timestamp=utcnow_naive())
 
         response = client.get("/api/checkins/export.csv?sort=old&page=2&per_page=2")
         rows = list(csv.reader(response.data.decode("utf-8").splitlines()))

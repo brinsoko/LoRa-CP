@@ -12,6 +12,24 @@ DEFAULT_TZ_NAME = DISPLAY_TZ_NAME
 DEFAULT_TZ = DISPLAY_TZ
 
 
+def utcnow_naive() -> datetime:
+    """Naive UTC `datetime.now()`.
+
+    Replaces `datetime.utcnow()`, which is deprecated in Python 3.12+. The
+    return value matches the existing convention in this codebase: naive
+    datetimes interpreted as UTC for storage in DateTime columns.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def utc_from_timestamp_naive(ts: float) -> datetime:
+    """Naive UTC datetime from a unix timestamp.
+
+    Replaces `datetime.utcfromtimestamp(ts)`, deprecated in Python 3.12+.
+    """
+    return datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
+
+
 def get_timezone(tz_name: str | None = None) -> ZoneInfo:
     name = (tz_name or DEFAULT_TZ_NAME).strip()
     if name.upper() in {"GMT", "UTC", "ETC/GMT"}:

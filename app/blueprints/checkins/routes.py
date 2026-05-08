@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from app.utils.time import utcnow_naive
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
 from flask_babel import gettext as _
@@ -68,7 +69,7 @@ def _fetch_checkpoints_for_user(include_checkpoint_id: int | None = None):
 def _parse_timestamp_from_form(fallback: datetime | None = None) -> datetime:
     ts_str = (request.form.get("timestamp") or request.form.get("timestamp_local") or "").strip()
     tz_name = (request.form.get("timezone") or request.form.get("tz") or DEFAULT_TIMEZONE_NAME).strip()
-    default_dt = fallback or datetime.utcnow()
+    default_dt = fallback or utcnow_naive()
 
     if not ts_str:
         return default_dt
@@ -219,7 +220,7 @@ def export_checkins_csv():
 def add_checkin():
     teams = _fetch_teams()
     checkpoints = _fetch_checkpoints_for_user()
-    now = datetime.utcnow()
+    now = utcnow_naive()
     default_checkpoint_id = None
     if get_current_competition_role() == "judge":
         default_row = (
@@ -333,7 +334,7 @@ def edit_checkin(checkin_id: int):
         payload = {
             "team_id": team_id,
             "checkpoint_id": checkpoint_id,
-            "timestamp": _parse_timestamp_from_form(decorated.get("timestamp") or datetime.utcnow()).isoformat(),
+            "timestamp": _parse_timestamp_from_form(decorated.get("timestamp") or utcnow_naive()).isoformat(),
         }
         if override == "replace":
             payload["override"] = "replace"

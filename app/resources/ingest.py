@@ -1,6 +1,7 @@
 # app/resources/ingest.py
 from __future__ import annotations
 from datetime import datetime, timedelta
+from app.utils.time import utcnow_naive, utc_from_timestamp_naive
 import hashlib, hmac
 
 from flask import current_app
@@ -195,7 +196,7 @@ def ingest_post():
         gps_age = args.get("gps_age_ms")
         ingest_password = args.get("ingest_password") or args.get("password")
 
-        received_at = datetime.utcfromtimestamp(ts_unix) if ts_unix else datetime.utcnow()
+        received_at = utc_from_timestamp_naive(ts_unix) if ts_unix else utcnow_naive()
 
         competition = db.session.get(Competition, competition_id)
         if not competition:

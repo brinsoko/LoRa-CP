@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from app.utils.time import utcnow_naive
 from typing import Any
 
 from flask_babel import gettext as _
@@ -120,7 +121,7 @@ def record_audit_event(
         ),
         summary=summary,
         details=details or None,
-        created_at=created_at or datetime.utcnow(),
+        created_at=created_at or utcnow_naive(),
     )
     db.session.add(event)
     return event

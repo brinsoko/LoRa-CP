@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from app.utils.time import utcnow_naive
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user
@@ -740,7 +741,7 @@ def score_submit():
                 competition_id=comp_id,
                 team_id=team.id,
                 checkpoint_id=checkpoint_id,
-                timestamp=datetime.utcnow(),
+                timestamp=utcnow_naive(),
                 created_by_user_id=current_user.id,
             )
             db.session.add(checkin)
@@ -783,7 +784,7 @@ def score_submit():
             judge_user_id=current_user.id,
             raw_fields=fields,
             total=total,
-            created_at=datetime.utcnow(),
+            created_at=utcnow_naive(),
         )
         db.session.add(entry)
         db.session.flush()

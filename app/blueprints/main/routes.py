@@ -13,6 +13,7 @@ from app.utils.export_safety import escape_formula_cell
 from app.utils.validators import validate_email, validate_text
 import io, csv
 from datetime import datetime, timedelta
+from app.utils.time import utcnow_naive
 
 main_bp = Blueprint('main', __name__)
 
@@ -216,7 +217,7 @@ def competition_settings():
                     CompetitionInvite.competition_id == competition.id,
                     CompetitionInvite.invited_email.ilike(email),
                     CompetitionInvite.used_at.is_(None),
-                    CompetitionInvite.expires_at > datetime.utcnow(),
+                    CompetitionInvite.expires_at > utcnow_naive(),
                 )
                 .first()
             )
@@ -245,7 +246,7 @@ def competition_settings():
                         )
                     )
                 invite.invited_user_id = user.id
-                invite.used_at = datetime.utcnow()
+                invite.used_at = utcnow_naive()
             db.session.flush()
             record_audit_event(
                 competition_id=competition.id,
@@ -334,7 +335,7 @@ def competition_settings():
         return redirect(url_for("main.competition_settings"))
 
     public_url = url_for("scores.public_scores", competition_id=competition.id, _external=True)
-    now = datetime.utcnow()
+    now = utcnow_naive()
     invites = (
         CompetitionInvite.query
         .filter(CompetitionInvite.competition_id == competition.id)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from app.utils.time import utcnow_naive
 
 from sqlalchemy.orm import joinedload
 
@@ -136,7 +137,7 @@ def _sort_team_rows(rows: list[dict], sort: str) -> list[dict]:
 
 
 def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "number_asc") -> dict:
-    now = datetime.utcnow()
+    now = utcnow_naive()
     groups = (
         CheckpointGroup.query
         .filter(CheckpointGroup.competition_id == comp_id)

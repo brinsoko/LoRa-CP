@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from app.utils.time import utcnow_naive
 import io, csv
 from typing import Optional, Tuple
 
@@ -85,7 +86,7 @@ def _parse_timestamp(payload: dict, fallback_dt: Optional[datetime] = None) -> d
       - timestamp_local + timezone (IANA)   (e.g. "2025-10-17T04:36", "Europe/Ljubljana")
     Fallbacks to `fallback_dt` or utcnow().
     """
-    default_dt = fallback_dt or datetime.utcnow()
+    default_dt = fallback_dt or utcnow_naive()
 
     ts_str = (payload.get("timestamp") or payload.get("timestamp_local") or "").strip()
     tz_name = (payload.get("timezone") or payload.get("tz") or "").strip()
@@ -239,7 +240,7 @@ def checkin_create():
         if not _judge_can_access_checkpoint(checkpoint_id, comp_id):
             return jsonify({"error": "forbidden", "detail": "Checkpoint is not assigned to the current judge."}), 403
 
-        ts = _parse_timestamp(payload, datetime.utcnow())
+        ts = _parse_timestamp(payload, utcnow_naive())
         override = (payload.get("override") or "").strip().lower()
 
         existing = (
@@ -260,7 +261,7 @@ def checkin_create():
                     actor_user=current_user if current_user.is_authenticated else None,
                     summary="Check-in updated.",
                     details={"before": before, "after": _checkin_snapshot(existing)},
-                    created_at=datetime.utcnow(),
+                    created_at=utcnow_naive(),
                 )
                 db.session.commit()
                 return {"ok": True, "replaced": True, "checkin": _serialize_checkin(existing)}, 200
@@ -420,7 +421,7 @@ def _update_checkin(checkin_id: int, partial: bool):
             actor_user=current_user if current_user.is_authenticated else None,
             summary="Check-in updated.",
             details={"before": before, "after": _checkin_snapshot(c)},
-            created_at=datetime.utcnow(),
+            created_at=utcnow_naive(),
         )
         db.session.commit()
         try:
@@ -469,7 +470,7 @@ def checkin_delete(checkin_id: int):
             actor_user=current_user if current_user.is_authenticated else None,
             summary="Check-in deleted.",
             details=snapshot,
-            created_at=datetime.utcnow(),
+            created_at=utcnow_naive(),
         )
         db.session.delete(c)
         db.session.commit()
