@@ -405,14 +405,37 @@ def _update_checkin(checkin_id: int, partial: bool):
                 "other_checkin": _serialize_checkin(dup),
             }, 409
 
-        if dup and override == "replace":
-            db.session.delete(dup)
-            db.session.flush()
-
-        c.team_id = new_team_id
-        c.checkpoint_id = new_cp_id
-        c.timestamp = new_ts
-        db.session.flush()
+        # SAVEPOINT around the delete-of-dup + update-of-c sequence: a
+        # concurrent caller can insert a fresh row into the slot we just
+        # freed. Treat the resulting uq_team_checkpoint violation as a
+        # regular 409 instead of leaking a 500. begin_nested rolls back
+        # both the delete and the update if the constraint fires, so the
+        # original dup row stays put.
+        try:
+            with db.session.begin_nested():
+                if dup and override == "replace":
+                    db.session.delete(dup)
+                    db.session.flush()
+                c.team_id = new_team_id
+                c.checkpoint_id = new_cp_id
+                c.timestamp = new_ts
+                db.session.flush()
+        except IntegrityError:
+            current = (
+                Checkin.query
+                .filter(
+                    Checkin.team_id == new_team_id,
+                    Checkin.checkpoint_id == new_cp_id,
+                    Checkin.competition_id == comp_id,
+                    Checkin.id != checkin_id,
+                )
+                .first()
+            )
+            return {
+                "error": "duplicate",
+                "detail": "Another check-in exists for that team & checkpoint. Use override=replace to replace it.",
+                "other_checkin": _serialize_checkin(current) if current else None,
+            }, 409
         record_audit_event(
             competition_id=comp_id,
             event_type="checkin_updated",

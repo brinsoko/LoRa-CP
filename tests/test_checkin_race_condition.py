@@ -1,4 +1,4 @@
-"""Verify the TOCTOU fix on duplicate check-in inserts.
+"""Verify TOCTOU fixes on the duplicate check-in code paths.
 
 Two concurrent callers can both pass the existence check and try to insert the
 same (team, checkpoint, competition) row. The DB-level uq_team_checkpoint
@@ -57,3 +57,62 @@ def test_savepoint_isolates_unique_constraint_violation(app):
         .all()
     )
     assert len(rows) == 1
+
+
+def test_savepoint_isolates_update_replace_violation(app):
+    """The same pattern applied to _update_checkin's replace path.
+
+    The replace flow deletes the existing duplicate inside a savepoint,
+    then mutates the target row's team_id/checkpoint_id. If a concurrent
+    caller fills the freed slot between the delete and the update, the
+    update raises uq_team_checkpoint. begin_nested rolls back the delete
+    too, so the original duplicate stays put — the caller sees a clean
+    409 and no rows were lost.
+    """
+    admin = create_user(username="replace-admin")
+    competition = create_competition(name="Replace Race")
+    team_a = create_team(competition, name="Team A", number=1)
+    team_b = create_team(competition, name="Team B", number=2)
+    checkpoint = create_checkpoint(competition, name="Replace CP")
+
+    # The original duplicate at (team_b, checkpoint).
+    dup = create_checkin(competition, team_b, checkpoint, created_by_user=admin)
+    # The target check-in that wants to be moved to (team_b, checkpoint).
+    target = create_checkin(competition, team_a, checkpoint, created_by_user=admin)
+
+    # Mid-savepoint, simulate a concurrent insert that fills the slot we
+    # just freed. We do this by pre-inserting another row at the target
+    # coordinates (using a different team to bypass the immediate FK
+    # collision), then attempt the savepoint sequence and assert it
+    # rolls back cleanly. Since we can't truly race in SQLite, we verify
+    # the SAVEPOINT semantics: rollback restores both the delete and the
+    # subsequent update.
+
+    # Stage: pre-existing rows are dup and target.
+    assert dup.id != target.id
+
+    target_id = target.id
+    dup_id = dup.id
+
+    with pytest.raises(IntegrityError):
+        with db.session.begin_nested():
+            db.session.delete(dup)
+            db.session.flush()
+            # An adversarial concurrent insert at the freed slot.
+            interloper = Checkin(
+                team_id=team_b.id,
+                checkpoint_id=checkpoint.id,
+                competition_id=competition.id,
+            )
+            db.session.add(interloper)
+            db.session.flush()
+            # Now move target into (team_b, checkpoint) — boom.
+            target.team_id = team_b.id
+            db.session.flush()
+
+    # Both the delete and the update must have rolled back.
+    survivor = db.session.get(Checkin, dup_id)
+    assert survivor is not None  # the dup is back
+    refreshed_target = db.session.get(Checkin, target_id)
+    assert refreshed_target is not None
+    assert refreshed_target.team_id == team_a.id  # target unchanged
