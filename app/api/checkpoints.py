@@ -12,7 +12,7 @@ from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, LoRaDev
 from app.utils.audit import record_audit_event
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_login_required, json_roles_required
-from app.utils.validators import validate_text
+from app.utils.validators import validate_finite_float, validate_text
 
 checkpoints_api_bp = Blueprint("api_checkpoints", __name__)
 
@@ -181,13 +181,20 @@ def checkpoint_create():
     if _checkpoint_query(comp_id).filter(Checkpoint.name == name).first():
         return jsonify({"error": "duplicate", "detail": "Checkpoint name already exists."}), 409
 
+    easting, easting_err = validate_finite_float(payload.get("easting"), field_name="easting")
+    if easting_err:
+        return jsonify({"error": "validation_error", "detail": easting_err}), 400
+    northing, northing_err = validate_finite_float(payload.get("northing"), field_name="northing")
+    if northing_err:
+        return jsonify({"error": "validation_error", "detail": northing_err}), 400
+
     cp = Checkpoint(
         competition_id=comp_id,
         name=name,
         location=location,
         description=description,
-        easting=payload.get("easting"),
-        northing=payload.get("northing"),
+        easting=easting,
+        northing=northing,
         is_virtual=bool(payload.get("is_virtual")),
     )
     db.session.add(cp)
@@ -288,10 +295,16 @@ def _update_checkpoint(checkpoint_id: int, partial: bool):
         cp.description = description or None
 
     if "easting" in payload or not partial:
-        cp.easting = payload.get("easting")
+        easting, easting_err = validate_finite_float(payload.get("easting"), field_name="easting")
+        if easting_err:
+            return jsonify({"error": "validation_error", "detail": easting_err}), 400
+        cp.easting = easting
 
     if "northing" in payload or not partial:
-        cp.northing = payload.get("northing")
+        northing, northing_err = validate_finite_float(payload.get("northing"), field_name="northing")
+        if northing_err:
+            return jsonify({"error": "validation_error", "detail": northing_err}), 400
+        cp.northing = northing
 
     if "is_virtual" in payload or not partial:
         cp.is_virtual = bool(payload.get("is_virtual"))
@@ -435,15 +448,13 @@ def checkpoint_import():
             cp.description = description
 
         if "easting" in item and item["easting"] not in (None, ""):
-            try:
-                cp.easting = float(item["easting"])
-            except Exception:
-                pass
+            easting, _err = validate_finite_float(item["easting"], field_name="easting")
+            if easting is not None:
+                cp.easting = easting
         if "northing" in item and item["northing"] not in (None, ""):
-            try:
-                cp.northing = float(item["northing"])
-            except Exception:
-                pass
+            northing, _err = validate_finite_float(item["northing"], field_name="northing")
+            if northing is not None:
+                cp.northing = northing
 
         if "group_ids" in item:
             group_ids = _parse_group_ids(item.get("group_ids"))

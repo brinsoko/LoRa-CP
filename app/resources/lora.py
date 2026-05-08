@@ -47,9 +47,14 @@ def _parse_device_payload(payload: dict, *, for_update: bool = False) -> tuple[d
         errors.append("dev_num is required")
     elif dev_num is not None:
         try:
-            data["dev_num"] = int(dev_num)
+            parsed = int(dev_num)
         except Exception:
             errors.append("dev_num must be an integer")
+        else:
+            if parsed <= 0:
+                errors.append("dev_num must be > 0")
+            else:
+                data["dev_num"] = parsed
 
     if "name" in payload or not for_update:
         name = payload.get("name")

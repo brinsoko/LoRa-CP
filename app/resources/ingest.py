@@ -65,24 +65,35 @@ def resolve_checkpoint_for_dev(competition_id: int, dev_num: int) -> tuple[Check
     return cp, device, created_device, created_checkpoint
 
 
-def _optional_int(payload: dict, key: str):
+def _optional_int(payload: dict, key: str, *, positive: bool = False):
     raw = payload.get(key)
     if raw in (None, ""):
         return None
     try:
-        return parse_int(raw, key)
+        parsed = parse_int(raw, key)
     except BadRequest as exc:
-        raise BadRequest() from exc
+        raise BadRequest(description=f"invalid {key}") from exc
+    if positive and parsed <= 0:
+        raise BadRequest(description=f"{key} must be > 0")
+    return parsed
 
 
-def _optional_float(payload: dict, key: str):
+def _optional_float(payload: dict, key: str, *, minimum: float | None = None, maximum: float | None = None):
     raw = payload.get(key)
     if raw in (None, ""):
         return None
     try:
-        return float(raw)
+        parsed = float(raw)
     except (TypeError, ValueError) as exc:
-        raise BadRequest() from exc
+        raise BadRequest(description=f"invalid {key}") from exc
+    import math
+    if not math.isfinite(parsed):
+        raise BadRequest(description=f"{key} must be a finite number")
+    if minimum is not None and parsed < minimum:
+        raise BadRequest(description=f"{key} must be >= {minimum}")
+    if maximum is not None and parsed > maximum:
+        raise BadRequest(description=f"{key} must be <= {maximum}")
+    return parsed
 
 
 def _parse_ingest_payload() -> dict:
@@ -103,8 +114,8 @@ def _parse_ingest_payload() -> dict:
 
     return {
         "competition_id": competition_id,
-        "dev_id": _optional_int(payload, "dev_id"),
-        "checkpoint_id": _optional_int(payload, "checkpoint_id"),
+        "dev_id": _optional_int(payload, "dev_id", positive=True),
+        "checkpoint_id": _optional_int(payload, "checkpoint_id", positive=True),
         "payload": payload.get("payload"),
         "rssi": _optional_float(payload, "rssi"),
         "snr": _optional_float(payload, "snr"),
@@ -112,9 +123,11 @@ def _parse_ingest_payload() -> dict:
         "source": payload.get("source"),
         "ingest_password": payload.get("ingest_password"),
         "password": payload.get("password"),
-        "gps_lat": _optional_float(payload, "gps_lat"),
-        "gps_lon": _optional_float(payload, "gps_lon"),
-        "gps_alt": _optional_float(payload, "gps_alt"),
+        "gps_lat": _optional_float(payload, "gps_lat", minimum=-90.0, maximum=90.0),
+        "gps_lon": _optional_float(payload, "gps_lon", minimum=-180.0, maximum=180.0),
+        # Altitude in metres — Mt. Everest is 8848, the deepest mine ~4000 below
+        # sea level. ±20000 is generous and rejects garbage like 1e308.
+        "gps_alt": _optional_float(payload, "gps_alt", minimum=-20000.0, maximum=20000.0),
         "gps_age_ms": _optional_int(payload, "gps_age_ms"),
     }
 
