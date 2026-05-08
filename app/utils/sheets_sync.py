@@ -158,6 +158,21 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
 
 
 def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime | None = None):
+    """Public entrypoint — schedules the Sheets write on the background worker
+    when an app context is available, falls back to a synchronous call when
+    not (e.g. tests, CLI scripts, or direct callers that have already chosen
+    to take the latency)."""
+    try:
+        app = current_app._get_current_object()
+    except RuntimeError:
+        return mark_arrival_checkbox_sync(team_id, checkpoint_id, arrived_at)
+    if app.config.get("SHEETS_SYNC_INLINE"):
+        return mark_arrival_checkbox_sync(team_id, checkpoint_id, arrived_at)
+    from app.utils.sheets_sync_worker import enqueue_mark_arrival
+    enqueue_mark_arrival(app, team_id, checkpoint_id, arrived_at)
+
+
+def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: datetime | None = None):
     """Set arrived checkbox TRUE for the given team/checkpoint in any linked checkpoint tab."""
     if not sheets_sync_enabled():
         return
@@ -233,6 +248,18 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime
 
 
 def update_checkpoint_scores(team_id: int, checkpoint_id: int, group_name: str, values: dict, scored_at: datetime | None = None):
+    """Public entrypoint — see mark_arrival_checkbox for the dispatch policy."""
+    try:
+        app = current_app._get_current_object()
+    except RuntimeError:
+        return update_checkpoint_scores_sync(team_id, checkpoint_id, group_name, values, scored_at)
+    if app.config.get("SHEETS_SYNC_INLINE"):
+        return update_checkpoint_scores_sync(team_id, checkpoint_id, group_name, values, scored_at)
+    from app.utils.sheets_sync_worker import enqueue_update_scores
+    enqueue_update_scores(app, team_id, checkpoint_id, group_name, values, scored_at)
+
+
+def update_checkpoint_scores_sync(team_id: int, checkpoint_id: int, group_name: str, values: dict, scored_at: datetime | None = None):
     """Update score-related fields for a team in a checkpoint tab based on config layout."""
     if not sheets_sync_enabled():
         return
