@@ -5,7 +5,7 @@ from flask_login import current_user, login_user, logout_user
 from sqlalchemy.exc import IntegrityError
 
 from app.api.helpers import json_ok
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models import CompetitionMember, User
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_login_required, json_roles_required
@@ -47,6 +47,7 @@ def _json():
 
 
 @auth_api_bp.post("/api/auth/login")
+@limiter.limit("10 per minute; 60 per hour", methods=["POST"])
 def auth_login():
     data, err_resp, err_code = _json()
     if err_resp:

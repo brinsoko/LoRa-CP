@@ -2,15 +2,26 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_babel import Babel
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-db = SQLAlchemy()           
+db = SQLAlchemy()
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 login_manager.login_message_category = "warning"
 
 babel = Babel()
+
+# In-memory storage is fine for a single-process deployment; resets on
+# restart, which is acceptable for the small operator footprint here.
+# If we ever scale beyond one worker, swap storage_uri to redis://...
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[],
+    storage_uri="memory://",
+)
 
 @login_manager.user_loader
 def load_user(user_id: str):

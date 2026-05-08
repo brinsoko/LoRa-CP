@@ -4,7 +4,7 @@ from flask_babel import get_locale
 from flask_login import current_user
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
-from .extensions import db, login_manager, babel
+from .extensions import db, login_manager, babel, limiter
 from sqlalchemy import inspect, text
 from .api.auth import auth_api_bp
 from .api.checkpoints import checkpoints_api_bp
@@ -105,6 +105,12 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
     login_manager.login_message_category = "warning"
+
+    # Wire the rate limiter. It's a no-op until a route uses @limiter.limit.
+    # Disabled in tests so existing assertions don't trip on 429.
+    if app.config.get("TESTING") and not app.config.get("RATELIMIT_ENABLED"):
+        app.config["RATELIMIT_ENABLED"] = False
+    limiter.init_app(app)
 
     def _select_locale() -> str:
         lang = session.get("lang")

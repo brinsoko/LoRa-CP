@@ -9,7 +9,7 @@ import re
 from datetime import datetime
 
 from app.models import User, CompetitionInvite, CompetitionMember
-from app.extensions import db
+from app.extensions import db, limiter
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
 from app.utils.redirects import safe_redirect_target
@@ -73,6 +73,7 @@ def _accept_pending_invites(user: User) -> None:
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute; 60 per hour", methods=["POST"])
 def login():  # endpoint: auth.login
     if request.method == "POST":
         username = (request.form.get("username") or "").strip()

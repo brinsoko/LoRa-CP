@@ -12,6 +12,7 @@ alembic>=1.13.0
 # --- Auth & Roles ---
 Flask-Login==0.6.3
 Flask-Babel==4.0.0
+Flask-Limiter==3.8.0
 
 # --- Optional Serial / Hardware access ---
 pyserial==3.5
