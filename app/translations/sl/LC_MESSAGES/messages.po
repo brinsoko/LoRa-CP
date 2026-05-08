@@ -303,7 +303,7 @@ msgstr "NVS odmik mora biti manjši od odmika aplikacije."
 
 #: app/blueprints/firmware/routes.py:118
 msgid "NVS size must be a positive multiple of 4096 (e.g. 0x3000)."
-msgstr ""
+msgstr "Velikost NVS mora biti pozitiven večkratnik 4096 (npr. 0x3000)."
 
 #: app/blueprints/firmware/routes.py:120
 #, fuzzy
@@ -312,7 +312,7 @@ msgstr "NVS odmik mora biti manjši od odmika aplikacije."
 
 #: app/blueprints/firmware/routes.py:122
 msgid "NVS keys partition (0x1000) must fit before NVS offset."
-msgstr ""
+msgstr "Particija NVS keys (0x1000) mora biti pred odmikom NVS."
 
 #: app/blueprints/firmware/routes.py:158
 #, python-format
@@ -734,13 +734,15 @@ msgstr "Veljaven e-poštni naslov je obvezen."
 
 #: app/blueprints/users/routes.py:27
 msgid "Enter a valid email address."
-msgstr ""
+msgstr "Vnesite veljaven e-poštni naslov."
 
 #: app/blueprints/users/routes.py:31
 msgid ""
 "Username may only contain letters, numbers, dots, underscores, and "
 "hyphens."
 msgstr ""
+"Uporabniško ime lahko vsebuje samo črke, številke, pike, podčrtaje in "
+"vezaje."
 
 #: app/blueprints/users/routes.py:85
 #, fuzzy
@@ -875,7 +877,7 @@ msgstr "Ekipa"
 
 #: app/templates/add_checkin.html:14
 msgid "Search teams..."
-msgstr ""
+msgstr "Iskanje ekip..."
 
 #: app/templates/add_checkin.html:25 app/templates/checkin_edit.html:24
 #: app/templates/group_members.html:24 app/templates/judge_assign.html:49
@@ -1176,7 +1178,7 @@ msgstr "Revizijska sled"
 #: app/templates/audit_list.html:51
 #, python-format
 msgid "Showing %(count)s of %(total)s events"
-msgstr ""
+msgstr "Prikazanih %(count)s od %(total)s dogodkov"
 
 #: app/templates/audit_list.html:58
 msgid "When"
@@ -1205,7 +1207,7 @@ msgstr "Noben revizijski dogodek ne ustreza vašim filtrom."
 #: app/templates/audit_list.html:99 app/templates/view_checkins.html:138
 #, python-format
 msgid "Page %(page)s of %(pages)s"
-msgstr ""
+msgstr "Stran %(page)s od %(pages)s"
 
 #: app/templates/audit_list.html:105
 msgid "First"
@@ -1283,7 +1285,7 @@ msgstr "Sodniki"
 
 #: app/templates/base.html:99 app/templates/firmware_list.html:2
 msgid "Firmware"
-msgstr ""
+msgstr "Firmver"
 
 #: app/templates/base.html:104
 msgid "Dark mode"
@@ -1389,9 +1391,8 @@ msgid "Edit Check-in"
 msgstr "Uredi prihod"
 
 #: app/templates/checkin_edit.html:38
-#, fuzzy
 msgid "Time"
-msgstr "Časovni pas"
+msgstr "Čas"
 
 #: app/templates/checkin_edit.html:44
 msgid "Enter time with seconds in GMT."
@@ -1603,7 +1604,7 @@ msgstr "Ime tekmovanja"
 
 #: app/templates/competition_select.html:51
 msgid "e.g. Spring Orienteering 2025"
-msgstr ""
+msgstr "npr. Spomladanska orientacija 2025"
 
 #: app/templates/competition_select.html:53
 msgid "Create Competition"
@@ -1633,7 +1634,7 @@ msgstr "Kopiraj"
 
 #: app/templates/competition_settings.html:22
 msgid "Use this ID when configuring LoRa devices for ingest."
-msgstr ""
+msgstr "Uporabite ta ID pri konfiguriranju LoRa naprav za vnos."
 
 #: app/templates/competition_settings.html:26
 msgid "Ingest password (optional)"
@@ -1778,6 +1779,10 @@ msgid ""
 "Version mismatches between export files and the current system may cause "
 "unexpected behavior."
 msgstr ""
+"Eksperimentalna funkcija — združevanje podatkov iz različnih virov lahko "
+"povzroči nedoslednosti. Pred uvozom ali združevanjem vedno varnostno "
+"kopirajte podatke. Neskladja med različico izvoznih datotek in trenutnim "
+"sistemom lahko povzročijo nepričakovano vedenje."
 
 #: app/templates/competition_transfer.html:12
 msgid "Export Competition"
@@ -1835,7 +1840,7 @@ msgstr "Tekmovanje uspešno uvoženo."
 #: app/templates/competition_transfer.html:81
 #: app/templates/competition_transfer.html:131
 msgid "Warnings:"
-msgstr ""
+msgstr "Opozorila:"
 
 #: app/templates/competition_transfer.html:88
 msgid "Import failed."
@@ -1843,7 +1848,7 @@ msgstr "Uvoz ni uspel."
 
 #: app/templates/competition_transfer.html:106
 msgid "Analyzing..."
-msgstr ""
+msgstr "Analiziram..."
 
 #: app/templates/competition_transfer.html:112
 msgid "Invalid JSON file."
@@ -1884,7 +1889,7 @@ msgstr "Preskoči"
 
 #: app/templates/competition_transfer.html:183
 msgid "Merging..."
-msgstr ""
+msgstr "Združujem..."
 
 #: app/templates/competition_transfer.html:194
 msgid "Merge complete."
@@ -1965,7 +1970,7 @@ msgstr "npr. Receiver v1.0"
 
 #: app/templates/firmware_flash.html:80
 msgid "WiFi SSID"
-msgstr ""
+msgstr "WiFi SSID"
 
 #: app/templates/firmware_flash.html:84
 #, fuzzy
@@ -2098,7 +2103,7 @@ msgstr "NVS odmik"
 
 #: app/templates/firmware_upload.html:38
 msgid "nvs_keys partition (0x1000)"
-msgstr ""
+msgstr "nvs_keys particija (0x1000)"
 
 #: app/templates/firmware_upload.html:41
 #, fuzzy
@@ -2117,7 +2122,7 @@ msgstr "Odmik NVS particije"
 
 #: app/templates/firmware_upload.html:48
 msgid "sec_nvs size (min 0x3000)"
-msgstr ""
+msgstr "Velikost sec_nvs (min 0x3000)"
 
 #: app/templates/firmware_upload.html:51
 msgid "App partition offset"
@@ -2147,11 +2152,11 @@ msgstr "Predpona stevilk"
 
 #: app/templates/group_edit.html:19
 msgid "e.g. 1xx, 2xx"
-msgstr ""
+msgstr "npr. 1xx, 2xx"
 
 #: app/templates/group_edit.html:21
 msgid "Used for random team numbers (e.g. 1xx → 100-199)."
-msgstr ""
+msgstr "Uporablja se za naključne številke ekip (npr. 1xx → 100-199)."
 
 #: app/templates/group_edit.html:34
 msgid "Selected order"
@@ -3784,7 +3789,7 @@ msgstr "Izbrišem ta prihod?"
 #: app/templates/view_checkins.html:131
 #, python-format
 msgid "Showing %(count)s of %(total)s check-ins"
-msgstr ""
+msgstr "Prikazanih %(count)s od %(total)s prijav"
 
 #: app/templates/view_checkins.html:147
 msgid "No check-ins match your filters."
