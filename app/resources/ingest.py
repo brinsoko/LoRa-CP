@@ -341,21 +341,35 @@ def ingest_post():
                     if exists:
                         arrived_at = exists.timestamp or received_at
                     else:
-                        # Use a SAVEPOINT around the insert so a concurrent
-                        # ingest racing on the same (team, checkpoint) hits the
-                        # uq_team_checkpoint constraint cleanly: we roll back
-                        # just the savepoint, re-read the existing row, and
+                        # Use a SAVEPOINT around just the Checkin insert so a
+                        # concurrent ingest racing on the same (team, checkpoint)
+                        # hits the uq_team_checkpoint constraint cleanly: we roll
+                        # back just the savepoint, re-read the existing row, and
                         # continue treating this packet as a duplicate (200).
+                        # The audit event lives outside the try/except so an
+                        # unrelated IntegrityError (from the audit insert or
+                        # anywhere else) is not misclassified as a duplicate.
+                        created = Checkin(
+                            team_id=team.id,
+                            checkpoint_id=cp.id,
+                            competition_id=competition_id,
+                            timestamp=received_at,
+                            created_by_device_id=device.id if device else None,
+                        )
+                        savepoint_ok = True
                         try:
                             with db.session.begin_nested():
-                                created = Checkin(
-                                    team_id=team.id,
-                                    checkpoint_id=cp.id,
-                                    competition_id=competition_id,
-                                    timestamp=received_at,
-                                    created_by_device_id=device.id if device else None,
-                                )
                                 db.session.add(created)
+                        except IntegrityError:
+                            savepoint_ok = False
+                            existing = Checkin.query.filter_by(
+                                team_id=team.id,
+                                checkpoint_id=cp.id,
+                                competition_id=competition_id,
+                            ).first()
+                            if existing:
+                                arrived_at = existing.timestamp or received_at
+                        if savepoint_ok:
                             record_audit_event(
                                 competition_id=competition_id,
                                 event_type="checkin_created",
@@ -376,14 +390,6 @@ def ingest_post():
                                 created_at=received_at,
                             )
                             created_checkin = True
-                        except IntegrityError:
-                            existing = Checkin.query.filter_by(
-                                team_id=team.id,
-                                checkpoint_id=cp.id,
-                                competition_id=competition_id,
-                            ).first()
-                            if existing:
-                                arrived_at = existing.timestamp or received_at
 
                     try:
                         mark_arrival_checkbox(team.id, cp.id, arrived_at)
