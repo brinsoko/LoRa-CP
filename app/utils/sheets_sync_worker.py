@@ -23,6 +23,7 @@ Design choices:
 
 from __future__ import annotations
 
+import atexit
 import logging
 import queue
 import threading
@@ -33,9 +34,11 @@ logger = logging.getLogger(__name__)
 
 
 _QUEUE_MAXSIZE = 1024
+_SHUTDOWN_DRAIN_TIMEOUT_S = 10.0
 _jobs: "queue.Queue[tuple]" = queue.Queue(maxsize=_QUEUE_MAXSIZE)
 _worker_thread: threading.Thread | None = None
 _lock = threading.Lock()
+_atexit_registered = False
 
 
 def _worker_loop() -> None:
@@ -51,8 +54,39 @@ def _worker_loop() -> None:
             _jobs.task_done()
 
 
+def _drain_on_shutdown() -> None:
+    """Best-effort drain of pending Sheets writes when the process exits.
+
+    Called via atexit so a graceful gunicorn restart (or a Ctrl-C in dev)
+    gives in-flight jobs up to _SHUTDOWN_DRAIN_TIMEOUT_S to land before
+    the daemon thread is killed. Without this, up to _QUEUE_MAXSIZE
+    arrival/score Sheets updates can be lost on restart while the DB
+    state appears fully written.
+    """
+    pending = _jobs.unfinished_tasks
+    if not pending:
+        return
+    logger.info("sheets sync drain: %d job(s) pending, waiting up to %.1fs", pending, _SHUTDOWN_DRAIN_TIMEOUT_S)
+    try:
+        # queue.Queue has no built-in join-with-timeout; do it manually.
+        deadline = threading.Event()
+        timer = threading.Timer(_SHUTDOWN_DRAIN_TIMEOUT_S, deadline.set)
+        timer.daemon = True
+        timer.start()
+        try:
+            while _jobs.unfinished_tasks and not deadline.is_set():
+                deadline.wait(0.1)
+        finally:
+            timer.cancel()
+    except Exception:
+        logger.exception("sheets sync drain failed")
+    remaining = _jobs.unfinished_tasks
+    if remaining:
+        logger.warning("sheets sync drain: %d job(s) still pending at exit", remaining)
+
+
 def _ensure_worker() -> None:
-    global _worker_thread
+    global _worker_thread, _atexit_registered
     with _lock:
         if _worker_thread is None or not _worker_thread.is_alive():
             _worker_thread = threading.Thread(
@@ -61,6 +95,9 @@ def _ensure_worker() -> None:
                 daemon=True,
             )
             _worker_thread.start()
+        if not _atexit_registered:
+            atexit.register(_drain_on_shutdown)
+            _atexit_registered = True
 
 
 def _submit(app, fn, *args, **kwargs) -> None:
