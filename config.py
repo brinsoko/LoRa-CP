@@ -27,6 +27,12 @@ class Config:
         os.path.dirname(__file__), "app", "translations"
     )
 
+    # Hard cap on request body size — applies to file uploads (firmware,
+    # checkpoint JSON, RFID CSV) and JSON ingest. Defaults to 32 MiB which
+    # is well above any realistic ESP32 firmware image. Override with
+    # MAX_CONTENT_LENGTH_MB env var.
+    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH_MB", "32")) * 1024 * 1024
+
     # App settings
     _WEBHOOK_SECRET_ENV = os.getenv("LORA_WEBHOOK_SECRET")
     if (not _WEBHOOK_SECRET_ENV or _WEBHOOK_SECRET_ENV == "CHANGE_LATER") and os.getenv("FLASK_ENV") == "production":

@@ -247,6 +247,14 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     def conflict(e):
         return json_error("conflict", 409, _http_detail(e, "Conflict."))
 
+    @app.errorhandler(413)
+    def payload_too_large(e):
+        return json_error(
+            "payload_too_large",
+            413,
+            _http_detail(e, "Request body exceeds the configured maximum."),
+        )
+
     @app.errorhandler(422)
     def unprocessable_entity(e):
         return json_error("error", 422, _http_detail(e, "Unprocessable entity."))
