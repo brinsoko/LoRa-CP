@@ -993,7 +993,7 @@ def run_spike_test(args):
         sys.exit(2)
 
     threads = []
-    for i in range(spike_workers):
+    for _i in range(spike_workers):
         w_sess = _make_session(args.cookie, args.webhook_secret)
         worker = IngestWorker(args.base_url, w_sess, args.competition_id,
                               dev_ids, uid_pool, results, lock, stop_event,

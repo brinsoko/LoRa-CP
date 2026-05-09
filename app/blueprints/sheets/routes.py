@@ -660,7 +660,7 @@ def add_tab():
             client.set_header_row(spreadsheet_id, tab_title, headers)
 
             # Populate team numbers under each group header if groups exist
-            for grp, start_col in zip(groups_with_ids, group_start_cols):
+            for grp, start_col in zip(groups_with_ids, group_start_cols, strict=False):
                 db_group = group_by_name.get(_norm_name(grp.get("name")))
                 if not db_group:
                     continue

@@ -378,7 +378,7 @@ class TestTimeTrial:
             min_points=10, max_points=100,
         )
         vals = [scores[tid] for tid in team_ids]
-        for a, b in zip(vals, vals[1:]):
+        for a, b in zip(vals, vals[1:], strict=False):
             assert a >= b
 
     def test_time_trial_cat2_reversed_direction(self, app, seeded):

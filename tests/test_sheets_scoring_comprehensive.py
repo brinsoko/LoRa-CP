@@ -715,7 +715,7 @@ class TestOrgSummary:
             ws = sp.worksheet(tab)
             all_vals = ws.get_all_values()
             # Find org section — look for "Org-1" in any row
-            for i, row in enumerate(all_vals):
+            for _i, row in enumerate(all_vals):
                 if "Org-1" in row:
                     # The last cell with a number should be the org total
                     nums = []

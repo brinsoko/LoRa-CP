@@ -159,7 +159,7 @@ def _apply_field_rule(value, rule, context: dict) -> float | None:
             return _round_score(_clamp_non_negative(pts[0][1]))
         if x >= pts[-1][0]:
             return _round_score(_clamp_non_negative(pts[-1][1]))
-        for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+        for (x1, y1), (x2, y2) in zip(pts, pts[1:], strict=False):
             if x1 <= x <= x2:
                 if x2 == x1:
                     return _round_score(_clamp_non_negative(y1))

@@ -23,8 +23,8 @@ def json_error(key: str, status: int, detail: str | None = None):
 def parse_int(value, name: str) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
-        raise BadRequest(description=f"{name} must be an integer.")
+    except (TypeError, ValueError) as err:
+        raise BadRequest(description=f"{name} must be an integer.") from err
 
 
 def parse_int_list(value, name: str) -> list[int]:
@@ -40,8 +40,8 @@ def parse_int_list(value, name: str) -> list[int]:
 
     try:
         return [int(part) for part in parts]
-    except (TypeError, ValueError):
-        raise BadRequest(description=f"{name} must be integers.")
+    except (TypeError, ValueError) as err:
+        raise BadRequest(description=f"{name} must be integers.") from err
 
 
 def paginate(query, page, per_page: int = 50):

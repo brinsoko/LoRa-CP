@@ -562,7 +562,7 @@ def team_randomize_numbers():
             continue
 
         random.shuffle(available)
-        for team, number in zip(teams_needing_number, available):
+        for team, number in zip(teams_needing_number, available, strict=False):
             team.number = number
         assigned_total += needed
         results.append(

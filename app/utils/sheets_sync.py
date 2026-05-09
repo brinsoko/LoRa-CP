@@ -139,7 +139,7 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
             continue
         group_cols = _group_start_cols_from_config(cfg.config or {})
 
-        for grp, start_col in zip(groups, group_cols):
+        for grp, start_col in zip(groups, group_cols, strict=False):
             db_group = _resolve_group_from_cfg(comp_id, grp, group_cache)
             if not db_group:
                 continue
@@ -204,7 +204,7 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
         group_defs = (cfg.config or {}).get("groups", [])
         group_cols = _group_start_cols_from_config(cfg.config or {})
         time_enabled = bool((cfg.config or {}).get("time_enabled"))
-        for grp_def, start_col in zip(group_defs, group_cols):
+        for grp_def, start_col in zip(group_defs, group_cols, strict=False):
             db_group = _resolve_group_from_cfg(cfg.competition_id, grp_def, group_cache)
             if not db_group:
                 continue
@@ -295,7 +295,7 @@ def update_checkpoint_scores_sync(team_id: int, checkpoint_id: int, group_name: 
         time_header = (cfg.config or {}).get("time_header") or "Time"
         points_header = (cfg.config or {}).get("points_header") or "Points"
 
-        for grp_def, start_col in zip(group_defs, group_cols):
+        for grp_def, start_col in zip(group_defs, group_cols, strict=False):
             grp_name = (grp_def.get("name") or "").strip()
             if _norm_name(grp_name) != _norm_name(group_name):
                 continue
@@ -951,7 +951,7 @@ def wizard_build_checkpoint_tabs(
         ws = _with_retry(client.add_tab, spreadsheet_id, tab_title)
         _with_retry(client.set_header_row, spreadsheet_id, tab_title, headers)
 
-        for grp, start_col in zip(groups_def, group_start_cols):
+        for grp, start_col in zip(groups_def, group_start_cols, strict=False):
             db_group = db.session.get(CheckpointGroup, grp.get("group_id"))
             if not db_group:
                 continue
