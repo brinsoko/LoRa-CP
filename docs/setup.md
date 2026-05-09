@@ -79,6 +79,24 @@ make db-init
 This runs `db.create_all()` inside a Flask app context, creating all tables in
 the SQLite database at `instance/app.db`.
 
+After a fresh `db.create_all()` the schema already matches every Alembic
+revision; mark the DB as such so future `alembic upgrade head` runs are
+no-ops on the revisions you just created via `create_all`:
+
+```bash
+alembic stamp head
+```
+
+For **upgrades** to an existing prod DB (in-place, not a fresh install),
+run migrations before booting the app:
+
+```bash
+alembic upgrade head
+```
+
+The boot path no longer auto-applies schema patches — Alembic is the
+single source of truth.
+
 ## 5. Seed data
 
 ```bash

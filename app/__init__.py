@@ -6,7 +6,7 @@ import tempfile
 from flask import Flask, current_app, g, request, session
 from flask_babel import get_locale
 from flask_login import current_user
-from sqlalchemy import inspect, text
+from sqlalchemy import text
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -177,66 +177,19 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.register_blueprint(firmware_bp, url_prefix="/firmware")
 
     with app.app_context():
+        # Schema management:
+        #   - Fresh installs: db.create_all() builds the full schema from
+        #     models. Pair with `alembic stamp head` after first boot to
+        #     mark the DB as already at HEAD.
+        #   - Existing installs: run `alembic upgrade head` before booting.
+        # The "ensure column exists" / "CREATE INDEX IF NOT EXISTS" blocks
+        # that used to live here have been moved into Alembic revisions
+        # (see alembic/versions/d4e5f6a7b8c9_codify_runtime_schema_drift.py).
         db.create_all()
         try:
             ensure_default_competition()
         except Exception:
             app.logger.exception("Failed to ensure default competition")
-        try:
-            insp = inspect(db.engine)
-            cols = {c["name"] for c in insp.get_columns("competitions")}
-            if "ingest_password_hash" not in cols:
-                with db.engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE competitions ADD COLUMN ingest_password_hash VARCHAR(255)"))
-        except Exception:
-            app.logger.exception("Failed to ensure competitions.ingest_password_hash column")
-        try:
-            insp = inspect(db.engine)
-            cols = {c["name"] for c in insp.get_columns("users")}
-            if "last_competition_id" not in cols:
-                with db.engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE users ADD COLUMN last_competition_id INTEGER"))
-        except Exception:
-            app.logger.exception("Failed to ensure users.last_competition_id column")
-        try:
-            insp = inspect(db.engine)
-            cols = {c["name"] for c in insp.get_columns("checkins")}
-            with db.engine.begin() as conn:
-                if "created_by_user_id" not in cols:
-                    conn.execute(text("ALTER TABLE checkins ADD COLUMN created_by_user_id INTEGER"))
-                if "created_by_device_id" not in cols:
-                    conn.execute(text("ALTER TABLE checkins ADD COLUMN created_by_device_id INTEGER"))
-        except Exception:
-            app.logger.exception("Failed to ensure checkins audit columns")
-        try:
-            insp = inspect(db.engine)
-            cols = {c["name"] for c in insp.get_columns("competitions")}
-            if "hide_gps_map" not in cols:
-                with db.engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE competitions ADD COLUMN hide_gps_map BOOLEAN NOT NULL DEFAULT 0"))
-        except Exception:
-            app.logger.exception("Failed to ensure competitions.hide_gps_map column")
-        try:
-            insp = inspect(db.engine)
-            cols = {c["name"] for c in insp.get_columns("firmware_files")}
-            if cols and "nvs_size" not in cols:
-                with db.engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE firmware_files ADD COLUMN nvs_size INTEGER DEFAULT 20480"))
-                    conn.execute(text("UPDATE firmware_files SET nvs_size = 20480 WHERE nvs_size IS NULL"))
-        except Exception:
-            app.logger.exception("Failed to ensure firmware_files.nvs_size column")
-        try:
-            # db.create_all() only creates indexes for tables it creates fresh;
-            # existing DBs need the new composite index added explicitly.
-            with db.engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "CREATE INDEX IF NOT EXISTS ix_lora_messages_dedup "
-                        "ON lora_messages (competition_id, dev_id, received_at)"
-                    )
-                )
-        except Exception:
-            app.logger.exception("Failed to ensure lora_messages dedup index")
 
     def _http_detail(e: Exception, default: str) -> str:
         if isinstance(e, HTTPException):
