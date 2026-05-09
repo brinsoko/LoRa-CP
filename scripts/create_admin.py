@@ -14,13 +14,29 @@ from app.extensions import db
 from app.models import User
 
 
+DEV_DEFAULT_PASSWORD = "admin123"
+
+
 def main() -> None:
     username = os.environ.get("ADMIN_USER", "admin").strip()
-    password = os.environ.get("ADMIN_PASS", "admin123")
+    raw_pass_env = os.environ.get("ADMIN_PASS")
+    password = raw_pass_env if raw_pass_env is not None else DEV_DEFAULT_PASSWORD
     role = (os.environ.get("ADMIN_ROLE", "admin") or "admin").strip()
 
     if role not in ("public", "judge", "admin", "superadmin"):
         raise SystemExit(f"Invalid ADMIN_ROLE={role!r}; must be one of public|judge|admin|superadmin")
+
+    # Refuse the dev default in production. Operators must supply
+    # ADMIN_PASS explicitly. The dev convenience stays intact for
+    # `make admin` runs locally.
+    if (
+        os.environ.get("FLASK_ENV") == "production"
+        and (raw_pass_env is None or password == DEV_DEFAULT_PASSWORD)
+    ):
+        raise SystemExit(
+            "FATAL: ADMIN_PASS must be set explicitly when FLASK_ENV=production. "
+            f"The dev default {DEV_DEFAULT_PASSWORD!r} is not allowed in production."
+        )
 
     app = create_app()
     with app.app_context():

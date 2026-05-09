@@ -20,14 +20,15 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from app.utils.time import utcnow_naive
-
-# Ensure project root (where 'app/' lives) is importable
+# Ensure project root (where 'app/' lives) is importable BEFORE any
+# `from app...` imports — otherwise running this script directly from
+# a subprocess (instead of via the Makefile) raises ModuleNotFoundError.
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from app import create_app
+from app.utils.time import utcnow_naive
 from app.extensions import db
 from app.models import (
     Checkin,
@@ -300,20 +301,49 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
             db.create_all()
 
         print("Seeding users...")
+        # Dev defaults stay convenient (`make seed` locally just works).
+        # In production every credential env var must be set explicitly;
+        # the seed script refuses to fall back to the well-known defaults.
+        is_prod = os.environ.get("FLASK_ENV") == "production"
+        DEV_ADMIN_PASS = "admin123"
+        DEV_JUDGE_PASS = "judge-pass"
+        DEV_SUPER_PASS = "change-me-now"
+
         admin_user = (os.environ.get("SEED_ADMIN_USER") or "admin").strip()
-        admin_pass = os.environ.get("SEED_ADMIN_PASS") or "admin123"
+        raw_admin_pass = os.environ.get("SEED_ADMIN_PASS")
+        admin_pass = raw_admin_pass if raw_admin_pass is not None else DEV_ADMIN_PASS
         admin_role = (os.environ.get("SEED_ADMIN_ROLE") or "admin").strip().lower()
         if admin_role not in ("public", "judge", "admin", "superadmin"):
             admin_role = "admin"
+
+        if is_prod and (raw_admin_pass is None or admin_pass == DEV_ADMIN_PASS):
+            sys.exit(
+                "FATAL: SEED_ADMIN_PASS must be set explicitly when "
+                f"FLASK_ENV=production. The dev default {DEV_ADMIN_PASS!r} "
+                "is not allowed in production."
+            )
+
         admin = get_or_create_user(admin_user, admin_role, admin_pass)
 
         judge_user = (os.environ.get("SEED_JUDGE_USER") or "judge").strip()
-        judge_pass = os.environ.get("SEED_JUDGE_PASS") or "judge-pass"
+        raw_judge_pass = os.environ.get("SEED_JUDGE_PASS")
+        judge_pass = raw_judge_pass if raw_judge_pass is not None else DEV_JUDGE_PASS
+        if is_prod and (raw_judge_pass is None or judge_pass == DEV_JUDGE_PASS):
+            sys.exit(
+                "FATAL: SEED_JUDGE_PASS must be set explicitly when "
+                "FLASK_ENV=production."
+            )
         judge = get_or_create_user(judge_user, "judge", judge_pass)
 
         super_user = (os.environ.get("SEED_SUPERADMIN_USER") or "").strip()
         if super_user:
-            super_pass = os.environ.get("SEED_SUPERADMIN_PASS") or "change-me-now"
+            raw_super_pass = os.environ.get("SEED_SUPERADMIN_PASS")
+            super_pass = raw_super_pass if raw_super_pass is not None else DEV_SUPER_PASS
+            if is_prod and (raw_super_pass is None or super_pass == DEV_SUPER_PASS):
+                sys.exit(
+                    "FATAL: SEED_SUPERADMIN_PASS must be set explicitly when "
+                    "FLASK_ENV=production."
+                )
             get_or_create_user(super_user, "superadmin", super_pass)
 
         competition = ensure_default_competition()
