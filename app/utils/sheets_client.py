@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Iterable, List, Optional
+from collections.abc import Iterable
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -17,9 +17,9 @@ log = logging.getLogger(__name__)
 class SheetsClient:
     def __init__(
         self,
-        service_account_file: Optional[str] = None,
-        service_account_json: Optional[str] = None,
-        scopes: Optional[Iterable[str]] = None,
+        service_account_file: str | None = None,
+        service_account_json: str | None = None,
+        scopes: Iterable[str] | None = None,
     ):
         scopes = scopes or [
             "https://www.googleapis.com/auth/spreadsheets",
@@ -55,7 +55,7 @@ class SheetsClient:
             self._call_count = 0
 
     # Spreadsheet helpers
-    def create_spreadsheet(self, title: str, initial_tabs: Optional[List[str]] = None) -> gspread.Spreadsheet:
+    def create_spreadsheet(self, title: str, initial_tabs: list[str] | None = None) -> gspread.Spreadsheet:
         self._throttle()
         ss = self.gc.create(title)
         if initial_tabs:
@@ -71,7 +71,7 @@ class SheetsClient:
         ss = self.gc.open_by_key(spreadsheet_id)
         return ss.add_worksheet(title=title, rows=rows, cols=cols)
 
-    def set_header_row(self, spreadsheet_id: str, tab_name: str, headers: List[str]):
+    def set_header_row(self, spreadsheet_id: str, tab_name: str, headers: list[str]):
         self._throttle()
         ss = self.gc.open_by_key(spreadsheet_id)
         ws = ss.worksheet(tab_name)
@@ -82,7 +82,7 @@ class SheetsClient:
         )
         return ws
 
-    def update_column(self, spreadsheet_id: str, tab_name: str, col_index: int, start_row: int, values: List[str]):
+    def update_column(self, spreadsheet_id: str, tab_name: str, col_index: int, start_row: int, values: list[str]):
         """Write a single column (vertical) starting at start_row."""
         self._throttle()
         ss = self.gc.open_by_key(spreadsheet_id)

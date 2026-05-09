@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
-from typing import List
 
 from flask import current_app
 from gspread.exceptions import APIError
@@ -100,7 +99,7 @@ def _sort_groups(groups: list[CheckpointGroup], order: list[str]) -> list[Checkp
     return sorted(groups, key=key)
 
 
-def _group_start_cols_from_config(cfg: dict) -> List[int]:
+def _group_start_cols_from_config(cfg: dict) -> list[int]:
     cols = []
     current = 1
     dead_time_enabled = bool(cfg.get("dead_time_enabled"))

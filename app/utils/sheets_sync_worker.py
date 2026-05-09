@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 _QUEUE_MAXSIZE = 1024
 _SHUTDOWN_DRAIN_TIMEOUT_S = 10.0
-_jobs: "queue.Queue[tuple]" = queue.Queue(maxsize=_QUEUE_MAXSIZE)
+_jobs: queue.Queue[tuple] = queue.Queue(maxsize=_QUEUE_MAXSIZE)
 _worker_thread: threading.Thread | None = None
 _lock = threading.Lock()
 _atexit_registered = False

@@ -1,8 +1,6 @@
 # app/blueprints/groups/routes.py
 from __future__ import annotations
 
-from typing import List, Tuple
-
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_babel import gettext as _
 
@@ -19,8 +17,8 @@ def _parse_int(value) -> int | None:
         return None
 
 
-def _parse_checkpoint_ids(values) -> List[int]:
-    ids: List[int] = []
+def _parse_checkpoint_ids(values) -> list[int]:
+    ids: list[int] = []
     for value in values or []:
         num = _parse_int(value)
         if num and num > 0:
@@ -28,13 +26,13 @@ def _parse_checkpoint_ids(values) -> List[int]:
     return ids
 
 
-def _partition_checkpoints(all_checkpoints: List[dict], ordered_ids: List[int]) -> Tuple[List[dict], List[dict]]:
+def _partition_checkpoints(all_checkpoints: list[dict], ordered_ids: list[int]) -> tuple[list[dict], list[dict]]:
     lookup = {}
     for cp in all_checkpoints:
         cp_id = _parse_int(cp.get("id"))
         if cp_id is not None:
             lookup[cp_id] = cp
-    selected: List[dict] = []
+    selected: list[dict] = []
     for cid in ordered_ids:
         cp = lookup.get(cid)
         if cp:
@@ -50,7 +48,7 @@ def _partition_checkpoints(all_checkpoints: List[dict], ordered_ids: List[int]) 
     return selected, available
 
 
-def _fetch_checkpoints() -> List[dict]:
+def _fetch_checkpoints() -> list[dict]:
     resp, payload = api_json("GET", "/api/checkpoints")
     if resp.status_code != 200:
         flash(_("Could not load checkpoints."), "warning")

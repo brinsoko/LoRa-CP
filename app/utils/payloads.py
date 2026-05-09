@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
 
-
-def parse_gps_payload(payload: str) -> Optional[Dict[str, float]]:
+def parse_gps_payload(payload: str) -> dict[str, float] | None:
     """Parse a GPS payload of the form:
     pos,<lat>,<lon>,<alt>,<age_ms>
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 import csv
 import io
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
 
 from flask import Blueprint, jsonify, make_response, request
 from flask_login import current_user
@@ -25,7 +24,7 @@ checkins_api_bp = Blueprint("api_checkins", __name__)
 
 
 # -------- helpers --------
-def _parse_date_range(date_from_str: Optional[str], date_to_str: Optional[str]) -> Tuple[Optional[datetime], Optional[datetime]]:
+def _parse_date_range(date_from_str: str | None, date_to_str: str | None) -> tuple[datetime | None, datetime | None]:
     """Build an inclusive range for YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS inputs."""
     start = end = None
     try:
@@ -42,8 +41,8 @@ def _parse_date_range(date_from_str: Optional[str], date_to_str: Optional[str]) 
     return start, end
 
 
-def _filtered_query(team_id: Optional[int], checkpoint_id: Optional[int],
-                    date_from: Optional[str], date_to: Optional[str]):
+def _filtered_query(team_id: int | None, checkpoint_id: int | None,
+                    date_from: str | None, date_to: str | None):
     """Return a SQLAlchemy query over Checkin with eager-loaded relations and filters applied."""
     comp_id = require_current_competition_id()
     q = (Checkin.query
@@ -78,7 +77,7 @@ def _parse_pagination() -> tuple[int, int]:
     return page, per_page
 
 
-def _parse_timestamp(payload: dict, fallback_dt: Optional[datetime] = None) -> datetime:
+def _parse_timestamp(payload: dict, fallback_dt: datetime | None = None) -> datetime:
     """
     Accepts either:
       - timestamp: ISO-8601 UTC string      (e.g. "2025-10-17T02:36:00")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Iterable, List
+from collections.abc import Iterable
 
 from flask import Blueprint, jsonify, request
 from flask_babel import gettext as _
@@ -90,8 +90,8 @@ def _group_snapshot(group: CheckpointGroup) -> dict:
     return _serialize_group(group)
 
 
-def _parse_checkpoint_ids(values: Iterable) -> List[int]:
-    ids: List[int] = []
+def _parse_checkpoint_ids(values: Iterable) -> list[int]:
+    ids: list[int] = []
     for value in values or []:
         try:
             number = int(value)
@@ -102,9 +102,9 @@ def _parse_checkpoint_ids(values: Iterable) -> List[int]:
     return ids
 
 
-def _sync_group_checkpoints(group: CheckpointGroup, ordered_ids: List[int]) -> None:
+def _sync_group_checkpoints(group: CheckpointGroup, ordered_ids: list[int]) -> None:
     existing = {link.checkpoint_id: link for link in group.checkpoint_links}
-    new_links: List[CheckpointGroupLink] = []
+    new_links: list[CheckpointGroupLink] = []
 
     for position, cp_id in enumerate(ordered_ids):
         link = existing.pop(cp_id, None)

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-from typing import List
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 from flask_babel import gettext as _
@@ -72,9 +71,9 @@ def _local_spreadsheet_id(comp_id: int) -> str:
     return f"local:{comp_id}"
 
 
-def _parse_group_fields(raw: str) -> List[dict]:
+def _parse_group_fields(raw: str) -> list[dict]:
     """Parse textarea lines of format: GroupName|field1,field2"""
-    result: List[dict] = []
+    result: list[dict] = []
     for line in raw.splitlines():
         line = line.strip()
         if not line:
@@ -625,8 +624,8 @@ def add_tab():
         return redirect(url_for("sheets_admin.list_sheets"))
 
     # Build headers horizontally for all groups
-    headers: List[str] = []
-    group_start_cols: List[int] = []
+    headers: list[str] = []
+    group_start_cols: list[int] = []
     current_col = 1
     for grp in groups:
         group_start_cols.append(current_col)

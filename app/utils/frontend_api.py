@@ -1,7 +1,7 @@
 # app/utils/frontend_api.py
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from flask import current_app, request, session
 
@@ -26,10 +26,10 @@ def _base_url() -> str:
 def api_request(method: str,
                 path: str,
                 *,
-                params: Optional[Dict[str, Any]] = None,
-                json: Optional[Dict[str, Any]] = None,
-                data: Optional[Dict[str, Any]] = None,
-                headers: Optional[Dict[str, str]] = None):
+                params: dict[str, Any] | None = None,
+                json: dict[str, Any] | None = None,
+                data: dict[str, Any] | None = None,
+                headers: dict[str, str] | None = None):
     """Call an internal API endpoint using the current session cookie."""
     if not path.startswith("/"):
         path = "/" + path
@@ -71,10 +71,10 @@ def transfer_api_cookies(api_response, flask_response):
 def api_json(method: str,
              path: str,
              *,
-             params: Optional[Dict[str, Any]] = None,
-             json: Optional[Dict[str, Any]] = None,
-             data: Optional[Dict[str, Any]] = None,
-             headers: Optional[Dict[str, str]] = None) -> Tuple[Any, Dict[str, Any]]:
+             params: dict[str, Any] | None = None,
+             json: dict[str, Any] | None = None,
+             data: dict[str, Any] | None = None,
+             headers: dict[str, str] | None = None) -> tuple[Any, dict[str, Any]]:
     resp = api_request(method, path, params=params, json=json, data=data, headers=headers)
     payload = resp.get_json(silent=True) or {}
     return resp, payload

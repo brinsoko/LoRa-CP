@@ -36,7 +36,7 @@ def main():
                     if PRINT_BYTES:
                         log(f"tcp -> serial ({len(r)} bytes): {r!r}")
                     ser.write(r)
-            except socket.timeout:
+            except TimeoutError:
                 pass
     except KeyboardInterrupt:
         pass

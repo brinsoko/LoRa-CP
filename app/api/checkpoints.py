@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, List, Optional
+from collections.abc import Iterable
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user
@@ -53,8 +53,8 @@ def _checkpoint_snapshot(cp: Checkpoint) -> dict:
     return _serialize_checkpoint(cp)
 
 
-def _parse_group_ids(values: Iterable) -> List[int]:
-    ids: List[int] = []
+def _parse_group_ids(values: Iterable) -> list[int]:
+    ids: list[int] = []
     for value in values or []:
         try:
             number = int(value)
@@ -65,12 +65,12 @@ def _parse_group_ids(values: Iterable) -> List[int]:
     return ids
 
 
-def _apply_groups(cp: Checkpoint, group_ids: List[int]) -> None:
+def _apply_groups(cp: Checkpoint, group_ids: list[int]) -> None:
     if group_ids is None:
         return
 
     existing = {link.group_id: link for link in cp.group_links}
-    new_links: List[CheckpointGroupLink] = []
+    new_links: list[CheckpointGroupLink] = []
 
     if not group_ids:
         for link in existing.values():
@@ -105,7 +105,7 @@ def _apply_groups(cp: Checkpoint, group_ids: List[int]) -> None:
     cp.group_links = new_links
 
 
-def _assign_lora_device(cp: Checkpoint, device_id: Optional[int]) -> Optional[dict]:
+def _assign_lora_device(cp: Checkpoint, device_id: int | None) -> dict | None:
     if not device_id:
         cp.lora_device = None
         return None
@@ -391,7 +391,7 @@ def checkpoint_import():
         return jsonify({"error": "validation_error", "detail": "items must be an array"}), 400
 
     created = updated = skipped = 0
-    errors: List[dict] = []
+    errors: list[dict] = []
 
     for idx, item in enumerate(items):
         if not isinstance(item, dict):

@@ -128,7 +128,7 @@ def run():
                         dlog(f"[reader] trimming buffer (len={len(buf)})")
                         buf = buf[-1024:]
 
-                except socket.timeout:
+                except TimeoutError:
                     # just idle; loop again
                     continue
 

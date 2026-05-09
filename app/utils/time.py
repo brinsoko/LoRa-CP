@@ -1,9 +1,9 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 # Storage stays UTC everywhere in the database.
 # Display happens in this single timezone (server-side conversion).
-STORAGE_TZ = timezone.utc
+STORAGE_TZ = UTC
 DISPLAY_TZ_NAME = "Europe/Ljubljana"
 DISPLAY_TZ = ZoneInfo(DISPLAY_TZ_NAME)
 
@@ -19,7 +19,7 @@ def utcnow_naive() -> datetime:
     return value matches the existing convention in this codebase: naive
     datetimes interpreted as UTC for storage in DateTime columns.
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def utc_from_timestamp_naive(ts: float) -> datetime:
@@ -27,7 +27,7 @@ def utc_from_timestamp_naive(ts: float) -> datetime:
 
     Replaces `datetime.utcfromtimestamp(ts)`, deprecated in Python 3.12+.
     """
-    return datetime.fromtimestamp(ts, tz=timezone.utc).replace(tzinfo=None)
+    return datetime.fromtimestamp(ts, tz=UTC).replace(tzinfo=None)
 
 
 def get_timezone(tz_name: str | None = None) -> ZoneInfo:
@@ -39,8 +39,8 @@ def get_timezone(tz_name: str | None = None) -> ZoneInfo:
 
 def _as_aware_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def _as_display(dt: datetime) -> datetime:
@@ -87,7 +87,7 @@ def from_datetime_local(s: str | None, tz_name: str | None = None) -> datetime |
     if local_dt is None:
         return None
     if local_dt.tzinfo is not None:
-        return local_dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return local_dt.astimezone(UTC).replace(tzinfo=None)
     aware_local = local_dt.replace(tzinfo=tz)
-    utc_dt = aware_local.astimezone(timezone.utc)
+    utc_dt = aware_local.astimezone(UTC)
     return utc_dt.replace(tzinfo=None)

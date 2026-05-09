@@ -36,7 +36,7 @@ def api_spec(filename: str):
     if path is None or not os.path.isfile(path):
         return {"error": "not_found"}, 404
     if filename.endswith(".json"):
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f), 200
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return f.read(), 200, {"Content-Type": "text/plain; charset=utf-8"}

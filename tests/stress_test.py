@@ -47,8 +47,7 @@ import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -105,7 +104,7 @@ class RequestResult:
     status_code: int
     latency_ms:  float
     success:     bool
-    error:       Optional[str] = None
+    error:       str | None = None
     ts:          float = field(default_factory=time.monotonic)
 
 
@@ -115,8 +114,8 @@ class ScenarioStats:
     total:         int = 0
     ok:            int = 0
     errors:        int = 0
-    latencies:     List[float] = field(default_factory=list)
-    status_counts: Dict[int, int] = field(default_factory=lambda: defaultdict(int))
+    latencies:     list[float] = field(default_factory=list)
+    status_counts: dict[int, int] = field(default_factory=lambda: defaultdict(int))
 
     @property
     def error_rate(self) -> float:
@@ -153,7 +152,7 @@ class ScenarioStats:
 # HTTP session factory
 # ---------------------------------------------------------------------------
 
-def _make_session(cookie: Optional[str], webhook_secret: Optional[str]) -> requests.Session:
+def _make_session(cookie: str | None, webhook_secret: str | None) -> requests.Session:
     sess = requests.Session()
     adapter = HTTPAdapter(
         max_retries=Retry(total=0),       # no retries – we want raw failures
@@ -183,7 +182,7 @@ def _random_uid(length: int = 8) -> str:
     return "".join(random.choices("0123456789ABCDEF", k=length))
 
 
-def _random_dev_id(pool: List[int]) -> int:
+def _random_dev_id(pool: list[int]) -> int:
     return random.choice(pool) if pool else random.randint(1, 10)
 
 
@@ -195,7 +194,7 @@ def _default_card_secret() -> str:
     )
 
 
-def _build_verify_payload(uid: str, dev_ids: List[int], card_secret: str, hmac_len: int) -> dict:
+def _build_verify_payload(uid: str, dev_ids: list[int], card_secret: str, hmac_len: int) -> dict:
     digests = []
     for dev_id in dev_ids:
         raw = hmac.new(
@@ -215,11 +214,11 @@ class IngestWorker:
     """Hammers POST /api/ingest at a given rate."""
 
     def __init__(self, base_url: str, session: requests.Session,
-                 competition_id: int, dev_id_pool: List[int],
-                 uid_pool: List[str], results: List[RequestResult],
+                 competition_id: int, dev_id_pool: list[int],
+                 uid_pool: list[str], results: list[RequestResult],
                  lock: threading.Lock, stop_event: threading.Event,
                  target_interval: float,
-                 ingest_password: Optional[str] = None):
+                 ingest_password: str | None = None):
         self.base_url        = base_url.rstrip("/")
         self.session         = session
         self.competition_id  = competition_id
@@ -272,7 +271,7 @@ class ReadWorker:
     """Reads /checkins/ and /checkins/export.csv to simulate judge/viewer load."""
 
     def __init__(self, base_url: str, session: requests.Session,
-                 results: List[RequestResult], lock: threading.Lock,
+                 results: list[RequestResult], lock: threading.Lock,
                  stop_event: threading.Event, interval: float = 2.0):
         self.base_url = base_url.rstrip("/")
         self.session  = session
@@ -305,8 +304,8 @@ class VerifyWorker:
     """Exercises POST /api/rfid/verify."""
 
     def __init__(self, base_url: str, session: requests.Session,
-                 competition_id: int, dev_id_pool: List[int],
-                 uid_pool: List[str], results: List[RequestResult],
+                 competition_id: int, dev_id_pool: list[int],
+                 uid_pool: list[str], results: list[RequestResult],
                  lock: threading.Lock, stop_event: threading.Event,
                  interval: float = 1.0,
                  card_secret: str = "dev-secret",
@@ -351,7 +350,7 @@ class VerifyWorker:
 class RampController:
     """Linearly ramps active worker count from 0 → max over ramp_seconds."""
 
-    def __init__(self, workers: List[threading.Thread],
+    def __init__(self, workers: list[threading.Thread],
                  ramp_seconds: float, start_delay: float = 0.1):
         self.workers      = workers
         self.ramp_seconds = ramp_seconds
@@ -374,7 +373,7 @@ class RampController:
 class MetricsTicker:
     """Prints a one-line rolling summary every second."""
 
-    def __init__(self, results: List[RequestResult],
+    def __init__(self, results: list[RequestResult],
                  lock: threading.Lock, stop_event: threading.Event):
         self.results = results
         self.lock    = lock
@@ -408,8 +407,8 @@ class MetricsTicker:
 # Aggregation & reporting
 # ---------------------------------------------------------------------------
 
-def _aggregate(results: List[RequestResult]) -> Dict[str, ScenarioStats]:
-    stats: Dict[str, ScenarioStats] = {}
+def _aggregate(results: list[RequestResult]) -> dict[str, ScenarioStats]:
+    stats: dict[str, ScenarioStats] = {}
     for r in results:
         if r.endpoint not in stats:
             stats[r.endpoint] = ScenarioStats(name=r.endpoint)
@@ -424,7 +423,7 @@ def _aggregate(results: List[RequestResult]) -> Dict[str, ScenarioStats]:
     return stats
 
 
-def _print_report(stats: Dict[str, ScenarioStats],
+def _print_report(stats: dict[str, ScenarioStats],
                   duration: float, workers: int,
                   target_rps: int):
 
@@ -505,7 +504,7 @@ def _print_report(stats: Dict[str, ScenarioStats],
             print(f"  actual_rps={actual_rps}  statuses={dict(s.status_counts)}")
 
 
-def _draw_latency_chart(results: List[RequestResult]):
+def _draw_latency_chart(results: list[RequestResult]):
     if not PLOTEXT:
         return
     ingest = [r.latency_ms for r in results if r.endpoint == INGEST_PATH]
@@ -513,7 +512,7 @@ def _draw_latency_chart(results: List[RequestResult]):
         return
     # Bucket into 1-second windows
     start = results[0].ts if results else 0
-    buckets: Dict[int, List[float]] = defaultdict(list)
+    buckets: dict[int, list[float]] = defaultdict(list)
     for r in results:
         if r.endpoint == INGEST_PATH:
             bucket = int(r.ts - start)
@@ -528,8 +527,8 @@ def _draw_latency_chart(results: List[RequestResult]):
     plt.show()
 
 
-def _save_report(stats: Dict[str, ScenarioStats],
-                 results: List[RequestResult],
+def _save_report(stats: dict[str, ScenarioStats],
+                 results: list[RequestResult],
                  args, path: str):
     report = {
         "meta": {
@@ -539,7 +538,7 @@ def _save_report(stats: Dict[str, ScenarioStats],
             "target_rps":   args.ingest_rps,
             "duration_s":   args.duration,
             "ramp_up_s":    args.ramp_up,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
         "scenarios": {},
     }
@@ -562,7 +561,7 @@ def _save_report(stats: Dict[str, ScenarioStats],
 
     # Timeline sample (1 row per second, ingest only)
     start = results[0].ts if results else 0
-    timeline: Dict[int, Dict] = {}
+    timeline: dict[int, dict] = {}
     for r in results:
         if r.endpoint != INGEST_PATH:
             continue
@@ -606,7 +605,7 @@ def _preflight(base_url: str, session: requests.Session) -> bool:
         return False
 
 
-def _discover_device_pool(base_url: str, session: requests.Session) -> List[int]:
+def _discover_device_pool(base_url: str, session: requests.Session) -> list[int]:
     try:
         resp = session.get(base_url.rstrip("/") + "/api/devices", timeout=8)
     except Exception as exc:
@@ -641,9 +640,9 @@ def _warm_verify_scope(
     base_url: str,
     session: requests.Session,
     competition_id: int,
-    dev_id_pool: List[int],
-    uid_pool: List[str],
-    ingest_password: Optional[str] = None,
+    dev_id_pool: list[int],
+    uid_pool: list[str],
+    ingest_password: str | None = None,
 ) -> None:
     if not dev_id_pool or not uid_pool:
         return
@@ -664,9 +663,9 @@ def _preflight_ingest(
     base_url: str,
     session: requests.Session,
     competition_id: int,
-    dev_id_pool: List[int],
-    uid_pool: List[str],
-    ingest_password: Optional[str] = None,
+    dev_id_pool: list[int],
+    uid_pool: list[str],
+    ingest_password: str | None = None,
 ) -> tuple[bool, str]:
     if not dev_id_pool:
         return False, "No device IDs available for ingest preflight."
@@ -701,8 +700,8 @@ def _preflight_ingest(
 def _preflight_verify(
     base_url: str,
     session: requests.Session,
-    dev_id_pool: List[int],
-    uid_pool: List[str],
+    dev_id_pool: list[int],
+    uid_pool: list[str],
     card_secret: str,
     hmac_len: int,
 ) -> tuple[bool, str]:
@@ -736,12 +735,12 @@ def _preflight_verify(
 # Seed data helpers (optional – prepopulate fake devices/UIDs when no real data)
 # ---------------------------------------------------------------------------
 
-def _seed_uid_pool(n: int = 200) -> List[str]:
+def _seed_uid_pool(n: int = 200) -> list[str]:
     """Generate a pool of plausible RFID UIDs."""
     return [_random_uid(8) for _ in range(n)]
 
 
-def _seed_dev_id_pool(start: int = 1, count: int = 5) -> List[int]:
+def _seed_dev_id_pool(start: int = 1, count: int = 5) -> list[int]:
     return list(range(start, start + count))
 
 
@@ -823,7 +822,7 @@ def run_stress_test(args):
     console.print(f"  Verify workers  : {verify_workers}")
     console.print(f"  Duration        : {args.duration}s  (ramp {args.ramp_up}s)\n")
 
-    results: List[RequestResult] = []
+    results: list[RequestResult] = []
     lock        = threading.Lock()
     stop_event  = threading.Event()
 

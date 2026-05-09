@@ -1,13 +1,11 @@
 # app/utils/status.py
 from __future__ import annotations
 
-from typing import Dict, List, Optional
-
 from app.extensions import db
 from app.models import Checkin, Checkpoint, CheckpointGroup, TeamGroup
 
 
-def get_active_group_for_team(team_id: int, competition_id: int) -> Optional[CheckpointGroup]:
+def get_active_group_for_team(team_id: int, competition_id: int) -> CheckpointGroup | None:
     """Return the currently-active CheckpointGroup for a team (if any)."""
     tg = (
         db.session.query(TeamGroup)
@@ -23,7 +21,7 @@ def get_active_group_for_team(team_id: int, competition_id: int) -> Optional[Che
         return None
     return tg.group
 
-def get_group_checkpoints(group: CheckpointGroup) -> List[Checkpoint]:
+def get_group_checkpoints(group: CheckpointGroup) -> list[Checkpoint]:
     """
     Return checkpoints for a group. With your many-to-many, this comes
     from group.checkpoints (SQLAlchemy relationship).
@@ -31,7 +29,7 @@ def get_group_checkpoints(group: CheckpointGroup) -> List[Checkpoint]:
     # You can order here if you want a specific order (e.g., by name)
     return list(group.checkpoints)
 
-def get_found_checkpoint_ids(team_id: int, competition_id: int) -> List[int]:
+def get_found_checkpoint_ids(team_id: int, competition_id: int) -> list[int]:
     """Return checkpoint IDs that the team has already checked in at."""
     rows = (
         db.session.query(Checkin.checkpoint_id)
@@ -40,7 +38,7 @@ def get_found_checkpoint_ids(team_id: int, competition_id: int) -> List[int]:
     )
     return [cp_id for (cp_id,) in rows]
 
-def compute_team_statuses(team_id: int, competition_id: int) -> Dict:
+def compute_team_statuses(team_id: int, competition_id: int) -> dict:
     """
     Compute per-checkpoint status for the team's ACTIVE group.
     Statuses: 'found' | 'not_found' and pick one 'next' (first not found).
@@ -91,7 +89,7 @@ def compute_team_statuses(team_id: int, competition_id: int) -> Dict:
         "checkpoints": items,
     }
 
-def all_checkpoints_for_map(competition_id: int) -> List[Dict]:
+def all_checkpoints_for_map(competition_id: int) -> list[dict]:
     """Return all checkpoints with coords for the public map layer.
 
     Virtual checkpoints are excluded — they have no physical location.

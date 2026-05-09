@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 from flask import Blueprint, flash, render_template, request, url_for
 
@@ -13,7 +13,7 @@ from app.utils.time import format_datetime_display
 messages_bp = Blueprint("messages", __name__, template_folder="../../templates")
 
 
-def _build_pagination(meta: Dict[str, Any], dev_id: str | None, per_page: int) -> Dict[str, Any]:
+def _build_pagination(meta: dict[str, Any], dev_id: str | None, per_page: int) -> dict[str, Any]:
     page = meta.get("page", 1)
     pages = meta.get("pages", 1) or 1
 

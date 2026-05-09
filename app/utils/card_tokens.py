@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from typing import Iterable, List
+from collections.abc import Iterable
 
 from flask import current_app
 
@@ -33,7 +33,7 @@ def compute_card_digest(uid: str, dev_id: int) -> str | None:
     return digest[:hlen]
 
 
-def match_digests(uid: str, digests: Iterable[str], device_ids: Iterable[int]) -> List[dict]:
+def match_digests(uid: str, digests: Iterable[str], device_ids: Iterable[int]) -> list[dict]:
     """
     Return a list of match records per digest:
       {"digest": "...", "matches": [dev_id, ...]}
@@ -45,7 +45,7 @@ def match_digests(uid: str, digests: Iterable[str], device_ids: Iterable[int]) -
     clean_digests = [str(d).strip().lower() for d in digests or [] if str(d).strip()]
     device_ids = [int(d) for d in device_ids or []]
 
-    results: List[dict] = []
+    results: list[dict] = []
     for dg in clean_digests:
         matched = []
         for dev_id in device_ids:

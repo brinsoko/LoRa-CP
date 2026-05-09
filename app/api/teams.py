@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 import re
-from typing import Iterable, List, Optional
+from collections.abc import Iterable
 
 from flask import Blueprint, jsonify, request
 from flask_babel import gettext as _
@@ -49,8 +49,8 @@ def _team_snapshot(team: Team) -> dict:
     return _serialize_team(team)
 
 
-def _parse_group_ids(raw_ids: Iterable) -> List[int]:
-    ids: List[int] = []
+def _parse_group_ids(raw_ids: Iterable) -> list[int]:
+    ids: list[int] = []
     for value in raw_ids or []:
         try:
             number = int(value)
@@ -61,7 +61,7 @@ def _parse_group_ids(raw_ids: Iterable) -> List[int]:
     return ids
 
 
-def _apply_group_assignment(team: Team, selected_group_id: Optional[int]) -> tuple[bool, Optional[str]]:
+def _apply_group_assignment(team: Team, selected_group_id: int | None) -> tuple[bool, str | None]:
     existing_links = {tg.group_id: tg for tg in list(team.group_assignments)}
 
     if selected_group_id is None:
@@ -296,7 +296,7 @@ def _update_team(team_id: int, partial: bool):
         team.dnf = bool(payload.get("dnf"))
 
     change_group = False
-    selected_group_id: Optional[int] = None
+    selected_group_id: int | None = None
 
     if "group_id" in payload:
         change_group = True

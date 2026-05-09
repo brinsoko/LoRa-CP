@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from typing import Dict
 
 from flask import current_app
 
@@ -35,7 +34,7 @@ def _lang_path() -> Path:
     return Path(inst) / "sheets_lang.json"
 
 
-def load_lang() -> Dict[str, str]:
+def load_lang() -> dict[str, str]:
     path = _lang_path()
     if not path.exists():
         return DEFAULT_LANG.copy()
@@ -46,7 +45,7 @@ def load_lang() -> Dict[str, str]:
         return DEFAULT_LANG.copy()
 
 
-def save_lang(payload: Dict[str, str]) -> None:
+def save_lang(payload: dict[str, str]) -> None:
     path = _lang_path()
     merged = {**DEFAULT_LANG, **(payload or {})}
     path.write_text(json.dumps(merged, ensure_ascii=False, indent=2))

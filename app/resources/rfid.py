@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import csv
 import io
-from typing import Optional
 
 from flask import Blueprint, jsonify, request
 from flask_babel import gettext as _
@@ -38,7 +37,7 @@ def _serialize_card(card: RFIDCard) -> dict:
     }
 
 
-def _parse_card_payload(payload: dict, require_team: bool = True) -> tuple[Optional[str], Optional[int], Optional[int], Optional[str]]:
+def _parse_card_payload(payload: dict, require_team: bool = True) -> tuple[str | None, int | None, int | None, str | None]:
     uid_raw = (payload.get("uid") or "").strip()
     uid = normalize_uid(uid_raw)
     if not uid:

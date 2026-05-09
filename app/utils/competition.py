@@ -4,7 +4,6 @@ from __future__ import annotations
 import secrets
 from datetime import timedelta
 from types import SimpleNamespace
-from typing import Optional
 
 from flask import session
 from flask_login import current_user
@@ -91,7 +90,7 @@ def _is_member(user_id: int, competition_id: int) -> bool:
     )
 
 
-def get_current_competition_id() -> Optional[int]:
+def get_current_competition_id() -> int | None:
     if not current_user.is_authenticated:
         return None
 
@@ -166,7 +165,7 @@ def get_current_membership(user_id: int | None = None) -> CompetitionMember | No
     )
 
 
-def get_current_competition_role() -> Optional[str]:
+def get_current_competition_role() -> str | None:
     if current_user.is_authenticated and (current_user.role or "").strip().lower() == "superadmin":
         return "admin"
     membership = get_current_membership()
@@ -175,7 +174,7 @@ def get_current_competition_role() -> Optional[str]:
     return (membership.role or "").strip().lower() or None
 
 
-def require_current_competition_id() -> Optional[int]:
+def require_current_competition_id() -> int | None:
     comp_id = get_current_competition_id()
     return comp_id
 
