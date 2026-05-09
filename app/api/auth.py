@@ -79,6 +79,7 @@ def auth_logout():
 
 
 @auth_api_bp.post("/api/auth/password")
+@limiter.limit("10 per minute; 60 per hour", methods=["POST"])
 @json_login_required
 def auth_change_password():
     data, err_resp, err_code = _json()

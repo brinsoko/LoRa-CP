@@ -63,3 +63,15 @@ class Config:
     # MUST be off when the Flask container is reachable directly,
     # otherwise clients can spoof these headers.
     TRUST_PROXY_HEADERS = _env_bool("TRUST_PROXY_HEADERS", os.getenv("FLASK_ENV") == "production")
+
+    # Session cookie hardening.
+    # - HTTPONLY: always on (defence against XSS reading the cookie).
+    # - SECURE: required in production so the cookie is never sent over
+    #   plain HTTP. Off in dev so `flask run` (http://localhost:...)
+    #   can still authenticate.
+    # - SAMESITE=Lax: blocks cross-site POSTs (CSRF defence in depth)
+    #   while allowing top-level navigations (so OAuth callbacks and
+    #   external links into the app still work).
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SECURE = _env_bool("SESSION_COOKIE_SECURE", os.getenv("FLASK_ENV") == "production")
+    SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
