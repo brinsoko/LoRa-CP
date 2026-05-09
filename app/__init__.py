@@ -48,8 +48,12 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     # Trust X-Forwarded-* headers from a single reverse proxy hop (Caddy in
     # prod). Without this, OAuth redirect_uri uses the internal scheme/host
     # (`http://web:5000/...`) which Google rejects as a redirect mismatch.
-    # Safe in dev too: it's a no-op when no proxy headers are present.
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    # Gated behind TRUST_PROXY_HEADERS — defaults to on in production, off
+    # otherwise. ProxyFix without an actual proxy in front lets clients
+    # spoof X-Forwarded-Host / X-Forwarded-Proto, so it must NOT be enabled
+    # when the Flask container is reachable directly.
+    if app.config.get("TRUST_PROXY_HEADERS"):
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     os.makedirs(app.instance_path, exist_ok=True)
 

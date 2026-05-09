@@ -55,3 +55,11 @@ class Config:
     GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
     WTF_CSRF_ENABLED = _env_bool("WTF_CSRF_ENABLED", True)
     TEMPLATES_AUTO_RELOAD = os.getenv("FLASK_ENV") != "production"
+
+    # Trust X-Forwarded-* headers from a single reverse-proxy hop.
+    # Required when the app sits behind Caddy / nginx / similar so that
+    # request.scheme/host reflect the public URL (OAuth redirect_uri,
+    # url_for(_external=True), rate limiter client IP, etc.).
+    # MUST be off when the Flask container is reachable directly,
+    # otherwise clients can spoof these headers.
+    TRUST_PROXY_HEADERS = _env_bool("TRUST_PROXY_HEADERS", os.getenv("FLASK_ENV") == "production")
