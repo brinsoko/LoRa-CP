@@ -301,7 +301,7 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
 
         print("Seeding users...")
         admin_user = (os.environ.get("SEED_ADMIN_USER") or "admin").strip()
-        admin_pass = os.environ.get("SEED_ADMIN_PASS") or "change-me-now"
+        admin_pass = os.environ.get("SEED_ADMIN_PASS") or "admin123"
         admin_role = (os.environ.get("SEED_ADMIN_ROLE") or "admin").strip().lower()
         if admin_role not in ("public", "judge", "admin", "superadmin"):
             admin_role = "admin"

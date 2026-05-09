@@ -278,13 +278,13 @@ def import_checkpoints_json():
     if not payload_text:
         payload_text = (request.form.get("payload") or "").strip()
     if not payload_text:
-        flash("Paste JSON payload to import.", "warning")
+        flash(_("Paste JSON payload to import."), "warning")
         return redirect(url_for("checkpoints.import_checkpoints_json"))
 
     try:
         parsed = json.loads(payload_text)
     except Exception as exc:
-        flash(f"Invalid JSON: {exc}", "warning")
+        flash(_("Invalid JSON: %(error)s", error=str(exc)), "warning")
         return redirect(url_for("checkpoints.import_checkpoints_json"))
 
     items = None
@@ -307,27 +307,31 @@ def import_checkpoints_json():
         items = converted
 
     if not items:
-        flash("JSON must be an array of checkpoints, an object with 'items', or an object with 'cps' list.", "warning")
+        flash(
+            _("JSON must be an array of checkpoints, an object with 'items', or an object with 'cps' list."),
+            "warning",
+        )
         return redirect(url_for("checkpoints.import_checkpoints_json"))
 
     resp, payload = api_json("POST", "/api/checkpoints/import", json={"items": items})
     if resp.status_code != 200:
-        detail = payload.get("detail") or payload.get("error") or "Import failed."
-        flash(f"Import failed: {detail}", "warning")
+        detail = payload.get("detail") or payload.get("error") or _("Import failed.")
+        flash(_("Import failed: %(detail)s", detail=detail), "warning")
         return redirect(url_for("checkpoints.import_checkpoints_json"))
 
     summary = payload.get("summary") or {}
     errors = payload.get("errors") or []
     flash(
-        (
-            f"Imported checkpoints: created {summary.get('created', 0)}, "
-            f"updated {summary.get('updated', 0)}, "
-            f"skipped {summary.get('skipped', 0)}."
+        _(
+            "Imported checkpoints: created %(created)s, updated %(updated)s, skipped %(skipped)s.",
+            created=summary.get("created", 0),
+            updated=summary.get("updated", 0),
+            skipped=summary.get("skipped", 0),
         ),
         "success",
     )
     if errors:
-        flash(f"{len(errors)} row(s) reported errors; see logs.", "warning")
+        flash(_("%(count)s row(s) reported errors; see logs.", count=len(errors)), "warning")
         current_app.logger.warning("Checkpoint import errors: %s", errors)
 
     return redirect(url_for("checkpoints.list_checkpoints"))

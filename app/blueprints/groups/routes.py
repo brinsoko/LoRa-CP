@@ -120,7 +120,7 @@ def add_group():
 def edit_group(group_id: int):
     group_resp, group_payload = api_json("GET", f"/api/groups/{group_id}")
     if group_resp.status_code != 200:
-        flash("Group not found.", "warning")
+        flash(_("Group not found."), "warning")
         return redirect(url_for("groups.list_groups"))
 
     group = group_payload

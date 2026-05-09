@@ -10,7 +10,7 @@ from sqlalchemy import text
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from app.utils.time import to_datetime_local
+from app.utils.time import DISPLAY_TZ_NAME, to_datetime_local
 
 from .api.auth import auth_api_bp
 from .api.checkpoints import checkpoints_api_bp
@@ -290,6 +290,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
             available_competitions=(
                 get_user_competitions(current_user.id) if getattr(current_user, "is_authenticated", False) else []
             ),
+            display_timezone=DISPLAY_TZ_NAME,
         )
 
     return app

@@ -48,8 +48,8 @@
 
         <div class="col-md-4">
           <label class="form-label">{{ _('Time zone') }}</label>
-          <input type="hidden" name="timezone" value="Europe/Ljubljana">
-          <input type="text" class="form-control" value="Europe/Ljubljana" disabled>
+          <input type="hidden" name="timezone" value="{{ display_timezone }}">
+          <input type="text" class="form-control" value="{{ display_timezone }}" disabled>
           <div class="form-text">{{ _('Times are entered in local time and stored in UTC.') }}</div>
         </div>
       </div>
