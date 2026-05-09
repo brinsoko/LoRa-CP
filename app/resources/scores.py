@@ -10,7 +10,6 @@ from app.models import (
     Checkin,
     Checkpoint,
     CompetitionMember,
-    GlobalScoreRule,
     JudgeCheckpoint,
     RFIDCard,
     ScoreEntry,
@@ -73,14 +72,6 @@ def _get_score_rule(competition_id: int, checkpoint_id: int, group_id: int) -> d
         ScoreRule.competition_id == competition_id,
         ScoreRule.checkpoint_id == checkpoint_id,
         ScoreRule.group_id == group_id,
-    ).first()
-    return rule.rules if rule else None
-
-
-def _get_global_score_rule(competition_id: int, group_id: int) -> dict | None:
-    rule = GlobalScoreRule.query.filter(
-        GlobalScoreRule.competition_id == competition_id,
-        GlobalScoreRule.group_id == group_id,
     ).first()
     return rule.rules if rule else None
 
@@ -211,28 +202,6 @@ def _apply_field_rule(value, rule, context: dict) -> float | None:
         points = max(max_points - penalty, min_points)
         return _round_score(_clamp_non_negative(points))
     return _round_score(_to_number(value))
-
-
-def _parse_time_to_seconds(value) -> float | None:
-    if value is None or value == "":
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    text = str(value).strip()
-    if ":" in text:
-        parts = text.split(":")
-        try:
-            parts = [float(p) for p in parts]
-        except Exception:
-            return None
-        while len(parts) < 3:
-            parts.insert(0, 0.0)
-        hours, minutes, seconds = parts[-3], parts[-2], parts[-1]
-        return hours * 3600 + minutes * 60 + seconds
-    try:
-        return float(text)
-    except Exception:
-        return None
 
 
 def _get_team_dead_time_total(competition_id: int, team_id: int) -> float:
