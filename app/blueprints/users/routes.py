@@ -232,7 +232,9 @@ def edit_user(user_id: int):
             return render_template("user_edit.html", mode="edit", u=u, membership=membership)
 
         u.username = username
-        u.role = "public" if role == "viewer" else role
+        # User.role is the system-level role (superadmin/public) and is
+        # left untouched here. The per-competition role lives only in
+        # CompetitionMember.
         if membership:
             membership.role = role
 

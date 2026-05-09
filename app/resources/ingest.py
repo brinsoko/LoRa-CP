@@ -225,8 +225,14 @@ def ingest_post():
             "detail": "Competition not found.",
         }, 404
 
+    # The competition-level ingest password gates non-webhook callers.
+    # An authenticated user may skip it only if they are an active
+    # admin/judge of *this* competition — same rule as the webhook secret
+    # bypass above. Previously any authenticated user (including a viewer
+    # from another competition) could bypass.
     if competition.ingest_password_hash and not (
-        current_user.is_authenticated or competition.check_ingest_password(ingest_password)
+        _ingest_member_can_bypass_secret(current_user, competition_id)
+        or competition.check_ingest_password(ingest_password)
     ):
         return {
             "ok": False,

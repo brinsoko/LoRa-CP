@@ -8,13 +8,23 @@ from app.utils.competition import get_current_competition_role
 
 
 def _current_role_set():
+    """Roles in scope for the *currently selected* competition.
+
+    Only the user's CompetitionMember.role for the active competition counts.
+    The global User.role field is intentionally NOT unioned in here — that
+    field is reserved for the system-level "superadmin" role, which is
+    handled as an explicit bypass below. Doing the union allowed roles to
+    leak across competitions (e.g. an admin in one comp passing admin
+    gates in another)."""
     roles = set()
     comp_role = (get_current_competition_role() or "").strip().lower()
-    global_role = (getattr(current_user, "role", None) or "").strip().lower()
     if comp_role:
         roles.add(comp_role)
-    if global_role:
-        roles.add(global_role)
+    # Superadmin is a system-level bypass: it satisfies any per-competition
+    # role gate without requiring a CompetitionMember row.
+    global_role = (getattr(current_user, "role", None) or "").strip().lower()
+    if global_role == "superadmin":
+        roles.update({"superadmin", "admin", "judge", "viewer"})
     return roles
 
 

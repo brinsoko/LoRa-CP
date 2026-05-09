@@ -173,8 +173,12 @@ def users_create():
     if err:
         return jsonify({"error": err}), 400
 
-    user_role = "public" if role == "viewer" else role
-    u = User(username=username, role=user_role, email=email)
+    # User.role is the *system-level* role and stays "public" for everyone
+    # except explicitly seeded superadmins (see scripts/create_admin.py and
+    # scripts/seed_db.py). The per-competition role lives only in
+    # CompetitionMember.role. Mixing them previously let a "judge" in one
+    # competition pass judge gates in another.
+    u = User(username=username, role="public", email=email)
     u.set_password(password)
     db.session.add(u)
     db.session.flush()
@@ -253,7 +257,8 @@ def users_patch(user_id: int):
         return jsonify({"error": "Username already exists"}), 409
 
     u.username = new_username
-    u.role = "public" if new_role == "viewer" else new_role
+    # User.role is the system-level role (superadmin/public) and is left
+    # untouched here. The per-competition role lives in CompetitionMember.
     if membership:
         membership.role = new_role
 

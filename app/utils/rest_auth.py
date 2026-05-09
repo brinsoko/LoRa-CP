@@ -8,13 +8,16 @@ from app.utils.competition import get_current_competition_role, require_current_
 
 
 def _current_role_set():
+    """See app/utils/perms.py:_current_role_set for rationale.
+    Only the per-competition role counts; the global User.role is
+    used solely for the "superadmin" system bypass."""
     roles = set()
     comp_role = (get_current_competition_role() or "").strip().lower()
-    global_role = (getattr(current_user, "role", None) or "").strip().lower()
     if comp_role:
         roles.add(comp_role)
-    if global_role:
-        roles.add(global_role)
+    global_role = (getattr(current_user, "role", None) or "").strip().lower()
+    if global_role == "superadmin":
+        roles.update({"superadmin", "admin", "judge", "viewer"})
     return roles
 
 
