@@ -38,6 +38,9 @@ help:
 	@echo "  make test-extended     - run extended regression suite"
 	@echo "  make cov               - run tests with coverage"
 	@echo "  make i18n-compile      - compile translations (.po -> .mo)"
+	@echo "  make lint              - ruff check (read-only)"
+	@echo "  make lint-fix          - ruff check --fix (apply safe autofixes)"
+	@echo "  make format            - ruff format (rewrites files; opt-in)"
 	@echo "  make openapi           - regenerate docs/openapi.json from live url_map"
 	@echo "  make openapi-check     - fail if openapi.json is out of sync (CI use)"
 	@echo "  make smoke-int         - run integer-input smoke script"
@@ -105,9 +108,23 @@ test-extended:
 cov:
 	$(PYTEST) --cov=app --cov-report=term-missing tests $(TEST_ARGS)
 
-.PHONY: i18n-compile openapi openapi-check smoke-int stress-help
+.PHONY: i18n-compile lint lint-fix format openapi openapi-check smoke-int stress-help
 i18n-compile:
 	$(PYBABEL) compile -d app/translations
+
+# Lint: read-only check. Configured in pyproject.toml.
+lint:
+	$(VENV_BIN)ruff check .
+
+# Apply safe auto-fixes (unused imports, redundant f-strings, etc.).
+# Review the diff before committing.
+lint-fix:
+	$(VENV_BIN)ruff check --fix .
+
+# Black-equivalent formatting. Not run automatically — invoking this
+# rewrites files in place, so prefer doing it as a dedicated commit.
+format:
+	$(VENV_BIN)ruff format .
 
 openapi:
 	$(PYTHON) scripts/generate_openapi.py

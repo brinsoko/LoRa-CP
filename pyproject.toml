@@ -1,0 +1,46 @@
+[tool.ruff]
+# Match the runtime target so type-aware rules + autofixes use the right syntax.
+target-version = "py313"
+# Wider than ruff's default 88 — existing code has a lot of moderately long
+# lines and reflowing them would create churn for no real readability win.
+line-length = 120
+
+# Don't lint third-party or build artifacts.
+extend-exclude = [
+    "venv",
+    "venv*",
+    ".venv",
+    "alembic/versions",
+    "ESP_*",
+    "2025_data",
+]
+
+[tool.ruff.lint]
+# Conservative starter set: just F (pyflakes) — catches real bugs like
+# undefined names and unused imports without flagging stylistic things
+# that would require a code-wide cleanup pass.
+#
+# Future graduations to consider, one at a time:
+#   "I"   — isort import ordering (creates churn, fix in a separate pass)
+#   "B"   — flake8-bugbear (real bug-prone patterns; usually low noise)
+#   "UP"  — pyupgrade (suggests modern syntax, useful after Python bumps)
+#   "E", "W" — pycodestyle (style warnings; lots of pre-existing noise)
+select = ["F"]
+
+# Keep the noqa intent we already had: `# noqa: F401` on the model
+# registration import in app/__init__.py is honored automatically by ruff.
+
+[tool.ruff.lint.per-file-ignores]
+# Test files are allowed to do test-y things.
+"tests/**/*.py" = ["F841"]
+# stress_test imports rich modules conditionally inside try/except guards;
+# treat its imports as documentation rather than enforce strictness there.
+"tests/stress_test.py" = ["F401", "F841"]
+
+[tool.ruff.format]
+# Black-compatible settings; not run automatically — invoked via `make format`
+# when someone wants to opt in. Documenting the choice here so a future
+# format pass produces predictable output.
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

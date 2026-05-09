@@ -20,16 +20,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Lint — fail on undefined names
-        # Catches real bugs like a missing import after a refactor (the
-        # datetime/utcnow_naive sweep produced one). Unused-import lines
-        # are intentionally NOT fatal: cleanup is a separate gradual
-        # concern and some imports are kept for side effects.
-        run: |
-          if pyflakes app/ scripts/ 2>&1 | grep "undefined name"; then
-            echo "::error::pyflakes found undefined names"
-            exit 1
-          fi
+      - name: Lint
+        # Ruff replaces pyflakes here. The rule set (just F today) is
+        # configured in pyproject.toml so local `make lint` and CI agree.
+        run: ruff check .
 
       - name: Run tests
         run: pytest --cov=app --cov-report=term-missing tests/ -v
