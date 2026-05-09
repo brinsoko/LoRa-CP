@@ -23,10 +23,12 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
+
 @login_manager.user_loader
 def load_user(user_id: str):
     # Local import prevents circular dependency at import time
     from app.models import User
+
     try:
         return db.session.get(User, int(user_id))
     except Exception:

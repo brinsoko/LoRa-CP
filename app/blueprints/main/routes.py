@@ -22,7 +22,8 @@ from app.utils.redirects import safe_redirect_target
 from app.utils.time import utcnow_naive
 from app.utils.validators import validate_email, validate_text
 
-main_bp = Blueprint('main', __name__)
+main_bp = Blueprint("main", __name__)
+
 
 @main_bp.route("/")
 def index():
@@ -33,12 +34,7 @@ def index():
 
 @main_bp.route("/public-results", methods=["GET"])
 def public_results():
-    competitions = (
-        Competition.query
-        .filter(Competition.public_results.is_(True))
-        .order_by(Competition.name.asc())
-        .all()
-    )
+    competitions = Competition.query.filter(Competition.public_results.is_(True)).order_by(Competition.name.asc()).all()
     return render_template("public_results.html", competitions=competitions)
 
 
@@ -80,14 +76,10 @@ def create_competition():
         )
     )
     db.session.flush()
-    membership = (
-        CompetitionMember.query
-        .filter(
-            CompetitionMember.competition_id == competition.id,
-            CompetitionMember.user_id == current_user.id,
-        )
-        .first()
-    )
+    membership = CompetitionMember.query.filter(
+        CompetitionMember.competition_id == competition.id,
+        CompetitionMember.user_id == current_user.id,
+    ).first()
     record_audit_event(
         competition_id=competition.id,
         event_type="competition_created",
@@ -139,24 +131,31 @@ def set_language(lang_code: str):
 def _parse_date_range(date_from_str, date_to_str):
     start = end = None
     try:
-        if date_from_str: start = datetime.fromisoformat(date_from_str)
-        if date_to_str: end = datetime.fromisoformat(date_to_str) + timedelta(days=1)
+        if date_from_str:
+            start = datetime.fromisoformat(date_from_str)
+        if date_to_str:
+            end = datetime.fromisoformat(date_to_str) + timedelta(days=1)
     except ValueError:
         pass
     return start, end
 
+
 def _filtered_checkins(team_id, checkpoint_id, date_from_str, date_to_str):
     comp_id = get_current_competition_id()
-    q = (Checkin.query
-         .options(joinedload(Checkin.team), joinedload(Checkin.checkpoint)))
+    q = Checkin.query.options(joinedload(Checkin.team), joinedload(Checkin.checkpoint))
     if comp_id:
         q = q.filter(Checkin.competition_id == comp_id)
-    if team_id: q = q.filter(Checkin.team_id == team_id)
-    if checkpoint_id: q = q.filter(Checkin.checkpoint_id == checkpoint_id)
+    if team_id:
+        q = q.filter(Checkin.team_id == team_id)
+    if checkpoint_id:
+        q = q.filter(Checkin.checkpoint_id == checkpoint_id)
     date_from, date_to = _parse_date_range(date_from_str, date_to_str)
-    if date_from: q = q.filter(Checkin.timestamp >= date_from)
-    if date_to: q = q.filter(Checkin.timestamp < date_to)
+    if date_from:
+        q = q.filter(Checkin.timestamp >= date_from)
+    if date_to:
+        q = q.filter(Checkin.timestamp < date_to)
     return q.order_by(Checkin.timestamp.desc())
+
 
 @main_bp.route("/checkins")
 def view_checkins():
@@ -166,32 +165,46 @@ def view_checkins():
         return redirect(url_for("main.select_competition"))
     teams = Team.query.filter(Team.competition_id == comp_id).order_by(Team.name.asc()).all()
     cps = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
-    team_id = request.args.get('team_id', type=int)
-    cp_id = request.args.get('checkpoint_id', type=int)
-    df = request.args.get('date_from')
-    dt = request.args.get('date_to')
+    team_id = request.args.get("team_id", type=int)
+    cp_id = request.args.get("checkpoint_id", type=int)
+    df = request.args.get("date_from")
+    dt = request.args.get("date_to")
     checkins = _filtered_checkins(team_id, cp_id, df, dt).all()
-    return render_template("view_checkins.html",
-        checkins=checkins, teams=teams, checkpoints=cps,
-        selected_team_id=team_id, selected_checkpoint_id=cp_id,
-        selected_date_from=df or "", selected_date_to=dt or "")
+    return render_template(
+        "view_checkins.html",
+        checkins=checkins,
+        teams=teams,
+        checkpoints=cps,
+        selected_team_id=team_id,
+        selected_checkpoint_id=cp_id,
+        selected_date_from=df or "",
+        selected_date_to=dt or "",
+    )
+
 
 @main_bp.route("/checkins.csv")
 def export_checkins_csv():
-    team_id = request.args.get('team_id', type=int)
-    cp_id = request.args.get('checkpoint_id', type=int)
-    df = request.args.get('date_from'); dt = request.args.get('date_to')
+    team_id = request.args.get("team_id", type=int)
+    cp_id = request.args.get("checkpoint_id", type=int)
+    df = request.args.get("date_from")
+    dt = request.args.get("date_to")
     rows = _filtered_checkins(team_id, cp_id, df, dt).all()
-    si = io.StringIO(); w = csv.writer(si)
-    w.writerow(["timestamp_utc","team_id","team_name","checkpoint_id","checkpoint_name"])
+    si = io.StringIO()
+    w = csv.writer(si)
+    w.writerow(["timestamp_utc", "team_id", "team_name", "checkpoint_id", "checkpoint_name"])
     for r in rows:
-        w.writerow([r.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                    r.team.id if r.team else "",
-                    escape_formula_cell(r.team.name) if r.team else "",
-                    r.checkpoint.id if r.checkpoint else "",
-                    escape_formula_cell(r.checkpoint.name) if r.checkpoint else ""])
-    return Response(si.getvalue(), mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=checkins.csv"})
+        w.writerow(
+            [
+                r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                r.team.id if r.team else "",
+                escape_formula_cell(r.team.name) if r.team else "",
+                r.checkpoint.id if r.checkpoint else "",
+                escape_formula_cell(r.checkpoint.name) if r.checkpoint else "",
+            ]
+        )
+    return Response(
+        si.getvalue(), mimetype="text/csv", headers={"Content-Disposition": "attachment; filename=checkins.csv"}
+    )
 
 
 @main_bp.route("/competition/settings", methods=["GET", "POST"])
@@ -218,16 +231,12 @@ def competition_settings():
             if role not in ("viewer", "judge", "admin"):
                 flash(_("Invalid role selected."), "warning")
                 return redirect(url_for("main.competition_settings"))
-            existing_invite = (
-                CompetitionInvite.query
-                .filter(
-                    CompetitionInvite.competition_id == competition.id,
-                    CompetitionInvite.invited_email.ilike(email),
-                    CompetitionInvite.used_at.is_(None),
-                    CompetitionInvite.expires_at > utcnow_naive(),
-                )
-                .first()
-            )
+            existing_invite = CompetitionInvite.query.filter(
+                CompetitionInvite.competition_id == competition.id,
+                CompetitionInvite.invited_email.ilike(email),
+                CompetitionInvite.used_at.is_(None),
+                CompetitionInvite.expires_at > utcnow_naive(),
+            ).first()
             if existing_invite:
                 flash(_("An active invite already exists for this email."), "warning")
                 return redirect(url_for("main.competition_settings"))
@@ -235,14 +244,10 @@ def competition_settings():
             invite = create_invite(competition.id, current_user.id, role=role, invited_email=email)
             user = User.query.filter(User.email.ilike(email)).first()
             if user:
-                membership = (
-                    CompetitionMember.query
-                    .filter(
-                        CompetitionMember.competition_id == competition.id,
-                        CompetitionMember.user_id == user.id,
-                    )
-                    .first()
-                )
+                membership = CompetitionMember.query.filter(
+                    CompetitionMember.competition_id == competition.id,
+                    CompetitionMember.user_id == user.id,
+                ).first()
                 if not membership:
                     db.session.add(
                         CompetitionMember(
@@ -262,17 +267,18 @@ def competition_settings():
                 entity_id=invite.id,
                 actor_user=current_user,
                 summary=f"Invite saved for {email}.",
-                details={"invite_id": invite.id, "email": email, "role": role, "auto_attached_user_id": user.id if user else None},
+                details={
+                    "invite_id": invite.id,
+                    "email": email,
+                    "role": role,
+                    "auto_attached_user_id": user.id if user else None,
+                },
             )
             if user:
-                membership = (
-                    CompetitionMember.query
-                    .filter(
-                        CompetitionMember.competition_id == competition.id,
-                        CompetitionMember.user_id == user.id,
-                    )
-                    .first()
-                )
+                membership = CompetitionMember.query.filter(
+                    CompetitionMember.competition_id == competition.id,
+                    CompetitionMember.user_id == user.id,
+                ).first()
                 if membership:
                     record_audit_event(
                         competition_id=competition.id,
@@ -281,7 +287,12 @@ def competition_settings():
                         entity_id=membership.id,
                         actor_user=current_user,
                         summary=f"User {user.username} added to the competition.",
-                        details={"user_id": user.id, "username": user.username, "role": membership.role, "active": membership.active},
+                        details={
+                            "user_id": user.id,
+                            "username": user.username,
+                            "role": membership.role,
+                            "active": membership.active,
+                        },
                     )
             db.session.commit()
             flash(_("Invite saved."), "success")
@@ -302,11 +313,7 @@ def competition_settings():
         if name_error:
             flash(_(name_error), "warning")
             return redirect(url_for("main.competition_settings"))
-        existing = (
-            Competition.query
-            .filter(Competition.id != competition.id, Competition.name == new_name)
-            .first()
-        )
+        existing = Competition.query.filter(Competition.id != competition.id, Competition.name == new_name).first()
         if existing:
             flash(_("A competition with that name already exists."), "warning")
             return redirect(url_for("main.competition_settings"))
@@ -344,8 +351,7 @@ def competition_settings():
     public_url = url_for("scores.public_scores", competition_id=competition.id, _external=True)
     now = utcnow_naive()
     invites = (
-        CompetitionInvite.query
-        .filter(CompetitionInvite.competition_id == competition.id)
+        CompetitionInvite.query.filter(CompetitionInvite.competition_id == competition.id)
         .order_by(CompetitionInvite.created_at.desc())
         .all()
     )
@@ -356,13 +362,15 @@ def competition_settings():
             status = "used"
         elif inv.expires_at and inv.expires_at < now:
             status = "expired"
-        invite_rows.append({
-            "email": inv.invited_email or "",
-            "role": inv.role,
-            "status": status,
-            "expires_at": inv.expires_at,
-            "id": inv.id,
-        })
+        invite_rows.append(
+            {
+                "email": inv.invited_email or "",
+                "role": inv.role,
+                "status": status,
+                "expires_at": inv.expires_at,
+                "id": inv.id,
+            }
+        )
     return render_template(
         "competition_settings.html",
         competition=competition,
@@ -379,14 +387,10 @@ def revoke_invite(invite_id: int):
         flash(_("Select a competition first."), "warning")
         return redirect(url_for("main.select_competition"))
 
-    invite = (
-        CompetitionInvite.query
-        .filter(
-            CompetitionInvite.id == invite_id,
-            CompetitionInvite.competition_id == comp_id,
-        )
-        .first()
-    )
+    invite = CompetitionInvite.query.filter(
+        CompetitionInvite.id == invite_id,
+        CompetitionInvite.competition_id == comp_id,
+    ).first()
     if not invite:
         flash(_("Invite not found."), "warning")
         return redirect(url_for("main.competition_settings"))

@@ -44,13 +44,15 @@ def _decorate_messages(messages: list[dict]) -> list[dict]:
         except Exception:
             dt = None
         display_ts = format_datetime_display(dt) if dt else (ts or "—")
-        decorated.append({
-            "dev_id": msg.get("dev_id"),
-            "payload": msg.get("payload"),
-            "rssi": msg.get("rssi"),
-            "snr": msg.get("snr"),
-            "display_received_at": display_ts,
-        })
+        decorated.append(
+            {
+                "dev_id": msg.get("dev_id"),
+                "payload": msg.get("payload"),
+                "rssi": msg.get("rssi"),
+                "snr": msg.get("snr"),
+                "display_received_at": display_ts,
+            }
+        )
     return decorated
 
 

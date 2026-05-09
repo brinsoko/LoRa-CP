@@ -25,4 +25,3 @@ def safe_redirect_target(target: str | None, default: str) -> str:
 def safe_next_from_request(default_endpoint: str = "main.index") -> str:
     target = request.args.get("next") or request.form.get("next")
     return safe_redirect_target(target, url_for(default_endpoint))
-

@@ -8,6 +8,7 @@ See docs/test-spreadsheet-setup.md for full setup instructions.
 Run with: pytest -m sheets
 Skip with: pytest -m "not sheets"
 """
+
 from __future__ import annotations
 
 import os
@@ -55,14 +56,13 @@ def sheets_app(app_factory):
     """App with sheets sync enabled and service account configured."""
     overrides = {"SHEETS_SYNC_ENABLED": True}
     if SA_FILE:
-        overrides["GOOGLE_SERVICE_ACCOUNT_FILE"] = (
-            os.path.abspath(SA_FILE) if not os.path.isabs(SA_FILE) else SA_FILE
-        )
+        overrides["GOOGLE_SERVICE_ACCOUNT_FILE"] = os.path.abspath(SA_FILE) if not os.path.isabs(SA_FILE) else SA_FILE
     if SA_JSON:
         overrides["GOOGLE_SERVICE_ACCOUNT_JSON"] = SA_JSON
     application = app_factory(**overrides)
     with application.app_context():
         from app.utils.sheets_settings import save_settings
+
         save_settings({"sync_enabled": True})
         yield application
 
@@ -103,15 +103,17 @@ def _seeded(sheets_app, sheets_client):
         (ci2, t2, cp1, 30),
         (ci3, t3, cp2, 18),
     ]:
-        db.session.add(ScoreEntry(
-            competition_id=comp.id,
-            checkin_id=ci.id,
-            team_id=team.id,
-            checkpoint_id=cp.id,
-            judge_user_id=user.id,
-            raw_fields={"task1": total // 2, "task2": total - total // 2},
-            total=total,
-        ))
+        db.session.add(
+            ScoreEntry(
+                competition_id=comp.id,
+                checkin_id=ci.id,
+                team_id=team.id,
+                checkpoint_id=cp.id,
+                judge_user_id=user.id,
+                raw_fields={"task1": total // 2, "task2": total - total // 2},
+                total=total,
+            )
+        )
     db.session.commit()
 
     login_as(sheets_client, user, comp)
@@ -134,6 +136,7 @@ def _get_gc():
         creds = Credentials.from_service_account_file(sa, scopes=scopes)
     elif SA_JSON:
         import json as _json
+
         creds = Credentials.from_service_account_info(_json.loads(SA_JSON), scopes=scopes)
     else:
         pytest.skip("No service account credentials found")
@@ -203,10 +206,13 @@ class TestBuildArrivalsMatrix:
         _run_wizard(sheets_client, checkpoints, "test_")
 
         tab_name = "test_arrivals"
-        resp = sheets_client.post("/sheets/build-arrivals", data={
-            "spreadsheet_id": SPREADSHEET_ID,
-            "tab_name": tab_name,
-        })
+        resp = sheets_client.post(
+            "/sheets/build-arrivals",
+            data={
+                "spreadsheet_id": SPREADSHEET_ID,
+                "tab_name": tab_name,
+            },
+        )
         assert resp.status_code in (200, 302)
         time.sleep(3)
 
@@ -229,10 +235,13 @@ class TestBuildTeamsRoster:
         _cleanup_tabs(spreadsheet, "test_")
 
         tab_name = "test_teams"
-        resp = sheets_client.post("/sheets/build-teams", data={
-            "spreadsheet_id": SPREADSHEET_ID,
-            "tab_name": tab_name,
-        })
+        resp = sheets_client.post(
+            "/sheets/build-teams",
+            data={
+                "spreadsheet_id": SPREADSHEET_ID,
+                "tab_name": tab_name,
+            },
+        )
         assert resp.status_code in (200, 302)
         time.sleep(3)
 
@@ -258,11 +267,14 @@ class TestBuildScoreSheet:
         _run_wizard(sheets_client, checkpoints, "test_")
 
         tab_name = "test_scores"
-        resp = sheets_client.post("/sheets/build-score", data={
-            "spreadsheet_id": SPREADSHEET_ID,
-            "tab_name": tab_name,
-            "group_id": group.id,
-        })
+        resp = sheets_client.post(
+            "/sheets/build-score",
+            data={
+                "spreadsheet_id": SPREADSHEET_ID,
+                "tab_name": tab_name,
+                "group_id": group.id,
+            },
+        )
         assert resp.status_code in (200, 302)
         time.sleep(3)
 

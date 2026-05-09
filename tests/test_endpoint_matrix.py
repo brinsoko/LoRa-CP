@@ -337,7 +337,9 @@ def test_group_api_remaining_endpoints(client, app, seeded_state):
         "/api/groups/order",
         json={"group_ids": [seeded_state.second_group_id, seeded_state.group_id]},
     )
-    delete_group = create_group(db.session.get(Team, seeded_state.team_id).competition, name="Delete Group", prefix="3xx")
+    delete_group = create_group(
+        db.session.get(Team, seeded_state.team_id).competition, name="Delete Group", prefix="3xx"
+    )
     deleted = client.delete(f"/api/groups/{delete_group.id}")
 
     assert fetched.status_code == 200
@@ -356,7 +358,12 @@ def test_checkpoint_api_remaining_endpoints(client, app, seeded_state):
     )
     put_response = client.put(
         f"/api/checkpoints/{seeded_state.third_checkpoint_id}",
-        json={"name": "Delete CP Updated", "location": "Loc", "description": "Desc", "group_ids": [seeded_state.group_id]},
+        json={
+            "name": "Delete CP Updated",
+            "location": "Loc",
+            "description": "Desc",
+            "group_ids": [seeded_state.group_id],
+        },
     )
     imported = client.post(
         "/api/checkpoints/import",
@@ -384,7 +391,9 @@ def test_rfid_api_remaining_endpoints(client, app, seeded_state, monkeypatch):
     )
     monkeypatch.setattr("app.resources.rfid.read_uid_once", lambda *args, **kwargs: "SCAN1234")
     scanned = client.post("/api/rfid/scan")
-    delete_team = create_team(db.session.get(Team, seeded_state.team_id).competition, name="RFID Delete Team", number=123)
+    delete_team = create_team(
+        db.session.get(Team, seeded_state.team_id).competition, name="RFID Delete Team", number=123
+    )
     delete_card = create_rfid_card(delete_team, uid="DELETE01")
     deleted = client.delete(f"/api/rfid/cards/{delete_card.id}")
 
@@ -407,7 +416,9 @@ def test_device_message_and_map_alias_endpoints(client, app, seeded_state):
     map_checkpoints = client.get(f"/api/map/checkpoints?team_id={seeded_state.team_id}")
     map_primary = client.get("/api/map/lora-points")
     map_alias = client.get("/api/map/device-points")
-    delete_device = create_device(db.session.get(Team, seeded_state.team_id).competition, dev_num=88, name="Delete Device")
+    delete_device = create_device(
+        db.session.get(Team, seeded_state.team_id).competition, dev_num=88, name="Delete Device"
+    )
     deleted = client.delete(f"/api/devices/{delete_device.id}")
 
     assert lora_alias.status_code == 200
@@ -513,7 +524,11 @@ def test_score_api_and_rule_endpoints(client, app, seeded_state):
     )
     updated_rule = client.post(
         "/api/score-rules",
-        json={"checkpoint_id": seeded_state.checkpoint_id, "group_id": seeded_state.group_id, "rules": {"field_rules": {"accuracy": {"type": "multiplier", "factor": 3}}}},
+        json={
+            "checkpoint_id": seeded_state.checkpoint_id,
+            "group_id": seeded_state.group_id,
+            "rules": {"field_rules": {"accuracy": {"type": "multiplier", "factor": 3}}},
+        },
     )
     delete_rule = client.delete(f"/api/score-rules/{seeded_state.score_rule_id}")
 
@@ -561,8 +576,12 @@ def test_admin_remaining_html_get_endpoints(client, app, seeded_state, path_temp
 def test_admin_remaining_html_post_endpoints(client, app, seeded_state):
     _login(client, seeded_state, "admin")
 
-    attach = client.post("/users/attach", data={"identifier": _user(seeded_state, seeded_state.extra_user_id).username, "role": "judge"})
-    add_user = client.post("/users/add", data={"username": "html-added-user", "password": "secret123", "role": "viewer"})
+    attach = client.post(
+        "/users/attach", data={"identifier": _user(seeded_state, seeded_state.extra_user_id).username, "role": "judge"}
+    )
+    add_user = client.post(
+        "/users/add", data={"username": "html-added-user", "password": "secret123", "role": "viewer"}
+    )
     edit_user = client.post(
         f"/users/{seeded_state.extra_user_id}/edit",
         data={"username": "matrix-extra-edited", "role": "viewer", "new_password": "", "confirm_password": ""},
@@ -571,12 +590,17 @@ def test_admin_remaining_html_post_endpoints(client, app, seeded_state):
     randomize = client.post("/teams/randomize", data={"group_id": str(seeded_state.group_id)})
     save_lang = client.post("/sheets/save-lang", data={"teams_tab": "Teams"})
     save_settings = client.post("/sheets/save-settings", data={"sheets_sync_enabled": ""})
-    build_arrivals = client.post("/sheets/build-arrivals", data={"spreadsheet_id": "local:matrix", "tab_name": "Arrivals"})
+    build_arrivals = client.post(
+        "/sheets/build-arrivals", data={"spreadsheet_id": "local:matrix", "tab_name": "Arrivals"}
+    )
     build_teams = client.post("/sheets/build-teams", data={"spreadsheet_id": "local:matrix", "tab_name": "Teams"})
     build_score = client.post("/sheets/build-score", data={"spreadsheet_id": "local:matrix", "tab_name": "Score"})
     wizard = client.post("/sheets/wizard/checkpoints", data={"spreadsheet_id": "local:matrix"})
     add_tab = client.post("/sheets/add-tab", data={"spreadsheet_id": "local:matrix", "tab_title": "CP Sheet"})
-    global_rules = client.post("/scores/global-rules", data={"global_group_id": str(seeded_state.group_id), "global_found_enabled": "on", "global_found_points": "3"})
+    global_rules = client.post(
+        "/scores/global-rules",
+        data={"global_group_id": str(seeded_state.group_id), "global_found_enabled": "on", "global_found_points": "3"},
+    )
     delete_global_rule = client.post(f"/scores/global-rules/{seeded_state.global_rule_id}/delete")
     delete_score_rule = client.post(f"/scores/rules/{seeded_state.score_rule_id}/delete")
 

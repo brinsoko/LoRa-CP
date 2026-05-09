@@ -17,6 +17,7 @@ def _current_role_set():
         roles.add(global_role)
     return roles
 
+
 def roles_required(*roles):
     """
     If NOT authenticated -> redirect to login (?next=...).
@@ -30,8 +31,7 @@ def roles_required(*roles):
         def wrapped(*args, **kwargs):
             if not current_user.is_authenticated:
                 current_app.logger.debug(
-                    "[roles_required] redirect → login: endpoint=%s next=%s",
-                    request.endpoint, request.url
+                    "[roles_required] redirect → login: endpoint=%s next=%s", request.endpoint, request.url
                 )
                 return redirect(url_for("auth.login", next=request.url))
 
@@ -44,20 +44,29 @@ def roles_required(*roles):
             current_app.logger.debug(
                 "[roles_required] user=%r role=%r allowed=%r ok=%s endpoint=%s path=%s",
                 getattr(current_user, "username", None),
-                user_role, allowed, ok, request.endpoint, request.path
+                user_role,
+                allowed,
+                ok,
+                request.endpoint,
+                request.path,
             )
 
             if not ok:
                 abort(403)
             return view(*args, **kwargs)
+
         return wrapped
+
     return decorator
+
 
 def inject_perms():
     """In templates: {{ has_role('admin') }} (case-insensitive)."""
+
     def has_role(*roles):
         if not current_user.is_authenticated:
             return False
         allowed = {(r or "").strip().lower() for r in roles}
         return (not allowed) or bool(_current_role_set() & allowed)
+
     return dict(has_role=has_role)

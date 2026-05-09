@@ -39,11 +39,7 @@ def build_test_config(tmp_path: Path) -> dict:
 def _assert_safe_test_database(application, tmp_path: Path) -> None:
     uri = str(application.config.get("SQLALCHEMY_DATABASE_URI") or "")
     tmp_prefix = f"sqlite:///{tmp_path}"
-    if (
-        uri == "sqlite:///:memory:"
-        or uri.startswith(tmp_prefix)
-        or application.config.get("_EPHEMERAL_TEST_DB")
-    ):
+    if uri == "sqlite:///:memory:" or uri.startswith(tmp_prefix) or application.config.get("_EPHEMERAL_TEST_DB"):
         return
     raise RuntimeError(f"Refusing to drop tables for unsafe test database URI: {uri}")
 

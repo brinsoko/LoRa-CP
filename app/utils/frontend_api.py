@@ -23,13 +23,15 @@ def _base_url() -> str:
     return f"{scheme}://{_server_name()}"
 
 
-def api_request(method: str,
-                path: str,
-                *,
-                params: dict[str, Any] | None = None,
-                json: dict[str, Any] | None = None,
-                data: dict[str, Any] | None = None,
-                headers: dict[str, str] | None = None):
+def api_request(
+    method: str,
+    path: str,
+    *,
+    params: dict[str, Any] | None = None,
+    json: dict[str, Any] | None = None,
+    data: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+):
     """Call an internal API endpoint using the current session cookie."""
     if not path.startswith("/"):
         path = "/" + path
@@ -68,13 +70,15 @@ def transfer_api_cookies(api_response, flask_response):
     return flask_response
 
 
-def api_json(method: str,
-             path: str,
-             *,
-             params: dict[str, Any] | None = None,
-             json: dict[str, Any] | None = None,
-             data: dict[str, Any] | None = None,
-             headers: dict[str, str] | None = None) -> tuple[Any, dict[str, Any]]:
+def api_json(
+    method: str,
+    path: str,
+    *,
+    params: dict[str, Any] | None = None,
+    json: dict[str, Any] | None = None,
+    data: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+) -> tuple[Any, dict[str, Any]]:
     resp = api_request(method, path, params=params, json=json, data=data, headers=headers)
     payload = resp.get_json(silent=True) or {}
     return resp, payload

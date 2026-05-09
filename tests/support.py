@@ -26,7 +26,9 @@ def unique_name(prefix: str) -> str:
     return f"{prefix}-{next(_COUNTER)}"
 
 
-def create_user(*, username: str | None = None, password: str = "password123", email: str | None = None, role: str = "public") -> User:
+def create_user(
+    *, username: str | None = None, password: str = "password123", email: str | None = None, role: str = "public"
+) -> User:
     username = username or unique_name("user")
     if email is None:
         email = f"{username}@example.com"
@@ -37,7 +39,13 @@ def create_user(*, username: str | None = None, password: str = "password123", e
     return user
 
 
-def create_competition(*, name: str | None = None, created_by_user: User | None = None, public_results: bool = False, ingest_password: str | None = None) -> Competition:
+def create_competition(
+    *,
+    name: str | None = None,
+    created_by_user: User | None = None,
+    public_results: bool = False,
+    ingest_password: str | None = None,
+) -> Competition:
     competition = Competition(
         name=name or unique_name("competition"),
         created_by_user_id=created_by_user.id if created_by_user else None,
@@ -50,7 +58,9 @@ def create_competition(*, name: str | None = None, created_by_user: User | None 
     return competition
 
 
-def add_membership(user: User, competition: Competition, *, role: str = "admin", active: bool = True) -> CompetitionMember:
+def add_membership(
+    user: User, competition: Competition, *, role: str = "admin", active: bool = True
+) -> CompetitionMember:
     membership = CompetitionMember(
         user_id=user.id,
         competition_id=competition.id,
@@ -62,7 +72,9 @@ def add_membership(user: User, competition: Competition, *, role: str = "admin",
     return membership
 
 
-def create_team(competition: Competition, *, name: str | None = None, number: int | None = None, organization: str | None = None) -> Team:
+def create_team(
+    competition: Competition, *, name: str | None = None, number: int | None = None, organization: str | None = None
+) -> Team:
     team = Team(
         competition_id=competition.id,
         name=name or unique_name("team"),
@@ -74,10 +86,14 @@ def create_team(competition: Competition, *, name: str | None = None, number: in
     return team
 
 
-def create_group(competition: Competition, *, name: str | None = None, prefix: str | None = None, description: str | None = None) -> CheckpointGroup:
-    position = db.session.query(db.func.max(CheckpointGroup.position)).filter(
-        CheckpointGroup.competition_id == competition.id
-    ).scalar()
+def create_group(
+    competition: Competition, *, name: str | None = None, prefix: str | None = None, description: str | None = None
+) -> CheckpointGroup:
+    position = (
+        db.session.query(db.func.max(CheckpointGroup.position))
+        .filter(CheckpointGroup.competition_id == competition.id)
+        .scalar()
+    )
     group = CheckpointGroup(
         competition_id=competition.id,
         name=name or unique_name("group"),
@@ -97,7 +113,15 @@ def assign_team_group(team: Team, group: CheckpointGroup, *, active: bool = True
     return link
 
 
-def create_device(competition: Competition, *, dev_num: int, name: str | None = None, note: str | None = None, model: str | None = None, active: bool = True) -> LoRaDevice:
+def create_device(
+    competition: Competition,
+    *,
+    dev_num: int,
+    name: str | None = None,
+    note: str | None = None,
+    model: str | None = None,
+    active: bool = True,
+) -> LoRaDevice:
     device = LoRaDevice(
         competition_id=competition.id,
         dev_num=dev_num,
@@ -172,9 +196,9 @@ def create_checkin(
 def assign_judge_checkpoint(user: User, checkpoint: Checkpoint, *, is_default: bool = False) -> JudgeCheckpoint:
     if is_default:
         (
-            JudgeCheckpoint.query
-            .filter(JudgeCheckpoint.user_id == user.id)
-            .update({JudgeCheckpoint.is_default: False}, synchronize_session=False)
+            JudgeCheckpoint.query.filter(JudgeCheckpoint.user_id == user.id).update(
+                {JudgeCheckpoint.is_default: False}, synchronize_session=False
+            )
         )
     assignment = JudgeCheckpoint(user_id=user.id, checkpoint_id=checkpoint.id, is_default=is_default)
     db.session.add(assignment)
@@ -189,4 +213,3 @@ def login_as(client, user: User, competition: Competition | None = None) -> None
             sess.pop("competition_id", None)
         else:
             sess["competition_id"] = competition.id
-

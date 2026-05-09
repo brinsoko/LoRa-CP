@@ -1,4 +1,5 @@
 """Test suite 2: Group prefix validation."""
+
 from __future__ import annotations
 
 import pytest
@@ -52,9 +53,19 @@ class TestPrefixOverlap:
 
 
 class TestInvalidPrefixFormat:
-    @pytest.mark.parametrize("bad_prefix", [
-        "abc", "xx3", "3x3x", "---", "", "x", "3", "xxx",
-    ])
+    @pytest.mark.parametrize(
+        "bad_prefix",
+        [
+            "abc",
+            "xx3",
+            "3x3x",
+            "---",
+            "",
+            "x",
+            "3",
+            "xxx",
+        ],
+    )
     def test_invalid_prefix_format_rejected(self, client, _seeded, bad_prefix):
         resp = client.post(
             "/api/groups",
@@ -136,5 +147,6 @@ class TestTeamNumberOutsidePrefixOnRandomise:
 
         # Verify team got a number in range 301-301 (only 1 team)
         from app.models import Team
+
         refreshed = Team.query.get(t.id)
         assert refreshed.number == 301

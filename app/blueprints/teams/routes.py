@@ -33,6 +33,7 @@ def _parse_optional_int(raw_value, field_label: str) -> tuple[int | None, str | 
     except (TypeError, ValueError):
         return None, f"{field_label} must be an integer."
 
+
 def _load_organizations() -> list[str]:
     resp, payload = api_json("GET", "/api/teams")
     if resp.status_code != 200:
@@ -51,10 +52,12 @@ def _load_organizations() -> list[str]:
 def _transform_team_payload(team: dict) -> dict:
     assignments = []
     for grp in team.get("groups", []):
-        assignments.append({
-            "group": {"id": grp.get("id"), "name": grp.get("name")},
-            "active": grp.get("active", False),
-        })
+        assignments.append(
+            {
+                "group": {"id": grp.get("id"), "name": grp.get("name")},
+                "active": grp.get("active", False),
+            }
+        )
     team["group_assignments"] = assignments
     return team
 
@@ -151,7 +154,12 @@ def add_team():
                 if rfid_resp.status_code == 201:
                     flash(_tr("RFID mapping created."), "success")
                 else:
-                    flash(rfid_payload.get("detail") or rfid_payload.get("error") or _tr("Could not create RFID mapping."), "warning")
+                    flash(
+                        rfid_payload.get("detail")
+                        or rfid_payload.get("error")
+                        or _tr("Could not create RFID mapping."),
+                        "warning",
+                    )
             flash(_("Team created."), "success")
             return redirect(url_for("teams.list_teams"))
 
@@ -190,7 +198,9 @@ def edit_team(team_id: int):
     else:
         flash(_tr("Could not load RFID mappings."), "warning")
 
-    selected_group_id = next((g.get("group", {}).get("id") for g in team.get("group_assignments", []) if g.get("group")), None)
+    selected_group_id = next(
+        (g.get("group", {}).get("id") for g in team.get("group_assignments", []) if g.get("group")), None
+    )
     organizations = _load_organizations()
 
     if request.method == "POST":
@@ -270,7 +280,12 @@ def edit_team(team_id: int):
                     if rfid_resp.status_code in (200, 201):
                         flash(_tr("RFID mapping saved."), "success")
                     else:
-                        flash(rfid_payload.get("detail") or rfid_payload.get("error") or _tr("Could not save RFID mapping."), "warning")
+                        flash(
+                            rfid_payload.get("detail")
+                            or rfid_payload.get("error")
+                            or _tr("Could not save RFID mapping."),
+                            "warning",
+                        )
 
             flash(_("Team updated."), "success")
             return redirect(_safe_next_url(url_for("teams.list_teams")))
@@ -280,10 +295,12 @@ def edit_team(team_id: int):
         team["number"] = number
         grp = next((g for g in groups if g.get("id") == selected_group_id), None)
         if grp:
-            team["group_assignments"] = [{
-                "group": {"id": grp.get("id"), "name": grp.get("name")},
-                "active": True,
-            }]
+            team["group_assignments"] = [
+                {
+                    "group": {"id": grp.get("id"), "name": grp.get("name")},
+                    "active": True,
+                }
+            ]
         else:
             team["group_assignments"] = []
         team["dnf"] = bool(request.form.get("dnf"))
@@ -341,10 +358,16 @@ def randomize_numbers():
         name = res.get("group_name") or _("Group %(id)s", id=res.get("group_id"))
         if status == "insufficient_numbers":
             r = res.get("range", [0, 0])
-            flash(_(
-                "Not enough numbers available in range %(min)s\u2013%(max)s. %(available)s available, %(needed)s needed.",
-                min=r[0], max=r[1], available=res.get("available", 0), needed=res.get("needed", 0),
-            ), "warning")
+            flash(
+                _(
+                    "Not enough numbers available in range %(min)s\u2013%(max)s. %(available)s available, %(needed)s needed.",
+                    min=r[0],
+                    max=r[1],
+                    available=res.get("available", 0),
+                    needed=res.get("needed", 0),
+                ),
+                "warning",
+            )
         elif status == "skipped":
             flash(_("%(group)s: invalid or missing prefix.", group=name), "warning")
 

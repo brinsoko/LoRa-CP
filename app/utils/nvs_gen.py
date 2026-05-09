@@ -13,6 +13,7 @@ NVS key contract (namespace "config"):
   hmac_len       i32    DEVICE_CARD_HMAC_LEN
   webhook_secret string LORA_WEBHOOK_SECRET
 """
+
 from __future__ import annotations
 
 import csv
@@ -27,7 +28,8 @@ NVS_NAMESPACE = "config"
 
 class EncryptedNVS(NamedTuple):
     """Pair of binaries produced by encrypted NVS generation."""
-    nvs_bin: bytes   # encrypted NVS partition (flash at sec_nvs offset)
+
+    nvs_bin: bytes  # encrypted NVS partition (flash at sec_nvs offset)
     keys_bin: bytes  # NVS keys partition, 0x1000 bytes (flash at nvs_keys offset)
 
 
@@ -46,17 +48,17 @@ def _build_csv_rows(
     rows = [
         ["key", "type", "encoding", "value"],
         [NVS_NAMESPACE, "namespace", "", ""],
-        ["dev_num",        "data", "i32",    str(dev_num)],
-        ["competition_id", "data", "i32",    str(competition_id)],
-        ["card_secret",    "data", "string", card_secret],
-        ["hmac_len",       "data", "i32",    str(hmac_len)],
+        ["dev_num", "data", "i32", str(dev_num)],
+        ["competition_id", "data", "i32", str(competition_id)],
+        ["card_secret", "data", "string", card_secret],
+        ["hmac_len", "data", "i32", str(hmac_len)],
         ["webhook_secret", "data", "string", webhook_secret],
     ]
     # WiFi / receiver fields — only written when non-empty to save NVS space
     if wifi_ssid:
-        rows.append(["wifi_ssid",  "data", "string", wifi_ssid])
+        rows.append(["wifi_ssid", "data", "string", wifi_ssid])
     if wifi_pass:
-        rows.append(["wifi_pass",  "data", "string", wifi_pass])
+        rows.append(["wifi_pass", "data", "string", wifi_pass])
     if ingest_url:
         rows.append(["ingest_url", "data", "string", ingest_url])
     return rows
@@ -104,7 +106,8 @@ def generate_nvs_partition(
         subprocess.check_call(
             [
                 sys.executable,
-                "-m", "esp_idf_nvs_partition_gen",
+                "-m",
+                "esp_idf_nvs_partition_gen",
                 "generate",
                 csv_path,
                 bin_path,
@@ -166,13 +169,15 @@ def generate_encrypted_nvs_partition(
         subprocess.check_call(
             [
                 sys.executable,
-                "-m", "esp_idf_nvs_partition_gen",
+                "-m",
+                "esp_idf_nvs_partition_gen",
                 "encrypt",
                 "config.csv",
                 "nvs_enc.bin",
                 str(partition_size),
                 "--keygen",
-                "--keyfile", "keys.bin",
+                "--keyfile",
+                "keys.bin",
             ],
             cwd=tmpdir,
             timeout=30,

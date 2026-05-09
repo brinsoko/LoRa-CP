@@ -59,18 +59,25 @@ try:
     from rich.console import Console
     from rich.panel import Panel
     from rich.table import Table
+
     RICH = True
     console = Console()
 except ImportError:
     RICH = False
+
     class _FallbackConsole:
-        def print(self, *a, **kw): print(*a)
-        def rule(self, *a, **kw): print("─" * 60)
+        def print(self, *a, **kw):
+            print(*a)
+
+        def rule(self, *a, **kw):
+            print("─" * 60)
+
     console = _FallbackConsole()
 
 # Optional live ASCII chart
 try:
     import plotext as plt
+
     PLOTEXT = True
 except ImportError:
     PLOTEXT = False
@@ -80,41 +87,42 @@ except ImportError:
 # Configuration & constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_BASE_URL    = "https://brinsoko.duckdns.org"
-DEFAULT_WORKERS     = 30
-DEFAULT_INGEST_RPS  = 150       # target requests per second
-DEFAULT_DURATION    = 30       # seconds of sustained load
-DEFAULT_RAMP_UP     = 5        # seconds to ramp from 0 → target RPS
+DEFAULT_BASE_URL = "https://brinsoko.duckdns.org"
+DEFAULT_WORKERS = 30
+DEFAULT_INGEST_RPS = 150  # target requests per second
+DEFAULT_DURATION = 30  # seconds of sustained load
+DEFAULT_RAMP_UP = 5  # seconds to ramp from 0 → target RPS
 DEFAULT_COMPETITION = 1
-DEFAULT_HMAC_LEN    = int(os.getenv("DEVICE_CARD_HMAC_LEN", "12"))
+DEFAULT_HMAC_LEN = int(os.getenv("DEVICE_CARD_HMAC_LEN", "12"))
 
-INGEST_PATH  = "/api/ingest"
-VERIFY_PATH  = "/api/rfid/verify"
+INGEST_PATH = "/api/ingest"
+VERIFY_PATH = "/api/rfid/verify"
 CHECKIN_PATH = "/checkins/"
-CSV_PATH     = "/checkins/export.csv"
+CSV_PATH = "/checkins/export.csv"
 
 
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RequestResult:
-    endpoint:    str
+    endpoint: str
     status_code: int
-    latency_ms:  float
-    success:     bool
-    error:       str | None = None
-    ts:          float = field(default_factory=time.monotonic)
+    latency_ms: float
+    success: bool
+    error: str | None = None
+    ts: float = field(default_factory=time.monotonic)
 
 
 @dataclass
 class ScenarioStats:
-    name:          str
-    total:         int = 0
-    ok:            int = 0
-    errors:        int = 0
-    latencies:     list[float] = field(default_factory=list)
+    name: str
+    total: int = 0
+    ok: int = 0
+    errors: int = 0
+    latencies: list[float] = field(default_factory=list)
     status_counts: dict[int, int] = field(default_factory=lambda: defaultdict(int))
 
     @property
@@ -152,10 +160,11 @@ class ScenarioStats:
 # HTTP session factory
 # ---------------------------------------------------------------------------
 
+
 def _make_session(cookie: str | None, webhook_secret: str | None) -> requests.Session:
     sess = requests.Session()
     adapter = HTTPAdapter(
-        max_retries=Retry(total=0),       # no retries – we want raw failures
+        max_retries=Retry(total=0),  # no retries – we want raw failures
         pool_connections=50,
         pool_maxsize=200,
     )
@@ -178,6 +187,7 @@ def _make_session(cookie: str | None, webhook_secret: str | None) -> requests.Se
 # UID / payload generators
 # ---------------------------------------------------------------------------
 
+
 def _random_uid(length: int = 8) -> str:
     return "".join(random.choices("0123456789ABCDEF", k=length))
 
@@ -187,11 +197,7 @@ def _random_dev_id(pool: list[int]) -> int:
 
 
 def _default_card_secret() -> str:
-    return (
-        os.getenv("DEVICE_CARD_SECRET")
-        or os.getenv("SECRET_KEY")
-        or "dev-secret"
-    )
+    return os.getenv("DEVICE_CARD_SECRET") or os.getenv("SECRET_KEY") or "dev-secret"
 
 
 def _build_verify_payload(uid: str, dev_ids: list[int], card_secret: str, hmac_len: int) -> dict:
@@ -210,52 +216,60 @@ def _build_verify_payload(uid: str, dev_ids: list[int], card_secret: str, hmac_l
 # Individual scenario workers
 # ---------------------------------------------------------------------------
 
+
 class IngestWorker:
     """Hammers POST /api/ingest at a given rate."""
 
-    def __init__(self, base_url: str, session: requests.Session,
-                 competition_id: int, dev_id_pool: list[int],
-                 uid_pool: list[str], results: list[RequestResult],
-                 lock: threading.Lock, stop_event: threading.Event,
-                 target_interval: float,
-                 ingest_password: str | None = None):
-        self.base_url        = base_url.rstrip("/")
-        self.session         = session
-        self.competition_id  = competition_id
-        self.dev_id_pool     = dev_id_pool
-        self.uid_pool        = uid_pool
-        self.results         = results
-        self.lock            = lock
-        self.stop            = stop_event
+    def __init__(
+        self,
+        base_url: str,
+        session: requests.Session,
+        competition_id: int,
+        dev_id_pool: list[int],
+        uid_pool: list[str],
+        results: list[RequestResult],
+        lock: threading.Lock,
+        stop_event: threading.Event,
+        target_interval: float,
+        ingest_password: str | None = None,
+    ):
+        self.base_url = base_url.rstrip("/")
+        self.session = session
+        self.competition_id = competition_id
+        self.dev_id_pool = dev_id_pool
+        self.uid_pool = uid_pool
+        self.results = results
+        self.lock = lock
+        self.stop = stop_event
         self.target_interval = target_interval  # seconds between requests
         self.ingest_password = ingest_password
 
     def run(self):
         url = self.base_url + INGEST_PATH
         while not self.stop.is_set():
-            uid    = random.choice(self.uid_pool)
+            uid = random.choice(self.uid_pool)
             dev_id = _random_dev_id(self.dev_id_pool)
             payload = {
                 "competition_id": self.competition_id,
-                "dev_id":         dev_id,
-                "payload":        uid,
-                "rssi":           round(random.uniform(-120, -40), 1),
-                "snr":            round(random.uniform(-5, 15), 1),
+                "dev_id": dev_id,
+                "payload": uid,
+                "rssi": round(random.uniform(-120, -40), 1),
+                "snr": round(random.uniform(-5, 15), 1),
             }
             if self.ingest_password:
                 payload["ingest_password"] = self.ingest_password
             t0 = time.monotonic()
             try:
                 resp = self.session.post(url, json=payload, timeout=10)
-                lat  = (time.monotonic() - t0) * 1000
-                ok   = resp.status_code in (200, 201)
-                r    = RequestResult(INGEST_PATH, resp.status_code, lat, ok)
+                lat = (time.monotonic() - t0) * 1000
+                ok = resp.status_code in (200, 201)
+                r = RequestResult(INGEST_PATH, resp.status_code, lat, ok)
             except requests.exceptions.Timeout:
                 lat = (time.monotonic() - t0) * 1000
-                r   = RequestResult(INGEST_PATH, 0, lat, False, "Timeout")
+                r = RequestResult(INGEST_PATH, 0, lat, False, "Timeout")
             except Exception as exc:
                 lat = (time.monotonic() - t0) * 1000
-                r   = RequestResult(INGEST_PATH, 0, lat, False, str(exc))
+                r = RequestResult(INGEST_PATH, 0, lat, False, str(exc))
 
             with self.lock:
                 self.results.append(r)
@@ -270,30 +284,36 @@ class IngestWorker:
 class ReadWorker:
     """Reads /checkins/ and /checkins/export.csv to simulate judge/viewer load."""
 
-    def __init__(self, base_url: str, session: requests.Session,
-                 results: list[RequestResult], lock: threading.Lock,
-                 stop_event: threading.Event, interval: float = 2.0):
+    def __init__(
+        self,
+        base_url: str,
+        session: requests.Session,
+        results: list[RequestResult],
+        lock: threading.Lock,
+        stop_event: threading.Event,
+        interval: float = 2.0,
+    ):
         self.base_url = base_url.rstrip("/")
-        self.session  = session
-        self.results  = results
-        self.lock     = lock
-        self.stop     = stop_event
+        self.session = session
+        self.results = results
+        self.lock = lock
+        self.stop = stop_event
         self.interval = interval
 
     def run(self):
         endpoints = [CHECKIN_PATH, CSV_PATH + "?sort=new"]
         while not self.stop.is_set():
-            ep  = random.choice(endpoints)
+            ep = random.choice(endpoints)
             url = self.base_url + ep
-            t0  = time.monotonic()
+            t0 = time.monotonic()
             try:
                 resp = self.session.get(url, timeout=15)
-                lat  = (time.monotonic() - t0) * 1000
-                ok   = resp.status_code in (200, 302)
-                r    = RequestResult(ep, resp.status_code, lat, ok)
+                lat = (time.monotonic() - t0) * 1000
+                ok = resp.status_code in (200, 302)
+                r = RequestResult(ep, resp.status_code, lat, ok)
             except Exception as exc:
                 lat = (time.monotonic() - t0) * 1000
-                r   = RequestResult(ep, 0, lat, False, str(exc))
+                r = RequestResult(ep, 0, lat, False, str(exc))
 
             with self.lock:
                 self.results.append(r)
@@ -303,40 +323,47 @@ class ReadWorker:
 class VerifyWorker:
     """Exercises POST /api/rfid/verify."""
 
-    def __init__(self, base_url: str, session: requests.Session,
-                 competition_id: int, dev_id_pool: list[int],
-                 uid_pool: list[str], results: list[RequestResult],
-                 lock: threading.Lock, stop_event: threading.Event,
-                 interval: float = 1.0,
-                 card_secret: str = "dev-secret",
-                 hmac_len: int = DEFAULT_HMAC_LEN):
-        self.base_url       = base_url.rstrip("/")
-        self.session        = session
+    def __init__(
+        self,
+        base_url: str,
+        session: requests.Session,
+        competition_id: int,
+        dev_id_pool: list[int],
+        uid_pool: list[str],
+        results: list[RequestResult],
+        lock: threading.Lock,
+        stop_event: threading.Event,
+        interval: float = 1.0,
+        card_secret: str = "dev-secret",
+        hmac_len: int = DEFAULT_HMAC_LEN,
+    ):
+        self.base_url = base_url.rstrip("/")
+        self.session = session
         self.competition_id = competition_id
-        self.dev_id_pool    = dev_id_pool
-        self.uid_pool       = uid_pool
-        self.results        = results
-        self.lock           = lock
-        self.stop           = stop_event
-        self.interval       = interval
-        self.card_secret    = card_secret
-        self.hmac_len       = hmac_len
+        self.dev_id_pool = dev_id_pool
+        self.uid_pool = uid_pool
+        self.results = results
+        self.lock = lock
+        self.stop = stop_event
+        self.interval = interval
+        self.card_secret = card_secret
+        self.hmac_len = hmac_len
 
     def run(self):
-        url    = self.base_url + VERIFY_PATH
+        url = self.base_url + VERIFY_PATH
         while not self.stop.is_set():
-            uid     = random.choice(self.uid_pool)
+            uid = random.choice(self.uid_pool)
             dev_ids = random.sample(self.dev_id_pool, min(3, len(self.dev_id_pool)))
             body = _build_verify_payload(uid, dev_ids, self.card_secret, self.hmac_len)
-            t0   = time.monotonic()
+            t0 = time.monotonic()
             try:
                 resp = self.session.post(url, json=body, timeout=10)
-                lat  = (time.monotonic() - t0) * 1000
-                ok   = resp.status_code == 200
-                r    = RequestResult(VERIFY_PATH, resp.status_code, lat, ok)
+                lat = (time.monotonic() - t0) * 1000
+                ok = resp.status_code == 200
+                r = RequestResult(VERIFY_PATH, resp.status_code, lat, ok)
             except Exception as exc:
                 lat = (time.monotonic() - t0) * 1000
-                r   = RequestResult(VERIFY_PATH, 0, lat, False, str(exc))
+                r = RequestResult(VERIFY_PATH, 0, lat, False, str(exc))
 
             with self.lock:
                 self.results.append(r)
@@ -347,14 +374,14 @@ class VerifyWorker:
 # Ramp controller
 # ---------------------------------------------------------------------------
 
+
 class RampController:
     """Linearly ramps active worker count from 0 → max over ramp_seconds."""
 
-    def __init__(self, workers: list[threading.Thread],
-                 ramp_seconds: float, start_delay: float = 0.1):
-        self.workers      = workers
+    def __init__(self, workers: list[threading.Thread], ramp_seconds: float, start_delay: float = 0.1):
+        self.workers = workers
         self.ramp_seconds = ramp_seconds
-        self.start_delay  = start_delay
+        self.start_delay = start_delay
 
     def start(self):
         n = len(self.workers)
@@ -370,42 +397,44 @@ class RampController:
 # Live metrics ticker
 # ---------------------------------------------------------------------------
 
+
 class MetricsTicker:
     """Prints a one-line rolling summary every second."""
 
-    def __init__(self, results: list[RequestResult],
-                 lock: threading.Lock, stop_event: threading.Event):
+    def __init__(self, results: list[RequestResult], lock: threading.Lock, stop_event: threading.Event):
         self.results = results
-        self.lock    = lock
-        self.stop    = stop_event
+        self.lock = lock
+        self.stop = stop_event
         self._prev_total = 0
-        self._start      = time.monotonic()
+        self._start = time.monotonic()
 
     def run(self):
         while not self.stop.is_set():
             time.sleep(1.0)
             with self.lock:
                 total = len(self.results)
-                recent = [r for r in self.results[-200:]
-                          if (time.monotonic() - r.ts) < 5.0]
+                recent = [r for r in self.results[-200:] if (time.monotonic() - r.ts) < 5.0]
 
-            rps      = total - self._prev_total
+            rps = total - self._prev_total
             self._prev_total = total
-            ok       = sum(1 for r in recent if r.success)
-            err      = len(recent) - ok
-            lats     = [r.latency_ms for r in recent]
-            p50      = f"{statistics.median(lats):.0f}" if lats else "—"
-            p95_val  = sorted(lats)[int(len(lats)*0.95)] if lats else 0
-            elapsed  = time.monotonic() - self._start
+            ok = sum(1 for r in recent if r.success)
+            err = len(recent) - ok
+            lats = [r.latency_ms for r in recent]
+            p50 = f"{statistics.median(lats):.0f}" if lats else "—"
+            p95_val = sorted(lats)[int(len(lats) * 0.95)] if lats else 0
+            elapsed = time.monotonic() - self._start
 
-            line = (f"  t={elapsed:5.0f}s │ rps={rps:4d} │ total={total:6d} │ "
-                    f"ok={ok:4d} err={err:3d} │ p50={p50}ms p95={p95_val:.0f}ms")
+            line = (
+                f"  t={elapsed:5.0f}s │ rps={rps:4d} │ total={total:6d} │ "
+                f"ok={ok:4d} err={err:3d} │ p50={p50}ms p95={p95_val:.0f}ms"
+            )
             console.print(line)
 
 
 # ---------------------------------------------------------------------------
 # Aggregation & reporting
 # ---------------------------------------------------------------------------
+
 
 def _aggregate(results: list[RequestResult]) -> dict[str, ScenarioStats]:
     stats: dict[str, ScenarioStats] = {}
@@ -423,29 +452,26 @@ def _aggregate(results: list[RequestResult]) -> dict[str, ScenarioStats]:
     return stats
 
 
-def _print_report(stats: dict[str, ScenarioStats],
-                  duration: float, workers: int,
-                  target_rps: int):
+def _print_report(stats: dict[str, ScenarioStats], duration: float, workers: int, target_rps: int):
 
     if RICH:
         console.rule("[bold cyan]Stress Test Results")
-        table = Table(box=box.ROUNDED, show_header=True,
-                      header_style="bold magenta")
-        table.add_column("Endpoint",    style="cyan",    no_wrap=True)
-        table.add_column("Total",       justify="right")
-        table.add_column("OK",          justify="right", style="green")
-        table.add_column("Errors",      justify="right", style="red")
-        table.add_column("Err %",       justify="right")
-        table.add_column("Mean ms",     justify="right")
-        table.add_column("p50 ms",      justify="right")
-        table.add_column("p95 ms",      justify="right")
-        table.add_column("p99 ms",      justify="right")
-        table.add_column("Max ms",      justify="right")
-        table.add_column("Actual RPS",  justify="right")
+        table = Table(box=box.ROUNDED, show_header=True, header_style="bold magenta")
+        table.add_column("Endpoint", style="cyan", no_wrap=True)
+        table.add_column("Total", justify="right")
+        table.add_column("OK", justify="right", style="green")
+        table.add_column("Errors", justify="right", style="red")
+        table.add_column("Err %", justify="right")
+        table.add_column("Mean ms", justify="right")
+        table.add_column("p50 ms", justify="right")
+        table.add_column("p95 ms", justify="right")
+        table.add_column("p99 ms", justify="right")
+        table.add_column("Max ms", justify="right")
+        table.add_column("Actual RPS", justify="right")
 
         for ep, s in sorted(stats.items()):
             actual_rps = f"{s.total / duration:.1f}" if duration else "—"
-            err_style  = "red" if s.error_rate > 5 else "yellow" if s.error_rate > 1 else "green"
+            err_style = "red" if s.error_rate > 5 else "yellow" if s.error_rate > 1 else "green"
             table.add_row(
                 ep,
                 str(s.total),
@@ -472,7 +498,7 @@ def _print_report(stats: dict[str, ScenarioStats],
         total_req = sum(s.total for s in stats.values())
         total_err = sum(s.errors for s in stats.values())
         overall_err_pct = total_err / total_req * 100 if total_req else 0
-        achieved_rps    = total_req / duration if duration else 0
+        achieved_rps = total_req / duration if duration else 0
 
         if overall_err_pct < 1.0 and achieved_rps >= target_rps * 0.9:
             verdict = "[bold green]✔  PASS – System handled load within thresholds.[/bold green]"
@@ -481,26 +507,28 @@ def _print_report(stats: dict[str, ScenarioStats],
         else:
             verdict = "[bold red]✘  FAIL – Error rate too high or throughput unmet.[/bold red]"
 
-        console.print(Panel(
-            f"Total requests : {total_req}\n"
-            f"Total errors   : {total_err}  ({overall_err_pct:.2f}%)\n"
-            f"Achieved RPS   : {achieved_rps:.1f}  (target {target_rps})\n"
-            f"Test duration  : {duration:.1f}s  |  Workers: {workers}\n\n"
-            + verdict,
-            title="[bold]Summary", expand=False
-        ))
+        console.print(
+            Panel(
+                f"Total requests : {total_req}\n"
+                f"Total errors   : {total_err}  ({overall_err_pct:.2f}%)\n"
+                f"Achieved RPS   : {achieved_rps:.1f}  (target {target_rps})\n"
+                f"Test duration  : {duration:.1f}s  |  Workers: {workers}\n\n" + verdict,
+                title="[bold]Summary",
+                expand=False,
+            )
+        )
     else:
         # Plain fallback
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("STRESS TEST RESULTS")
-        print("="*70)
+        print("=" * 70)
         for ep, s in sorted(stats.items()):
             actual_rps = f"{s.total / duration:.1f}" if duration else "—"
             print(f"\n{ep}")
-            print(f"  total={s.total}  ok={s.ok}  errors={s.errors}  "
-                  f"err%={s.error_rate:.1f}")
-            print(f"  mean={s.mean:.1f}ms  p50={s.p50:.1f}ms  "
-                  f"p95={s.p95:.1f}ms  p99={s.p99:.1f}ms  max={s.max_lat:.1f}ms")
+            print(f"  total={s.total}  ok={s.ok}  errors={s.errors}  err%={s.error_rate:.1f}")
+            print(
+                f"  mean={s.mean:.1f}ms  p50={s.p50:.1f}ms  p95={s.p95:.1f}ms  p99={s.p99:.1f}ms  max={s.max_lat:.1f}ms"
+            )
             print(f"  actual_rps={actual_rps}  statuses={dict(s.status_counts)}")
 
 
@@ -527,36 +555,34 @@ def _draw_latency_chart(results: list[RequestResult]):
     plt.show()
 
 
-def _save_report(stats: dict[str, ScenarioStats],
-                 results: list[RequestResult],
-                 args, path: str):
+def _save_report(stats: dict[str, ScenarioStats], results: list[RequestResult], args, path: str):
     report = {
         "meta": {
-            "base_url":     args.base_url,
-            "competition":  args.competition_id,
-            "workers":      args.workers,
-            "target_rps":   args.ingest_rps,
-            "duration_s":   args.duration,
-            "ramp_up_s":    args.ramp_up,
+            "base_url": args.base_url,
+            "competition": args.competition_id,
+            "workers": args.workers,
+            "target_rps": args.ingest_rps,
+            "duration_s": args.duration,
+            "ramp_up_s": args.ramp_up,
             "generated_at": datetime.now(UTC).isoformat(),
         },
         "scenarios": {},
     }
     for ep, s in stats.items():
         report["scenarios"][ep] = {
-            "total":   s.total,
-            "ok":      s.ok,
-            "errors":  s.errors,
+            "total": s.total,
+            "ok": s.ok,
+            "errors": s.errors,
             "error_pct": round(s.error_rate, 3),
             "latency": {
                 "mean": round(s.mean, 2),
-                "p50":  round(s.p50, 2),
-                "p95":  round(s.p95, 2),
-                "p99":  round(s.p99, 2),
-                "max":  round(s.max_lat, 2),
+                "p50": round(s.p50, 2),
+                "p95": round(s.p95, 2),
+                "p99": round(s.p99, 2),
+                "max": round(s.max_lat, 2),
             },
             "status_codes": dict(s.status_counts),
-            "actual_rps":   round(s.total / args.duration, 2) if args.duration else 0,
+            "actual_rps": round(s.total / args.duration, 2) if args.duration else 0,
         }
 
     # Timeline sample (1 row per second, ingest only)
@@ -575,7 +601,7 @@ def _save_report(stats: dict[str, ScenarioStats],
 
     report["timeline"] = {
         str(k): {
-            "rps":    v["count"],
+            "rps": v["count"],
             "errors": v["errors"],
             "p50_ms": round(statistics.median(v["lats"]), 1) if v["lats"] else 0,
         }
@@ -590,6 +616,7 @@ def _save_report(stats: dict[str, ScenarioStats],
 # ---------------------------------------------------------------------------
 # Pre-flight connectivity check
 # ---------------------------------------------------------------------------
+
 
 def _preflight(base_url: str, session: requests.Session) -> bool:
     console.print(f"\n  Checking connectivity to [bold]{base_url}[/bold] …")
@@ -735,6 +762,7 @@ def _preflight_verify(
 # Seed data helpers (optional – prepopulate fake devices/UIDs when no real data)
 # ---------------------------------------------------------------------------
 
+
 def _seed_uid_pool(n: int = 200) -> list[str]:
     """Generate a pool of plausible RFID UIDs."""
     return [_random_uid(8) for _ in range(n)]
@@ -747,6 +775,7 @@ def _seed_dev_id_pool(start: int = 1, count: int = 5) -> list[int]:
 # ---------------------------------------------------------------------------
 # Main test runner
 # ---------------------------------------------------------------------------
+
 
 def run_stress_test(args):
     console.print("\n")
@@ -761,7 +790,7 @@ def run_stress_test(args):
         sys.exit(1)
 
     # ── Pools ──────────────────────────────────────────────────────────────
-    uid_pool    = _seed_uid_pool(args.uid_pool_size)
+    uid_pool = _seed_uid_pool(args.uid_pool_size)
     discovered_dev_ids = _discover_device_pool(args.base_url, session)
     dev_id_pool = discovered_dev_ids or _seed_dev_id_pool(args.dev_id_start, args.dev_id_count)
     verify_workers = args.verify_workers
@@ -806,10 +835,7 @@ def run_stress_test(args):
             console.print("  Verify preflight    : OK")
         else:
             verify_workers = 0
-            console.print(
-                "  [yellow]Disabling verify workers: "
-                f"{verify_reason}[/yellow]"
-            )
+            console.print(f"  [yellow]Disabling verify workers: {verify_reason}[/yellow]")
 
     console.print(f"\n  UIDs in pool    : {len(uid_pool)}")
     console.print(f"  Device IDs      : {dev_id_pool}")
@@ -823,8 +849,8 @@ def run_stress_test(args):
     console.print(f"  Duration        : {args.duration}s  (ramp {args.ramp_up}s)\n")
 
     results: list[RequestResult] = []
-    lock        = threading.Lock()
-    stop_event  = threading.Event()
+    lock = threading.Lock()
+    stop_event = threading.Event()
 
     # ── Worker interval per worker ─────────────────────────────────────────
     # Each ingest worker fires one request then sleeps.
@@ -848,8 +874,7 @@ def run_stress_test(args):
             target_interval=ingest_interval,
             ingest_password=args.ingest_password,
         )
-        t = threading.Thread(target=worker.run, daemon=True,
-                             name=f"ingest-{i}")
+        t = threading.Thread(target=worker.run, daemon=True, name=f"ingest-{i}")
         ingest_threads.append(t)
 
     # Read workers (viewer/judge simulation)
@@ -865,8 +890,7 @@ def run_stress_test(args):
                 stop_event=stop_event,
                 interval=max(1.0, args.workers / 5),
             )
-            t = threading.Thread(target=worker.run, daemon=True,
-                                 name=f"read-{i}")
+            t = threading.Thread(target=worker.run, daemon=True, name=f"read-{i}")
             read_threads.append(t)
 
     # Verify workers
@@ -887,14 +911,12 @@ def run_stress_test(args):
                 card_secret=args.card_secret,
                 hmac_len=args.hmac_len,
             )
-            t = threading.Thread(target=worker.run, daemon=True,
-                                 name=f"verify-{i}")
+            t = threading.Thread(target=worker.run, daemon=True, name=f"verify-{i}")
             verify_threads.append(t)
 
     # Metrics ticker
     ticker = MetricsTicker(results, lock, stop_event)
-    ticker_thread = threading.Thread(target=ticker.run, daemon=True,
-                                     name="ticker")
+    ticker_thread = threading.Thread(target=ticker.run, daemon=True, name="ticker")
 
     # ── Start ──────────────────────────────────────────────────────────────
     console.print(f"  [bold]Ramping up over {args.ramp_up}s …[/bold]")
@@ -939,15 +961,12 @@ def run_stress_test(args):
         s = stats[INGEST_PATH]
         violations = []
         if s.error_rate > args.max_error_pct:
-            violations.append(
-                f"Error rate {s.error_rate:.1f}% > threshold {args.max_error_pct}%")
+            violations.append(f"Error rate {s.error_rate:.1f}% > threshold {args.max_error_pct}%")
         if s.p95 > args.max_p95_ms:
-            violations.append(
-                f"p95 latency {s.p95:.1f}ms > threshold {args.max_p95_ms}ms")
+            violations.append(f"p95 latency {s.p95:.1f}ms > threshold {args.max_p95_ms}ms")
         actual_rps = s.total / actual_duration if actual_duration else 0
         if actual_rps < args.ingest_rps * 0.8:
-            violations.append(
-                f"Achieved RPS {actual_rps:.1f} < 80% of target {args.ingest_rps}")
+            violations.append(f"Achieved RPS {actual_rps:.1f} < 80% of target {args.ingest_rps}")
         if violations:
             console.print("\n  [bold red]THRESHOLD VIOLATIONS:[/bold red]")
             for v in violations:
@@ -961,6 +980,7 @@ def run_stress_test(args):
 # Spike test: burst of requests in a short window
 # ---------------------------------------------------------------------------
 
+
 def run_spike_test(args):
     console.print("\n")
     if RICH:
@@ -968,16 +988,16 @@ def run_spike_test(args):
     else:
         console.print("Spike Test")
 
-    session    = _make_session(args.cookie, args.webhook_secret)
-    uid_pool   = _seed_uid_pool(50)
-    dev_ids    = _seed_dev_id_pool(args.dev_id_start, args.dev_id_count)
-    results    = []
-    lock       = threading.Lock()
+    session = _make_session(args.cookie, args.webhook_secret)
+    uid_pool = _seed_uid_pool(50)
+    dev_ids = _seed_dev_id_pool(args.dev_id_start, args.dev_id_count)
+    results = []
+    lock = threading.Lock()
     stop_event = threading.Event()
 
     spike_workers = args.workers * 3
-    spike_rps     = args.ingest_rps * 10
-    interval      = spike_workers / spike_rps if spike_rps else 0.01
+    spike_rps = args.ingest_rps * 10
+    interval = spike_workers / spike_rps if spike_rps else 0.01
 
     ingest_ok, ingest_reason = _preflight_ingest(
         args.base_url,
@@ -995,9 +1015,18 @@ def run_spike_test(args):
     threads = []
     for _i in range(spike_workers):
         w_sess = _make_session(args.cookie, args.webhook_secret)
-        worker = IngestWorker(args.base_url, w_sess, args.competition_id,
-                              dev_ids, uid_pool, results, lock, stop_event,
-                              interval, args.ingest_password)
+        worker = IngestWorker(
+            args.base_url,
+            w_sess,
+            args.competition_id,
+            dev_ids,
+            uid_pool,
+            results,
+            lock,
+            stop_event,
+            interval,
+            args.ingest_password,
+        )
         t = threading.Thread(target=worker.run, daemon=True)
         threads.append(t)
         t.start()
@@ -1015,13 +1044,13 @@ def run_spike_test(args):
 # Endurance test: sustained low-level load for a long time
 # ---------------------------------------------------------------------------
 
+
 def run_endurance_test(args, duration_override: int = 300):
-    original   = args.duration
+    original = args.duration
     args.duration = duration_override
-    args.workers  = max(2, args.workers // 2)
+    args.workers = max(2, args.workers // 2)
     args.ingest_rps = max(5, args.ingest_rps // 2)
-    console.print(f"\n  Endurance test: {duration_override}s "
-                  f"at {args.ingest_rps} RPS with {args.workers} workers")
+    console.print(f"\n  Endurance test: {duration_override}s at {args.ingest_rps} RPS with {args.workers} workers")
     run_stress_test(args)
     args.duration = original
 
@@ -1030,59 +1059,44 @@ def run_endurance_test(args, duration_override: int = 300):
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def _build_parser():
     p = argparse.ArgumentParser(
         description="LoRa-CP HTTP/database throughput stress tester",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--base-url",       default=DEFAULT_BASE_URL,
-                   help="Base URL of the running LoRa-CP instance")
-    p.add_argument("--cookie",         default=None,
-                   help="Session cookie  e.g. 'session=<token>'")
-    p.add_argument("--webhook-secret", default=None,
-                   help="Value for X-Webhook-Secret header")
-    p.add_argument("--ingest-password", default=None,
-                   help="Competition ingest password when protected")
-    p.add_argument("--card-secret",    default=_default_card_secret(),
-                   help="Secret used to build RFID verify digests")
-    p.add_argument("--hmac-len",       type=int, default=DEFAULT_HMAC_LEN,
-                   help="Truncated HMAC length used by RFID verify digests")
-    p.add_argument("--competition-id", type=int, default=DEFAULT_COMPETITION,
-                   help="Competition ID to target")
-    p.add_argument("--workers",        type=int, default=DEFAULT_WORKERS,
-                   help="Number of concurrent ingest threads")
-    p.add_argument("--ingest-rps",     type=int, default=DEFAULT_INGEST_RPS,
-                   help="Target ingest requests per second")
-    p.add_argument("--duration",       type=int, default=DEFAULT_DURATION,
-                   help="Sustained load duration (seconds, after ramp-up)")
-    p.add_argument("--ramp-up",        type=int, default=DEFAULT_RAMP_UP,
-                   help="Ramp-up period (seconds)")
-    p.add_argument("--read-workers",   type=int, default=2,
-                   help="Threads reading /checkins/ (viewer simulation)")
-    p.add_argument("--verify-workers", type=int, default=1,
-                   help="Threads calling /api/rfid/verify")
-    p.add_argument("--uid-pool-size",  type=int, default=200,
-                   help="Number of distinct UIDs in the test pool")
-    p.add_argument("--dev-id-start",   type=int, default=1,
-                   help="Lowest device ID to use")
-    p.add_argument("--dev-id-count",   type=int, default=5,
-                   help="Number of device IDs to cycle through")
-    p.add_argument("--max-error-pct",  type=float, default=5.0,
-                   help="Fail if error rate exceeds this %%")
-    p.add_argument("--max-p95-ms",     type=float, default=2000.0,
-                   help="Fail if ingest p95 latency exceeds this ms")
-    p.add_argument("--scenario",
-                   choices=["load", "spike", "endurance", "all"],
-                   default="load",
-                   help="Which scenario(s) to run")
-    p.add_argument("--report",         default=None,
-                   help="Path to write JSON report  e.g. report.json")
+    p.add_argument("--base-url", default=DEFAULT_BASE_URL, help="Base URL of the running LoRa-CP instance")
+    p.add_argument("--cookie", default=None, help="Session cookie  e.g. 'session=<token>'")
+    p.add_argument("--webhook-secret", default=None, help="Value for X-Webhook-Secret header")
+    p.add_argument("--ingest-password", default=None, help="Competition ingest password when protected")
+    p.add_argument("--card-secret", default=_default_card_secret(), help="Secret used to build RFID verify digests")
+    p.add_argument(
+        "--hmac-len", type=int, default=DEFAULT_HMAC_LEN, help="Truncated HMAC length used by RFID verify digests"
+    )
+    p.add_argument("--competition-id", type=int, default=DEFAULT_COMPETITION, help="Competition ID to target")
+    p.add_argument("--workers", type=int, default=DEFAULT_WORKERS, help="Number of concurrent ingest threads")
+    p.add_argument("--ingest-rps", type=int, default=DEFAULT_INGEST_RPS, help="Target ingest requests per second")
+    p.add_argument(
+        "--duration", type=int, default=DEFAULT_DURATION, help="Sustained load duration (seconds, after ramp-up)"
+    )
+    p.add_argument("--ramp-up", type=int, default=DEFAULT_RAMP_UP, help="Ramp-up period (seconds)")
+    p.add_argument("--read-workers", type=int, default=2, help="Threads reading /checkins/ (viewer simulation)")
+    p.add_argument("--verify-workers", type=int, default=1, help="Threads calling /api/rfid/verify")
+    p.add_argument("--uid-pool-size", type=int, default=200, help="Number of distinct UIDs in the test pool")
+    p.add_argument("--dev-id-start", type=int, default=1, help="Lowest device ID to use")
+    p.add_argument("--dev-id-count", type=int, default=5, help="Number of device IDs to cycle through")
+    p.add_argument("--max-error-pct", type=float, default=5.0, help="Fail if error rate exceeds this %%")
+    p.add_argument("--max-p95-ms", type=float, default=2000.0, help="Fail if ingest p95 latency exceeds this ms")
+    p.add_argument(
+        "--scenario", choices=["load", "spike", "endurance", "all"], default="load", help="Which scenario(s) to run"
+    )
+    p.add_argument("--report", default=None, help="Path to write JSON report  e.g. report.json")
     return p
 
 
 def main():
     parser = _build_parser()
-    args   = parser.parse_args()
+    args = parser.parse_args()
 
     if args.scenario in ("load", "all"):
         run_stress_test(args)

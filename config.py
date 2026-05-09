@@ -8,6 +8,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
         return default
     return raw.strip().lower() not in ("0", "false", "no", "off", "")
 
+
 class Config:
     _SECRET_KEY_ENV = os.getenv("SECRET_KEY")
     if not _SECRET_KEY_ENV and os.getenv("FLASK_ENV") == "production":
@@ -23,9 +24,7 @@ class Config:
     LANGUAGES = {"en": "English", "sl": "Slovenščina"}
     BABEL_DEFAULT_LOCALE = "en"
     # Use an absolute path so translations load no matter the CWD (gunicorn, wsgi)
-    BABEL_TRANSLATION_DIRECTORIES = os.path.join(
-        os.path.dirname(__file__), "app", "translations"
-    )
+    BABEL_TRANSLATION_DIRECTORIES = os.path.join(os.path.dirname(__file__), "app", "translations")
 
     # Hard cap on request body size — applies to file uploads (firmware,
     # checkpoint JSON, RFID CSV) and JSON ingest. Defaults to 32 MiB which

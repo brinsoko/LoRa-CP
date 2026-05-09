@@ -96,4 +96,3 @@ def validate_email(value: str | None) -> tuple[str | None, str | None]:
     if "@" not in lowered or lowered.startswith("@") or lowered.endswith("@"):
         return None, "email is invalid"
     return lowered, None
-

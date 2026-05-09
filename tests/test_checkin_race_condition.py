@@ -51,11 +51,7 @@ def test_savepoint_isolates_unique_constraint_violation(app):
     # Outer transaction must still be usable — that's the whole point of the
     # savepoint. If the bare INSERT had been used, the session would now be
     # in a failed state and any subsequent query would error.
-    rows = (
-        Checkin.query
-        .filter_by(team_id=team.id, checkpoint_id=checkpoint.id, competition_id=competition.id)
-        .all()
-    )
+    rows = Checkin.query.filter_by(team_id=team.id, checkpoint_id=checkpoint.id, competition_id=competition.id).all()
     assert len(rows) == 1
 
 

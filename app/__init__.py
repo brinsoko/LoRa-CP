@@ -91,11 +91,14 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     logging.getLogger("werkzeug").setLevel(logging.INFO)
 
     if log_level == logging.DEBUG:
+
         @app.before_request
         def _log_req():
             app.logger.debug(
                 "REQ %s %s endpoint=%s auth=%s role=%s ua=%s",
-                request.method, request.path, request.endpoint,
+                request.method,
+                request.path,
+                request.endpoint,
                 getattr(current_user, "is_authenticated", False),
                 getattr(current_user, "role", None),
                 request.headers.get("User-Agent", "")[:80],
@@ -120,7 +123,9 @@ def create_app(config_overrides: dict | None = None) -> Flask:
         lang = session.get("lang")
         if lang and lang in app.config.get("LANGUAGES", {}):
             return lang
-        return request.accept_languages.best_match(app.config.get("LANGUAGES", {}).keys()) or app.config.get("BABEL_DEFAULT_LOCALE", "en")
+        return request.accept_languages.best_match(app.config.get("LANGUAGES", {}).keys()) or app.config.get(
+            "BABEL_DEFAULT_LOCALE", "en"
+        )
 
     babel.init_app(app, locale_selector=_select_locale)
 
@@ -157,15 +162,15 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.register_blueprint(messages_bp, url_prefix="/messages")
     app.register_blueprint(lora_bp, url_prefix="/lora")
     app.register_blueprint(groups_bp, url_prefix="/groups")
-    app.register_blueprint(maps_bp,   url_prefix="/map")
+    app.register_blueprint(maps_bp, url_prefix="/map")
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
-    app.register_blueprint(teams_bp,        url_prefix="/teams")
-    app.register_blueprint(checkpoints_bp,  url_prefix="/checkpoints")
-    app.register_blueprint(checkins_bp,     url_prefix="/checkins")
-    app.register_blueprint(rfid_bp,         url_prefix="/rfid")
-    app.register_blueprint(sheets_bp,       url_prefix="/sheets")
-    app.register_blueprint(firmware_bp,     url_prefix="/firmware")
+    app.register_blueprint(teams_bp, url_prefix="/teams")
+    app.register_blueprint(checkpoints_bp, url_prefix="/checkpoints")
+    app.register_blueprint(checkins_bp, url_prefix="/checkins")
+    app.register_blueprint(rfid_bp, url_prefix="/rfid")
+    app.register_blueprint(sheets_bp, url_prefix="/sheets")
+    app.register_blueprint(firmware_bp, url_prefix="/firmware")
 
     with app.app_context():
         db.create_all()
@@ -220,10 +225,12 @@ def create_app(config_overrides: dict | None = None) -> Flask:
             # db.create_all() only creates indexes for tables it creates fresh;
             # existing DBs need the new composite index added explicitly.
             with db.engine.begin() as conn:
-                conn.execute(text(
-                    "CREATE INDEX IF NOT EXISTS ix_lora_messages_dedup "
-                    "ON lora_messages (competition_id, dev_id, received_at)"
-                ))
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_lora_messages_dedup "
+                        "ON lora_messages (competition_id, dev_id, received_at)"
+                    )
+                )
         except Exception:
             app.logger.exception("Failed to ensure lora_messages dedup index")
 
@@ -244,7 +251,8 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     def forbidden(e):
         app.logger.warning(
             "403 Forbidden at %s (endpoint=%s) auth=%s role=%s",
-            request.path, request.endpoint,
+            request.path,
+            request.endpoint,
             getattr(current_user, "is_authenticated", False),
             getattr(current_user, "role", None),
         )
@@ -323,9 +331,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
             current_competition=getattr(g, "current_competition", None),
             current_competition_role=get_current_competition_role(),
             available_competitions=(
-                get_user_competitions(current_user.id)
-                if getattr(current_user, "is_authenticated", False)
-                else []
+                get_user_competitions(current_user.id) if getattr(current_user, "is_authenticated", False) else []
             ),
         )
 

@@ -100,20 +100,13 @@ def list_sheets():
     lang = load_lang()
     sheets_settings = load_sheet_settings()
     configs = (
-        SheetConfig.query
-        .filter(SheetConfig.competition_id == comp_id)
-        .order_by(SheetConfig.created_at.desc())
-        .all()
+        SheetConfig.query.filter(SheetConfig.competition_id == comp_id).order_by(SheetConfig.created_at.desc()).all()
     )
-    checkpoints = (
-        Checkpoint.query
-        .filter(Checkpoint.competition_id == comp_id)
-        .order_by(Checkpoint.name.asc())
-        .all()
-    )
+    checkpoints = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
     groups = (
-        CheckpointGroup.query
-        .options(db.joinedload(CheckpointGroup.checkpoint_links).joinedload(CheckpointGroupLink.checkpoint))
+        CheckpointGroup.query.options(
+            db.joinedload(CheckpointGroup.checkpoint_links).joinedload(CheckpointGroupLink.checkpoint)
+        )
         .filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
         .all()
@@ -199,6 +192,7 @@ def build_arrivals():
     if per_group_cp_order_raw:
         try:
             import json
+
             per_group_cp_order = json.loads(per_group_cp_order_raw)
         except Exception:
             per_group_cp_order = {}
@@ -294,6 +288,7 @@ def build_score():
         if per_group_cp_order_raw:
             try:
                 import json
+
                 per_group_cp_order = json.loads(per_group_cp_order_raw)
             except Exception:
                 per_group_cp_order = {}
@@ -376,17 +371,16 @@ def wizard_checkpoints():
     lang = load_lang()
     arrived_header = (request.form.get("arrived_header") or lang.get("arrived_header") or "Arrived to CP").strip()
     points_header = (request.form.get("points_header") or lang.get("points_header") or "Points").strip()
-    dead_time_header = (request.form.get("dead_time_header") or lang.get("dead_time_header") or "Dead Time [min]").strip()
+    dead_time_header = (
+        request.form.get("dead_time_header") or lang.get("dead_time_header") or "Dead Time [min]"
+    ).strip()
     time_header = (request.form.get("time_header") or lang.get("time_header") or "Čas").strip()
-    checkpoints = (
-        Checkpoint.query
-        .filter(Checkpoint.competition_id == comp_id)
-        .order_by(Checkpoint.name.asc())
-        .all()
-    )
+    checkpoints = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
     group_order_raw = request.form.get("group_order") or ""
     checkpoint_order_raw = (request.form.get("checkpoint_order") or "").strip()
-    checkpoint_order = [c.strip() for c in checkpoint_order_raw.split(",") if c.strip()] if checkpoint_order_raw else None
+    checkpoint_order = (
+        [c.strip() for c in checkpoint_order_raw.split(",") if c.strip()] if checkpoint_order_raw else None
+    )
     per_group_cp_order_raw = (request.form.get("per_group_cp_order") or "").strip()
     per_group_cp_order = {}
     if per_group_cp_order_raw:
@@ -431,7 +425,7 @@ def wizard_checkpoints():
                 cp_id_int = int(cp_id)
             except Exception:
                 continue
-            per_cp_dead_time[cp_id_int] = (val == "1")
+            per_cp_dead_time[cp_id_int] = val == "1"
         if key.startswith("record_time_cp_"):
             cp_id = key.replace("record_time_cp_", "")
             try:
@@ -515,9 +509,23 @@ def wizard_checkpoints():
         return redirect(url_for("sheets_admin.list_sheets"))
 
     if not use_sheets:
-        flash(_("Wizard completed. Created %(created)s local configs, skipped %(skipped)s existing.", created=created, skipped=skipped), "success")
+        flash(
+            _(
+                "Wizard completed. Created %(created)s local configs, skipped %(skipped)s existing.",
+                created=created,
+                skipped=skipped,
+            ),
+            "success",
+        )
     else:
-        flash(_("Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing.", created=created, skipped=skipped), "success")
+        flash(
+            _(
+                "Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing.",
+                created=created,
+                skipped=skipped,
+            ),
+            "success",
+        )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -530,11 +538,7 @@ def sync_team_numbers(config_id: int):
     comp_id, redirect_resp = _require_competition()
     if redirect_resp:
         return redirect_resp
-    cfg = (
-        SheetConfig.query
-        .filter(SheetConfig.competition_id == comp_id, SheetConfig.id == config_id)
-        .first()
-    )
+    cfg = SheetConfig.query.filter(SheetConfig.competition_id == comp_id, SheetConfig.id == config_id).first()
     if not cfg:
         flash(_("Config not found."), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
@@ -560,11 +564,7 @@ def delete_config(config_id: int):
     comp_id, redirect_resp = _require_competition()
     if redirect_resp:
         return redirect_resp
-    cfg = (
-        SheetConfig.query
-        .filter(SheetConfig.competition_id == comp_id, SheetConfig.id == config_id)
-        .first()
-    )
+    cfg = SheetConfig.query.filter(SheetConfig.competition_id == comp_id, SheetConfig.id == config_id).first()
     if not cfg:
         flash(_("Config not found."), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
@@ -603,7 +603,9 @@ def add_tab():
     arrived_header = (request.form.get("arrived_header") or lang.get("arrived_header") or "Arrived to CP").strip()
     points_header = (request.form.get("points_header") or lang.get("points_header") or "Points").strip()
     dead_time_enabled = bool(request.form.get("dead_time"))
-    dead_time_header = (request.form.get("dead_time_header") or lang.get("dead_time_header") or "Dead Time [min]").strip()
+    dead_time_header = (
+        request.form.get("dead_time_header") or lang.get("dead_time_header") or "Dead Time [min]"
+    ).strip()
     include_time = bool(request.form.get("include_time"))
     time_header = (request.form.get("time_header") or lang.get("time_header") or "Čas").strip()
     groups_raw = request.form.get("groups_raw") or ""
@@ -639,11 +641,7 @@ def add_tab():
         current_col += 1 + (1 if dead_time_enabled else 0) + (1 if include_time else 0) + len(grp.get("fields", [])) + 1
 
     ws_title = None
-    db_groups = (
-        CheckpointGroup.query
-        .filter(CheckpointGroup.competition_id == comp_id)
-        .all()
-    )
+    db_groups = CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id).all()
     group_by_name = {_norm_name(g.name): g for g in db_groups}
     groups_with_ids = []
     for grp in groups:
@@ -679,7 +677,9 @@ def add_tab():
             current_app.logger.exception("Failed to add tab")
             msg = _("Could not add tab: %(error)s", error=exc)
             if "PermissionError" in type(exc).__name__ or "permission" in str(exc).lower():
-                msg += " - " + _("Check that the spreadsheet ID is correct and that the service account email has Editor access to it.")
+                msg += " - " + _(
+                    "Check that the spreadsheet ID is correct and that the service account email has Editor access to it."
+                )
             flash(msg, "warning")
             return redirect(url_for("sheets_admin.list_sheets"))
 
@@ -687,7 +687,10 @@ def add_tab():
     existing = SheetConfig.query.filter_by(spreadsheet_id=spreadsheet_id, tab_name=tab_title).first()
     if existing and not overwrite:
         flash(
-            _("A config for tab '%(tab)s' already exists. Submit again with overwrite enabled to replace it.", tab=tab_title),
+            _(
+                "A config for tab '%(tab)s' already exists. Submit again with overwrite enabled to replace it.",
+                tab=tab_title,
+            ),
             "warning",
         )
         return redirect(url_for("sheets_admin.list_sheets"))

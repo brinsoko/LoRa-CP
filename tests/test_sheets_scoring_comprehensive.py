@@ -9,6 +9,7 @@ Requires: TEST_SPREADSHEET_ID env var + service account credentials.
 Run with: pytest -m sheets
 Skip with: pytest -m "not sheets"
 """
+
 from __future__ import annotations
 
 import os
@@ -66,6 +67,7 @@ def _get_gc():
         creds = Credentials.from_service_account_file(sa, scopes=scopes)
     elif SA_JSON:
         import json as _json
+
         creds = Credentials.from_service_account_info(_json.loads(SA_JSON), scopes=scopes)
     else:
         pytest.skip("No service account credentials found")
@@ -87,18 +89,18 @@ def _cleanup_tabs(spreadsheet, prefix: str = TAB_PREFIX):
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def sheets_app(app_factory):
     overrides = {"SHEETS_SYNC_ENABLED": True}
     if SA_FILE:
-        overrides["GOOGLE_SERVICE_ACCOUNT_FILE"] = (
-            os.path.abspath(SA_FILE) if not os.path.isabs(SA_FILE) else SA_FILE
-        )
+        overrides["GOOGLE_SERVICE_ACCOUNT_FILE"] = os.path.abspath(SA_FILE) if not os.path.isabs(SA_FILE) else SA_FILE
     if SA_JSON:
         overrides["GOOGLE_SERVICE_ACCOUNT_JSON"] = SA_JSON
     application = app_factory(**overrides)
     with application.app_context():
         from app.utils.sheets_settings import save_settings
+
         save_settings({"sync_enabled": True})
         yield application
 
@@ -154,31 +156,50 @@ def seeded(sheets_app, sheets_client):
         (ci4, t1, cp2, 50.0),
         (ci5, t2, cp2, 45.0),
     ]:
-        db.session.add(ScoreEntry(
-            competition_id=comp.id, checkin_id=ci.id, team_id=team.id,
-            checkpoint_id=cp.id, judge_user_id=user.id,
-            raw_fields={"dead_time": 5, "task": total, "points": total},
-            total=total,
-        ))
-    db.session.add(ScoreEntry(
-        competition_id=comp.id, checkin_id=None, team_id=t1.id,
-        checkpoint_id=vcp.id, judge_user_id=user.id,
-        raw_fields={"topo": 32}, total=32.0,
-    ))
+        db.session.add(
+            ScoreEntry(
+                competition_id=comp.id,
+                checkin_id=ci.id,
+                team_id=team.id,
+                checkpoint_id=cp.id,
+                judge_user_id=user.id,
+                raw_fields={"dead_time": 5, "task": total, "points": total},
+                total=total,
+            )
+        )
+    db.session.add(
+        ScoreEntry(
+            competition_id=comp.id,
+            checkin_id=None,
+            team_id=t1.id,
+            checkpoint_id=vcp.id,
+            judge_user_id=user.id,
+            raw_fields={"topo": 32},
+            total=32.0,
+        )
+    )
     db.session.commit()
 
     login_as(sheets_client, user, comp)
     return {
-        "comp": comp, "user": user,
-        "grp": grp, "grp2": grp2,
-        "cp1": cp1, "cp2": cp2, "vcp": vcp,
-        "t1": t1, "t2": t2, "t3": t3, "t4": t4,
+        "comp": comp,
+        "user": user,
+        "grp": grp,
+        "grp2": grp2,
+        "cp1": cp1,
+        "cp2": cp2,
+        "vcp": vcp,
+        "t1": t1,
+        "t2": t2,
+        "t3": t3,
+        "t4": t4,
     }
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _run_wizard(client, checkpoints, prefix=TAB_PREFIX, dead_time=True, record_time=True):
     form_data = {"spreadsheet_id": SPREADSHEET_ID, "create_remote": "1"}
@@ -197,6 +218,7 @@ def _run_wizard(client, checkpoints, prefix=TAB_PREFIX, dead_time=True, record_t
 def _write_scores(app, s):
     """Push DB scores to checkpoint tabs."""
     from app.utils.sheets_sync import update_checkpoint_scores
+
     for team, cp, grp_name, vals in [
         (s["t1"], s["cp1"], "Alpha", {"dead_time": 5, "task": 40, "points": 40}),
         (s["t2"], s["cp1"], "Alpha", {"dead_time": 3, "task": 35, "points": 35}),
@@ -209,20 +231,26 @@ def _write_scores(app, s):
 
 
 def _build_score_tab(client, s, tab_name, dead_time_sum=True):
-    resp = client.post("/sheets/build-score", data={
-        "spreadsheet_id": SPREADSHEET_ID,
-        "tab_name": tab_name,
-        "include_dead_time_sum": "1" if dead_time_sum else "",
-    })
+    resp = client.post(
+        "/sheets/build-score",
+        data={
+            "spreadsheet_id": SPREADSHEET_ID,
+            "tab_name": tab_name,
+            "include_dead_time_sum": "1" if dead_time_sum else "",
+        },
+    )
     assert resp.status_code in (200, 302)
     time.sleep(5)
 
 
 def _build_arrivals_tab(client, tab_name):
-    resp = client.post("/sheets/build-arrivals", data={
-        "spreadsheet_id": SPREADSHEET_ID,
-        "tab_name": tab_name,
-    })
+    resp = client.post(
+        "/sheets/build-arrivals",
+        data={
+            "spreadsheet_id": SPREADSHEET_ID,
+            "tab_name": tab_name,
+        },
+    )
     assert resp.status_code in (200, 302)
     time.sleep(5)
 
@@ -248,6 +276,7 @@ def _find_col(header, *keywords):
 # GROUP 1: Score Tab Formula Verification
 # ===========================================================================
 
+
 @pytest.mark.sheets
 @skip_no_sheets
 class TestScoreTabFormulas:
@@ -272,6 +301,7 @@ class TestScoreTabFormulas:
                     break
             assert cp_col_idx is not None, f"No CP column in header: {header}"
             from gspread.utils import rowcol_to_a1
+
             cell_a1 = rowcol_to_a1(2, cp_col_idx + 1)
             formula = ws.acell(cell_a1, value_render_option="FORMULA").value
             assert "INDEX" in str(formula).upper(), f"Expected INDEX formula, got: {formula}"
@@ -295,6 +325,7 @@ class TestScoreTabFormulas:
             total_col = _find_col(header, "skupaj", "total")
             assert total_col is not None, f"No total column: {header}"
             from gspread.utils import rowcol_to_a1
+
             cell_a1 = rowcol_to_a1(2, total_col + 1)
             formula = ws.acell(cell_a1, value_render_option="FORMULA").value
             assert str(formula).upper().startswith("=SUM("), f"Expected =SUM formula, got: {formula}"
@@ -326,6 +357,7 @@ class TestScoreTabFormulas:
                     break
             assert team_row is not None, "Team 101 not found in score tab"
             from gspread.utils import rowcol_to_a1
+
             original = ws_score.acell(rowcol_to_a1(team_row, total_col + 1)).value
             assert float(original) == pytest.approx(90.0, abs=1)
 
@@ -341,8 +373,7 @@ class TestScoreTabFormulas:
 
             # Re-read score tab total — should now be 999 + 50 = 1049
             updated = ws_score.acell(rowcol_to_a1(team_row, total_col + 1)).value
-            assert float(updated) == pytest.approx(1049.0, abs=1), \
-                f"Propagation failed: expected ~1049, got {updated}"
+            assert float(updated) == pytest.approx(1049.0, abs=1), f"Propagation failed: expected ~1049, got {updated}"
         finally:
             _cleanup_tabs(sp)
 
@@ -388,6 +419,7 @@ class TestScoreTabFormulas:
             dt_col = _find_col(header, "mrtvi", "dead time")
             assert dt_col is not None, f"No dead time sum column: {header}"
             from gspread.utils import rowcol_to_a1
+
             formula = ws.acell(rowcol_to_a1(2, dt_col + 1), value_render_option="FORMULA").value
             assert "SUM" in str(formula).upper(), f"Expected SUM formula, got: {formula}"
         finally:
@@ -397,6 +429,7 @@ class TestScoreTabFormulas:
 # ===========================================================================
 # GROUP 2: Dead Time Sum Verification
 # ===========================================================================
+
 
 @pytest.mark.sheets
 @skip_no_sheets
@@ -421,8 +454,7 @@ class TestDeadTimeSum:
             for row in all_vals[1:]:
                 if "101" in row:
                     val = float(row[dt_col]) if row[dt_col] else 0
-                    assert val == pytest.approx(15.0, abs=0.5), \
-                        f"Team-A dead time sum: expected 15, got {val}"
+                    assert val == pytest.approx(15.0, abs=0.5), f"Team-A dead time sum: expected 15, got {val}"
                     break
         finally:
             _cleanup_tabs(sp)
@@ -481,8 +513,7 @@ class TestDeadTimeSum:
                 if "101" in row:
                     val = float(row[score_dt_col]) if row[score_dt_col] else 0
                     # Was 5+10=15, now 99+10=109
-                    assert val == pytest.approx(109.0, abs=1), \
-                        f"Dead time propagation: expected ~109, got {val}"
+                    assert val == pytest.approx(109.0, abs=1), f"Dead time propagation: expected ~109, got {val}"
                     break
         finally:
             _cleanup_tabs(sp)
@@ -491,6 +522,7 @@ class TestDeadTimeSum:
 # ===========================================================================
 # GROUP 3: Arrivals Coloring
 # ===========================================================================
+
 
 @pytest.mark.sheets
 @skip_no_sheets
@@ -549,6 +581,7 @@ class TestArrivalsColoring:
 # GROUP 4: mark_arrival_checkbox Behavior
 # ===========================================================================
 
+
 @pytest.mark.sheets
 @skip_no_sheets
 class TestMarkArrival:
@@ -563,6 +596,7 @@ class TestMarkArrival:
         time.sleep(2)
 
         from app.utils.sheets_sync import mark_arrival_checkbox
+
         ts = T0 + timedelta(minutes=15)
         mark_arrival_checkbox(s["t1"].id, s["cp1"].id, ts)
         time.sleep(3)
@@ -581,8 +615,9 @@ class TestMarkArrival:
             time_col = 2  # 0-based: Group(0), DeadTime(1), Time(2), Points(3)
             cell_val = str(all_vals[team_row - 1][time_col])
             assert cell_val != "TRUE", "Expected timestamp, got TRUE"
-            assert "2026" in cell_val or "08:" in cell_val, \
+            assert "2026" in cell_val or "08:" in cell_val, (
                 f"Expected timestamp at col {time_col}, got: {cell_val}. Header: {header}"
+            )
         finally:
             _cleanup_tabs(sp)
 
@@ -596,6 +631,7 @@ class TestMarkArrival:
         time.sleep(2)
 
         from app.utils.sheets_sync import mark_arrival_checkbox
+
         mark_arrival_checkbox(s["t1"].id, s["cp1"].id, T0)
         time.sleep(3)
 
@@ -614,8 +650,9 @@ class TestMarkArrival:
             # Col 2 = time header (SHOULD have timestamp)
             time_val = str(all_vals[team_row - 1][2])
             assert "2026" not in dt_val, f"Timestamp leaked into dead_time column: {dt_val}"
-            assert "2026" in time_val or "08:" in time_val, \
+            assert "2026" in time_val or "08:" in time_val, (
                 f"Expected timestamp in time col (index 2): {time_val}. Row: {all_vals[team_row - 1]}"
+            )
         finally:
             _cleanup_tabs(sp)
 
@@ -623,6 +660,7 @@ class TestMarkArrival:
 # ===========================================================================
 # GROUP 5: Concurrent Submissions
 # ===========================================================================
+
 
 @pytest.mark.sheets
 @skip_no_sheets
@@ -641,6 +679,7 @@ class TestConcurrentSubmissions:
         time.sleep(2)
 
         from app.utils.sheets_sync import update_checkpoint_scores
+
         # Rapid sequential writes (simulating near-concurrent submissions)
         update_checkpoint_scores(s["t1"].id, s["cp1"].id, "Alpha", {"dead_time": 1, "points": 77})
         update_checkpoint_scores(s["t2"].id, s["cp1"].id, "Alpha", {"dead_time": 2, "points": 88})
@@ -673,6 +712,7 @@ class TestConcurrentSubmissions:
         time.sleep(2)
 
         from app.utils.sheets_sync import update_checkpoint_scores
+
         update_checkpoint_scores(s["t1"].id, s["cp1"].id, "Alpha", {"points": 111})
         update_checkpoint_scores(s["t1"].id, s["cp1"].id, "Alpha", {"points": 222})
         time.sleep(3)
@@ -695,6 +735,7 @@ class TestConcurrentSubmissions:
 # ===========================================================================
 # GROUP 6: Score Tab Org Summary
 # ===========================================================================
+
 
 @pytest.mark.sheets
 @skip_no_sheets
@@ -730,8 +771,7 @@ class TestOrgSummary:
                     # Team-B: CP1=35 + CP2=45 = 80
                     # Org-1 total should be >= 90 (at minimum Team-A's contribution)
                     # The formula uses FILTER by org name across the group block
-                    assert org_total >= 80, \
-                        f"Org-1 total too low: got {org_total}, row: {row}"
+                    assert org_total >= 80, f"Org-1 total too low: got {org_total}, row: {row}"
                     break
             else:
                 pytest.fail("Org-1 not found in score tab")
@@ -760,6 +800,7 @@ class TestOrgSummary:
 # GROUP 7: Checkpoint Tab Values
 # ===========================================================================
 
+
 @pytest.mark.sheets
 @skip_no_sheets
 class TestCheckpointTabValues:
@@ -781,9 +822,9 @@ class TestCheckpointTabValues:
             team_row = _find_team_row(all_vals, "101")
             assert pts_col is not None and team_row is not None
             from gspread.utils import rowcol_to_a1
+
             formula = ws.acell(rowcol_to_a1(team_row, pts_col + 1), value_render_option="FORMULA").value
-            assert not str(formula).startswith("="), \
-                f"Checkpoint tab should have raw values, got formula: {formula}"
+            assert not str(formula).startswith("="), f"Checkpoint tab should have raw values, got formula: {formula}"
         finally:
             _cleanup_tabs(sp)
 
@@ -808,7 +849,6 @@ class TestCheckpointTabValues:
                 row = _find_team_row(all_vals, num_str)
                 assert row is not None, f"Team {num_str} not found"
                 sheet_val = float(all_vals[row - 1][pts_col])
-                assert sheet_val == pytest.approx(db_val, abs=0.01), \
-                    f"Team {num_str}: sheet={sheet_val} vs db={db_val}"
+                assert sheet_val == pytest.approx(db_val, abs=0.01), f"Team {num_str}: sheet={sheet_val} vs db={db_val}"
         finally:
             _cleanup_tabs(sp)

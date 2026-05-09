@@ -268,11 +268,7 @@ def _update_checkpoint(checkpoint_id: int, partial: bool):
         name, name_error = validate_text(payload.get("name"), field_name="name", max_length=120, required=True)
         if name_error:
             return jsonify({"error": "validation_error", "detail": name_error}), 400
-        existing = (
-            _checkpoint_query(comp_id)
-            .filter(Checkpoint.name == name, Checkpoint.id != cp.id)
-            .first()
-        )
+        existing = _checkpoint_query(comp_id).filter(Checkpoint.name == name, Checkpoint.id != cp.id).first()
         if existing:
             return jsonify({"error": "duplicate", "detail": "Checkpoint name already exists."}), 409
         cp.name = name

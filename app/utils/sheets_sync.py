@@ -29,11 +29,7 @@ def _resolve_group_from_cfg(
         return None
     groups = cache.get(competition_id)
     if groups is None:
-        groups = (
-            CheckpointGroup.query
-            .filter(CheckpointGroup.competition_id == competition_id)
-            .all()
-        )
+        groups = CheckpointGroup.query.filter(CheckpointGroup.competition_id == competition_id).all()
         cache[competition_id] = groups
 
     group_id = grp_def.get("group_id")
@@ -58,8 +54,7 @@ def _resolve_group_from_cfg(
 
 def _get_global_group_order(spreadsheet_id: str) -> list[str]:
     cfgs = (
-        SheetConfig.query
-        .filter(SheetConfig.spreadsheet_id == spreadsheet_id)
+        SheetConfig.query.filter(SheetConfig.spreadsheet_id == spreadsheet_id)
         .filter(SheetConfig.tab_type == "checkpoint")
         .order_by(SheetConfig.id.asc())
         .all()
@@ -83,7 +78,9 @@ def _get_default_group_order(spreadsheet_id: str | None, competition_id: int | N
 def _get_group_checkpoint_order_from_db() -> dict[str, list[str]]:
     """Return default checkpoint order per group based on CheckpointGroupLink positions."""
     orders: dict[str, list[str]] = {}
-    groups = CheckpointGroup.query.options(db.joinedload(CheckpointGroup.checkpoint_links).joinedload(CheckpointGroupLink.checkpoint)).all()
+    groups = CheckpointGroup.query.options(
+        db.joinedload(CheckpointGroup.checkpoint_links).joinedload(CheckpointGroupLink.checkpoint)
+    ).all()
     for g in groups:
         # order by position asc
         ordered = sorted(g.checkpoint_links, key=lambda l: l.position if l.position is not None else 0)
@@ -93,9 +90,11 @@ def _get_group_checkpoint_order_from_db() -> dict[str, list[str]]:
 
 def _sort_groups(groups: list[CheckpointGroup], order: list[str]) -> list[CheckpointGroup]:
     order_norm = [g.lower().strip() for g in order]
+
     def key(g: CheckpointGroup):
         norm = g.name.lower().strip()
         return (order_norm.index(norm) if norm in order_norm else len(order_norm), g.name)
+
     return sorted(groups, key=key)
 
 
@@ -167,6 +166,7 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime
     if app.config.get("SHEETS_SYNC_INLINE"):
         return mark_arrival_checkbox_sync(team_id, checkpoint_id, arrived_at)
     from app.utils.sheets_sync_worker import enqueue_mark_arrival
+
     enqueue_mark_arrival(app, team_id, checkpoint_id, arrived_at)
 
 
@@ -180,8 +180,7 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
         return
 
     configs = (
-        SheetConfig.query
-        .filter(SheetConfig.tab_type == "checkpoint")
+        SheetConfig.query.filter(SheetConfig.tab_type == "checkpoint")
         .filter(SheetConfig.checkpoint_id == checkpoint_id)
         .filter(SheetConfig.competition_id == checkpoint.competition_id)
         .all()
@@ -209,11 +208,7 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
             if not db_group:
                 continue
             # Is team in this group?
-            belongs = (
-                TeamGroup.query
-                .filter(TeamGroup.team_id == team.id, TeamGroup.group_id == db_group.id)
-                .first()
-            )
+            belongs = TeamGroup.query.filter(TeamGroup.team_id == team.id, TeamGroup.group_id == db_group.id).first()
             if not belongs:
                 continue
             # Determine row by sorted team numbers
@@ -245,7 +240,9 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
                 current_app.logger.warning("Could not update arrival checkbox: %s", exc)
 
 
-def update_checkpoint_scores(team_id: int, checkpoint_id: int, group_name: str, values: dict, scored_at: datetime | None = None):
+def update_checkpoint_scores(
+    team_id: int, checkpoint_id: int, group_name: str, values: dict, scored_at: datetime | None = None
+):
     """Public entrypoint — see mark_arrival_checkbox for the dispatch policy."""
     try:
         app = current_app._get_current_object()
@@ -254,10 +251,13 @@ def update_checkpoint_scores(team_id: int, checkpoint_id: int, group_name: str, 
     if app.config.get("SHEETS_SYNC_INLINE"):
         return update_checkpoint_scores_sync(team_id, checkpoint_id, group_name, values, scored_at)
     from app.utils.sheets_sync_worker import enqueue_update_scores
+
     enqueue_update_scores(app, team_id, checkpoint_id, group_name, values, scored_at)
 
 
-def update_checkpoint_scores_sync(team_id: int, checkpoint_id: int, group_name: str, values: dict, scored_at: datetime | None = None):
+def update_checkpoint_scores_sync(
+    team_id: int, checkpoint_id: int, group_name: str, values: dict, scored_at: datetime | None = None
+):
     """Update score-related fields for a team in a checkpoint tab based on config layout."""
     if not sheets_sync_enabled():
         return
@@ -267,8 +267,7 @@ def update_checkpoint_scores_sync(team_id: int, checkpoint_id: int, group_name: 
         return
 
     configs = (
-        SheetConfig.query
-        .filter(SheetConfig.tab_type == "checkpoint")
+        SheetConfig.query.filter(SheetConfig.tab_type == "checkpoint")
         .filter(SheetConfig.checkpoint_id == checkpoint_id)
         .filter(SheetConfig.competition_id == checkpoint.competition_id)
         .all()
@@ -321,22 +320,34 @@ def update_checkpoint_scores_sync(team_id: int, checkpoint_id: int, group_name: 
             col = start_col + 1
             if dead_time_enabled:
                 if dead_time_header in values or "dead_time" in values:
-                    client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(dead_time_header, values.get("dead_time")))
+                    client.update_cell(
+                        cfg.spreadsheet_id,
+                        cfg.tab_name,
+                        row,
+                        col,
+                        values.get(dead_time_header, values.get("dead_time")),
+                    )
                 col += 1
             if time_enabled:
                 if time_header in values or "time" in values:
-                    client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(time_header, values.get("time")))
+                    client.update_cell(
+                        cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(time_header, values.get("time"))
+                    )
                 elif scored_at:
-                    client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, col, scored_at.strftime("%Y-%m-%d %H:%M:%S"))
+                    client.update_cell(
+                        cfg.spreadsheet_id, cfg.tab_name, row, col, scored_at.strftime("%Y-%m-%d %H:%M:%S")
+                    )
                 col += 1
 
-            for field_name in (grp_def.get("fields") or []):
+            for field_name in grp_def.get("fields") or []:
                 if field_name in values:
                     client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(field_name))
                 col += 1
 
             if points_header in values or "points" in values:
-                client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(points_header, values.get("points")))
+                client.update_cell(
+                    cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(points_header, values.get("points"))
+                )
 
 
 def build_arrivals_tab(
@@ -356,18 +367,15 @@ def build_arrivals_tab(
     # was a refactor leftover that issued a redundant DB query on every call.
 
     cp_configs = (
-        SheetConfig.query
-        .filter(SheetConfig.spreadsheet_id == spreadsheet_id)
+        SheetConfig.query.filter(SheetConfig.spreadsheet_id == spreadsheet_id)
         .filter(SheetConfig.tab_type == "checkpoint")
         .order_by(SheetConfig.tab_name.asc())
         .all()
     )
     # Exclude virtual checkpoints from arrivals — they have no check-in concept.
     from app.models import Checkpoint as _CP
-    virtual_cp_ids = {
-        row[0]
-        for row in db.session.query(_CP.id).filter(_CP.is_virtual.is_(True)).all()
-    }
+
+    virtual_cp_ids = {row[0] for row in db.session.query(_CP.id).filter(_CP.is_virtual.is_(True)).all()}
     cp_configs = [cfg for cfg in cp_configs if cfg.checkpoint_id not in virtual_cp_ids]
     if not cp_configs:
         return "No checkpoint tab configs found."
@@ -427,6 +435,7 @@ def build_arrivals_tab(
                     idx = [n.lower().strip() for n in grp_names].index(g.name.lower().strip())
                     start_col = cols[idx]
                     from gspread.utils import rowcol_to_a1
+
                     team_col_letter = rowcol_to_a1(1, start_col).rstrip("1")
                     time_enabled = bool((cfg.config or {}).get("time_enabled"))
                     dead_time_enabled = bool((cfg.config or {}).get("dead_time_enabled"))
@@ -439,12 +448,12 @@ def build_arrivals_tab(
                             f"=IFERROR("
                             f"INDEX('{cfg.tab_name}'!{time_col_letter}:{time_col_letter}; "
                             f"MATCH(A{row_idx}; '{cfg.tab_name}'!{team_col_letter}:{team_col_letter}; 0)"
-                            f"); \"\")"
+                            f'); "")'
                         )
                     else:
-                        formula = "\"\""
+                        formula = '""'
                 except Exception:
-                    formula = "\"\""
+                    formula = '""'
                 row.append(formula)
             values.append(row)
         values.append([])
@@ -469,20 +478,22 @@ def build_arrivals_tab(
             {
                 "addConditionalFormatRule": {
                     "rule": {
-                        "ranges": [{
-                            "sheetId": ws.id,
-                            "startRowIndex": 1,
-                            "endRowIndex": last_row,
-                            "startColumnIndex": 1,
-                            "endColumnIndex": last_col,
-                        }],
+                        "ranges": [
+                            {
+                                "sheetId": ws.id,
+                                "startRowIndex": 1,
+                                "endRowIndex": last_row,
+                                "startColumnIndex": 1,
+                                "endColumnIndex": last_col,
+                            }
+                        ],
                         "booleanRule": {
                             "condition": {
                                 "type": "CUSTOM_FORMULA",
                                 "values": [{"userEnteredValue": "=NOT(ISBLANK(B2))"}],
                             },
                             "format": {"backgroundColor": {"red": 0.8, "green": 1, "blue": 0.8}},
-                        }
+                        },
                     },
                     "index": 0,
                 }
@@ -490,13 +501,15 @@ def build_arrivals_tab(
             {
                 "addConditionalFormatRule": {
                     "rule": {
-                        "ranges": [{
-                            "sheetId": ws.id,
-                            "startRowIndex": 1,
-                            "endRowIndex": last_row,
-                            "startColumnIndex": 1,
-                            "endColumnIndex": last_col,
-                        }],
+                        "ranges": [
+                            {
+                                "sheetId": ws.id,
+                                "startRowIndex": 1,
+                                "endRowIndex": last_row,
+                                "startColumnIndex": 1,
+                                "endColumnIndex": last_col,
+                            }
+                        ],
                         "booleanRule": {
                             "condition": {
                                 "type": "CUSTOM_FORMULA",
@@ -534,8 +547,7 @@ def build_teams_tab(
     max_rows = 0
     for g in groups:
         teams = (
-            Team.query
-            .join(TeamGroup, TeamGroup.team_id == Team.id)
+            Team.query.join(TeamGroup, TeamGroup.team_id == Team.id)
             .filter(TeamGroup.group_id == g.id)
             .order_by(Team.number.asc().nulls_last(), Team.name.asc())
             .all()
@@ -567,10 +579,7 @@ def build_teams_tab(
         for block in group_blocks:
             if i < len(block["rows"]):
                 # pad to col_count
-                safe_row = [
-                    escape_formula_cell(v) if isinstance(v, str) else v
-                    for v in block["rows"][i]
-                ]
+                safe_row = [escape_formula_cell(v) if isinstance(v, str) else v for v in block["rows"][i]]
                 row.extend(safe_row + [""] * (col_count - len(block["rows"][i])))
             else:
                 row.extend([""] * col_count)
@@ -604,8 +613,7 @@ def build_score_tab(
     group_order = group_order_override or _get_default_group_order(spreadsheet_id, competition_id)
     per_group_cp_order = per_group_checkpoint_order or _get_group_checkpoint_order_from_db()
     cp_configs = (
-        SheetConfig.query
-        .filter(SheetConfig.spreadsheet_id == spreadsheet_id)
+        SheetConfig.query.filter(SheetConfig.spreadsheet_id == spreadsheet_id)
         .filter(SheetConfig.tab_type == "checkpoint")
         .order_by(SheetConfig.tab_name.asc())
         .all()
@@ -623,8 +631,7 @@ def build_score_tab(
 
     for g in groups:
         teams = (
-            Team.query
-            .join(TeamGroup, TeamGroup.team_id == Team.id)
+            Team.query.join(TeamGroup, TeamGroup.team_id == Team.id)
             .filter(TeamGroup.group_id == g.id)
             .order_by(Team.number.asc().nulls_last(), Team.name.asc())
             .all()
@@ -720,6 +727,7 @@ def build_score_tab(
                     if dead_time:
                         dead_time_col = start_col + 1
                     from gspread.utils import rowcol_to_a1
+
                     team_col_letter = rowcol_to_a1(1, start_col).rstrip("1")
                     points_col_letter = rowcol_to_a1(1, points_col).rstrip("1")
                     formula = (
@@ -766,14 +774,16 @@ def build_score_tab(
         data_start = start_row + 1
         data_end = start_row + len(teams)
         total_col_idx = len(header)
-        blocks.append({
-            "num_col": 2,
-            "name_col": 3,
-            "org_col": 4,
-            "total_col": total_col_idx,
-            "start_row": data_start,
-            "end_row": data_end,
-        })
+        blocks.append(
+            {
+                "num_col": 2,
+                "name_col": 3,
+                "org_col": 4,
+                "total_col": total_col_idx,
+                "start_row": data_start,
+                "end_row": data_end,
+            }
+        )
         values.append([])
 
     # Organization summary at bottom
@@ -788,18 +798,23 @@ def build_score_tab(
     org_names = [o[0] for o in orgs if o[0]]
     if org_names:
         values.append([])
-        values.append([
-            lang.get("score_org_section_header", "Organizacija"),
-            lang.get("score_org_teams_header", "Ekipe"),
-            lang.get("score_org_numbers_header", "Številke"),
-            lang.get("score_org_count_header", "Št ekip"),
-            lang.get("score_org_total_header", "Skupaj točke (org)"),
-        ])
+        values.append(
+            [
+                lang.get("score_org_section_header", "Organizacija"),
+                lang.get("score_org_teams_header", "Ekipe"),
+                lang.get("score_org_numbers_header", "Številke"),
+                lang.get("score_org_count_header", "Št ekip"),
+                lang.get("score_org_total_header", "Skupaj točke (org)"),
+            ]
+        )
         for org in org_names:
             row_idx = len(values) + 1
+
             def col_letter(idx: int) -> str:
                 from gspread.utils import rowcol_to_a1
+
                 return rowcol_to_a1(1, idx).rstrip("1")
+
             name_filters = []
             num_filters = []
             total_filters = []
@@ -810,22 +825,28 @@ def build_score_tab(
                 ocol = col_letter(b["org_col"])
                 tcol = col_letter(b["num_col"])
                 pcol = col_letter(b["total_col"])
-                name_filters.append(f"FILTER({ncol}{b['start_row']}:{ncol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})")
-                num_filters.append(f"FILTER({tcol}{b['start_row']}:{tcol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})")
-                total_filters.append(f"FILTER({pcol}{b['start_row']}:{pcol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})")
+                name_filters.append(
+                    f"FILTER({ncol}{b['start_row']}:{ncol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})"
+                )
+                num_filters.append(
+                    f"FILTER({tcol}{b['start_row']}:{tcol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})"
+                )
+                total_filters.append(
+                    f"FILTER({pcol}{b['start_row']}:{pcol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})"
+                )
             # assemble base arrays
             names_raw = "{" + "; ".join(name_filters) + "}"
             nums_raw = "{" + "; ".join(num_filters) + "}"
             totals_raw = "{" + "; ".join(total_filters) + "}"
             # wrap with IFERROR to avoid #N/A when filters have no matches
-            names_expr = f"IFERROR({names_raw}; \"\")"
-            nums_expr = f"IFERROR({nums_raw}; \"\")"
+            names_expr = f'IFERROR({names_raw}; "")'
+            nums_expr = f'IFERROR({nums_raw}; "")'
             totals_expr = f"IFERROR({totals_raw}; 0)"
             count_expr = f"=SUMPRODUCT(N(LEN({nums_expr})>0))"
             org_row = [
                 escape_formula_cell(org),
-                f"=TEXTJOIN(\", \"; TRUE; {names_expr})",
-                f"=TEXTJOIN(\", \"; TRUE; {nums_expr})",
+                f'=TEXTJOIN(", "; TRUE; {names_expr})',
+                f'=TEXTJOIN(", "; TRUE; {nums_expr})',
                 count_expr,
                 f"=SUM({totals_expr})",
             ]
@@ -914,17 +935,14 @@ def wizard_build_checkpoint_tabs(
 
         # Groups attached to this checkpoint, ordered by group_order then name
         if per_checkpoint_groups and cp.id in per_checkpoint_groups:
-            raw_groups = (
-                CheckpointGroup.query
-                .filter(CheckpointGroup.id.in_(per_checkpoint_groups[cp.id]))
-                .all()
-            )
+            raw_groups = CheckpointGroup.query.filter(CheckpointGroup.id.in_(per_checkpoint_groups[cp.id])).all()
         else:
             raw_groups = cp.groups or []
 
         def _sort_key(g):
             norm = g.name.lower().strip()
             return (group_order_norm.index(norm) if norm in group_order_norm else len(group_order_norm), g.name)
+
         ordered_groups = sorted(raw_groups, key=_sort_key)
         extra_fields = per_checkpoint_extra_fields.get(cp.id, []) if per_checkpoint_extra_fields else []
         time_enabled = bool(record_time_cp and cp.id in record_time_cp)
@@ -946,7 +964,9 @@ def wizard_build_checkpoint_tabs(
                 headers.append(time_header)
             headers.extend(grp.get("fields", []))
             headers.append(points_header)
-            current_col += 1 + (1 if dead_time_enabled else 0) + (1 if time_enabled else 0) + len(grp.get("fields", [])) + 1
+            current_col += (
+                1 + (1 if dead_time_enabled else 0) + (1 if time_enabled else 0) + len(grp.get("fields", [])) + 1
+            )
 
         ws = _with_retry(client.add_tab, spreadsheet_id, tab_title)
         _with_retry(client.set_header_row, spreadsheet_id, tab_title, headers)
@@ -1048,17 +1068,14 @@ def wizard_create_checkpoint_configs(
             continue
 
         if per_checkpoint_groups and cp.id in per_checkpoint_groups:
-            raw_groups = (
-                CheckpointGroup.query
-                .filter(CheckpointGroup.id.in_(per_checkpoint_groups[cp.id]))
-                .all()
-            )
+            raw_groups = CheckpointGroup.query.filter(CheckpointGroup.id.in_(per_checkpoint_groups[cp.id])).all()
         else:
             raw_groups = cp.groups or []
 
         def _sort_key(g):
             norm = g.name.lower().strip()
             return (group_order_norm.index(norm) if norm in group_order_norm else len(group_order_norm), g.name)
+
         ordered_groups = sorted(raw_groups, key=_sort_key)
         extra_fields = per_checkpoint_extra_fields.get(cp.id, []) if per_checkpoint_extra_fields else []
         time_enabled = bool(record_time_cp and cp.id in record_time_cp)

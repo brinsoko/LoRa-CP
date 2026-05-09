@@ -4,6 +4,7 @@ Tests all scoring types (no-rule, mapping, interpolation, multiplier, found,
 deviation), timeline/časovnica, time trial, DNF, virtual checkpoints, org
 scoring, negative-score clamping, and decimal precision — all LOCAL (no Sheets).
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -43,6 +44,7 @@ T0 = datetime(2026, 6, 20, 8, 0, 0)
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def seeded(app):
@@ -102,8 +104,15 @@ def seeded(app):
     return {
         "comp": comp,
         "user": user,
-        "cat1": cat1, "cat2": cat2, "cat3": cat3,
-        "cp1": cp1, "cp2": cp2, "cp3": cp3, "cp4": cp4, "cp5": cp5, "vcp": vcp,
+        "cat1": cat1,
+        "cat2": cat2,
+        "cat3": cat3,
+        "cp1": cp1,
+        "cp2": cp2,
+        "cp3": cp3,
+        "cp4": cp4,
+        "cp5": cp5,
+        "vcp": vcp,
         "teams": teams,
     }
 
@@ -117,6 +126,7 @@ def _checkin(comp, team, cp, offset_minutes):
 # Helper: apply a field rule in isolation
 # ---------------------------------------------------------------------------
 
+
 def _rule(rule_dict, value, context=None):
     return _apply_field_rule(value, rule_dict, context or {})
 
@@ -124,6 +134,7 @@ def _rule(rule_dict, value, context=None):
 # ===========================================================================
 # DEVIATION TESTS (CP4 — Minefield)
 # ===========================================================================
+
 
 class TestDeviation:
     DEV_RULE = {
@@ -178,6 +189,7 @@ class TestDeviation:
 # MULTIPLIER TESTS (CP5 — Bonus task)
 # ===========================================================================
 
+
 class TestMultiplier:
     def test_multiplier_basic(self):
         rule = {"type": "multiplier", "factor": 5}
@@ -207,6 +219,7 @@ class TestMultiplier:
 # MAPPING TESTS (Virtual CP — Topo test)
 # ===========================================================================
 
+
 class TestMapping:
     TOPO_MAP = {"type": "mapping", "map": {"0": 0, "1": 8, "2": 16, "3": 24, "4": 32, "5": 40}}
 
@@ -228,6 +241,7 @@ class TestMapping:
 # ===========================================================================
 # NO-RULE / CONSTRAINT TESTS (CP3 — Looks + Effect)
 # ===========================================================================
+
 
 class TestNoRule:
     def test_no_rule_passthrough(self):
@@ -255,6 +269,7 @@ class TestNoRule:
 # ===========================================================================
 # INTERPOLATION TESTS
 # ===========================================================================
+
 
 class TestInterpolation:
     INTERP = {"type": "interpolate", "points": [[0, 100], [60, 50], [120, 0]]}
@@ -286,6 +301,7 @@ class TestInterpolation:
 # ===========================================================================
 # FOUND POINTS TESTS
 # ===========================================================================
+
 
 class TestFoundPoints:
     def test_found_points_auto_awarded_on_checkin(self, app, seeded):
@@ -321,6 +337,7 @@ class TestFoundPoints:
 # TIME TRIAL TESTS
 # ===========================================================================
 
+
 class TestTimeTrial:
     def _setup_cat1_time_trial(self, s):
         """Set up Cat 1 time trial checkins (CP1=start, CP2=end)."""
@@ -343,9 +360,12 @@ class TestTimeTrial:
     def test_time_trial_cat1_fastest_gets_max(self, app, seeded):
         team_ids = self._setup_cat1_time_trial(seeded)
         scores = _compute_time_race_scores_from_checkins(
-            team_ids, seeded["comp"].id,
-            seeded["cp1"].id, seeded["cp2"].id,
-            min_points=10, max_points=100,
+            team_ids,
+            seeded["comp"].id,
+            seeded["cp1"].id,
+            seeded["cp2"].id,
+            min_points=10,
+            max_points=100,
         )
         # mGG-1 (60 min) is fastest → max points
         assert scores[seeded["teams"]["mGG-1"].id] == 100.0
@@ -353,9 +373,12 @@ class TestTimeTrial:
     def test_time_trial_cat1_slowest_gets_min(self, app, seeded):
         team_ids = self._setup_cat1_time_trial(seeded)
         scores = _compute_time_race_scores_from_checkins(
-            team_ids, seeded["comp"].id,
-            seeded["cp1"].id, seeded["cp2"].id,
-            min_points=10, max_points=100,
+            team_ids,
+            seeded["comp"].id,
+            seeded["cp1"].id,
+            seeded["cp2"].id,
+            min_points=10,
+            max_points=100,
         )
         # mGG-4 (150 min) is slowest → min points
         assert scores[seeded["teams"]["mGG-4"].id] == 10.0
@@ -363,9 +386,12 @@ class TestTimeTrial:
     def test_time_trial_cat1_linear_interpolation(self, app, seeded):
         team_ids = self._setup_cat1_time_trial(seeded)
         scores = _compute_time_race_scores_from_checkins(
-            team_ids, seeded["comp"].id,
-            seeded["cp1"].id, seeded["cp2"].id,
-            min_points=10, max_points=100,
+            team_ids,
+            seeded["comp"].id,
+            seeded["cp1"].id,
+            seeded["cp2"].id,
+            min_points=10,
+            max_points=100,
         )
         # mGG-2 (90 min): t = (90-60)/(150-60) = 30/90 = 1/3 → 100 - 1/3*90 = 70
         assert scores[seeded["teams"]["mGG-2"].id] == pytest.approx(70.0, abs=0.01)
@@ -373,9 +399,12 @@ class TestTimeTrial:
     def test_time_trial_cat1_monotonically_decreasing(self, app, seeded):
         team_ids = self._setup_cat1_time_trial(seeded)
         scores = _compute_time_race_scores_from_checkins(
-            team_ids, seeded["comp"].id,
-            seeded["cp1"].id, seeded["cp2"].id,
-            min_points=10, max_points=100,
+            team_ids,
+            seeded["comp"].id,
+            seeded["cp1"].id,
+            seeded["cp2"].id,
+            min_points=10,
+            max_points=100,
         )
         vals = [scores[tid] for tid in team_ids]
         for a, b in zip(vals, vals[1:], strict=False):
@@ -396,12 +425,15 @@ class TestTimeTrial:
         team_ids = [teams["PP-1"].id, teams["PP-2"].id]
         # Note: start=cp2, end=cp1 (reversed for cat2)
         scores = _compute_time_race_scores_from_checkins(
-            team_ids, comp.id,
-            s["cp2"].id, s["cp1"].id,
-            min_points=10, max_points=100,
+            team_ids,
+            comp.id,
+            s["cp2"].id,
+            s["cp1"].id,
+            min_points=10,
+            max_points=100,
         )
         assert scores[teams["PP-1"].id] == 100.0  # fastest
-        assert scores[teams["PP-2"].id] == 10.0   # slowest
+        assert scores[teams["PP-2"].id] == 10.0  # slowest
 
     def test_time_trial_equal_times_all_get_max(self, app, seeded):
         s = seeded
@@ -415,9 +447,12 @@ class TestTimeTrial:
 
         team_ids = [teams["RR-1"].id, teams["RR-4"].id]
         scores = _compute_time_race_scores_from_checkins(
-            team_ids, comp.id,
-            s["cp1"].id, s["cp2"].id,
-            min_points=10, max_points=100,
+            team_ids,
+            comp.id,
+            s["cp1"].id,
+            s["cp2"].id,
+            min_points=10,
+            max_points=100,
         )
         assert scores[teams["RR-1"].id] == 100.0
         assert scores[teams["RR-4"].id] == 100.0
@@ -431,9 +466,12 @@ class TestTimeTrial:
 
         team_ids = [teams["RR-5"].id]
         scores = _compute_time_race_scores_from_checkins(
-            team_ids, comp.id,
-            s["cp1"].id, s["cp2"].id,
-            min_points=10, max_points=100,
+            team_ids,
+            comp.id,
+            s["cp1"].id,
+            s["cp2"].id,
+            min_points=10,
+            max_points=100,
         )
         # No end checkin → not in scores dict → 0
         assert teams["RR-5"].id not in scores
@@ -446,9 +484,12 @@ class TestTimeTrial:
         _checkin(comp, teams["RR-3"], s["cp2"], 160)
 
         scores = _compute_time_race_scores_from_checkins(
-            [teams["RR-3"].id], comp.id,
-            s["cp1"].id, s["cp2"].id,
-            min_points=10, max_points=100,
+            [teams["RR-3"].id],
+            comp.id,
+            s["cp1"].id,
+            s["cp2"].id,
+            min_points=10,
+            max_points=100,
         )
         # Only 1 team → min_d == max_d → all get max
         assert scores[teams["RR-3"].id] == 100.0
@@ -470,12 +511,20 @@ class TestTimeTrial:
         _checkin(comp, teams["PP-2"], s["cp1"], 80)
 
         cat1_scores = _compute_time_race_scores_from_checkins(
-            [teams["mGG-1"].id, teams["mGG-2"].id], comp.id,
-            s["cp1"].id, s["cp2"].id, min_points=10, max_points=100,
+            [teams["mGG-1"].id, teams["mGG-2"].id],
+            comp.id,
+            s["cp1"].id,
+            s["cp2"].id,
+            min_points=10,
+            max_points=100,
         )
         cat2_scores = _compute_time_race_scores_from_checkins(
-            [teams["PP-1"].id, teams["PP-2"].id], comp.id,
-            s["cp2"].id, s["cp1"].id, min_points=10, max_points=100,
+            [teams["PP-1"].id, teams["PP-2"].id],
+            comp.id,
+            s["cp2"].id,
+            s["cp1"].id,
+            min_points=10,
+            max_points=100,
         )
         # Both fastest get max independently
         assert cat1_scores[teams["mGG-1"].id] == 100.0
@@ -486,12 +535,23 @@ class TestTimeTrial:
 # TIMELINE / ČASOVNICA TESTS
 # ===========================================================================
 
+
 class TestTimeline:
     """Test the global time rule (timeline/časovnica scoring)."""
 
-    def _make_global_time_rule(self, comp_id, group_id, cp_start_id, cp_end_id,
-                                threshold=120, max_pts=120, penalty_min=1,
-                                penalty_pts=2, min_pts=0, dq_mult=None):
+    def _make_global_time_rule(
+        self,
+        comp_id,
+        group_id,
+        cp_start_id,
+        cp_end_id,
+        threshold=120,
+        max_pts=120,
+        penalty_min=1,
+        penalty_pts=2,
+        min_pts=0,
+        dq_mult=None,
+    ):
         time_cfg = {
             "start_checkpoint_id": cp_start_id,
             "end_checkpoint_id": cp_end_id,
@@ -504,9 +564,7 @@ class TestTimeline:
         if dq_mult is not None:
             time_cfg["dq_multiplier"] = dq_mult
         rules = {"time": time_cfg}
-        rec = GlobalScoreRule(
-            competition_id=comp_id, group_id=group_id, rules=rules
-        )
+        rec = GlobalScoreRule(competition_id=comp_id, group_id=group_id, rules=rules)
         db.session.add(rec)
         db.session.commit()
         return rules
@@ -517,9 +575,7 @@ class TestTimeline:
         # 100 min elapsed, timeline=120
         _checkin(s["comp"], t, s["cp1"], 0)
         _checkin(s["comp"], t, s["cp2"], 100)
-        rules = self._make_global_time_rule(
-            s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120
-        )
+        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
         result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
         assert result["time_points"] == 120.0
 
@@ -529,9 +585,7 @@ class TestTimeline:
         # 130 min elapsed, timeline=120 → 10 over × 2 = 20 penalty → 100
         _checkin(s["comp"], t, s["cp1"], 0)
         _checkin(s["comp"], t, s["cp2"], 130)
-        rules = self._make_global_time_rule(
-            s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120
-        )
+        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
         result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
         assert result["time_points"] == pytest.approx(100.0, abs=0.01)
 
@@ -541,9 +595,7 @@ class TestTimeline:
         # Exactly 120 min → max points
         _checkin(s["comp"], t, s["cp1"], 0)
         _checkin(s["comp"], t, s["cp2"], 120)
-        rules = self._make_global_time_rule(
-            s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120
-        )
+        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
         result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
         assert result["time_points"] == 120.0
 
@@ -553,9 +605,7 @@ class TestTimeline:
         # 200 min, timeline=120 → 80 over × 2 = 160 → 120-160 = -40 → clamped to 0
         _checkin(s["comp"], t, s["cp1"], 0)
         _checkin(s["comp"], t, s["cp2"], 200)
-        rules = self._make_global_time_rule(
-            s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120
-        )
+        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
         result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
         assert result["time_points"] == 0.0
 
@@ -566,8 +616,12 @@ class TestTimeline:
         _checkin(s["comp"], t, s["cp1"], 0)
         _checkin(s["comp"], t, s["cp2"], 250)
         rules = self._make_global_time_rule(
-            s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id,
-            threshold=120, dq_mult=2.0,
+            s["comp"].id,
+            s["cat1"].id,
+            s["cp1"].id,
+            s["cp2"].id,
+            threshold=120,
+            dq_mult=2.0,
         )
         result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
         assert result["auto_dnf"] is True
@@ -579,8 +633,12 @@ class TestTimeline:
         _checkin(s["comp"], t, s["cp1"], 0)
         _checkin(s["comp"], t, s["cp2"], 240)
         rules = self._make_global_time_rule(
-            s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id,
-            threshold=120, dq_mult=2.0,
+            s["comp"].id,
+            s["cat1"].id,
+            s["cp1"].id,
+            s["cp2"].id,
+            threshold=120,
+            dq_mult=2.0,
         )
         result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
         assert result["auto_dnf"] is False
@@ -603,9 +661,7 @@ class TestTimeline:
         db.session.add(entry)
         db.session.commit()
 
-        rules = self._make_global_time_rule(
-            s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120
-        )
+        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
         result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
         assert result["time_points"] == 120.0
 
@@ -615,9 +671,7 @@ class TestTimeline:
         # Way over: 500 min → penalty exceeds max → clamped to 0
         _checkin(s["comp"], t, s["cp1"], 0)
         _checkin(s["comp"], t, s["cp2"], 500)
-        rules = self._make_global_time_rule(
-            s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120
-        )
+        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
         result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
         assert result["time_points"] >= 0
 
@@ -631,17 +685,19 @@ class TestTimeline:
         _checkin(s["comp"], t3, s["cp1"], 0)
         _checkin(s["comp"], t3, s["cp2"], 170)
 
-        rules1 = self._make_global_time_rule(
-            s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120
-        )
-        rules3 = {"time": {
-            "start_checkpoint_id": s["cp1"].id, "end_checkpoint_id": s["cp2"].id,
-            "max_points": 180, "threshold_minutes": 180,
-            "penalty_minutes": 1, "penalty_points": 2, "min_points": 0,
-        }}
-        r3_db = GlobalScoreRule(
-            competition_id=s["comp"].id, group_id=s["cat3"].id, rules=rules3
-        )
+        rules1 = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
+        rules3 = {
+            "time": {
+                "start_checkpoint_id": s["cp1"].id,
+                "end_checkpoint_id": s["cp2"].id,
+                "max_points": 180,
+                "threshold_minutes": 180,
+                "penalty_minutes": 1,
+                "penalty_points": 2,
+                "min_points": 0,
+            }
+        }
+        r3_db = GlobalScoreRule(competition_id=s["comp"].id, group_id=s["cat3"].id, rules=rules3)
         db.session.add(r3_db)
         db.session.commit()
 
@@ -656,6 +712,7 @@ class TestTimeline:
 # ===========================================================================
 # DNF TESTS
 # ===========================================================================
+
 
 class TestDnf:
     def test_dnf_flag_exists_on_team(self, app, seeded):
@@ -714,6 +771,7 @@ class TestDnf:
 # VIRTUAL CHECKPOINT TESTS
 # ===========================================================================
 
+
 class TestVirtualCheckpoint:
     def test_virtual_cp_flag_set(self, app, seeded):
         assert seeded["vcp"].is_virtual is True
@@ -721,6 +779,7 @@ class TestVirtualCheckpoint:
 
     def test_virtual_cp_excluded_from_map(self, app, seeded):
         from app.utils.status import all_checkpoints_for_map
+
         cps = all_checkpoints_for_map(seeded["comp"].id)
         cp_names = [cp["name"] for cp in cps]
         assert "Start" not in cp_names
@@ -729,6 +788,7 @@ class TestVirtualCheckpoint:
     def test_virtual_cp_excluded_from_team_map_status(self, app, seeded):
         s = seeded
         from app.utils.status import compute_team_statuses
+
         status = compute_team_statuses(s["teams"]["mGG-1"].id, s["comp"].id)
         cp_names = [cp["name"] for cp in status["checkpoints"]]
         assert "Start" not in cp_names
@@ -746,6 +806,7 @@ class TestVirtualCheckpoint:
 # ===========================================================================
 # ORGANISATION SCORING TESTS
 # ===========================================================================
+
 
 class TestOrgScoring:
     def test_org_total_sum_logic(self):
@@ -795,6 +856,7 @@ class TestOrgScoring:
 # COMPUTE TOTAL TESTS
 # ===========================================================================
 
+
 class TestComputeTotal:
     def test_total_is_sum_of_fields_with_rules(self):
         rule = {
@@ -836,6 +898,7 @@ class TestComputeTotal:
 # DECIMAL PRECISION TESTS
 # ===========================================================================
 
+
 class TestDecimalPrecision:
     def test_round_score_2dp(self):
         assert _round_score(99.555) == 99.56
@@ -868,6 +931,7 @@ class TestDecimalPrecision:
 # ===========================================================================
 # NO-NEGATIVE POINTS TESTS
 # ===========================================================================
+
 
 class TestNoNegativePoints:
     def test_clamp_non_negative_positive(self):
@@ -913,11 +977,15 @@ class TestNoNegativePoints:
         s = seeded
         client = app.test_client()
         login_as(client, s["user"], s["comp"])
-        resp = client.post("/api/scores/submit", json={
-            "team_id": s["teams"]["mGG-1"].id,
-            "checkpoint_id": s["cp3"].id,
-            "fields": {"looks": -5},
-        }, headers={"Content-Type": "application/json"})
+        resp = client.post(
+            "/api/scores/submit",
+            json={
+                "team_id": s["teams"]["mGG-1"].id,
+                "checkpoint_id": s["cp3"].id,
+                "fields": {"looks": -5},
+            },
+            headers={"Content-Type": "application/json"},
+        )
         assert resp.status_code == 400
         data = resp.get_json()
         assert "negative" in data.get("detail", "").lower()
@@ -926,6 +994,7 @@ class TestNoNegativePoints:
 # ===========================================================================
 # SIGNALING (Multiplier ×5) — Regression
 # ===========================================================================
+
 
 class TestSignaling:
     def test_signaling_25_correct_gets_125(self):

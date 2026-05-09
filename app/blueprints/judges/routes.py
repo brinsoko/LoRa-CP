@@ -39,12 +39,7 @@ def assign_checkpoints():
         .all()
     )
     judges = [{"id": u.id, "username": u.username, "role": m.role} for u, m in members]
-    checkpoints = (
-        Checkpoint.query
-        .filter(Checkpoint.competition_id == comp_id)
-        .order_by(Checkpoint.name.asc())
-        .all()
-    )
+    checkpoints = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
 
     if request.method == "POST":
         judge_id = request.form.get("judge_id", type=int)
@@ -55,15 +50,11 @@ def assign_checkpoints():
             flash(_("Select a judge."), "warning")
             return redirect(url_for("judges.assign_checkpoints"))
 
-        member = (
-            CompetitionMember.query
-            .filter(
-                CompetitionMember.competition_id == comp_id,
-                CompetitionMember.user_id == judge_id,
-                CompetitionMember.active.is_(True),
-            )
-            .first()
-        )
+        member = CompetitionMember.query.filter(
+            CompetitionMember.competition_id == comp_id,
+            CompetitionMember.user_id == judge_id,
+            CompetitionMember.active.is_(True),
+        ).first()
         if not member or member.role not in ("judge", "admin"):
             flash(_("Invalid judge selection."), "warning")
             return redirect(url_for("judges.assign_checkpoints"))
@@ -73,19 +64,13 @@ def assign_checkpoints():
         except Exception:
             selected_ids = []
 
-        allowed_ids = {
-            c.id for c in checkpoints
-        }
+        allowed_ids = {c.id for c in checkpoints}
         selected_ids = [cid for cid in selected_ids if cid in allowed_ids]
 
         if default_id and default_id not in selected_ids:
             default_id = None
 
-        existing = (
-            JudgeCheckpoint.query
-            .filter(JudgeCheckpoint.user_id == judge_id)
-            .all()
-        )
+        existing = JudgeCheckpoint.query.filter(JudgeCheckpoint.user_id == judge_id).all()
         existing_ids = {jc.checkpoint_id for jc in existing}
         selected_set = set(selected_ids)
 
@@ -102,9 +87,9 @@ def assign_checkpoints():
 
         if selected_ids:
             (
-                JudgeCheckpoint.query
-                .filter(JudgeCheckpoint.user_id == judge_id)
-                .update({JudgeCheckpoint.is_default: False}, synchronize_session=False)
+                JudgeCheckpoint.query.filter(JudgeCheckpoint.user_id == judge_id).update(
+                    {JudgeCheckpoint.is_default: False}, synchronize_session=False
+                )
             )
             JudgeCheckpoint.query.filter(
                 JudgeCheckpoint.user_id == judge_id,
@@ -119,11 +104,7 @@ def assign_checkpoints():
     assigned = []
     default_checkpoint_id = None
     if selected_judge_id:
-        assigned = (
-            JudgeCheckpoint.query
-            .filter(JudgeCheckpoint.user_id == selected_judge_id)
-            .all()
-        )
+        assigned = JudgeCheckpoint.query.filter(JudgeCheckpoint.user_id == selected_judge_id).all()
         default_row = next((jc for jc in assigned if jc.is_default), None)
         default_checkpoint_id = default_row.checkpoint_id if default_row else None
 

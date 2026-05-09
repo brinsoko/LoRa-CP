@@ -17,7 +17,7 @@ from app.models import User
 def main() -> None:
     username = os.environ.get("ADMIN_USER", "admin").strip()
     password = os.environ.get("ADMIN_PASS", "admin123")
-    role     = (os.environ.get("ADMIN_ROLE", "admin") or "admin").strip()
+    role = (os.environ.get("ADMIN_ROLE", "admin") or "admin").strip()
 
     if role not in ("public", "judge", "admin", "superadmin"):
         raise SystemExit(f"Invalid ADMIN_ROLE={role!r}; must be one of public|judge|admin|superadmin")
@@ -47,6 +47,7 @@ def main() -> None:
             db.session.add(u)
             db.session.commit()
             print(f"User '{username}' created with role '{role}'. Password: {password}")
+
 
 if __name__ == "__main__":
     main()

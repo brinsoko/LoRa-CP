@@ -1,4 +1,5 @@
 """Test suite 1: Negative numbers in all number inputs."""
+
 from __future__ import annotations
 
 import pytest

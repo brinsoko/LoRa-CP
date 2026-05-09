@@ -41,17 +41,15 @@ def _parse_date_range(date_from_str: str | None, date_to_str: str | None) -> tup
     return start, end
 
 
-def _filtered_query(team_id: int | None, checkpoint_id: int | None,
-                    date_from: str | None, date_to: str | None):
+def _filtered_query(team_id: int | None, checkpoint_id: int | None, date_from: str | None, date_to: str | None):
     """Return a SQLAlchemy query over Checkin with eager-loaded relations and filters applied."""
     comp_id = require_current_competition_id()
-    q = (Checkin.query
-         .options(
-             joinedload(Checkin.team),
-             joinedload(Checkin.checkpoint),
-             joinedload(Checkin.created_by_user),
-             joinedload(Checkin.created_by_device),
-         ))
+    q = Checkin.query.options(
+        joinedload(Checkin.team),
+        joinedload(Checkin.checkpoint),
+        joinedload(Checkin.created_by_user),
+        joinedload(Checkin.created_by_device),
+    )
     if comp_id:
         q = q.filter(Checkin.competition_id == comp_id)
 
@@ -133,8 +131,7 @@ def _judge_can_access_checkpoint(checkpoint_id: int, comp_id: int) -> bool:
     if role != "judge":
         return True
     return (
-        JudgeCheckpoint.query
-        .join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
+        JudgeCheckpoint.query.join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
         .filter(
             JudgeCheckpoint.user_id == current_user.id,
             Checkpoint.competition_id == comp_id,
@@ -160,296 +157,283 @@ def _checkin_snapshot(c: Checkin) -> dict:
 @checkins_api_bp.get("/api/checkins")
 @json_roles_required("judge", "admin")
 def checkin_list():
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        # filters & sort
-        team_id = request.args.get("team_id", type=int)
-        checkpoint_id = request.args.get("checkpoint_id", type=int)
-        date_from = request.args.get("date_from")
-        date_to = request.args.get("date_to")
-        sort = (request.args.get("sort") or "new").lower()
-        page, per_page = _parse_pagination()
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    # filters & sort
+    team_id = request.args.get("team_id", type=int)
+    checkpoint_id = request.args.get("checkpoint_id", type=int)
+    date_from = request.args.get("date_from")
+    date_to = request.args.get("date_to")
+    sort = (request.args.get("sort") or "new").lower()
+    page, per_page = _parse_pagination()
 
-        q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
+    q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
 
-        if sort == "old":
-            q = q.order_by(Checkin.timestamp.asc())
-        elif sort == "team":
-            q = (q.join(Team, Checkin.team_id == Team.id)
-                   .order_by(Team.name.asc(),
-                             Team.number.asc().nulls_last(),
-                             Checkin.timestamp.asc()))
-        else:
-            q = q.order_by(Checkin.timestamp.desc())
+    if sort == "old":
+        q = q.order_by(Checkin.timestamp.asc())
+    elif sort == "team":
+        q = q.join(Team, Checkin.team_id == Team.id).order_by(
+            Team.name.asc(), Team.number.asc().nulls_last(), Checkin.timestamp.asc()
+        )
+    else:
+        q = q.order_by(Checkin.timestamp.desc())
 
-        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
-        rows = pagination.items
-        return {
-            "checkins": [_serialize_checkin(r) for r in rows],
-            "pagination": {
-                "page": pagination.page,
-                "per_page": pagination.per_page,
-                "pages": pagination.pages,
-                "total": pagination.total,
-                "has_prev": pagination.has_prev,
-                "has_next": pagination.has_next,
-            },
-        }, 200
+    pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+    rows = pagination.items
+    return {
+        "checkins": [_serialize_checkin(r) for r in rows],
+        "pagination": {
+            "page": pagination.page,
+            "per_page": pagination.per_page,
+            "pages": pagination.pages,
+            "total": pagination.total,
+            "has_prev": pagination.has_prev,
+            "has_next": pagination.has_next,
+        },
+    }, 200
 
 
 @checkins_api_bp.get("/api/checkins/live-arrivals")
 @json_roles_required("judge", "admin")
 def checkin_live_arrivals():
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        group_id = request.args.get("group_id", type=int)
-        sort = (request.args.get("sort") or "number_asc").strip().lower()
-        return build_live_arrivals(comp_id, group_id=group_id, sort=sort), 200
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    group_id = request.args.get("group_id", type=int)
+    sort = (request.args.get("sort") or "number_asc").strip().lower()
+    return build_live_arrivals(comp_id, group_id=group_id, sort=sort), 200
 
 
 @checkins_api_bp.post("/api/checkins")
 @json_roles_required("judge", "admin")
 def checkin_create():
-        """
-        Body (JSON or x-www-form-urlencoded):
-          - team_id (int, required)
-          - checkpoint_id (int, required)
-          - timestamp | timestamp_local + timezone (optional)
-          - override = "replace" (optional)
-        """
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        payload = request.get_json(silent=True) or request.form.to_dict()
-        try:
-            team_id = int(payload.get("team_id"))
-            checkpoint_id = int(payload.get("checkpoint_id"))
-        except Exception:
-            return jsonify({"error": "invalid_request", "detail": "team_id and checkpoint_id are required integers."}), 400
+    """
+    Body (JSON or x-www-form-urlencoded):
+      - team_id (int, required)
+      - checkpoint_id (int, required)
+      - timestamp | timestamp_local + timezone (optional)
+      - override = "replace" (optional)
+    """
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    try:
+        team_id = int(payload.get("team_id"))
+        checkpoint_id = int(payload.get("checkpoint_id"))
+    except Exception:
+        return jsonify({"error": "invalid_request", "detail": "team_id and checkpoint_id are required integers."}), 400
 
-        team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
-        checkpoint = Checkpoint.query.filter(
-            Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id
-        ).first()
-        if not team or not checkpoint:
-            return jsonify({"error": "invalid_fk", "detail": "Invalid team or checkpoint."}), 400
-        if not _judge_can_access_checkpoint(checkpoint_id, comp_id):
-            return jsonify({"error": "forbidden", "detail": "Checkpoint is not assigned to the current judge."}), 403
+    team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
+    checkpoint = Checkpoint.query.filter(Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id).first()
+    if not team or not checkpoint:
+        return jsonify({"error": "invalid_fk", "detail": "Invalid team or checkpoint."}), 400
+    if not _judge_can_access_checkpoint(checkpoint_id, comp_id):
+        return jsonify({"error": "forbidden", "detail": "Checkpoint is not assigned to the current judge."}), 403
 
-        ts = _parse_timestamp(payload, utcnow_naive())
-        override = (payload.get("override") or "").strip().lower()
+    ts = _parse_timestamp(payload, utcnow_naive())
+    override = (payload.get("override") or "").strip().lower()
 
-        existing = (
-            Checkin.query
-            .filter_by(team_id=team_id, checkpoint_id=checkpoint_id, competition_id=comp_id)
-            .first()
-        )
-        if existing:
-            if override == "replace":
-                before = _checkin_snapshot(existing)
-                existing.timestamp = ts
-                db.session.flush()
-                record_audit_event(
-                    competition_id=comp_id,
-                    event_type="checkin_updated",
-                    entity_type="checkin",
-                    entity_id=existing.id,
-                    actor_user=current_user if current_user.is_authenticated else None,
-                    summary="Check-in updated.",
-                    details={"before": before, "after": _checkin_snapshot(existing)},
-                    created_at=utcnow_naive(),
-                )
-                db.session.commit()
-                return {"ok": True, "replaced": True, "checkin": _serialize_checkin(existing)}, 200
-            return {
-                "error": "duplicate",
-                "detail": "Check-in for this team and checkpoint already exists. Use override=replace to update its timestamp.",
-                "checkin": _serialize_checkin(existing),
-            }, 409
-
-        c = Checkin(
-            team_id=team_id,
-            checkpoint_id=checkpoint_id,
-            competition_id=comp_id,
-            timestamp=ts,
-            created_by_user_id=current_user.id if current_user.is_authenticated else None,
-        )
-        # SAVEPOINT around the insert: a concurrent caller may have raced past
-        # the existence check above and inserted first. Treat the resulting
-        # uq_team_checkpoint violation as a regular duplicate (409) instead of
-        # bubbling up as a 500 the caller would just retry on.
-        try:
-            with db.session.begin_nested():
-                db.session.add(c)
-        except IntegrityError:
-            db.session.rollback()
-            existing = (
-                Checkin.query
-                .filter_by(team_id=team_id, checkpoint_id=checkpoint_id, competition_id=comp_id)
-                .first()
+    existing = Checkin.query.filter_by(team_id=team_id, checkpoint_id=checkpoint_id, competition_id=comp_id).first()
+    if existing:
+        if override == "replace":
+            before = _checkin_snapshot(existing)
+            existing.timestamp = ts
+            db.session.flush()
+            record_audit_event(
+                competition_id=comp_id,
+                event_type="checkin_updated",
+                entity_type="checkin",
+                entity_id=existing.id,
+                actor_user=current_user if current_user.is_authenticated else None,
+                summary="Check-in updated.",
+                details={"before": before, "after": _checkin_snapshot(existing)},
+                created_at=utcnow_naive(),
             )
-            return {
-                "error": "duplicate",
-                "detail": "Check-in for this team and checkpoint already exists. Use override=replace to update its timestamp.",
-                "checkin": _serialize_checkin(existing) if existing else None,
-            }, 409
-        record_audit_event(
-            competition_id=comp_id,
-            event_type="checkin_created",
-            entity_type="checkin",
-            entity_id=c.id,
-            actor_user=current_user if current_user.is_authenticated else None,
-            summary=f"Check-in recorded for team {team.name} at {checkpoint.name}.",
-            details=_checkin_snapshot(c),
-            created_at=ts,
-        )
-        db.session.commit()
-        try:
-            mark_arrival_checkbox(team_id, checkpoint_id, ts)
-        except Exception:
-            pass
-        return {"ok": True, "created": True, "checkin": _serialize_checkin(c)}, 201
+            db.session.commit()
+            return {"ok": True, "replaced": True, "checkin": _serialize_checkin(existing)}, 200
+        return {
+            "error": "duplicate",
+            "detail": "Check-in for this team and checkpoint already exists. Use override=replace to update its timestamp.",
+            "checkin": _serialize_checkin(existing),
+        }, 409
+
+    c = Checkin(
+        team_id=team_id,
+        checkpoint_id=checkpoint_id,
+        competition_id=comp_id,
+        timestamp=ts,
+        created_by_user_id=current_user.id if current_user.is_authenticated else None,
+    )
+    # SAVEPOINT around the insert: a concurrent caller may have raced past
+    # the existence check above and inserted first. Treat the resulting
+    # uq_team_checkpoint violation as a regular duplicate (409) instead of
+    # bubbling up as a 500 the caller would just retry on.
+    try:
+        with db.session.begin_nested():
+            db.session.add(c)
+    except IntegrityError:
+        db.session.rollback()
+        existing = Checkin.query.filter_by(team_id=team_id, checkpoint_id=checkpoint_id, competition_id=comp_id).first()
+        return {
+            "error": "duplicate",
+            "detail": "Check-in for this team and checkpoint already exists. Use override=replace to update its timestamp.",
+            "checkin": _serialize_checkin(existing) if existing else None,
+        }, 409
+    record_audit_event(
+        competition_id=comp_id,
+        event_type="checkin_created",
+        entity_type="checkin",
+        entity_id=c.id,
+        actor_user=current_user if current_user.is_authenticated else None,
+        summary=f"Check-in recorded for team {team.name} at {checkpoint.name}.",
+        details=_checkin_snapshot(c),
+        created_at=ts,
+    )
+    db.session.commit()
+    try:
+        mark_arrival_checkbox(team_id, checkpoint_id, ts)
+    except Exception:
+        pass
+    return {"ok": True, "created": True, "checkin": _serialize_checkin(c)}, 201
 
 
 @checkins_api_bp.get("/api/checkins/<int:checkin_id>")
 @json_roles_required("judge", "admin")
 def checkin_get(checkin_id: int):
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        c = (
-            Checkin.query
-            .filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
-            .options(
-                joinedload(Checkin.team),
-                joinedload(Checkin.checkpoint),
-                joinedload(Checkin.created_by_user),
-                joinedload(Checkin.created_by_device),
-            )
-            .first()
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    c = (
+        Checkin.query.filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
+        .options(
+            joinedload(Checkin.team),
+            joinedload(Checkin.checkpoint),
+            joinedload(Checkin.created_by_user),
+            joinedload(Checkin.created_by_device),
         )
-        if not c:
-            return jsonify({"error": "not_found"}), 404
-        return _serialize_checkin(c), 200
+        .first()
+    )
+    if not c:
+        return jsonify({"error": "not_found"}), 404
+    return _serialize_checkin(c), 200
+
 
 def _update_checkin(checkin_id: int, partial: bool):
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        c = (
-            Checkin.query
-            .filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
-            .options(
-                joinedload(Checkin.team),
-                joinedload(Checkin.checkpoint),
-                joinedload(Checkin.created_by_user),
-                joinedload(Checkin.created_by_device),
-            )
-            .first()
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    c = (
+        Checkin.query.filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
+        .options(
+            joinedload(Checkin.team),
+            joinedload(Checkin.checkpoint),
+            joinedload(Checkin.created_by_user),
+            joinedload(Checkin.created_by_device),
         )
-        if not c:
-            return jsonify({"error": "not_found"}), 404
-        before = _checkin_snapshot(c)
+        .first()
+    )
+    if not c:
+        return jsonify({"error": "not_found"}), 404
+    before = _checkin_snapshot(c)
 
-        payload = request.get_json(silent=True) or request.form.to_dict()
+    payload = request.get_json(silent=True) or request.form.to_dict()
 
-        new_team_id = payload.get("team_id", None if partial else c.team_id)
-        new_cp_id = payload.get("checkpoint_id", None if partial else c.checkpoint_id)
+    new_team_id = payload.get("team_id", None if partial else c.team_id)
+    new_cp_id = payload.get("checkpoint_id", None if partial else c.checkpoint_id)
 
-        # normalize to ints if provided
-        try:
-            if new_team_id is not None:
-                new_team_id = int(new_team_id)
-            if new_cp_id is not None:
-                new_cp_id = int(new_cp_id)
-        except Exception:
-            return jsonify({"error": "invalid_request", "detail": "team_id/checkpoint_id must be integers."}), 400
+    # normalize to ints if provided
+    try:
+        if new_team_id is not None:
+            new_team_id = int(new_team_id)
+        if new_cp_id is not None:
+            new_cp_id = int(new_cp_id)
+    except Exception:
+        return jsonify({"error": "invalid_request", "detail": "team_id/checkpoint_id must be integers."}), 400
 
-        # validate FKs if provided
-        if new_team_id is not None and not Team.query.filter(
-            Team.competition_id == comp_id, Team.id == new_team_id
-        ).first():
-            return jsonify({"error": "invalid_fk", "detail": "Invalid team."}), 400
-        if new_cp_id is not None and not Checkpoint.query.filter(
-            Checkpoint.competition_id == comp_id, Checkpoint.id == new_cp_id
-        ).first():
-            return jsonify({"error": "invalid_fk", "detail": "Invalid checkpoint."}), 400
-        if new_cp_id is not None and not _judge_can_access_checkpoint(new_cp_id, comp_id):
-            return jsonify({"error": "forbidden", "detail": "Checkpoint is not assigned to the current judge."}), 403
+    # validate FKs if provided
+    if (
+        new_team_id is not None
+        and not Team.query.filter(Team.competition_id == comp_id, Team.id == new_team_id).first()
+    ):
+        return jsonify({"error": "invalid_fk", "detail": "Invalid team."}), 400
+    if (
+        new_cp_id is not None
+        and not Checkpoint.query.filter(Checkpoint.competition_id == comp_id, Checkpoint.id == new_cp_id).first()
+    ):
+        return jsonify({"error": "invalid_fk", "detail": "Invalid checkpoint."}), 400
+    if new_cp_id is not None and not _judge_can_access_checkpoint(new_cp_id, comp_id):
+        return jsonify({"error": "forbidden", "detail": "Checkpoint is not assigned to the current judge."}), 403
 
-        # timestamp
-        new_ts = _parse_timestamp(payload, c.timestamp)
+    # timestamp
+    new_ts = _parse_timestamp(payload, c.timestamp)
 
-        # duplicate protection
-        if new_team_id is None:
-            new_team_id = c.team_id
-        if new_cp_id is None:
-            new_cp_id = c.checkpoint_id
+    # duplicate protection
+    if new_team_id is None:
+        new_team_id = c.team_id
+    if new_cp_id is None:
+        new_cp_id = c.checkpoint_id
 
-        dup = (Checkin.query
-               .filter(Checkin.team_id == new_team_id,
-                       Checkin.checkpoint_id == new_cp_id,
-                       Checkin.competition_id == comp_id,
-                       Checkin.id != checkin_id)
-               .first())
+    dup = Checkin.query.filter(
+        Checkin.team_id == new_team_id,
+        Checkin.checkpoint_id == new_cp_id,
+        Checkin.competition_id == comp_id,
+        Checkin.id != checkin_id,
+    ).first()
 
-        override = (payload.get("override") or "").strip().lower()
-        if dup and override != "replace":
-            return {
-                "error": "duplicate",
-                "detail": "Another check-in exists for that team & checkpoint. Use override=replace to replace it.",
-                "other_checkin": _serialize_checkin(dup),
-            }, 409
+    override = (payload.get("override") or "").strip().lower()
+    if dup and override != "replace":
+        return {
+            "error": "duplicate",
+            "detail": "Another check-in exists for that team & checkpoint. Use override=replace to replace it.",
+            "other_checkin": _serialize_checkin(dup),
+        }, 409
 
-        # SAVEPOINT around the delete-of-dup + update-of-c sequence: a
-        # concurrent caller can insert a fresh row into the slot we just
-        # freed. Treat the resulting uq_team_checkpoint violation as a
-        # regular 409 instead of leaking a 500. begin_nested rolls back
-        # both the delete and the update if the constraint fires, so the
-        # original dup row stays put.
-        try:
-            with db.session.begin_nested():
-                if dup and override == "replace":
-                    db.session.delete(dup)
-                    db.session.flush()
-                c.team_id = new_team_id
-                c.checkpoint_id = new_cp_id
-                c.timestamp = new_ts
+    # SAVEPOINT around the delete-of-dup + update-of-c sequence: a
+    # concurrent caller can insert a fresh row into the slot we just
+    # freed. Treat the resulting uq_team_checkpoint violation as a
+    # regular 409 instead of leaking a 500. begin_nested rolls back
+    # both the delete and the update if the constraint fires, so the
+    # original dup row stays put.
+    try:
+        with db.session.begin_nested():
+            if dup and override == "replace":
+                db.session.delete(dup)
                 db.session.flush()
-        except IntegrityError:
-            current = (
-                Checkin.query
-                .filter(
-                    Checkin.team_id == new_team_id,
-                    Checkin.checkpoint_id == new_cp_id,
-                    Checkin.competition_id == comp_id,
-                    Checkin.id != checkin_id,
-                )
-                .first()
-            )
-            return {
-                "error": "duplicate",
-                "detail": "Another check-in exists for that team & checkpoint. Use override=replace to replace it.",
-                "other_checkin": _serialize_checkin(current) if current else None,
-            }, 409
-        record_audit_event(
-            competition_id=comp_id,
-            event_type="checkin_updated",
-            entity_type="checkin",
-            entity_id=c.id,
-            actor_user=current_user if current_user.is_authenticated else None,
-            summary="Check-in updated.",
-            details={"before": before, "after": _checkin_snapshot(c)},
-            created_at=utcnow_naive(),
-        )
-        db.session.commit()
-        try:
-            mark_arrival_checkbox(new_team_id, new_cp_id)
-        except Exception:
-            pass
-        return {"ok": True, "updated": True, "checkin": _serialize_checkin(c)}, 200
+            c.team_id = new_team_id
+            c.checkpoint_id = new_cp_id
+            c.timestamp = new_ts
+            db.session.flush()
+    except IntegrityError:
+        current = Checkin.query.filter(
+            Checkin.team_id == new_team_id,
+            Checkin.checkpoint_id == new_cp_id,
+            Checkin.competition_id == comp_id,
+            Checkin.id != checkin_id,
+        ).first()
+        return {
+            "error": "duplicate",
+            "detail": "Another check-in exists for that team & checkpoint. Use override=replace to replace it.",
+            "other_checkin": _serialize_checkin(current) if current else None,
+        }, 409
+    record_audit_event(
+        competition_id=comp_id,
+        event_type="checkin_updated",
+        entity_type="checkin",
+        entity_id=c.id,
+        actor_user=current_user if current_user.is_authenticated else None,
+        summary="Check-in updated.",
+        details={"before": before, "after": _checkin_snapshot(c)},
+        created_at=utcnow_naive(),
+    )
+    db.session.commit()
+    try:
+        mark_arrival_checkbox(new_team_id, new_cp_id)
+    except Exception:
+        pass
+    return {"ok": True, "updated": True, "checkin": _serialize_checkin(c)}, 200
+
 
 @checkins_api_bp.put("/api/checkins/<int:checkin_id>")
 @json_roles_required("judge", "admin")
@@ -466,83 +450,89 @@ def checkin_patch(checkin_id: int):
 @checkins_api_bp.delete("/api/checkins/<int:checkin_id>")
 @json_roles_required("admin")
 def checkin_delete(checkin_id: int):
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        c = (
-            Checkin.query
-            .filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
-            .options(
-                joinedload(Checkin.team),
-                joinedload(Checkin.checkpoint),
-                joinedload(Checkin.created_by_user),
-                joinedload(Checkin.created_by_device),
-            )
-            .first()
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    c = (
+        Checkin.query.filter(Checkin.competition_id == comp_id, Checkin.id == checkin_id)
+        .options(
+            joinedload(Checkin.team),
+            joinedload(Checkin.checkpoint),
+            joinedload(Checkin.created_by_user),
+            joinedload(Checkin.created_by_device),
         )
-        if not c:
-            return jsonify({"error": "not_found"}), 404
-        snapshot = _checkin_snapshot(c)
-        record_audit_event(
-            competition_id=comp_id,
-            event_type="checkin_deleted",
-            entity_type="checkin",
-            entity_id=c.id,
-            actor_user=current_user if current_user.is_authenticated else None,
-            summary="Check-in deleted.",
-            details=snapshot,
-            created_at=utcnow_naive(),
-        )
-        db.session.delete(c)
-        db.session.commit()
-        return {"ok": True, "deleted": True}, 200
+        .first()
+    )
+    if not c:
+        return jsonify({"error": "not_found"}), 404
+    snapshot = _checkin_snapshot(c)
+    record_audit_event(
+        competition_id=comp_id,
+        event_type="checkin_deleted",
+        entity_type="checkin",
+        entity_id=c.id,
+        actor_user=current_user if current_user.is_authenticated else None,
+        summary="Check-in deleted.",
+        details=snapshot,
+        created_at=utcnow_naive(),
+    )
+    db.session.delete(c)
+    db.session.commit()
+    return {"ok": True, "deleted": True}, 200
 
 
 @checkins_api_bp.get("/api/checkins/export.csv")
 @json_roles_required("judge", "admin")
 def checkin_export():
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        team_id = request.args.get("team_id", type=int)
-        checkpoint_id = request.args.get("checkpoint_id", type=int)
-        date_from = request.args.get("date_from")
-        date_to = request.args.get("date_to")
-        sort = (request.args.get("sort") or "new").lower()
-        page, per_page = _parse_pagination()
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    team_id = request.args.get("team_id", type=int)
+    checkpoint_id = request.args.get("checkpoint_id", type=int)
+    date_from = request.args.get("date_from")
+    date_to = request.args.get("date_to")
+    sort = (request.args.get("sort") or "new").lower()
+    page, per_page = _parse_pagination()
 
-        q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
+    q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
 
-        if sort == "old":
-            q = q.order_by(Checkin.timestamp.asc())
-        elif sort == "team":
-            q = (q.join(Team, Checkin.team_id == Team.id)
-                   .order_by(Team.name.asc(),
-                             Team.number.asc().nulls_last(),
-                             Checkin.timestamp.asc()))
-        else:
-            q = q.order_by(Checkin.timestamp.desc())
+    if sort == "old":
+        q = q.order_by(Checkin.timestamp.asc())
+    elif sort == "team":
+        q = q.join(Team, Checkin.team_id == Team.id).order_by(
+            Team.name.asc(), Team.number.asc().nulls_last(), Checkin.timestamp.asc()
+        )
+    else:
+        q = q.order_by(Checkin.timestamp.desc())
 
-        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
-        rows = pagination.items
+    pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+    rows = pagination.items
 
-        buf = io.StringIO()
-        w = csv.writer(buf)
-        w.writerow([
-            "timestamp_utc", "team_id", "team_name", "team_number",
-            "checkpoint_id", "checkpoint_name",
-        ])
-        for r in rows:
-            w.writerow([
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(
+        [
+            "timestamp_utc",
+            "team_id",
+            "team_name",
+            "team_number",
+            "checkpoint_id",
+            "checkpoint_name",
+        ]
+    )
+    for r in rows:
+        w.writerow(
+            [
                 r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 r.team.id if r.team else "",
                 escape_formula_cell(r.team.name) if r.team else "",
                 r.team.number if (r.team and r.team.number is not None) else "",
                 r.checkpoint.id if r.checkpoint else "",
                 escape_formula_cell(r.checkpoint.name) if r.checkpoint else "",
-            ])
+            ]
+        )
 
-        resp = make_response(buf.getvalue(), 200)
-        resp.mimetype = "text/csv"
-        resp.headers["Content-Disposition"] = "attachment; filename=checkins.csv"
-        return resp
+    resp = make_response(buf.getvalue(), 200)
+    resp.mimetype = "text/csv"
+    resp.headers["Content-Disposition"] = "attachment; filename=checkins.csv"
+    return resp

@@ -4,6 +4,7 @@ Validates that the custom CSRF middleware in ``app/utils/csrf.py`` correctly
 rejects mutating requests without a valid token, accepts requests that supply
 one, and exempts the designated paths.
 """
+
 from __future__ import annotations
 
 from app.extensions import db
@@ -22,6 +23,7 @@ from tests.support import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _csrf_app(app_factory, **overrides):
     """Return a CSRF-enabled application instance."""
     return app_factory(WTF_CSRF_ENABLED=True, **overrides)
@@ -36,7 +38,9 @@ def _seed_admin(app):
         return admin.id, competition.id
 
 
-def _login_and_get_token(app, client, admin_id, competition_id, *, base_url: str | None = None, seed_path: str = "/teams/"):
+def _login_and_get_token(
+    app, client, admin_id, competition_id, *, base_url: str | None = None, seed_path: str = "/teams/"
+):
     """Log in, seed the session (GET), and return the CSRF token."""
     session_kwargs = {"base_url": base_url} if base_url else {}
     with client.session_transaction(**session_kwargs) as sess:
@@ -54,6 +58,7 @@ def _login_and_get_token(app, client, admin_id, competition_id, *, base_url: str
 # ---------------------------------------------------------------------------
 # TestCsrfFormProtection
 # ---------------------------------------------------------------------------
+
 
 class TestCsrfFormProtection:
     """POST to HTML form endpoints must include a valid csrf_token."""
@@ -253,6 +258,7 @@ class TestCsrfFormProtection:
 # TestCsrfApiProtection
 # ---------------------------------------------------------------------------
 
+
 class TestCsrfApiProtection:
     """JSON API endpoints must include X-CSRF-Token header."""
 
@@ -307,6 +313,7 @@ class TestCsrfApiProtection:
 # TestCsrfExemptPaths
 # ---------------------------------------------------------------------------
 
+
 class TestCsrfExemptPaths:
     """Paths listed in ``_EXEMPT_PATHS`` must not be rejected for CSRF."""
 
@@ -342,6 +349,7 @@ class TestCsrfExemptPaths:
 # ---------------------------------------------------------------------------
 # TestCsrfTokenInRenderedForms
 # ---------------------------------------------------------------------------
+
 
 class TestCsrfTokenInRenderedForms:
     """Rendered HTML pages must contain a hidden csrf_token input."""

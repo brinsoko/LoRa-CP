@@ -60,9 +60,7 @@ class Competition(db.Model):
     public_results = db.Column(db.Boolean, nullable=False, default=False)
     hide_gps_map = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     ingest_password_hash = db.Column(db.String(255), nullable=True)
-    created_by_user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     created_by_user = db.relationship("User")
     members = db.relationship(
@@ -153,9 +151,7 @@ class CompetitionMember(db.Model):
     competition = db.relationship("Competition", back_populates="members")
     user = db.relationship("User", back_populates="competition_memberships")
 
-    __table_args__ = (
-        UniqueConstraint("competition_id", "user_id", name="uq_competition_member"),
-    )
+    __table_args__ = (UniqueConstraint("competition_id", "user_id", name="uq_competition_member"),)
 
     def __repr__(self) -> str:
         return (
@@ -179,12 +175,8 @@ class CompetitionInvite(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     used_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
-    created_by_user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
-    invited_user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    invited_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     invited_email = db.Column(db.String(255), nullable=True, index=True)
 
     competition = db.relationship("Competition", back_populates="invites")
@@ -219,15 +211,14 @@ class JudgeCheckpoint(db.Model):
     user = db.relationship("User")
     checkpoint = db.relationship("Checkpoint")
 
-    __table_args__ = (
-        UniqueConstraint("user_id", "checkpoint_id", name="uq_judge_checkpoint"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "checkpoint_id", name="uq_judge_checkpoint"),)
 
     def __repr__(self) -> str:
         return (
             f"<JudgeCheckpoint id={self.id} user_id={self.user_id} "
             f"checkpoint_id={self.checkpoint_id} default={self.is_default}>"
         )
+
 
 # =========
 # Team
@@ -268,9 +259,7 @@ class Team(db.Model):
         passive_deletes=True,
     )
 
-    __table_args__ = (
-        CheckConstraint("number IS NULL OR number > 0", name="ck_team_number_positive"),
-    )
+    __table_args__ = (CheckConstraint("number IS NULL OR number > 0", name="ck_team_number_positive"),)
 
     def __repr__(self) -> str:
         return f"<Team id={self.id} comp={self.competition_id} number={self.number} name={self.name!r}>"
@@ -295,9 +284,7 @@ class RFIDCard(db.Model):
 
     team = db.relationship("Team", back_populates="rfid_card")
 
-    __table_args__ = (
-        CheckConstraint("number IS NULL OR number > 0", name="ck_rfid_number_positive"),
-    )
+    __table_args__ = (CheckConstraint("number IS NULL OR number > 0", name="ck_rfid_number_positive"),)
 
     def __repr__(self) -> str:
         return f"<RFIDCard id={self.id} uid={self.uid!r} team_id={self.team_id}>"
@@ -337,9 +324,7 @@ class CheckpointGroup(db.Model):
     #                                    cascade="all, delete-orphan",
     #                                    passive_deletes=True)
 
-    __table_args__ = (
-        UniqueConstraint("competition_id", "name", name="uq_checkpoint_group_competition_name"),
-    )
+    __table_args__ = (UniqueConstraint("competition_id", "name", name="uq_checkpoint_group_competition_name"),)
 
     def __repr__(self) -> str:
         return f"<CheckpointGroup id={self.id} comp={self.competition_id} name={self.name!r}>"
@@ -366,7 +351,7 @@ class Checkpoint(db.Model):
     lora_device_id = db.Column(
         db.Integer,
         db.ForeignKey("lora_devices.id", ondelete="SET NULL"),
-        unique=True,        # a device cannot be assigned to two checkpoints
+        unique=True,  # a device cannot be assigned to two checkpoints
         nullable=True,
     )
     lora_device = db.relationship("LoRaDevice", back_populates="checkpoint")
@@ -387,12 +372,11 @@ class Checkpoint(db.Model):
         creator=lambda group: CheckpointGroupLink(group=group),
     )
 
-    __table_args__ = (
-        UniqueConstraint("competition_id", "name", name="uq_checkpoint_competition_name"),
-    )
+    __table_args__ = (UniqueConstraint("competition_id", "name", name="uq_checkpoint_competition_name"),)
 
     def __repr__(self) -> str:
         return f"<Checkpoint id={self.id} comp={self.competition_id} name={self.name!r}>"
+
 
 class CheckpointGroupLink(db.Model):
     __tablename__ = "checkpoint_group_links"
@@ -412,9 +396,7 @@ class CheckpointGroupLink(db.Model):
     group = db.relationship("CheckpointGroup", back_populates="checkpoint_links")
     checkpoint = db.relationship("Checkpoint", back_populates="group_links")
 
-    __table_args__ = (
-        UniqueConstraint("checkpoint_id", "group_id", name="uq_cp_group"),
-    )
+    __table_args__ = (UniqueConstraint("checkpoint_id", "group_id", name="uq_cp_group"),)
 
     def __repr__(self) -> str:
         return (
@@ -433,12 +415,8 @@ class Checkin(db.Model):
     competition_id = db.Column(
         db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    team_id = db.Column(
-        db.Integer, db.ForeignKey("teams.id", ondelete="CASCADE"), nullable=False
-    )
-    checkpoint_id = db.Column(
-        db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False
-    )
+    team_id = db.Column(db.Integer, db.ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
+    checkpoint_id = db.Column(db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False)
     timestamp = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
     created_by_user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
@@ -459,9 +437,7 @@ class Checkin(db.Model):
         passive_deletes=True,
     )
 
-    __table_args__ = (
-        db.UniqueConstraint("team_id", "checkpoint_id", name="uq_team_checkpoint"),
-    )
+    __table_args__ = (db.UniqueConstraint("team_id", "checkpoint_id", name="uq_team_checkpoint"),)
 
     def __repr__(self) -> str:
         return (
@@ -520,28 +496,25 @@ class LoRaDevice(db.Model):
         db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     dev_num = db.Column(db.Integer, index=True, nullable=False)
-    name = db.Column(db.String(120), nullable=True)                  # friendly label
+    name = db.Column(db.String(120), nullable=True)  # friendly label
     note = db.Column(db.Text, nullable=True)
     model = db.Column(db.String(64), nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=True)
-    
 
     # optional telemetry-ish fields
     last_seen = db.Column(db.DateTime)
     last_rssi = db.Column(db.Float)
     battery = db.Column(db.Float)
 
-
     # inverse: which checkpoint references this device (0 or 1)
     checkpoint = db.relationship("Checkpoint", back_populates="lora_device", uselist=False)
     competition = db.relationship("Competition", back_populates="devices")
 
-    __table_args__ = (
-        UniqueConstraint("competition_id", "dev_num", name="uq_device_competition_devnum"),
-    )
+    __table_args__ = (UniqueConstraint("competition_id", "dev_num", name="uq_device_competition_devnum"),)
 
     def __repr__(self) -> str:
         return f"<LoRaDevice id={self.id} comp={self.competition_id} dev_num={self.dev_num} name={self.name!r}>"
+
 
 class LoRaMessage(db.Model):
     __tablename__ = "lora_messages"
@@ -585,17 +558,15 @@ class FirmwareFile(db.Model):
         db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name = db.Column(db.String(120), nullable=False)
-    device_type = db.Column(db.String(20), nullable=False)   # "receiver" | "sender"
+    device_type = db.Column(db.String(20), nullable=False)  # "receiver" | "sender"
     version = db.Column(db.String(40), nullable=True)
-    filename = db.Column(db.String(255), nullable=False)      # {uuid}_{secure_original}.bin on disk
-    nvs_offset = db.Column(db.Integer, nullable=False, default=0xD000)      # sec_nvs (encrypted)
+    filename = db.Column(db.String(255), nullable=False)  # {uuid}_{secure_original}.bin on disk
+    nvs_offset = db.Column(db.Integer, nullable=False, default=0xD000)  # sec_nvs (encrypted)
     nvs_size = db.Column(db.Integer, nullable=False, default=0x3000)
     nvs_keys_offset = db.Column(db.Integer, nullable=False, default=0xC000)  # nvs_keys partition
     app_offset = db.Column(db.Integer, nullable=False, default=0x10000)
     uploaded_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
-    uploaded_by_user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     competition = db.relationship("Competition", back_populates="firmware_files")
     uploaded_by = db.relationship("User", foreign_keys=[uploaded_by_user_id])
@@ -606,10 +577,7 @@ class FirmwareFile(db.Model):
     )
 
     def __repr__(self) -> str:
-        return (
-            f"<FirmwareFile id={self.id} comp={self.competition_id} "
-            f"name={self.name!r} type={self.device_type!r}>"
-        )
+        return f"<FirmwareFile id={self.id} comp={self.competition_id} name={self.name!r} type={self.device_type!r}>"
 
 
 # =========================
@@ -633,9 +601,7 @@ class SheetConfig(db.Model):
     competition = db.relationship("Competition", back_populates="sheets")
     checkpoint = db.relationship("Checkpoint")
 
-    __table_args__ = (
-        UniqueConstraint("spreadsheet_id", "tab_name", name="uq_sheet_tab"),
-    )
+    __table_args__ = (UniqueConstraint("spreadsheet_id", "tab_name", name="uq_sheet_tab"),)
 
     def __repr__(self) -> str:
         return (
@@ -654,18 +620,12 @@ class ScoreEntry(db.Model):
     competition_id = db.Column(
         db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    checkin_id = db.Column(
-        db.Integer, db.ForeignKey("checkins.id", ondelete="CASCADE"), nullable=True, index=True
-    )
-    team_id = db.Column(
-        db.Integer, db.ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    checkin_id = db.Column(db.Integer, db.ForeignKey("checkins.id", ondelete="CASCADE"), nullable=True, index=True)
+    team_id = db.Column(db.Integer, db.ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
     checkpoint_id = db.Column(
         db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    judge_user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    judge_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     raw_fields = db.Column(db.JSON, nullable=False, default=dict)
     total = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False, index=True)
@@ -704,9 +664,7 @@ class ScoreRule(db.Model):
     checkpoint = db.relationship("Checkpoint")
     group = db.relationship("CheckpointGroup")
 
-    __table_args__ = (
-        UniqueConstraint("competition_id", "checkpoint_id", "group_id", name="uq_score_rule_scope"),
-    )
+    __table_args__ = (UniqueConstraint("competition_id", "checkpoint_id", "group_id", name="uq_score_rule_scope"),)
 
     def __repr__(self) -> str:
         return (
@@ -729,9 +687,7 @@ class AuditEvent(db.Model):
     entity_type = db.Column(db.String(64), nullable=False, index=True)
     entity_id = db.Column(db.Integer, nullable=True, index=True)
     actor_type = db.Column(db.String(20), nullable=False, default="system", index=True)
-    actor_user_id = db.Column(
-        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     actor_device_id = db.Column(
         db.Integer, db.ForeignKey("lora_devices.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -769,15 +725,10 @@ class GlobalScoreRule(db.Model):
 
     group = db.relationship("CheckpointGroup")
 
-    __table_args__ = (
-        UniqueConstraint("competition_id", "group_id", name="uq_global_score_rule_scope"),
-    )
+    __table_args__ = (UniqueConstraint("competition_id", "group_id", name="uq_global_score_rule_scope"),)
 
     def __repr__(self) -> str:
-        return (
-            f"<GlobalScoreRule id={self.id} competition_id={self.competition_id} "
-            f"group_id={self.group_id}>"
-        )
+        return f"<GlobalScoreRule id={self.id} competition_id={self.competition_id} group_id={self.group_id}>"
 
 
 def _assign_checkpoint_link_position(link: CheckpointGroupLink) -> None:
@@ -787,11 +738,7 @@ def _assign_checkpoint_link_position(link: CheckpointGroupLink) -> None:
     if not group:
         return
 
-    existing_positions = [
-        l.position
-        for l in group.checkpoint_links
-        if l is not link and l.position is not None
-    ]
+    existing_positions = [l.position for l in group.checkpoint_links if l is not link and l.position is not None]
     link.position = (max(existing_positions) + 1) if existing_positions else 0
 
 

@@ -41,8 +41,7 @@ def _fetch_assigned_checkpoints():
     if not comp_id:
         return []
     assigned = (
-        JudgeCheckpoint.query
-        .join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
+        JudgeCheckpoint.query.join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
         .filter(
             JudgeCheckpoint.user_id == current_user.id,
             Checkpoint.competition_id == comp_id,
@@ -174,8 +173,7 @@ def live_arrivals():
     selected_group_id = request.args.get("group_id", type=int)
     selected_sort = (request.args.get("sort") or "number_asc").strip().lower()
     groups = (
-        CheckpointGroup.query
-        .filter(CheckpointGroup.competition_id == comp_id)
+        CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
         .all()
     )
@@ -222,11 +220,9 @@ def add_checkin():
     now = utcnow_naive()
     default_checkpoint_id = None
     if get_current_competition_role() == "judge":
-        default_row = (
-            JudgeCheckpoint.query
-            .filter(JudgeCheckpoint.user_id == current_user.id, JudgeCheckpoint.is_default.is_(True))
-            .first()
-        )
+        default_row = JudgeCheckpoint.query.filter(
+            JudgeCheckpoint.user_id == current_user.id, JudgeCheckpoint.is_default.is_(True)
+        ).first()
         default_checkpoint_id = default_row.checkpoint_id if default_row else None
 
     context = {
@@ -236,7 +232,9 @@ def add_checkin():
         "dup_team_id": None,
         "dup_checkpoint_id": None,
         "selected_checkpoint_id": default_checkpoint_id,
-        "timestamp_prefill": request.form.get("timestamp_local") if request.method == "POST" else format_datetime_input_local(now),
+        "timestamp_prefill": request.form.get("timestamp_local")
+        if request.method == "POST"
+        else format_datetime_input_local(now),
         "suggest_override": request.form.get("override") == "replace",
     }
 
@@ -317,11 +315,9 @@ def edit_checkin(checkin_id: int):
         "pending_cp_id": None,
     }
     if request.method == "GET" and get_current_competition_role() == "judge":
-        default_row = (
-            JudgeCheckpoint.query
-            .filter(JudgeCheckpoint.user_id == current_user.id, JudgeCheckpoint.is_default.is_(True))
-            .first()
-        )
+        default_row = JudgeCheckpoint.query.filter(
+            JudgeCheckpoint.user_id == current_user.id, JudgeCheckpoint.is_default.is_(True)
+        ).first()
         if default_row and not context["c"].get("checkpoint_id"):
             context["c"]["checkpoint_id"] = default_row.checkpoint_id
 

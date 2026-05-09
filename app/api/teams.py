@@ -253,12 +253,7 @@ def _update_team(team_id: int, partial: bool):
     comp_id = require_current_competition_id()
     if not comp_id:
         return jsonify({"error": "no_competition"}), 400
-    team = (
-        _team_query(comp_id)
-        .filter(Team.id == team_id)
-        .options(joinedload(Team.group_assignments))
-        .first()
-    )
+    team = _team_query(comp_id).filter(Team.id == team_id).options(joinedload(Team.group_assignments)).first()
     if not team:
         return jsonify({"error": "not_found"}), 404
     before = _team_snapshot(team)
@@ -279,9 +274,13 @@ def _update_team(team_id: int, partial: bool):
             try:
                 num_val = int(number)
             except Exception:
-                return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
+                return jsonify(
+                    {"error": "validation_error", "detail": _("Team number must be a positive integer.")}
+                ), 400
             if num_val <= 0:
-                return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
+                return jsonify(
+                    {"error": "validation_error", "detail": _("Team number must be a positive integer.")}
+                ), 400
             team.number = num_val
 
     if "organization" in payload or not partial:

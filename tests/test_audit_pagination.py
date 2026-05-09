@@ -1,4 +1,5 @@
 """Test suite 5: Audit pagination."""
+
 from __future__ import annotations
 
 import pytest
@@ -25,15 +26,17 @@ def _seeded(app, client):
 def _insert_audit_events(comp_id: int, count: int):
     """Insert N audit events directly into the database."""
     for i in range(count):
-        db.session.add(AuditEvent(
-            competition_id=comp_id,
-            event_type="test_event",
-            entity_type="test",
-            entity_id=i,
-            actor_type="system",
-            actor_label="test-system",
-            summary=f"Test event {i}",
-        ))
+        db.session.add(
+            AuditEvent(
+                competition_id=comp_id,
+                event_type="test_event",
+                entity_type="test",
+                entity_id=i,
+                actor_type="system",
+                actor_label="test-system",
+                summary=f"Test event {i}",
+            )
+        )
     db.session.commit()
 
 

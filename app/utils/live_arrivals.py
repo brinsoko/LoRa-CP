@@ -54,8 +54,7 @@ def _minutes_label(minutes: float | None) -> str:
 
 def _build_group_routes(comp_id: int) -> tuple[dict[int, list[int]], dict[int, int], dict[int, int]]:
     links = (
-        CheckpointGroupLink.query
-        .join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
+        CheckpointGroupLink.query.join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
         .filter(CheckpointGroup.competition_id == comp_id)
         .order_by(
             CheckpointGroupLink.group_id.asc(),
@@ -137,8 +136,7 @@ def _sort_team_rows(rows: list[dict], sort: str) -> list[dict]:
 def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "number_asc") -> dict:
     now = utcnow_naive()
     groups = (
-        CheckpointGroup.query
-        .filter(CheckpointGroup.competition_id == comp_id)
+        CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
         .all()
     )
@@ -147,10 +145,8 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
 
     teams_query = Team.query.filter(Team.competition_id == comp_id)
     if selected_group_id:
-        teams_query = (
-            teams_query
-            .join(TeamGroup, TeamGroup.team_id == Team.id)
-            .filter(TeamGroup.group_id == selected_group_id, TeamGroup.active.is_(True))
+        teams_query = teams_query.join(TeamGroup, TeamGroup.team_id == Team.id).filter(
+            TeamGroup.group_id == selected_group_id, TeamGroup.active.is_(True)
         )
     teams = teams_query.order_by(Team.number.asc().nulls_last(), Team.name.asc()).all()
 
@@ -164,15 +160,11 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
         checkpoint_ids_for_view = group_checkpoint_order.get(selected_group_id, [])
         checkpoint_by_id = {}
         if checkpoint_ids_for_view:
-            checkpoints_for_group = (
-                Checkpoint.query
-                .filter(
-                    Checkpoint.competition_id == comp_id,
-                    Checkpoint.is_virtual.is_(False),
-                    Checkpoint.id.in_(checkpoint_ids_for_view),
-                )
-                .all()
-            )
+            checkpoints_for_group = Checkpoint.query.filter(
+                Checkpoint.competition_id == comp_id,
+                Checkpoint.is_virtual.is_(False),
+                Checkpoint.id.in_(checkpoint_ids_for_view),
+            ).all()
             checkpoint_by_id = {checkpoint.id: checkpoint for checkpoint in checkpoints_for_group}
         checkpoints = [
             checkpoint_by_id[checkpoint_id]
@@ -181,8 +173,7 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
         ]
     else:
         checkpoints = (
-            Checkpoint.query
-            .filter(Checkpoint.competition_id == comp_id, Checkpoint.is_virtual.is_(False))
+            Checkpoint.query.filter(Checkpoint.competition_id == comp_id, Checkpoint.is_virtual.is_(False))
             .order_by(Checkpoint.name.asc())
             .all()
         )
@@ -192,8 +183,7 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
     team_group_ids: dict[int, list[int]] = {}
     group_team_ids: dict[int, set[int]] = {}
     active_assignments = (
-        TeamGroup.query
-        .join(Team, TeamGroup.team_id == Team.id)
+        TeamGroup.query.join(Team, TeamGroup.team_id == Team.id)
         .filter(Team.competition_id == comp_id, TeamGroup.active.is_(True))
         .all()
     )
@@ -211,16 +201,12 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
 
     checkins = []
     if not selected_group_id or (team_ids and checkpoint_ids_for_view):
-        checkins_query = (
-            Checkin.query
-            .filter(Checkin.competition_id == comp_id)
-            .options(joinedload(Checkin.team), joinedload(Checkin.checkpoint))
+        checkins_query = Checkin.query.filter(Checkin.competition_id == comp_id).options(
+            joinedload(Checkin.team), joinedload(Checkin.checkpoint)
         )
         if selected_group_id:
-            checkins_query = (
-                checkins_query
-                .filter(Checkin.team_id.in_(team_ids))
-                .filter(Checkin.checkpoint_id.in_(checkpoint_ids_for_view))
+            checkins_query = checkins_query.filter(Checkin.team_id.in_(team_ids)).filter(
+                Checkin.checkpoint_id.in_(checkpoint_ids_for_view)
             )
         checkins = checkins_query.order_by(Checkin.timestamp.asc(), Checkin.id.asc()).all()
 

@@ -15,15 +15,15 @@ with app.app_context():
     md = db.Model.metadata
 
     graph = create_schema_graph(
-        engine=engine,                
+        engine=engine,
         metadata=md,
-        show_datatypes=True,          # show column types
-        show_indexes=False,           # omit indexes for clarity
-        rankdir="LR",                 # layout left → right
-        concentrate=False,            # avoid overlapping lines
+        show_datatypes=True,  # show column types
+        show_indexes=False,  # omit indexes for clarity
+        rankdir="LR",  # layout left → right
+        concentrate=False,  # avoid overlapping lines
     )
 
-    graph.write_png("docs/erd.png") # type: ignore
-    graph.write_pdf("docs/erd.pdf") # type: ignore
+    graph.write_png("docs/erd.png")  # type: ignore
+    graph.write_pdf("docs/erd.pdf")  # type: ignore
 
 print("ERD generated: docs/erd.png and docs/erd.pdf")

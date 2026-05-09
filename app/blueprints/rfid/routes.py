@@ -47,15 +47,9 @@ def _fetch_checkpoints_for_user():
         return []
     role = get_current_competition_role()
     if role == "admin":
-        return (
-            Checkpoint.query
-            .filter(Checkpoint.competition_id == comp_id)
-            .order_by(Checkpoint.name.asc())
-            .all()
-        )
+        return Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
     assigned = (
-        JudgeCheckpoint.query
-        .join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
+        JudgeCheckpoint.query.join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
         .filter(
             JudgeCheckpoint.user_id == current_user.id,
             Checkpoint.competition_id == comp_id,
@@ -114,7 +108,9 @@ def edit_rfid(card_id: int):
 
     card = card_payload
     teams = _fetch_teams()
-    selected_team_id = request.form.get("team_id", type=int) if request.method == "POST" else (card.get("team", {}) or {}).get("id")
+    selected_team_id = (
+        request.form.get("team_id", type=int) if request.method == "POST" else (card.get("team", {}) or {}).get("id")
+    )
 
     if request.method == "POST":
         uid = (request.form.get("uid") or "").strip()
@@ -159,16 +155,12 @@ def judge_console():
         role = get_current_competition_role()
         if role == "admin":
             checkpoints = (
-                Checkpoint.query
-                .filter(Checkpoint.competition_id == comp_id)
-                .order_by(Checkpoint.name.asc())
-                .all()
+                Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
             )
             default_checkpoint_id = checkpoints[0].id if checkpoints else None
         else:
             assigned = (
-                JudgeCheckpoint.query
-                .join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
+                JudgeCheckpoint.query.join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
                 .filter(
                     JudgeCheckpoint.user_id == current_user.id,
                     Checkpoint.competition_id == comp_id,

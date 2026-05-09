@@ -12,13 +12,13 @@ def parse_gps_payload(payload: str) -> dict[str, float] | None:
     s = payload.strip()
     if not s.lower().startswith("pos,"):
         return None
-    parts = s.split(',')
+    parts = s.split(",")
     if len(parts) < 5:
         return None
     try:
         lat = float(parts[1])
         lon = float(parts[2])
-        alt = float(parts[3]) if parts[3] != '' else 0.0
+        alt = float(parts[3]) if parts[3] != "" else 0.0
         age_ms = int(float(parts[4]))  # tolerate "123.0"
     except (ValueError, TypeError):
         return None
@@ -29,4 +29,3 @@ def parse_gps_payload(payload: str) -> dict[str, float] | None:
         "alt": alt,
         "age_ms": age_ms,
     }
-

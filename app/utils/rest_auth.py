@@ -17,14 +17,18 @@ def _current_role_set():
         roles.add(global_role)
     return roles
 
+
 def json_login_required(fn):
     """Like @login_required but returns JSON 401 instead of redirect."""
+
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated:
             return jsonify({"error": "unauthorized", "code": 401}), 401
         return fn(*args, **kwargs)
+
     return wrapper
+
 
 def json_roles_required(*roles):
     """Role gate for REST: JSON 403 on failure."""
@@ -42,5 +46,7 @@ def json_roles_required(*roles):
             if not (role_set & allowed):
                 return jsonify({"error": "forbidden", "code": 403, "required": list(roles)}), 403
             return fn(*args, **kwargs)
+
         return wrapper
+
     return deco

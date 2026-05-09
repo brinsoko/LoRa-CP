@@ -20,12 +20,7 @@ def ensure_default_competition() -> Competition | None:
     if Competition.query.count():
         return Competition.query.order_by(Competition.created_at.asc()).first()
 
-    admin_user = (
-        User.query
-        .filter(User.role.in_(["superadmin", "admin"]))
-        .order_by(User.id.asc())
-        .first()
-    )
+    admin_user = User.query.filter(User.role.in_(["superadmin", "admin"])).order_by(User.id.asc()).first()
     competition = Competition(
         name=DEFAULT_COMPETITION_NAME,
         created_by_user_id=admin_user.id if admin_user else None,
@@ -50,18 +45,10 @@ def ensure_default_competition() -> Competition | None:
 def get_user_memberships(user_id: int) -> list[CompetitionMember]:
     user = User.query.filter_by(id=user_id).first()
     if user and (user.role or "").strip().lower() == "superadmin":
-        competitions = (
-            Competition.query
-            .order_by(Competition.name.asc())
-            .all()
-        )
-        return [
-            SimpleNamespace(competition=comp, role="admin", active=True, user_id=user_id)
-            for comp in competitions
-        ]
+        competitions = Competition.query.order_by(Competition.name.asc()).all()
+        return [SimpleNamespace(competition=comp, role="admin", active=True, user_id=user_id) for comp in competitions]
     return (
-        CompetitionMember.query
-        .filter(
+        CompetitionMember.query.filter(
             CompetitionMember.user_id == user_id,
             CompetitionMember.active.is_(True),
         )
@@ -79,13 +66,11 @@ def _is_member(user_id: int, competition_id: int) -> bool:
     if current_user.is_authenticated and (current_user.role or "").strip().lower() == "superadmin":
         return True
     return (
-        CompetitionMember.query
-        .filter(
+        CompetitionMember.query.filter(
             CompetitionMember.user_id == user_id,
             CompetitionMember.competition_id == competition_id,
             CompetitionMember.active.is_(True),
-        )
-        .first()
+        ).first()
         is not None
     )
 
@@ -119,8 +104,7 @@ def get_current_competition_id() -> int | None:
             return first.id
 
     membership = (
-        CompetitionMember.query
-        .filter(
+        CompetitionMember.query.filter(
             CompetitionMember.user_id == current_user.id,
             CompetitionMember.active.is_(True),
         )
@@ -154,15 +138,11 @@ def get_current_membership(user_id: int | None = None) -> CompetitionMember | No
             role="admin",
             active=True,
         )
-    return (
-        CompetitionMember.query
-        .filter(
-            CompetitionMember.user_id == user_id,
-            CompetitionMember.competition_id == comp_id,
-            CompetitionMember.active.is_(True),
-        )
-        .first()
-    )
+    return CompetitionMember.query.filter(
+        CompetitionMember.user_id == user_id,
+        CompetitionMember.competition_id == comp_id,
+        CompetitionMember.active.is_(True),
+    ).first()
 
 
 def get_current_competition_role() -> str | None:
@@ -220,8 +200,7 @@ def create_invite(
 
 def get_competition_group_order(competition_id: int) -> list[str]:
     groups = (
-        CheckpointGroup.query
-        .filter(CheckpointGroup.competition_id == competition_id)
+        CheckpointGroup.query.filter(CheckpointGroup.competition_id == competition_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
         .all()
     )

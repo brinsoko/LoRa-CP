@@ -1,4 +1,5 @@
 """Test suite 4: Export/Import/Merge."""
+
 from __future__ import annotations
 
 import io
@@ -247,6 +248,12 @@ class TestMerge:
 
         resp = client.post(
             f"/api/competition/{comp.id}/merge",
-            json={"schema_version": "1.0.0", "competition": {"name": "x"}, "teams": [], "groups": [], "checkpoints": []},
+            json={
+                "schema_version": "1.0.0",
+                "competition": {"name": "x"},
+                "teams": [],
+                "groups": [],
+                "checkpoints": [],
+            },
         )
         assert resp.status_code == 403

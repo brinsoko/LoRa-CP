@@ -10,6 +10,7 @@ from app.utils.validators import validate_finite_float, validate_positive_int
 
 # -- pure unit tests for the validator helpers --
 
+
 @pytest.mark.parametrize(
     "value, kwargs, expected_err_substr",
     [
@@ -48,6 +49,7 @@ def test_validate_positive_int_accepts_positive():
 
 
 # -- integration test for ingest GPS bounds --
+
 
 def test_ingest_rejects_gps_lat_out_of_range(client, app):
     from tests.support import create_competition

@@ -129,8 +129,7 @@ def list_audit_events():
     per_page = 50
 
     query = (
-        AuditEvent.query
-        .filter(AuditEvent.competition_id == comp_id)
+        AuditEvent.query.filter(AuditEvent.competition_id == comp_id)
         .options(
             joinedload(AuditEvent.actor_user),
             joinedload(AuditEvent.actor_device),
@@ -174,8 +173,7 @@ def list_audit_events():
     event_types = [
         value[0]
         for value in (
-            AuditEvent.query
-            .with_entities(AuditEvent.event_type)
+            AuditEvent.query.with_entities(AuditEvent.event_type)
             .filter(AuditEvent.competition_id == comp_id)
             .distinct()
             .order_by(AuditEvent.event_type.asc())
@@ -186,8 +184,7 @@ def list_audit_events():
     entity_types = [
         value[0]
         for value in (
-            AuditEvent.query
-            .with_entities(AuditEvent.entity_type)
+            AuditEvent.query.with_entities(AuditEvent.entity_type)
             .filter(AuditEvent.competition_id == comp_id)
             .distinct()
             .order_by(AuditEvent.entity_type.asc())

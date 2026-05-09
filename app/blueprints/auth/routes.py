@@ -39,23 +39,16 @@ def _accept_pending_invites(user: User) -> None:
     if not user.email:
         return
     now = utcnow_naive()
-    invites = (
-        CompetitionInvite.query
-        .filter(
-            CompetitionInvite.invited_email.ilike(user.email),
-            CompetitionInvite.used_at.is_(None),
-            CompetitionInvite.expires_at > now,
-        )
-        .all()
-    )
+    invites = CompetitionInvite.query.filter(
+        CompetitionInvite.invited_email.ilike(user.email),
+        CompetitionInvite.used_at.is_(None),
+        CompetitionInvite.expires_at > now,
+    ).all()
     if not invites:
         return
 
     existing_memberships = {
-        m.competition_id
-        for m in CompetitionMember.query
-        .filter(CompetitionMember.user_id == user.id)
-        .all()
+        m.competition_id for m in CompetitionMember.query.filter(CompetitionMember.user_id == user.id).all()
     }
     for invite in invites:
         if invite.competition_id not in existing_memberships:

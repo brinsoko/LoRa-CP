@@ -30,6 +30,7 @@ Flashing (esptool):
     The firmware binary is the same for all devices.
     Only the keys + encrypted NVS change per device.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -61,16 +62,16 @@ def generate_device(
     rows = [
         ["key", "type", "encoding", "value"],
         [NVS_NAMESPACE, "namespace", "", ""],
-        ["dev_num",        "data", "i32",    str(dev_num)],
-        ["competition_id", "data", "i32",    str(competition_id)],
-        ["card_secret",    "data", "string", card_secret],
-        ["hmac_len",       "data", "i32",    str(hmac_len)],
+        ["dev_num", "data", "i32", str(dev_num)],
+        ["competition_id", "data", "i32", str(competition_id)],
+        ["card_secret", "data", "string", card_secret],
+        ["hmac_len", "data", "i32", str(hmac_len)],
         ["webhook_secret", "data", "string", webhook_secret],
     ]
     if wifi_ssid:
-        rows.append(["wifi_ssid",  "data", "string", wifi_ssid])
+        rows.append(["wifi_ssid", "data", "string", wifi_ssid])
     if wifi_pass:
-        rows.append(["wifi_pass",  "data", "string", wifi_pass])
+        rows.append(["wifi_pass", "data", "string", wifi_pass])
     if ingest_url:
         rows.append(["ingest_url", "data", "string", ingest_url])
 
@@ -86,13 +87,15 @@ def generate_device(
         subprocess.check_call(
             [
                 sys.executable,
-                "-m", "esp_idf_nvs_partition_gen",
+                "-m",
+                "esp_idf_nvs_partition_gen",
                 "encrypt",
                 "config.csv",
                 "nvs_enc.bin",
                 str(partition_size),
                 "--keygen",
-                "--keyfile", "keys.bin",
+                "--keyfile",
+                "keys.bin",
             ],
             cwd=tmpdir,
             timeout=30,
@@ -116,9 +119,15 @@ def main() -> None:
         epilog=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("csv_file", help="CSV with columns: dev_num, competition_id, card_secret, hmac_len, webhook_secret")
+    parser.add_argument(
+        "csv_file", help="CSV with columns: dev_num, competition_id, card_secret, hmac_len, webhook_secret"
+    )
     parser.add_argument("-o", "--outdir", default="output", help="Output directory (default: output/)")
-    parser.add_argument("--size", default=hex(DEFAULT_PARTITION_SIZE), help=f"NVS partition size (default: {hex(DEFAULT_PARTITION_SIZE)})")
+    parser.add_argument(
+        "--size",
+        default=hex(DEFAULT_PARTITION_SIZE),
+        help=f"NVS partition size (default: {hex(DEFAULT_PARTITION_SIZE)})",
+    )
     args = parser.parse_args()
 
     partition_size = int(args.size, 0)

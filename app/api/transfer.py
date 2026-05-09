@@ -1,5 +1,6 @@
 # app/api/transfer.py
 """Export / Import / Merge competition data as JSON."""
+
 from __future__ import annotations
 
 import json
@@ -33,6 +34,7 @@ SCHEMA_VERSION = "1.0.0"
 
 # ---- serialisation helpers ----
 
+
 def _export_competition(comp: Competition) -> dict:
     """Build the full export payload for a competition."""
     teams = Team.query.filter_by(competition_id=comp.id).all()
@@ -41,21 +43,10 @@ def _export_competition(comp: Competition) -> dict:
     checkins = Checkin.query.filter_by(competition_id=comp.id).all()
     devices = LoRaDevice.query.filter_by(competition_id=comp.id).all()
     scores = ScoreEntry.query.filter_by(competition_id=comp.id).all()
-    rfid_cards = (
-        RFIDCard.query
-        .join(Team, RFIDCard.team_id == Team.id)
-        .filter(Team.competition_id == comp.id)
-        .all()
-    )
-    team_groups = (
-        TeamGroup.query
-        .join(Team, TeamGroup.team_id == Team.id)
-        .filter(Team.competition_id == comp.id)
-        .all()
-    )
+    rfid_cards = RFIDCard.query.join(Team, RFIDCard.team_id == Team.id).filter(Team.competition_id == comp.id).all()
+    team_groups = TeamGroup.query.join(Team, TeamGroup.team_id == Team.id).filter(Team.competition_id == comp.id).all()
     group_links = (
-        CheckpointGroupLink.query
-        .join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
+        CheckpointGroupLink.query.join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
         .filter(CheckpointGroup.competition_id == comp.id)
         .all()
     )
@@ -172,9 +163,7 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
 
     version = data.get("schema_version", "")
     if version != SCHEMA_VERSION:
-        warnings.append(
-            f"Schema version mismatch: file has '{version}', current is '{SCHEMA_VERSION}'."
-        )
+        warnings.append(f"Schema version mismatch: file has '{version}', current is '{SCHEMA_VERSION}'.")
 
     comp_data = data.get("competition", {})
     comp_name = comp_data.get("name", "Imported Competition")
@@ -195,12 +184,14 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
 
     # Add current user as admin member
     if current_user.is_authenticated:
-        db.session.add(CompetitionMember(
-            competition_id=comp.id,
-            user_id=current_user.id,
-            role="admin",
-            active=True,
-        ))
+        db.session.add(
+            CompetitionMember(
+                competition_id=comp.id,
+                user_id=current_user.id,
+                role="admin",
+                active=True,
+            )
+        )
 
     # Groups
     group_map = {}  # name → CheckpointGroup
@@ -262,22 +253,26 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
         group = group_map.get(gl_data.get("group_name"))
         cp = cp_map.get(gl_data.get("checkpoint_name"))
         if group and cp:
-            db.session.add(CheckpointGroupLink(
-                group_id=group.id,
-                checkpoint_id=cp.id,
-                position=gl_data.get("position", 0),
-            ))
+            db.session.add(
+                CheckpointGroupLink(
+                    group_id=group.id,
+                    checkpoint_id=cp.id,
+                    position=gl_data.get("position", 0),
+                )
+            )
 
     # Team ↔ group assignments
     for tg_data in data.get("team_groups", []):
         team = team_map.get(tg_data.get("team_name"))
         group = group_map.get(tg_data.get("group_name"))
         if team and group:
-            db.session.add(TeamGroup(
-                team_id=team.id,
-                group_id=group.id,
-                active=tg_data.get("active", True),
-            ))
+            db.session.add(
+                TeamGroup(
+                    team_id=team.id,
+                    group_id=group.id,
+                    active=tg_data.get("active", True),
+                )
+            )
 
     # RFID cards
     for card_data in data.get("rfid_cards", []):
@@ -286,11 +281,13 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
             uid = card_data.get("uid", "")
             existing_uid = RFIDCard.query.filter_by(uid=uid).first()
             if not existing_uid:
-                db.session.add(RFIDCard(
-                    uid=uid,
-                    team_id=team.id,
-                    number=card_data.get("number"),
-                ))
+                db.session.add(
+                    RFIDCard(
+                        uid=uid,
+                        team_id=team.id,
+                        number=card_data.get("number"),
+                    )
+                )
 
     # Check-ins
     for ci_data in data.get("checkins", []):
@@ -303,12 +300,14 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                     ts = datetime.fromisoformat(ci_data["timestamp"])
                 except Exception:
                     ts = utcnow_naive()
-            db.session.add(Checkin(
-                competition_id=comp.id,
-                team_id=team.id,
-                checkpoint_id=cp.id,
-                timestamp=ts or utcnow_naive(),
-            ))
+            db.session.add(
+                Checkin(
+                    competition_id=comp.id,
+                    team_id=team.id,
+                    checkpoint_id=cp.id,
+                    timestamp=ts or utcnow_naive(),
+                )
+            )
 
     # Scores
     db.session.flush()
@@ -317,22 +316,27 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
         cp = cp_map.get(s_data.get("checkpoint_name"))
         if team and cp:
             checkin = Checkin.query.filter_by(
-                team_id=team.id, checkpoint_id=cp.id, competition_id=comp.id,
-            ).first()
-            db.session.add(ScoreEntry(
-                competition_id=comp.id,
-                checkin_id=checkin.id if checkin else None,
                 team_id=team.id,
                 checkpoint_id=cp.id,
-                raw_fields=s_data.get("raw_fields"),
-                total=s_data.get("total"),
-            ))
+                competition_id=comp.id,
+            ).first()
+            db.session.add(
+                ScoreEntry(
+                    competition_id=comp.id,
+                    checkin_id=checkin.id if checkin else None,
+                    team_id=team.id,
+                    checkpoint_id=cp.id,
+                    raw_fields=s_data.get("raw_fields"),
+                    total=s_data.get("total"),
+                )
+            )
 
     db.session.flush()
     return comp, warnings
 
 
 # ---- merge helpers ----
+
 
 def _find_conflicts(data: dict, comp: Competition) -> list[dict]:
     """Compare imported JSON against existing competition and return conflicts."""
@@ -350,13 +354,15 @@ def _find_conflicts(data: dict, comp: Competition) -> list[dict]:
             if (t_data.get("organization") or None) != (local.organization or None):
                 diffs["organization"] = {"local": local.organization, "imported": t_data.get("organization")}
             if diffs:
-                conflicts.append({
-                    "entity_type": "team",
-                    "identifier": name,
-                    "local": {"name": local.name, "number": local.number, "organization": local.organization},
-                    "imported": t_data,
-                    "differences": diffs,
-                })
+                conflicts.append(
+                    {
+                        "entity_type": "team",
+                        "identifier": name,
+                        "local": {"name": local.name, "number": local.number, "organization": local.organization},
+                        "imported": t_data,
+                        "differences": diffs,
+                    }
+                )
 
     existing_cps = {cp.name: cp for cp in Checkpoint.query.filter_by(competition_id=comp.id).all()}
     for cp_data in data.get("checkpoints", []):
@@ -369,13 +375,15 @@ def _find_conflicts(data: dict, comp: Competition) -> list[dict]:
             if cp_data.get("northing") != local.northing:
                 diffs["northing"] = {"local": local.northing, "imported": cp_data.get("northing")}
             if diffs:
-                conflicts.append({
-                    "entity_type": "checkpoint",
-                    "identifier": name,
-                    "local": {"name": local.name, "easting": local.easting, "northing": local.northing},
-                    "imported": cp_data,
-                    "differences": diffs,
-                })
+                conflicts.append(
+                    {
+                        "entity_type": "checkpoint",
+                        "identifier": name,
+                        "local": {"name": local.name, "easting": local.easting, "northing": local.northing},
+                        "imported": cp_data,
+                        "differences": diffs,
+                    }
+                )
 
     existing_groups = {g.name: g for g in CheckpointGroup.query.filter_by(competition_id=comp.id).all()}
     for g_data in data.get("groups", []):
@@ -386,13 +394,15 @@ def _find_conflicts(data: dict, comp: Competition) -> list[dict]:
             if (g_data.get("prefix") or None) != (local.prefix or None):
                 diffs["prefix"] = {"local": local.prefix, "imported": g_data.get("prefix")}
             if diffs:
-                conflicts.append({
-                    "entity_type": "group",
-                    "identifier": name,
-                    "local": {"name": local.name, "prefix": local.prefix},
-                    "imported": g_data,
-                    "differences": diffs,
-                })
+                conflicts.append(
+                    {
+                        "entity_type": "group",
+                        "identifier": name,
+                        "local": {"name": local.name, "prefix": local.prefix},
+                        "imported": g_data,
+                        "differences": diffs,
+                    }
+                )
 
     return conflicts
 
@@ -499,7 +509,9 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
         cp = cp_map.get(ci_data.get("checkpoint_name"))
         if team and cp:
             existing = Checkin.query.filter_by(
-                team_id=team.id, checkpoint_id=cp.id, competition_id=comp.id,
+                team_id=team.id,
+                checkpoint_id=cp.id,
+                competition_id=comp.id,
             ).first()
             if not existing:
                 ts = utcnow_naive()
@@ -508,12 +520,14 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                         ts = datetime.fromisoformat(ci_data["timestamp"])
                     except Exception:
                         pass
-                db.session.add(Checkin(
-                    competition_id=comp.id,
-                    team_id=team.id,
-                    checkpoint_id=cp.id,
-                    timestamp=ts,
-                ))
+                db.session.add(
+                    Checkin(
+                        competition_id=comp.id,
+                        team_id=team.id,
+                        checkpoint_id=cp.id,
+                        timestamp=ts,
+                    )
+                )
                 added["checkins"] += 1
 
     db.session.flush()
@@ -521,6 +535,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
 
 
 # ---- API endpoints ----
+
 
 @transfer_api_bp.get("/api/competition/<int:comp_id>/export")
 @json_roles_required("admin")
@@ -560,12 +575,15 @@ def import_competition():
     comp, warnings = _import_competition_from_json(data)
     db.session.commit()
 
-    return json_ok({
-        "ok": True,
-        "competition_id": comp.id,
-        "competition_name": comp.name,
-        "warnings": warnings,
-    }, status=201)
+    return json_ok(
+        {
+            "ok": True,
+            "competition_id": comp.id,
+            "competition_name": comp.name,
+            "warnings": warnings,
+        },
+        status=201,
+    )
 
 
 @transfer_api_bp.post("/api/competition/<int:comp_id>/merge")
@@ -596,21 +614,21 @@ def merge_competition(comp_id: int):
     warnings = []
     version = data.get("schema_version", "")
     if version != SCHEMA_VERSION:
-        warnings.append(
-            f"Schema version mismatch: file has '{version}', current is '{SCHEMA_VERSION}'."
-        )
+        warnings.append(f"Schema version mismatch: file has '{version}', current is '{SCHEMA_VERSION}'.")
 
     resolutions = data.get("resolutions")
 
     if resolutions is None:
         # Step 1: Dry run — detect conflicts
         conflicts = _find_conflicts(data, comp)
-        return json_ok({
-            "ok": True,
-            "dry_run": True,
-            "conflicts": conflicts,
-            "warnings": warnings,
-        })
+        return json_ok(
+            {
+                "ok": True,
+                "dry_run": True,
+                "conflicts": conflicts,
+                "warnings": warnings,
+            }
+        )
 
     # Step 2: Apply merge with resolutions
     if not isinstance(resolutions, dict):
@@ -619,9 +637,11 @@ def merge_competition(comp_id: int):
     summary = _apply_merge(data, comp, resolutions)
     db.session.commit()
 
-    return json_ok({
-        "ok": True,
-        "dry_run": False,
-        "summary": summary,
-        "warnings": warnings,
-    })
+    return json_ok(
+        {
+            "ok": True,
+            "dry_run": False,
+            "summary": summary,
+            "warnings": warnings,
+        }
+    )

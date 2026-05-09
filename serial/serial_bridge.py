@@ -8,8 +8,10 @@ SER = os.getenv("SERIAL_DEVICE", "/dev/cu.usbserial-589A0002751")
 BAUD = int(os.getenv("SERIAL_BAUD", "115200"))
 PRINT_BYTES = os.getenv("PRINT_BYTES", "1") == "1"  # log serial/tcp traffic
 
+
 def log(msg: str):
     print(msg, flush=True)
+
 
 def main():
     ser = serial.Serial(SER, BAUD, timeout=0.05)
@@ -48,6 +50,7 @@ def main():
         ser.close()
         srv.close()
         log("bridge closed")
+
 
 if __name__ == "__main__":
     main()

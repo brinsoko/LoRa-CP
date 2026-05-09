@@ -21,6 +21,7 @@ def get_active_group_for_team(team_id: int, competition_id: int) -> CheckpointGr
         return None
     return tg.group
 
+
 def get_group_checkpoints(group: CheckpointGroup) -> list[Checkpoint]:
     """
     Return checkpoints for a group. With your many-to-many, this comes
@@ -28,6 +29,7 @@ def get_group_checkpoints(group: CheckpointGroup) -> list[Checkpoint]:
     """
     # You can order here if you want a specific order (e.g., by name)
     return list(group.checkpoints)
+
 
 def get_found_checkpoint_ids(team_id: int, competition_id: int) -> list[int]:
     """Return checkpoint IDs that the team has already checked in at."""
@@ -37,6 +39,7 @@ def get_found_checkpoint_ids(team_id: int, competition_id: int) -> list[int]:
         .all()
     )
     return [cp_id for (cp_id,) in rows]
+
 
 def compute_team_statuses(team_id: int, competition_id: int) -> dict:
     """
@@ -72,14 +75,16 @@ def compute_team_statuses(team_id: int, competition_id: int) -> dict:
                 status = "next"
             else:
                 status = "not_found"
-        items.append({
-            "id": cp.id,
-            "name": cp.name,
-            "easting": cp.easting,
-            "northing": cp.northing,
-            "status": status,
-            "order": order_index,
-        })
+        items.append(
+            {
+                "id": cp.id,
+                "name": cp.name,
+                "easting": cp.easting,
+                "northing": cp.northing,
+                "status": status,
+                "order": order_index,
+            }
+        )
 
     return {
         "team_id": team_id,
@@ -88,6 +93,7 @@ def compute_team_statuses(team_id: int, competition_id: int) -> dict:
         "next_id": next_id,
         "checkpoints": items,
     }
+
 
 def all_checkpoints_for_map(competition_id: int) -> list[dict]:
     """Return all checkpoints with coords for the public map layer.

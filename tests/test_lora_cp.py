@@ -415,7 +415,9 @@ class TestHtmlFlows:
 
         assert response.status_code == 200
         assert competition is not None
-        assert CompetitionMember.query.filter_by(user_id=user.id, competition_id=competition.id, role="admin").count() == 1
+        assert (
+            CompetitionMember.query.filter_by(user_id=user.id, competition_id=competition.id, role="admin").count() == 1
+        )
 
     def test_delete_competition_as_superadmin(self, client, app):
         user = create_user(username="super-user", role="superadmin")
@@ -438,7 +440,9 @@ class TestHtmlFlows:
 
         created = client.post("/teams/add", data={"name": "Delta", "number": "5"}, follow_redirects=True)
         team = Team.query.filter_by(competition_id=competition.id, name="Delta").one()
-        updated = client.post(f"/teams/{team.id}/edit", data={"name": "Delta Prime", "number": "6"}, follow_redirects=True)
+        updated = client.post(
+            f"/teams/{team.id}/edit", data={"name": "Delta Prime", "number": "6"}, follow_redirects=True
+        )
         deleted = client.post(f"/teams/{team.id}/delete", follow_redirects=True)
 
         assert created.status_code == 200

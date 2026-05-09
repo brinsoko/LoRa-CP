@@ -34,6 +34,7 @@ def _normalize_existing_user_identifier(raw_value: str) -> tuple[str | None, str
         return None, None, _("Username may only contain letters, numbers, dots, underscores, and hyphens.")
     return value, None, None
 
+
 @users_bp.route("/", methods=["GET"])
 @roles_required("admin")
 def list_users():
@@ -88,14 +89,10 @@ def attach_user():
         flash(_("No existing user matches that username or email."), "warning")
         return redirect(url_for("users.list_users"))
 
-    membership = (
-        CompetitionMember.query
-        .filter(
-            CompetitionMember.user_id == user.id,
-            CompetitionMember.competition_id == comp_id,
-        )
-        .first()
-    )
+    membership = CompetitionMember.query.filter(
+        CompetitionMember.user_id == user.id,
+        CompetitionMember.competition_id == comp_id,
+    ).first()
     if membership and membership.active:
         flash(_("That user is already in this competition."), "info")
         return redirect(url_for("users.list_users"))
@@ -126,6 +123,7 @@ def attach_user():
     )
     db.session.commit()
     return redirect(url_for("users.list_users"))
+
 
 @users_bp.route("/add", methods=["GET", "POST"])
 @roles_required("admin")
@@ -162,14 +160,10 @@ def add_user():
             )
         )
         db.session.flush()
-        membership = (
-            CompetitionMember.query
-            .filter(
-                CompetitionMember.competition_id == comp_id,
-                CompetitionMember.user_id == u.id,
-            )
-            .first()
-        )
+        membership = CompetitionMember.query.filter(
+            CompetitionMember.competition_id == comp_id,
+            CompetitionMember.user_id == u.id,
+        ).first()
         record_audit_event(
             competition_id=comp_id,
             event_type="user_created",
@@ -193,6 +187,7 @@ def add_user():
         return redirect(url_for("users.list_users"))
 
     return render_template("user_edit.html", mode="add")
+
 
 @users_bp.route("/<int:user_id>/edit", methods=["GET", "POST"])
 @roles_required("admin")
@@ -278,6 +273,7 @@ def edit_user(user_id: int):
 
     return render_template("user_edit.html", mode="edit", u=u, membership=membership)
 
+
 @users_bp.route("/<int:user_id>/delete", methods=["POST"])
 @roles_required("admin")
 def delete_user(user_id: int):
@@ -285,14 +281,10 @@ def delete_user(user_id: int):
     if not comp_id:
         flash(_("Select a competition first."), "warning")
         return redirect(url_for("main.select_competition"))
-    membership = (
-        CompetitionMember.query
-        .filter(
-            CompetitionMember.user_id == user_id,
-            CompetitionMember.competition_id == comp_id,
-        )
-        .first()
-    )
+    membership = CompetitionMember.query.filter(
+        CompetitionMember.user_id == user_id,
+        CompetitionMember.competition_id == comp_id,
+    ).first()
     if not membership:
         flash(_("User not found."), "warning")
         return redirect(url_for("users.list_users"))
@@ -315,9 +307,7 @@ def delete_user(user_id: int):
         summary=f"User {snapshot['username'] or user_id} removed from the competition.",
         details=snapshot,
     )
-    remaining = CompetitionMember.query.filter(
-        CompetitionMember.user_id == user_id
-    ).count()
+    remaining = CompetitionMember.query.filter(CompetitionMember.user_id == user_id).count()
     if remaining == 0:
         u = db.session.get(User, user_id)
         if u:

@@ -109,13 +109,15 @@ def edit_device(device_id: int):
 
         if not dev_num:
             flash("Device number is required.", "warning")
-            device.update({
-                "dev_num": dev_num,
-                "name": name,
-                "note": note,
-                "model": model,
-                "active": active,
-            })
+            device.update(
+                {
+                    "dev_num": dev_num,
+                    "name": name,
+                    "note": note,
+                    "model": model,
+                    "active": active,
+                }
+            )
             return render_template("lora_edit.html", d=device)
 
         resp, payload = api_json(
@@ -135,13 +137,15 @@ def edit_device(device_id: int):
             return redirect(url_for("lora.lora_list"))
 
         flash(payload.get("detail") or payload.get("error") or "Could not update device.", "warning")
-        device.update({
-            "dev_num": dev_num,
-            "name": name,
-            "note": note,
-            "model": model,
-            "active": active,
-        })
+        device.update(
+            {
+                "dev_num": dev_num,
+                "name": name,
+                "note": note,
+                "model": model,
+                "active": active,
+            }
+        )
         device = _decorate_devices([device])[0]
 
     return render_template("lora_edit.html", d=device)

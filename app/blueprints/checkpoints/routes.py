@@ -11,6 +11,7 @@ from app.utils.perms import roles_required
 
 checkpoints_bp = Blueprint("checkpoints", __name__, template_folder="../../templates")
 
+
 def _checkpoint_error_message(payload: dict, default_msg: str) -> str:
     error = payload.get("error")
     if error == "device_in_use":
@@ -301,7 +302,7 @@ def import_checkpoints_json():
             n = cp.get("n")
             if e is None or n is None:
                 continue
-            name = (cp.get("name") or "").strip() or f"CP-{idx+1}"
+            name = (cp.get("name") or "").strip() or f"CP-{idx + 1}"
             converted.append({"name": name, "easting": e, "northing": n})
         items = converted
 
@@ -318,7 +319,7 @@ def import_checkpoints_json():
     summary = payload.get("summary") or {}
     errors = payload.get("errors") or []
     flash(
-        f"Imported checkpoints: created {summary.get('created',0)}, updated {summary.get('updated',0)}, skipped {summary.get('skipped',0)}.",
+        f"Imported checkpoints: created {summary.get('created', 0)}, updated {summary.get('updated', 0)}, skipped {summary.get('skipped', 0)}.",
         "success",
     )
     if errors:

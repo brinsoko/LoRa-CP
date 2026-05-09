@@ -37,13 +37,9 @@ def _partition_checkpoints(all_checkpoints: list[dict], ordered_ids: list[int]) 
         cp = lookup.get(cid)
         if cp:
             selected.append(cp)
-    selected_ids = {
-        cp_id for cp in selected
-        if (cp_id := _parse_int(cp.get("id"))) is not None
-    }
+    selected_ids = {cp_id for cp in selected if (cp_id := _parse_int(cp.get("id"))) is not None}
     available = [
-        cp for cp in all_checkpoints
-        if (cp_id := _parse_int(cp.get("id"))) is not None and cp_id not in selected_ids
+        cp for cp in all_checkpoints if (cp_id := _parse_int(cp.get("id"))) is not None and cp_id not in selected_ids
     ]
     return selected, available
 
@@ -131,7 +127,9 @@ def edit_group(group_id: int):
     checkpoints = _fetch_checkpoints()
 
     existing_ids = [cp.get("id") for cp in group.get("checkpoints", [])]
-    selected_ids = _parse_checkpoint_ids(request.form.getlist("checkpoint_ids")) if request.method == "POST" else existing_ids
+    selected_ids = (
+        _parse_checkpoint_ids(request.form.getlist("checkpoint_ids")) if request.method == "POST" else existing_ids
+    )
     selected_items, available_items = _partition_checkpoints(checkpoints, selected_ids)
 
     if request.method == "POST":
@@ -144,8 +142,7 @@ def edit_group(group_id: int):
             group["name"] = name
             group["description"] = desc
             group["checkpoints"] = [
-                {"id": cp.get("id"), "name": cp.get("name"), "position": idx}
-                for idx, cp in enumerate(selected_items)
+                {"id": cp.get("id"), "name": cp.get("name"), "position": idx} for idx, cp in enumerate(selected_items)
             ]
             return render_template(
                 "group_edit.html",
@@ -176,14 +173,12 @@ def edit_group(group_id: int):
         group["prefix"] = prefix
         group["description"] = desc
         group["checkpoints"] = [
-            {"id": cp.get("id"), "name": cp.get("name"), "position": idx}
-            for idx, cp in enumerate(selected_items)
+            {"id": cp.get("id"), "name": cp.get("name"), "position": idx} for idx, cp in enumerate(selected_items)
         ]
 
     else:
         group["checkpoints"] = [
-            {"id": cp.get("id"), "name": cp.get("name"), "position": idx}
-            for idx, cp in enumerate(selected_items)
+            {"id": cp.get("id"), "name": cp.get("name"), "position": idx} for idx, cp in enumerate(selected_items)
         ]
 
     return render_template(

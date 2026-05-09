@@ -56,20 +56,22 @@ def _build_test_app():
     url_map without needing a real DB or secrets."""
     from app import create_app
 
-    return create_app({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "_EPHEMERAL_TEST_DB": True,
-        "WTF_CSRF_ENABLED": False,
-        "SECRET_KEY": "openapi-gen",
-        "DEVICE_CARD_SECRET": "openapi-gen",
-        "SERVER_NAME": "localhost",
-        "GOOGLE_OAUTH_CLIENT_ID": None,
-        "GOOGLE_OAUTH_CLIENT_SECRET": None,
-        "LORA_WEBHOOK_SECRET": "CHANGE_LATER",
-        "RATELIMIT_ENABLED": False,
-        "SHEETS_SYNC_INLINE": True,
-    })
+    return create_app(
+        {
+            "TESTING": True,
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "_EPHEMERAL_TEST_DB": True,
+            "WTF_CSRF_ENABLED": False,
+            "SECRET_KEY": "openapi-gen",
+            "DEVICE_CARD_SECRET": "openapi-gen",
+            "SERVER_NAME": "localhost",
+            "GOOGLE_OAUTH_CLIENT_ID": None,
+            "GOOGLE_OAUTH_CLIENT_SECRET": None,
+            "LORA_WEBHOOK_SECRET": "CHANGE_LATER",
+            "RATELIMIT_ENABLED": False,
+            "SHEETS_SYNC_INLINE": True,
+        }
+    )
 
 
 _PARAM_RE = re.compile(r"<(?:(?P<conv>[^:>]+):)?(?P<name>[^>]+)>")
@@ -101,12 +103,14 @@ def _path_parameters(rule: str) -> list[dict]:
         schema: dict = {"type": type_}
         if fmt:
             schema["format"] = fmt
-        params.append({
-            "name": m.group("name"),
-            "in": "path",
-            "required": True,
-            "schema": schema,
-        })
+        params.append(
+            {
+                "name": m.group("name"),
+                "in": "path",
+                "required": True,
+                "schema": schema,
+            }
+        )
     return params
 
 
@@ -160,19 +164,19 @@ def _merge(existing: dict, wired: dict[str, dict[str, dict]]) -> dict:
             entry = existing_path.setdefault(verb_lower, {})
             # Merge parameters: keep any existing query/header params, replace
             # path params from the live URL rule (source of truth).
-            existing_params = [
-                p for p in entry.get("parameters", [])
-                if isinstance(p, dict) and p.get("in") != "path"
-            ]
+            existing_params = [p for p in entry.get("parameters", []) if isinstance(p, dict) and p.get("in") != "path"]
             entry["parameters"] = info["parameters"] + existing_params
 
             # operationId must be globally unique per OpenAPI 3.0; derive
             # from verb + path so aliased endpoints get distinct IDs.
             entry["operationId"] = _operation_id(verb_lower, path)
             entry.setdefault("summary", "")
-            entry.setdefault("responses", {
-                "default": {"description": ""},
-            })
+            entry.setdefault(
+                "responses",
+                {
+                    "default": {"description": ""},
+                },
+            )
 
     # Sort paths for stable diffs.
     spec["paths"] = dict(sorted(paths.items()))

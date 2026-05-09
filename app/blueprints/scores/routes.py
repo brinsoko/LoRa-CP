@@ -41,16 +41,12 @@ def judge_score():
         role = get_current_competition_role()
         if role == "admin":
             checkpoints = (
-                Checkpoint.query
-                .filter(Checkpoint.competition_id == comp_id)
-                .order_by(Checkpoint.name.asc())
-                .all()
+                Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
             )
             default_checkpoint_id = checkpoints[0].id if checkpoints else None
         else:
             assigned = (
-                JudgeCheckpoint.query
-                .join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
+                JudgeCheckpoint.query.join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
                 .filter(
                     JudgeCheckpoint.user_id == current_user.id,
                     Checkpoint.competition_id == comp_id,
@@ -61,12 +57,7 @@ def judge_score():
             checkpoints = [jc.checkpoint for jc in assigned if jc.checkpoint]
             default_row = next((jc for jc in assigned if jc.is_default), None)
             default_checkpoint_id = default_row.checkpoint_id if default_row else None
-        teams = (
-            Team.query
-            .filter(Team.competition_id == comp_id)
-            .order_by(Team.name.asc())
-            .all()
-        )
+        teams = Team.query.filter(Team.competition_id == comp_id).order_by(Team.name.asc()).all()
 
     return render_template(
         "score_judge.html",
@@ -84,27 +75,15 @@ def score_rules():
         flash(_("Select a competition first."), "warning")
         return redirect(url_for("main.select_competition"))
 
-    checkpoints = (
-        Checkpoint.query
-        .filter(Checkpoint.competition_id == comp_id)
-        .order_by(Checkpoint.name.asc())
-        .all()
-    )
+    checkpoints = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
     groups = (
-        CheckpointGroup.query
-        .filter(CheckpointGroup.competition_id == comp_id)
+        CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
         .all()
     )
-    rules = (
-        ScoreRule.query
-        .filter(ScoreRule.competition_id == comp_id)
-        .order_by(ScoreRule.created_at.desc())
-        .all()
-    )
+    rules = ScoreRule.query.filter(ScoreRule.competition_id == comp_id).order_by(ScoreRule.created_at.desc()).all()
     global_rules = (
-        GlobalScoreRule.query
-        .filter(GlobalScoreRule.competition_id == comp_id)
+        GlobalScoreRule.query.filter(GlobalScoreRule.competition_id == comp_id)
         .order_by(GlobalScoreRule.created_at.desc())
         .all()
     )
@@ -135,15 +114,11 @@ def score_rules():
             if not tr.get("start_checkpoint_id") or not tr.get("end_checkpoint_id"):
                 flash(_("Time-based scoring requires start and end checkpoints."), "warning")
                 return redirect(url_for("scores.score_rules"))
-        existing = (
-            ScoreRule.query
-            .filter(
-                ScoreRule.competition_id == comp_id,
-                ScoreRule.checkpoint_id == checkpoint_id,
-                ScoreRule.group_id == group_id,
-            )
-            .first()
-        )
+        existing = ScoreRule.query.filter(
+            ScoreRule.competition_id == comp_id,
+            ScoreRule.checkpoint_id == checkpoint_id,
+            ScoreRule.group_id == group_id,
+        ).first()
         if existing:
             existing.rules = rules_json
             db_msg = _("Score rule updated.")
@@ -246,14 +221,10 @@ def save_global_rules():
         flash(_("Select at least one global rule."), "warning")
         return redirect(url_for("scores.score_rules"))
 
-    record = (
-        GlobalScoreRule.query
-        .filter(
-            GlobalScoreRule.competition_id == comp_id,
-            GlobalScoreRule.group_id == group_id,
-        )
-        .first()
-    )
+    record = GlobalScoreRule.query.filter(
+        GlobalScoreRule.competition_id == comp_id,
+        GlobalScoreRule.group_id == group_id,
+    ).first()
     if record:
         record.rules = rules
         db_msg = _("Global rules updated.")
@@ -294,18 +265,15 @@ def delete_global_rule(rule_id: int):
 
 def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     groups = (
-        CheckpointGroup.query
-        .filter(CheckpointGroup.competition_id == comp_id)
+        CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
         .all()
     )
     group_order = [g.name for g in groups if g.name]
     teams_query = Team.query.filter(Team.competition_id == comp_id)
     if group_id:
-        teams_query = (
-            teams_query
-            .join(TeamGroup, TeamGroup.team_id == Team.id)
-            .filter(TeamGroup.group_id == group_id, TeamGroup.active.is_(True))
+        teams_query = teams_query.join(TeamGroup, TeamGroup.team_id == Team.id).filter(
+            TeamGroup.group_id == group_id, TeamGroup.active.is_(True)
         )
     teams = teams_query.order_by(Team.number.asc().nulls_last(), Team.name.asc()).all()
     team_ids = [t.id for t in teams]
@@ -313,8 +281,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     entries = []
     if team_ids:
         entries = (
-            ScoreEntry.query
-            .filter(ScoreEntry.competition_id == comp_id)
+            ScoreEntry.query.filter(ScoreEntry.competition_id == comp_id)
             .filter(ScoreEntry.team_id.in_(team_ids))
             .order_by(ScoreEntry.created_at.desc())
             .all()
@@ -329,11 +296,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     team_groups = {}
     team_group_ids = {}
     if team_ids:
-        links = (
-            TeamGroup.query
-            .filter(TeamGroup.team_id.in_(team_ids), TeamGroup.active.is_(True))
-            .all()
-        )
+        links = TeamGroup.query.filter(TeamGroup.team_id.in_(team_ids), TeamGroup.active.is_(True)).all()
         for link in links:
             if link.team_id not in team_groups and link.group:
                 team_groups[link.team_id] = link.group.name
@@ -346,8 +309,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     if team_group_ids:
         unique_group_ids = sorted({gid for gid in team_group_ids.values() if gid})
         group_links = (
-            CheckpointGroupLink.query
-            .filter(CheckpointGroupLink.group_id.in_(unique_group_ids))
+            CheckpointGroupLink.query.filter(CheckpointGroupLink.group_id.in_(unique_group_ids))
             .order_by(
                 CheckpointGroupLink.group_id.asc(),
                 CheckpointGroupLink.position.asc().nulls_last(),
@@ -395,8 +357,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         start_ids = {cid for cid in group_start_checkpoint.values() if cid}
         end_ids = {cid for cid in group_final_checkpoint.values() if cid}
         checkins = (
-            Checkin.query
-            .filter(Checkin.competition_id == comp_id)
+            Checkin.query.filter(Checkin.competition_id == comp_id)
             .filter(Checkin.team_id.in_(team_ids))
             .filter(Checkin.checkpoint_id.in_(start_ids.union(end_ids)))
             .order_by(Checkin.timestamp.asc())
@@ -419,11 +380,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             if start_ts and end_ts and end_ts >= start_ts:
                 team_time_minutes[team_id] = (end_ts - start_ts).total_seconds() / 60.0
 
-    global_rules = (
-        GlobalScoreRule.query
-        .filter(GlobalScoreRule.competition_id == comp_id)
-        .all()
-    )
+    global_rules = GlobalScoreRule.query.filter(GlobalScoreRule.competition_id == comp_id).all()
     global_rules_map = {rule.group_id: rule.rules for rule in global_rules}
     global_totals = {}
     global_time_points = {}
@@ -478,24 +435,27 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
                 finished_map[team_id] = True
 
     for team in teams:
-        rows.append({
-            "id": team.id,
-            "name": team.name,
-            "number": team.number,
-            "group": team_groups.get(team.id, ""),
-            "total": (totals.get(team.id, 0.0) + global_totals.get(team.id, 0.0)),
-            "dead_time": dead_times.get(team.id, 0.0),
-            "global_time": global_time_points.get(team.id, 0.0),
-            "global_found": global_found_points.get(team.id, 0.0),
-            "time_minutes": team_time_minutes.get(team.id),
-            "dnf": bool(team.dnf),
-            "finished": finished_map.get(team.id, False),
-            "organization": team.organization or "",
-            "allowed_checkpoints": allowed_checkpoint_ids.get(team.id, set()),
-            "excluded_checkpoints": excluded_checkpoints_by_team.get(team.id, set()),
-        })
+        rows.append(
+            {
+                "id": team.id,
+                "name": team.name,
+                "number": team.number,
+                "group": team_groups.get(team.id, ""),
+                "total": (totals.get(team.id, 0.0) + global_totals.get(team.id, 0.0)),
+                "dead_time": dead_times.get(team.id, 0.0),
+                "global_time": global_time_points.get(team.id, 0.0),
+                "global_found": global_found_points.get(team.id, 0.0),
+                "time_minutes": team_time_minutes.get(team.id),
+                "dnf": bool(team.dnf),
+                "finished": finished_map.get(team.id, False),
+                "organization": team.organization or "",
+                "allowed_checkpoints": allowed_checkpoint_ids.get(team.id, set()),
+                "excluded_checkpoints": excluded_checkpoints_by_team.get(team.id, set()),
+            }
+        )
 
     group_order_norm = [g.lower().strip() for g in group_order]
+
     def _row_sort_key(row: dict):
         group_name = (row.get("group") or "").strip()
         group_norm = group_name.lower().strip()
@@ -522,14 +482,18 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         if not group_name or row.get("dnf"):
             continue
         group_totals_map[group_name] = group_totals_map.get(group_name, 0.0) + float(row.get("total") or 0.0)
+
     def _group_rank_sort(item):
         name, total = item
         norm = name.lower().strip()
         order_idx = group_order_norm.index(norm) if norm in group_order_norm else len(group_order_norm)
         return (-total, order_idx, name)
+
     group_totals_sorted = sorted(group_totals_map.items(), key=_group_rank_sort)
     group_ranks = {name: idx + 1 for idx, (name, _total) in enumerate(group_totals_sorted)}
-    group_totals = [{"name": name, "total": total, "rank": group_ranks.get(name)} for name, total in group_totals_sorted]
+    group_totals = [
+        {"name": name, "total": total, "rank": group_ranks.get(name)} for name, total in group_totals_sorted
+    ]
 
     org_totals_map = {}
     for row in rows:
@@ -542,9 +506,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     checkpoints_query = Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
     if group_id:
         group_cp_ids = (
-            db.session.query(CheckpointGroupLink.checkpoint_id)
-            .filter(CheckpointGroupLink.group_id == group_id)
-            .all()
+            db.session.query(CheckpointGroupLink.checkpoint_id).filter(CheckpointGroupLink.group_id == group_id).all()
         )
         cp_ids = [row[0] for row in group_cp_ids]
         if cp_ids:
@@ -606,8 +568,7 @@ def score_stats():
 
 def _build_stats_context(comp_id: int) -> dict:
     groups = (
-        CheckpointGroup.query
-        .filter(CheckpointGroup.competition_id == comp_id)
+        CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
         .all()
     )
@@ -622,8 +583,7 @@ def _build_stats_context(comp_id: int) -> dict:
         rows_by_group.setdefault(group_name, []).append(row)
 
     team_groups = (
-        TeamGroup.query
-        .join(Team, TeamGroup.team_id == Team.id)
+        TeamGroup.query.join(Team, TeamGroup.team_id == Team.id)
         .filter(Team.competition_id == comp_id, TeamGroup.active.is_(True))
         .all()
     )
@@ -632,8 +592,7 @@ def _build_stats_context(comp_id: int) -> dict:
         teams_by_group_id.setdefault(link.group_id, set()).add(link.team_id)
 
     links = (
-        CheckpointGroupLink.query
-        .filter(CheckpointGroupLink.group_id.in_([g.id for g in groups]))
+        CheckpointGroupLink.query.filter(CheckpointGroupLink.group_id.in_([g.id for g in groups]))
         .order_by(CheckpointGroupLink.group_id.asc(), CheckpointGroupLink.position.asc().nulls_last())
         .all()
     )
@@ -645,22 +604,24 @@ def _build_stats_context(comp_id: int) -> dict:
     for group in groups:
         team_ids = sorted(teams_by_group_id.get(group.id, set()))
         if not team_ids:
-            stats.append({
-                "id": group.id,
-                "name": group.name,
-                "team_count": 0,
-                "finished_count": 0,
-                "completion_rate": 0,
-                "avg_points": None,
-                "avg_time_minutes": None,
-                "median_time_minutes": None,
-                "fastest_team": None,
-                "fastest_minutes": None,
-                "avg_checkpoint_count": None,
-                "segments": [],
-                "dropoff_checkpoint": None,
-                "dropoff_rate": None,
-            })
+            stats.append(
+                {
+                    "id": group.id,
+                    "name": group.name,
+                    "team_count": 0,
+                    "finished_count": 0,
+                    "completion_rate": 0,
+                    "avg_points": None,
+                    "avg_time_minutes": None,
+                    "median_time_minutes": None,
+                    "fastest_team": None,
+                    "fastest_minutes": None,
+                    "avg_checkpoint_count": None,
+                    "segments": [],
+                    "dropoff_checkpoint": None,
+                    "dropoff_rate": None,
+                }
+            )
             continue
 
         group_rows = rows_by_group.get(group.name, [])
@@ -676,8 +637,7 @@ def _build_stats_context(comp_id: int) -> dict:
         checkins = []
         if cp_ids:
             checkins = (
-                Checkin.query
-                .filter(Checkin.competition_id == comp_id)
+                Checkin.query.filter(Checkin.competition_id == comp_id)
                 .filter(Checkin.team_id.in_(team_ids))
                 .filter(Checkin.checkpoint_id.in_(cp_ids))
                 .order_by(Checkin.timestamp.asc())
@@ -751,31 +711,35 @@ def _build_stats_context(comp_id: int) -> dict:
                     if dropoff_rate is None or rate > dropoff_rate:
                         dropoff_rate = rate
                         dropoff_checkpoint = to_cp.checkpoint.name if to_cp and to_cp.checkpoint else ""
-                segments.append({
-                    "from_id": from_id,
-                    "to_id": to_id,
-                    "from_name": from_cp.checkpoint.name if from_cp and from_cp.checkpoint else "",
-                    "to_name": to_cp.checkpoint.name if to_cp and to_cp.checkpoint else "",
-                    "avg_minutes": avg_segment,
-                    "sample_count": len(segment_durations),
-                })
+                segments.append(
+                    {
+                        "from_id": from_id,
+                        "to_id": to_id,
+                        "from_name": from_cp.checkpoint.name if from_cp and from_cp.checkpoint else "",
+                        "to_name": to_cp.checkpoint.name if to_cp and to_cp.checkpoint else "",
+                        "avg_minutes": avg_segment,
+                        "sample_count": len(segment_durations),
+                    }
+                )
 
-        stats.append({
-            "id": group.id,
-            "name": group.name,
-            "team_count": len(group_rows),
-            "finished_count": finished_count,
-            "completion_rate": completion_rate,
-            "avg_points": avg_points,
-            "avg_time_minutes": avg_time_minutes,
-            "median_time_minutes": median_time_minutes,
-            "fastest_team": fastest_team,
-            "fastest_minutes": fastest_minutes,
-            "avg_checkpoint_count": avg_checkpoint_count,
-            "segments": segments,
-            "dropoff_checkpoint": dropoff_checkpoint,
-            "dropoff_rate": dropoff_rate,
-        })
+        stats.append(
+            {
+                "id": group.id,
+                "name": group.name,
+                "team_count": len(group_rows),
+                "finished_count": finished_count,
+                "completion_rate": completion_rate,
+                "avg_points": avg_points,
+                "avg_time_minutes": avg_time_minutes,
+                "median_time_minutes": median_time_minutes,
+                "fastest_team": fastest_team,
+                "fastest_minutes": fastest_minutes,
+                "avg_checkpoint_count": avg_checkpoint_count,
+                "segments": segments,
+                "dropoff_checkpoint": dropoff_checkpoint,
+                "dropoff_rate": dropoff_rate,
+            }
+        )
 
     chart_groups = [g["name"] for g in stats if g["team_count"]]
     chart_points = [g["avg_points"] or 0 for g in stats if g["team_count"]]
@@ -814,29 +778,20 @@ def score_submissions():
 
     teams_query = Team.query.filter(Team.competition_id == comp_id)
     if group_id:
-        teams_query = (
-            teams_query
-            .join(TeamGroup, TeamGroup.team_id == Team.id)
-            .filter(TeamGroup.group_id == group_id, TeamGroup.active.is_(True))
+        teams_query = teams_query.join(TeamGroup, TeamGroup.team_id == Team.id).filter(
+            TeamGroup.group_id == group_id, TeamGroup.active.is_(True)
         )
     teams = teams_query.order_by(Team.number.asc().nulls_last(), Team.name.asc()).all()
 
-    checkpoints = (
-        Checkpoint.query
-        .filter(Checkpoint.competition_id == comp_id)
-        .order_by(Checkpoint.name.asc())
-        .all()
-    )
+    checkpoints = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
     groups = (
-        CheckpointGroup.query
-        .filter(CheckpointGroup.competition_id == comp_id)
+        CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
         .all()
     )
 
     query = (
-        ScoreEntry.query
-        .filter(ScoreEntry.competition_id == comp_id)
+        ScoreEntry.query.filter(ScoreEntry.competition_id == comp_id)
         .options(
             joinedload(ScoreEntry.team),
             joinedload(ScoreEntry.checkpoint),
@@ -853,20 +808,12 @@ def score_submissions():
     entry_team_ids = sorted({e.team_id for e in entries if e.team_id})
     team_group_map = {}
     if entry_team_ids:
-        links = (
-            TeamGroup.query
-            .filter(TeamGroup.team_id.in_(entry_team_ids), TeamGroup.active.is_(True))
-            .all()
-        )
+        links = TeamGroup.query.filter(TeamGroup.team_id.in_(entry_team_ids), TeamGroup.active.is_(True)).all()
         for link in links:
             if link.team_id not in team_group_map:
                 team_group_map[link.team_id] = link.group_id
 
-    global_rules = (
-        GlobalScoreRule.query
-        .filter(GlobalScoreRule.competition_id == comp_id)
-        .all()
-    )
+    global_rules = GlobalScoreRule.query.filter(GlobalScoreRule.competition_id == comp_id).all()
     global_rules_map = {rule.group_id: rule.rules for rule in global_rules}
     team_time_points: dict[int, float | None] = {}
     for team_id in entry_team_ids:
@@ -887,19 +834,21 @@ def score_submissions():
             dead_num = float(dead_val)
         except Exception:
             dead_num = None
-        rows.append({
-            "id": entry.id,
-            "team": entry.team.name if entry.team else "",
-            "team_id": entry.team_id,
-            "checkpoint": entry.checkpoint.name if entry.checkpoint else "",
-            "checkpoint_id": entry.checkpoint_id,
-            "created_at": entry.created_at,
-            "submitted_by": entry.judge_user.username if entry.judge_user else _("Legacy or unknown"),
-            "total": entry.total,
-            "dead_time": dead_num,
-            "time_points": team_time_points.get(entry.team_id),
-            "raw_fields": raw,
-        })
+        rows.append(
+            {
+                "id": entry.id,
+                "team": entry.team.name if entry.team else "",
+                "team_id": entry.team_id,
+                "checkpoint": entry.checkpoint.name if entry.checkpoint else "",
+                "checkpoint_id": entry.checkpoint_id,
+                "created_at": entry.created_at,
+                "submitted_by": entry.judge_user.username if entry.judge_user else _("Legacy or unknown"),
+                "total": entry.total,
+                "dead_time": dead_num,
+                "time_points": team_time_points.get(entry.team_id),
+                "raw_fields": raw,
+            }
+        )
 
     return render_template(
         "scores_submissions.html",

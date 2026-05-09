@@ -17,10 +17,6 @@ def test_lora_messages_dedup_index_exists(app):
     insp = inspect(db.engine)
     indexes = insp.get_indexes("lora_messages")
     by_name = {ix["name"]: ix for ix in indexes}
-    assert "ix_lora_messages_dedup" in by_name, (
-        f"composite index missing; have {sorted(by_name.keys())}"
-    )
+    assert "ix_lora_messages_dedup" in by_name, f"composite index missing; have {sorted(by_name.keys())}"
     cols = by_name["ix_lora_messages_dedup"]["column_names"]
-    assert cols == ["competition_id", "dev_id", "received_at"], (
-        f"wrong columns: {cols}"
-    )
+    assert cols == ["competition_id", "dev_id", "received_at"], f"wrong columns: {cols}"

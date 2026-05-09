@@ -15,4 +15,3 @@ def escape_formula_cells(values):
     if isinstance(values, list):
         return [escape_formula_cells(v) for v in values]
     return escape_formula_cell(values)
-

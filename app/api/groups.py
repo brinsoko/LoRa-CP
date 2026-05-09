@@ -30,7 +30,9 @@ def _validate_prefix_format(prefix: str | None) -> tuple[bool, str | None]:
     return True, None
 
 
-def _validate_prefix_overlap(prefix: str | None, comp_id: int, exclude_group_id: int | None = None) -> tuple[bool, str | None]:
+def _validate_prefix_overlap(
+    prefix: str | None, comp_id: int, exclude_group_id: int | None = None
+) -> tuple[bool, str | None]:
     """Check that the new prefix doesn't overlap with existing group prefixes in the same competition."""
     if not prefix:
         return True, None
@@ -62,6 +64,7 @@ def _validate_prefix_overlap(prefix: str | None, comp_id: int, exclude_group_id:
             )
 
     return True, None
+
 
 groups_api_bp = Blueprint("api_groups", __name__)
 

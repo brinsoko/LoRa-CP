@@ -48,9 +48,5 @@ def test_savepoint_isolates_score_submit_checkin_violation(app):
 
     # The outer transaction must still be usable — the savepoint rollback
     # must not poison it. This is the whole point of using begin_nested().
-    rows = (
-        Checkin.query
-        .filter_by(team_id=team.id, checkpoint_id=checkpoint.id, competition_id=competition.id)
-        .all()
-    )
+    rows = Checkin.query.filter_by(team_id=team.id, checkpoint_id=checkpoint.id, competition_id=competition.id).all()
     assert len(rows) == 1

@@ -4,6 +4,7 @@ Rebuild the local SQLite DB: drop all tables and recreate them.
 Run from project root:
     python scripts/rebuild_db.py
 """
+
 import os
 import sys
 
@@ -28,6 +29,7 @@ def main():
         print("Creating tables...")
         db.create_all()
         print("✅ Database rebuilt successfully.")
+
 
 if __name__ == "__main__":
     main()

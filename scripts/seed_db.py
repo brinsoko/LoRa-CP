@@ -46,6 +46,7 @@ from app.utils.competition import DEFAULT_COMPETITION_NAME, ensure_default_compe
 
 # ----------------------------- helpers -----------------------------
 
+
 def get_or_create_user(username: str, role: str, password: str) -> User:
     u = User.query.filter_by(username=username).first()
     if not u:
@@ -54,6 +55,7 @@ def get_or_create_user(username: str, role: str, password: str) -> User:
         db.session.add(u)
         db.session.flush()
     return u
+
 
 def get_or_create_team(
     competition_id: int,
@@ -83,6 +85,7 @@ def get_or_create_team(
         if organization and not t.organization:
             t.organization = organization
     return t
+
 
 def get_or_create_checkpoint(
     competition_id: int,
@@ -119,6 +122,7 @@ def get_or_create_checkpoint(
             cp.description = desc
     return cp
 
+
 def get_or_create_group(
     competition_id: int,
     name: str,
@@ -145,6 +149,7 @@ def get_or_create_group(
             g.prefix = prefix
     return g
 
+
 def assign_team_to_groups(team: Team, group_ids: list[int]):
     """Ensure a team has TeamGroup rows for the given groups (active=True),
     and remove TeamGroup rows for groups not in list."""
@@ -153,14 +158,17 @@ def assign_team_to_groups(team: Team, group_ids: list[int]):
 
     # Remove any not desired
     if current - desired:
-        (db.session.query(TeamGroup)
-         .filter(TeamGroup.team_id == team.id)
-         .filter(~TeamGroup.group_id.in_(list(desired) if desired else [-1]))
-         .delete(synchronize_session=False))
+        (
+            db.session.query(TeamGroup)
+            .filter(TeamGroup.team_id == team.id)
+            .filter(~TeamGroup.group_id.in_(list(desired) if desired else [-1]))
+            .delete(synchronize_session=False)
+        )
 
     # Add newly desired
     for gid in desired - current:
         db.session.add(TeamGroup(team_id=team.id, group_id=gid, active=True))
+
 
 def ensure_rfid(team: Team, uid: str, number: int | None):
     uid_norm = uid.strip().upper()
@@ -183,6 +191,7 @@ def ensure_rfid(team: Team, uid: str, number: int | None):
     db.session.flush()
     return card
 
+
 def add_checkin(team: Team, cp: Checkpoint, when: datetime, competition_id: int):
     # Respect unique check-in per (team, checkpoint) per your earlier rule
     exists = Checkin.query.filter_by(team_id=team.id, checkpoint_id=cp.id).first()
@@ -200,10 +209,7 @@ def add_checkin(team: Team, cp: Checkpoint, when: datetime, competition_id: int)
 
 def set_group_checkpoints(group: CheckpointGroup, checkpoints: list[Checkpoint]):
     """Assign ordered checkpoints to a group with positions."""
-    group.checkpoint_links = [
-        CheckpointGroupLink(checkpoint=cp, position=idx)
-        for idx, cp in enumerate(checkpoints)
-    ]
+    group.checkpoint_links = [CheckpointGroupLink(checkpoint=cp, position=idx) for idx, cp in enumerate(checkpoints)]
 
 
 def load_teams_from_csv(csv_path: str) -> list[tuple[str, int | None, str, str | None]]:
@@ -269,7 +275,9 @@ def import_teams_from_csv(csv_path: str, competition_id: int):
     db.session.flush()
     print(f"Imported {len(teams)} entries from {csv_path} across {len(group_names)} groups")
 
+
 # ----------------------------- main seeding -----------------------------
+
 
 def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = True):
     app = create_app()
@@ -313,14 +321,10 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
         def ensure_membership(user: User, role: str):
             if not user or not competition:
                 return
-            membership = (
-                CompetitionMember.query
-                .filter(
-                    CompetitionMember.competition_id == competition.id,
-                    CompetitionMember.user_id == user.id,
-                )
-                .first()
-            )
+            membership = CompetitionMember.query.filter(
+                CompetitionMember.competition_id == competition.id,
+                CompetitionMember.user_id == user.id,
+            ).first()
             if not membership:
                 db.session.add(
                     CompetitionMember(
@@ -401,7 +405,7 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
             set_group_checkpoints(g_alpha, [c for c in cps if 1 <= int(c.name.split("-")[1]) <= 5])
             set_group_checkpoints(g_bravo, [c for c in cps if 6 <= int(c.name.split("-")[1]) <= 10])
             set_group_checkpoints(g_charlie, [cps[1], cps[4], cps[7]])  # CP-02, CP-05, CP-08
-            set_group_checkpoints(g_delta, [cps[0], cps[2], cps[5]])    # CP-01, CP-03, CP-06
+            set_group_checkpoints(g_delta, [cps[0], cps[2], cps[5]])  # CP-01, CP-03, CP-06
 
             print("Seeding demo RFID cards...")
             all_teams = [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13]
@@ -415,11 +419,12 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
                 group_ids = [tg.group_id for tg in team.group_assignments]
                 if not group_ids:
                     return []
-                q = (Checkpoint.query
-                     .join(Checkpoint.groups)
-                     .filter(CheckpointGroup.id.in_(group_ids))
-                     .distinct()
-                     .order_by(Checkpoint.name.asc()))
+                q = (
+                    Checkpoint.query.join(Checkpoint.groups)
+                    .filter(CheckpointGroup.id.in_(group_ids))
+                    .distinct()
+                    .order_by(Checkpoint.name.asc())
+                )
                 return q.all()
 
             for t in all_teams:
@@ -472,6 +477,7 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
         print("\n✅ Seed complete!")
         print_counts()
 
+
 def print_counts():
     print("Counts:")
     print(f"  Users:       {User.query.count()}")
@@ -481,13 +487,17 @@ def print_counts():
     print(f"  RFID Cards:  {RFIDCard.query.count()}")
     print(f"  Check-ins:   {Checkin.query.count()}")
 
+
 # ----------------------------- entrypoint -----------------------------
 
 if __name__ == "__main__":
     import argparse
+
     p = argparse.ArgumentParser(description="Seed demo data.")
     p.add_argument("--fresh", action="store_true", help="Drop & recreate tables before seeding.")
-    p.add_argument("--teams-csv", type=str, help="CSV file with teams to import (defaults to 2025_data/*Ekipe.csv if present).")
+    p.add_argument(
+        "--teams-csv", type=str, help="CSV file with teams to import (defaults to 2025_data/*Ekipe.csv if present)."
+    )
     p.add_argument("--skip-demo", action="store_true", help="Skip demo data (users are still ensured).")
     args = p.parse_args()
     seed(fresh=args.fresh, teams_csv=args.teams_csv, skip_demo=args.skip_demo)

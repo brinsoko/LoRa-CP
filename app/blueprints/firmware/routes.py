@@ -34,6 +34,7 @@ firmware_bp = Blueprint("firmware", __name__, template_folder="../../templates")
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _require_comp():
     comp_id = get_current_competition_id()
     if not comp_id:
@@ -59,6 +60,7 @@ def _mask(value: str) -> str:
 # Firmware management
 # ---------------------------------------------------------------------------
 
+
 @firmware_bp.route("/", methods=["GET"])
 @roles_required("admin")
 def firmware_list():
@@ -66,8 +68,7 @@ def firmware_list():
     if redir:
         return redir
     files = (
-        FirmwareFile.query
-        .filter_by(competition_id=comp_id)
+        FirmwareFile.query.filter_by(competition_id=comp_id)
         .order_by(FirmwareFile.device_type.asc(), FirmwareFile.uploaded_at.desc())
         .all()
     )
@@ -209,21 +210,16 @@ def firmware_download(fw_id: int):
 # Flash UI
 # ---------------------------------------------------------------------------
 
+
 @firmware_bp.route("/flash", methods=["GET"])
 @roles_required("admin")
 def firmware_flash():
     comp_id, redir = _require_comp()
     if redir:
         return redir
-    devices = (
-        LoRaDevice.query
-        .filter_by(competition_id=comp_id, active=True)
-        .order_by(LoRaDevice.dev_num.asc())
-        .all()
-    )
+    devices = LoRaDevice.query.filter_by(competition_id=comp_id, active=True).order_by(LoRaDevice.dev_num.asc()).all()
     firmware_files = (
-        FirmwareFile.query
-        .filter_by(competition_id=comp_id)
+        FirmwareFile.query.filter_by(competition_id=comp_id)
         .order_by(FirmwareFile.device_type.asc(), FirmwareFile.name.asc())
         .all()
     )
@@ -237,6 +233,7 @@ def firmware_flash():
 # ---------------------------------------------------------------------------
 # JSON / binary API (called by browser JS)
 # ---------------------------------------------------------------------------
+
 
 @firmware_bp.route("/api/config/<int:device_id>/<int:fw_id>")
 @roles_required("admin")
@@ -254,37 +251,37 @@ def firmware_config_preview(device_id: int, fw_id: int):
     hmac_len = cfg.get("DEVICE_CARD_HMAC_LEN", 12)
 
     if card_secret and card_secret == cfg.get("SECRET_KEY"):
-        current_app.logger.warning(
-            "DEVICE_CARD_SECRET is falling back to SECRET_KEY — set a dedicated value in .env"
-        )
+        current_app.logger.warning("DEVICE_CARD_SECRET is falling back to SECRET_KEY — set a dedicated value in .env")
 
-    return jsonify({
-        "nvs_namespace": "config",
-        "entries": {
-            "dev_num":        device.dev_num,
-            "competition_id": comp_id,
-            "card_secret":    _mask(card_secret),
-            "hmac_len":       hmac_len,
-            "webhook_secret": _mask(webhook_secret),
-        },
-        "flash_plan": [
-            {
-                "label":  "NVS keys partition",
-                "offset": hex(fw.nvs_keys_offset),
-                "source": "generated on server (0x1000)",
+    return jsonify(
+        {
+            "nvs_namespace": "config",
+            "entries": {
+                "dev_num": device.dev_num,
+                "competition_id": comp_id,
+                "card_secret": _mask(card_secret),
+                "hmac_len": hmac_len,
+                "webhook_secret": _mask(webhook_secret),
             },
-            {
-                "label":  "Encrypted NVS partition (sec_nvs)",
-                "offset": hex(fw.nvs_offset),
-                "source": f"generated on server ({hex(fw.nvs_size)})",
-            },
-            {
-                "label":  "Application firmware",
-                "offset": hex(fw.app_offset),
-                "source": f"{fw.name}" + (f" v{fw.version}" if fw.version else ""),
-            },
-        ],
-    })
+            "flash_plan": [
+                {
+                    "label": "NVS keys partition",
+                    "offset": hex(fw.nvs_keys_offset),
+                    "source": "generated on server (0x1000)",
+                },
+                {
+                    "label": "Encrypted NVS partition (sec_nvs)",
+                    "offset": hex(fw.nvs_offset),
+                    "source": f"generated on server ({hex(fw.nvs_size)})",
+                },
+                {
+                    "label": "Application firmware",
+                    "offset": hex(fw.app_offset),
+                    "source": f"{fw.name}" + (f" v{fw.version}" if fw.version else ""),
+                },
+            ],
+        }
+    )
 
 
 @firmware_bp.route("/api/nvs/<int:device_id>/<int:fw_id>", methods=["GET", "POST"])
@@ -325,6 +322,7 @@ def firmware_nvs_binary(device_id: int, fw_id: int):
         abort(400, f"NVS partition overruns app offset: {fw.nvs_offset + partition_size:#x} > {fw.app_offset:#x}")
 
     from app.utils.nvs_gen import generate_encrypted_nvs_partition
+
     try:
         result = generate_encrypted_nvs_partition(
             dev_num=device.dev_num,
@@ -341,9 +339,11 @@ def firmware_nvs_binary(device_id: int, fw_id: int):
         current_app.logger.exception("NVS generation failed: %s", exc)
         return jsonify({"error": "nvs_generation_failed", "detail": str(exc)}), 500
 
-    return jsonify({
-        "nvs_bin": base64.b64encode(result.nvs_bin).decode(),
-        "keys_bin": base64.b64encode(result.keys_bin).decode(),
-        "nvs_offset": fw.nvs_offset,
-        "nvs_keys_offset": fw.nvs_keys_offset,
-    })
+    return jsonify(
+        {
+            "nvs_bin": base64.b64encode(result.nvs_bin).decode(),
+            "keys_bin": base64.b64encode(result.keys_bin).decode(),
+            "nvs_offset": fw.nvs_offset,
+            "nvs_keys_offset": fw.nvs_keys_offset,
+        }
+    )

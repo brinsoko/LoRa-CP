@@ -30,7 +30,9 @@ def _serialize_device(device: LoRaDevice) -> dict:
             "id": device.checkpoint.id,
             "name": device.checkpoint.name,
             "description": device.checkpoint.description,
-        } if device.checkpoint else None,
+        }
+        if device.checkpoint
+        else None,
     }
 
 
@@ -94,125 +96,117 @@ def _parse_device_payload(payload: dict, *, for_update: bool = False) -> tuple[d
 @lora_devices_api_bp.get("/api/devices")
 @json_login_required
 def lora_device_list():
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        devices = (
-            LoRaDevice.query
-            .filter(LoRaDevice.competition_id == comp_id)
-            .options(joinedload(LoRaDevice.checkpoint))
-            .order_by(LoRaDevice.name.asc().nulls_last(), LoRaDevice.dev_num.asc())
-            .all()
-        )
-        return {"devices": [_serialize_device(d) for d in devices]}, 200
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    devices = (
+        LoRaDevice.query.filter(LoRaDevice.competition_id == comp_id)
+        .options(joinedload(LoRaDevice.checkpoint))
+        .order_by(LoRaDevice.name.asc().nulls_last(), LoRaDevice.dev_num.asc())
+        .all()
+    )
+    return {"devices": [_serialize_device(d) for d in devices]}, 200
 
 
 @lora_devices_api_bp.post("/api/lora/devices")
 @lora_devices_api_bp.post("/api/devices")
 @json_roles_required("judge", "admin")
 def lora_device_create():
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        payload = request.get_json(silent=True) or {}
-        data, errors = _parse_device_payload(payload, for_update=False)
-        if errors:
-            return jsonify({"error": "validation_error", "detail": errors}), 400
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    payload = request.get_json(silent=True) or {}
+    data, errors = _parse_device_payload(payload, for_update=False)
+    if errors:
+        return jsonify({"error": "validation_error", "detail": errors}), 400
 
-        dev_num = data.get("dev_num")
-        if (
-            LoRaDevice.query
-            .filter(LoRaDevice.competition_id == comp_id, LoRaDevice.dev_num == dev_num)
-            .first()
-        ):
-            return jsonify({"error": "conflict", "detail": "Device number already exists."}), 409
+    dev_num = data.get("dev_num")
+    if LoRaDevice.query.filter(LoRaDevice.competition_id == comp_id, LoRaDevice.dev_num == dev_num).first():
+        return jsonify({"error": "conflict", "detail": "Device number already exists."}), 409
 
-        device = LoRaDevice(
-            competition_id=comp_id,
-            dev_num=data.get("dev_num"),
-            name=data.get("name"),
-            note=data.get("note"),
-            model=data.get("model"),
-            active=data.get("active", True),
-        )
-        db.session.add(device)
-        db.session.flush()
-        record_audit_event(
-            competition_id=comp_id,
-            event_type="device_created",
-            entity_type="device",
-            entity_id=device.id,
-            actor_user=current_user if current_user.is_authenticated else None,
-            summary=f"Device {device.name or f'DEV-{device.dev_num}'} created.",
-            details=_device_snapshot(device),
-        )
-        db.session.commit()
-        return {"ok": True, "device": _serialize_device(device)}, 201
+    device = LoRaDevice(
+        competition_id=comp_id,
+        dev_num=data.get("dev_num"),
+        name=data.get("name"),
+        note=data.get("note"),
+        model=data.get("model"),
+        active=data.get("active", True),
+    )
+    db.session.add(device)
+    db.session.flush()
+    record_audit_event(
+        competition_id=comp_id,
+        event_type="device_created",
+        entity_type="device",
+        entity_id=device.id,
+        actor_user=current_user if current_user.is_authenticated else None,
+        summary=f"Device {device.name or f'DEV-{device.dev_num}'} created.",
+        details=_device_snapshot(device),
+    )
+    db.session.commit()
+    return {"ok": True, "device": _serialize_device(device)}, 201
 
 
 @lora_devices_api_bp.get("/api/lora/devices/<int:device_id>")
 @lora_devices_api_bp.get("/api/devices/<int:device_id>")
 @json_login_required
 def lora_device_get(device_id: int):
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        device = (
-            LoRaDevice.query
-            .filter(LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id)
-            .options(joinedload(LoRaDevice.checkpoint))
-            .first()
-        )
-        if not device:
-            return jsonify({"error": "not_found"}), 404
-        return _serialize_device(device), 200
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    device = (
+        LoRaDevice.query.filter(LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id)
+        .options(joinedload(LoRaDevice.checkpoint))
+        .first()
+    )
+    if not device:
+        return jsonify({"error": "not_found"}), 404
+    return _serialize_device(device), 200
 
 
 def _update_device(device_id: int, partial: bool):
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        device = LoRaDevice.query.filter(
-            LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    device = LoRaDevice.query.filter(LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id).first()
+    if not device:
+        return jsonify({"error": "not_found"}), 404
+    before = _device_snapshot(device)
+
+    payload = request.get_json(silent=True) or {}
+    data, errors = _parse_device_payload(payload, for_update=True)
+    if errors:
+        return jsonify({"error": "validation_error", "detail": errors}), 400
+
+    if "dev_num" in data:
+        dev_num = data["dev_num"]
+        if dev_num is None:
+            return jsonify({"error": "validation_error", "detail": "dev_num is required"}), 400
+        exists = LoRaDevice.query.filter(
+            LoRaDevice.competition_id == comp_id,
+            LoRaDevice.dev_num == dev_num,
+            LoRaDevice.id != device.id,
         ).first()
-        if not device:
-            return jsonify({"error": "not_found"}), 404
-        before = _device_snapshot(device)
+        if exists:
+            return jsonify({"error": "conflict", "detail": "Device number already exists."}), 409
+        device.dev_num = dev_num
 
-        payload = request.get_json(silent=True) or {}
-        data, errors = _parse_device_payload(payload, for_update=True)
-        if errors:
-            return jsonify({"error": "validation_error", "detail": errors}), 400
+    for field in ("name", "note", "model", "active"):
+        if field in data:
+            setattr(device, field, data[field])
 
-        if "dev_num" in data:
-            dev_num = data["dev_num"]
-            if dev_num is None:
-                return jsonify({"error": "validation_error", "detail": "dev_num is required"}), 400
-            exists = LoRaDevice.query.filter(
-                LoRaDevice.competition_id == comp_id,
-                LoRaDevice.dev_num == dev_num,
-                LoRaDevice.id != device.id,
-            ).first()
-            if exists:
-                return jsonify({"error": "conflict", "detail": "Device number already exists."}), 409
-            device.dev_num = dev_num
-
-        for field in ("name", "note", "model", "active"):
-            if field in data:
-                setattr(device, field, data[field])
-
-        db.session.flush()
-        record_audit_event(
-            competition_id=comp_id,
-            event_type="device_updated",
-            entity_type="device",
-            entity_id=device.id,
-            actor_user=current_user if current_user.is_authenticated else None,
-            summary=f"Device {device.name or f'DEV-{device.dev_num}'} updated.",
-            details={"before": before, "after": _device_snapshot(device)},
-        )
-        db.session.commit()
-        return {"ok": True, "device": _serialize_device(device)}, 200
+    db.session.flush()
+    record_audit_event(
+        competition_id=comp_id,
+        event_type="device_updated",
+        entity_type="device",
+        entity_id=device.id,
+        actor_user=current_user if current_user.is_authenticated else None,
+        summary=f"Device {device.name or f'DEV-{device.dev_num}'} updated.",
+        details={"before": before, "after": _device_snapshot(device)},
+    )
+    db.session.commit()
+    return {"ok": True, "device": _serialize_device(device)}, 200
 
 
 @lora_devices_api_bp.patch("/api/lora/devices/<int:device_id>")
@@ -233,29 +227,27 @@ def lora_device_put(device_id: int):
 @lora_devices_api_bp.delete("/api/devices/<int:device_id>")
 @json_roles_required("admin")
 def lora_device_delete(device_id: int):
-        comp_id = require_current_competition_id()
-        if not comp_id:
-            return jsonify({"error": "no_competition"}), 400
-        device = LoRaDevice.query.filter(
-            LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id
-        ).first()
-        if not device:
-            return jsonify({"error": "not_found"}), 404
+    comp_id = require_current_competition_id()
+    if not comp_id:
+        return jsonify({"error": "no_competition"}), 400
+    device = LoRaDevice.query.filter(LoRaDevice.competition_id == comp_id, LoRaDevice.id == device_id).first()
+    if not device:
+        return jsonify({"error": "not_found"}), 404
 
-        checkpoint = device.checkpoint
-        if checkpoint:
-            checkpoint.lora_device = None
+    checkpoint = device.checkpoint
+    if checkpoint:
+        checkpoint.lora_device = None
 
-        snapshot = _device_snapshot(device)
-        record_audit_event(
-            competition_id=comp_id,
-            event_type="device_deleted",
-            entity_type="device",
-            entity_id=device.id,
-            actor_user=current_user if current_user.is_authenticated else None,
-            summary=f"Device {device.name or f'DEV-{device.dev_num}'} deleted.",
-            details=snapshot,
-        )
-        db.session.delete(device)
-        db.session.commit()
-        return {"ok": True}, 200
+    snapshot = _device_snapshot(device)
+    record_audit_event(
+        competition_id=comp_id,
+        event_type="device_deleted",
+        entity_type="device",
+        entity_id=device.id,
+        actor_user=current_user if current_user.is_authenticated else None,
+        summary=f"Device {device.name or f'DEV-{device.dev_num}'} deleted.",
+        details=snapshot,
+    )
+    db.session.delete(device)
+    db.session.commit()
+    return {"ok": True}, 200

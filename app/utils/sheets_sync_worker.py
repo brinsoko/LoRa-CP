@@ -121,6 +121,7 @@ def _submit(app, fn, *args, **kwargs) -> None:
 
 def enqueue_mark_arrival(app, team_id: int, checkpoint_id: int, arrived_at: datetime | None = None) -> None:
     from app.utils.sheets_sync import mark_arrival_checkbox_sync
+
     _submit(app, mark_arrival_checkbox_sync, team_id, checkpoint_id, arrived_at)
 
 
@@ -133,4 +134,5 @@ def enqueue_update_scores(
     scored_at: datetime | None = None,
 ) -> None:
     from app.utils.sheets_sync import update_checkpoint_scores_sync
+
     _submit(app, update_checkpoint_scores_sync, team_id, checkpoint_id, group_name, values, scored_at)
