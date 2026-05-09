@@ -83,7 +83,10 @@ make seed
 make run              # starts on http://127.0.0.1:5001
 ```
 
-Default admin credentials after seeding: `admin` / `admin123` (change immediately).
+Default admin credentials after seeding (dev only): `admin` / `admin123`
+(change immediately). In production the seed scripts refuse the
+default — you must set `ADMIN_PASS` / `SEED_ADMIN_PASS` explicitly
+when `FLASK_ENV=production`.
 
 See [docs/setup.md](docs/setup.md) for the full installation guide and
 [docs/deploy.md](docs/deploy.md) for production deployment.
@@ -115,6 +118,19 @@ See [docs/setup.md](docs/setup.md) for the full installation guide and
 
 The project uses Alembic for database migrations with batch mode enabled for
 SQLite compatibility.
+
+**Fresh installs** can use either path:
+- `make db-init` (`db.create_all()`) followed by `alembic stamp head` to
+  mark the DB as up-to-date without running any migrations.
+- `alembic upgrade head` directly against an empty DB. The initial
+  revision bootstraps the full schema via `db.metadata.create_all`,
+  and every subsequent revision is idempotent (skips operations the
+  schema already satisfies).
+
+**In-place upgrades** of an existing prod DB use `alembic upgrade head`.
+Every migration in the chain inspects the current schema and skips
+what's already there, so legacy DBs that previously ran the boot-time
+`ALTER TABLE` blocks upgrade cleanly.
 
 ```bash
 # Generate a new migration after changing models

@@ -31,14 +31,32 @@
 - Caddy terminates TLS via Let's Encrypt (see `deploy/Caddyfile`).
 - HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy
   are set globally. The `Server` header is stripped.
-- ProxyFix is enabled in `app/__init__.py` so `request.scheme` and
-  `request.host` reflect the proxied values; required for OAuth
-  `redirect_uri` and `_external=True` URLs to come out as `https://`.
+- ProxyFix is **gated behind `TRUST_PROXY_HEADERS`** in `config.py`.
+  It defaults to on when `FLASK_ENV=production` (so requests behind
+  Caddy get the right `request.scheme`/`request.host` for OAuth
+  `redirect_uri` and `_external=True` URLs), and off otherwise.
+  The flag MUST be off when the Flask process is reachable directly,
+  otherwise clients can spoof `X-Forwarded-Host` / `X-Forwarded-Proto`
+  and manipulate any external URL the app emits. Caddy in front of
+  prod is responsible for stripping inbound `X-Forwarded-*` before
+  injecting its own.
+
+### Session cookies
+- `SESSION_COOKIE_HTTPONLY=True` always (XSS can't read the cookie).
+- `SESSION_COOKIE_SECURE=True` in production (cookie never goes over
+  plain HTTP). Off in dev so `flask run` over `http://localhost`
+  still authenticates.
+- `SESSION_COOKIE_SAMESITE=Lax` (default; overridable via env).
+  Blocks cross-site form POSTs from carrying the cookie while still
+  allowing top-level navigations into the app (so external links and
+  OAuth callbacks work).
 
 ### Rate limiting
 - `flask-limiter` with in-memory storage, single-process scope.
 - `/api/auth/login` and `/login` (HTML form) limited to **10 requests
-  per minute, 60 per hour, per IP**. Resets on app restart.
+  per minute, 60 per hour, per IP**. Same limit applies to
+  `/api/auth/password` so an authenticated attacker can't brute-force
+  the current-password check. Resets on app restart.
 
 ### CDN integrity
 - All `<script>` and `<link>` tags loaded from jsdelivr/unpkg use SRI
@@ -60,24 +78,6 @@
   so a concurrent caller inserting first and triggering the
   `uq_team_checkpoint` constraint surfaces as 409 "duplicate" instead
   of 500.
-
-## Cookie flags (deferred, not yet set)
-
-The Flask defaults don't set `Secure` / `SameSite` on the session
-cookie. Production is HTTPS-only via Caddy, but a stricter posture
-would be:
-
-```python
-app.config.update(
-    SESSION_COOKIE_SECURE=True,
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-    PREFERRED_URL_SCHEME="https",
-)
-```
-
-Not blocking launch but worth a follow-up. `HTTPONLY` is already true
-by default; the missing pieces are `Secure` and `SameSite`.
 
 ## CSP (deferred)
 

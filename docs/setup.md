@@ -223,13 +223,27 @@ For production Docker deployment with HTTPS, see [deploy.md](deploy.md).
 Set `FLASK_ENV=development` locally, or export a real `SECRET_KEY`.
 
 **Tables not created / missing columns**
-The app auto-creates tables on startup via `db.create_all()` and runs
-inline `ALTER TABLE` statements for newer columns. For a clean start,
-use `make seed-fresh` or `make db-rebuild`.
+On boot the app calls `db.create_all()` for fresh installs (see
+"Initialize the database" above). The boot-time `ALTER TABLE` blocks
+that used to patch in newer columns have been removed — Alembic is
+the single source of truth. For a clean start, use `make seed-fresh`
+or `make db-rebuild`.
 
 **Alembic "Target database is not up to date"**
-Run `alembic upgrade head` to apply pending migrations, or `alembic stamp head`
-if the schema is already current but Alembic has no record of it.
+Run `alembic upgrade head` to apply pending migrations, or `alembic
+stamp head` if the schema is already current but Alembic has no
+record of it (the standard fresh-install flow). Both work against
+truly empty DBs as well — the initial revision bootstraps the full
+schema via `db.metadata.create_all`, and every subsequent migration
+in the chain is idempotent.
+
+**Reverse proxy / OAuth `redirect_uri` mismatch**
+If `redirect_uri` ends up as `http://web:5000/...` instead of your
+public HTTPS URL, ProxyFix isn't trusting your reverse-proxy headers.
+Either set `FLASK_ENV=production` (which auto-enables ProxyFix), or
+set `TRUST_PROXY_HEADERS=true` explicitly. Only do this when the
+Flask process is genuinely behind a reverse proxy that strips inbound
+`X-Forwarded-*` — otherwise clients can spoof `Host` and `Proto`.
 
 **Translation strings not appearing**
 Run `make i18n-compile` after editing `.po` files.

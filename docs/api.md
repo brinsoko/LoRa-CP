@@ -21,9 +21,23 @@ curl -c cookies.txt -X POST http://localhost:5001/api/auth/login \
 curl -b cookies.txt http://localhost:5001/api/teams
 ```
 
-Roles are scoped per competition. After login, switch to a competition via the
-UI or set the competition in the session. Most examples below assume you have
-an active session with the correct competition selected.
+Roles are scoped per competition (stored in `competition_members`):
+
+| Role | Can do |
+|------|--------|
+| `viewer` | read-only access |
+| `judge` | viewer + create/edit check-ins, submit scores |
+| `admin` | judge + manage teams/checkpoints/groups/users, delete records |
+
+The global `User.role` field is reserved for `superadmin` (system-wide
+bypass) and `public` (no special privileges; per-competition role
+applies). It does **not** grant per-competition rights — promoting a
+user to `admin` in one competition does not affect their role in
+another.
+
+After login, switch to a competition via the UI or set the competition in the
+session. Most examples below assume you have an active session with the
+correct competition selected.
 
 ### Webhook authentication
 
