@@ -4,7 +4,6 @@ from typing import List
 import time
 from datetime import datetime
 from app.utils.lang_store import load_lang
-import gspread
 from gspread.exceptions import APIError
 
 from flask import current_app

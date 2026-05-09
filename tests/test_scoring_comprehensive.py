@@ -12,7 +12,6 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    Checkin,
     Checkpoint,
     CheckpointGroup,
     CheckpointGroupLink,

@@ -1,7 +1,6 @@
 # app/utils/status.py
 from __future__ import annotations
-from typing import Dict, List, Optional, Tuple
-from sqlalchemy import select
+from typing import Dict, List, Optional
 from app.extensions import db
 from app.models import TeamGroup, CheckpointGroup, Checkpoint, Checkin
 

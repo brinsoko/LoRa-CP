@@ -6,7 +6,6 @@ from google.auth.transport import requests as google_requests
 import requests
 import secrets
 import re
-from datetime import datetime
 from app.utils.time import utcnow_naive
 
 from app.models import User, CompetitionInvite, CompetitionMember

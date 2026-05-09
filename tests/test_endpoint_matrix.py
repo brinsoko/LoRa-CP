@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 
 import pytest
 
 from app.extensions import db
 from app.models import (
-    Checkin,
     Checkpoint,
     CheckpointGroupLink,
     Competition,

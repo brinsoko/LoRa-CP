@@ -1,7 +1,6 @@
 """Test suite 4: Export/Import/Merge."""
 from __future__ import annotations
 
-import json
 import io
 
 import pytest

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import importlib
-from datetime import datetime, timedelta
+from datetime import timedelta
 from app.utils.time import utcnow_naive
 from types import SimpleNamespace
 
@@ -1095,9 +1095,6 @@ class TestScoreJudgeAccess:
         assert body["error"] == "forbidden"
 
     def test_judge_can_submit_score_for_assigned_checkpoint(self, client, app):
-        from app.models import ScoreEntry
-        from app.extensions import db as _db
-
         admin = create_user(username="score-setup-admin")
         judge = create_user(username="score-submit-judge")
         competition = create_competition(name="Score Submit Race")

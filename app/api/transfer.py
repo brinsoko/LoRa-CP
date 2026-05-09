@@ -7,7 +7,6 @@ from datetime import datetime
 from app.utils.time import utcnow_naive
 
 from flask import Blueprint, jsonify, request, make_response
-from flask_babel import gettext as _
 from flask_login import current_user
 
 from app.api.helpers import json_ok
@@ -25,7 +24,6 @@ from app.models import (
     Team,
     TeamGroup,
 )
-from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_roles_required
 
 transfer_api_bp = Blueprint("api_transfer", __name__)

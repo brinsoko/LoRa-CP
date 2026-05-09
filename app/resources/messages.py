@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from app.extensions import db
 from app.models import LoRaMessage
 from app.utils.payloads import parse_gps_payload
 from app.utils.rest_auth import json_roles_required

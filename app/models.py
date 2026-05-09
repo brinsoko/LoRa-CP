@@ -1,6 +1,5 @@
 # app/models.py
 from __future__ import annotations
-from datetime import datetime
 from app.utils.time import utcnow_naive
 
 from werkzeug.security import generate_password_hash, check_password_hash

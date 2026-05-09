@@ -5,7 +5,6 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import Team, Checkpoint, Checkin, Competition, CompetitionMember, CompetitionInvite, User
 from app.utils.audit import record_audit_event
-from app.utils.time import to_datetime_local
 from app.utils.competition import get_current_competition_id, get_user_memberships, set_current_competition_id, create_invite
 from app.utils.perms import roles_required
 from app.utils.redirects import safe_redirect_target

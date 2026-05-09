@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 
-from flask import Blueprint, abort, current_app
+from flask import Blueprint, current_app
 from werkzeug.utils import safe_join
 
 from app.utils.rest_auth import json_login_required

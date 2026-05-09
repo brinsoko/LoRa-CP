@@ -5,7 +5,7 @@ import csv
 import io
 from typing import Optional
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, jsonify, request
 from flask_babel import gettext as _
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError

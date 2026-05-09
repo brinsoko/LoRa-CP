@@ -1,7 +1,6 @@
 # app/resources/scores.py
 from __future__ import annotations
 
-from datetime import datetime
 from app.utils.time import utcnow_naive
 
 from flask import Blueprint, jsonify, request

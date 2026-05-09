@@ -6,7 +6,7 @@ from flask_login import current_user
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
-from app.models import LoRaDevice, Checkpoint
+from app.models import LoRaDevice
 from app.utils.audit import record_audit_event
 from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.competition import require_current_competition_id

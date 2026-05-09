@@ -2,7 +2,6 @@
 from __future__ import annotations
 from flask import Blueprint, jsonify, request
 from werkzeug.exceptions import BadRequest
-from app.extensions import db
 from app.models import LoRaMessage, Team
 from app.api.helpers import parse_int
 from app.utils.payloads import parse_gps_payload

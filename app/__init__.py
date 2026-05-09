@@ -1,5 +1,5 @@
 # app/__init__.py
-from flask import Flask, request, current_app, render_template, session, g
+from flask import Flask, request, current_app, session, g
 from flask_babel import get_locale
 from flask_login import current_user
 from werkzeug.exceptions import HTTPException

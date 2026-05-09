@@ -1,4 +1,4 @@
-import re, io, csv, os, serial
+import re, serial
 from serial.tools import list_ports
 
 def normalize_uid(uid: str) -> str:

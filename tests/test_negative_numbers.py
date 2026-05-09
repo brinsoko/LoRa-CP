@@ -5,10 +5,7 @@ import pytest
 
 from tests.support import (
     add_membership,
-    create_checkpoint,
     create_competition,
-    create_device,
-    create_group,
     create_team,
     create_user,
     login_as,

@@ -1,7 +1,7 @@
 # app/utils/competition.py
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from app.utils.time import utcnow_naive
 from typing import Optional
 from types import SimpleNamespace

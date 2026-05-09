@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import datetime, timedelta
 from app.utils.time import utcnow_naive, utc_from_timestamp_naive
-import hashlib, hmac
+import hmac
 
 from flask import current_app
 from flask import Blueprint, request

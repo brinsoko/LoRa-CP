@@ -9,7 +9,6 @@ from flask_babel import gettext as _
 
 from app.extensions import db
 from app.models import SheetConfig, Checkpoint, CheckpointGroup, Team, TeamGroup, CheckpointGroupLink
-from sqlalchemy import func
 from app.utils.perms import roles_required
 from app.utils.competition import get_current_competition_id
 from app.utils.sheets_client import SheetsClient
