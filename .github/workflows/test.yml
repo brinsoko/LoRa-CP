@@ -20,5 +20,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Lint — fail on undefined names
+        # Catches real bugs like a missing import after a refactor (the
+        # datetime/utcnow_naive sweep produced one). Unused-import lines
+        # are intentionally NOT fatal: cleanup is a separate gradual
+        # concern and some imports are kept for side effects.
+        run: |
+          if pyflakes app/ scripts/ 2>&1 | grep "undefined name"; then
+            echo "::error::pyflakes found undefined names"
+            exit 1
+          fi
+
       - name: Run tests
         run: pytest --cov=app --cov-report=term-missing tests/ -v
+
+      - name: Validate OpenAPI spec is in sync
+        # `make openapi` regenerates docs/openapi.json from the live
+        # url_map; this step fails if the committed spec drifted away
+        # from what the routes actually wire up.
+        run: make openapi-check
