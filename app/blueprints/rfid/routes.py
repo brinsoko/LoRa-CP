@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask_babel import gettext as _
 from flask_login import current_user
 
 from app.models import Checkpoint, JudgeCheckpoint
@@ -15,7 +16,7 @@ rfid_bp = Blueprint("rfid", __name__, template_folder="../../templates")
 def _fetch_cards():
     resp, payload = api_json("GET", "/api/rfid/cards")
     if resp.status_code != 200:
-        flash("Could not load RFID mappings.", "warning")
+        flash(_("Could not load RFID mappings."), "warning")
         return []
     return payload.get("cards", [])
 
@@ -23,7 +24,7 @@ def _fetch_cards():
 def _fetch_teams():
     resp, payload = api_json("GET", "/api/teams", params={"sort": "name_asc"})
     if resp.status_code != 200:
-        flash("Could not load teams.", "warning")
+        flash(_("Could not load teams."), "warning")
         return []
     return payload.get("teams", [])
 
@@ -31,7 +32,7 @@ def _fetch_teams():
 def _fetch_devices():
     resp, payload = api_json("GET", "/api/devices")
     if resp.status_code != 200:
-        flash("Could not load devices.", "warning")
+        flash(_("Could not load devices."), "warning")
         return []
     devices = payload.get("devices", [])
     try:
@@ -84,10 +85,10 @@ def add_rfid():
 
         resp, body = api_json("POST", "/api/rfid/cards", json=payload)
         if resp.status_code == 201:
-            flash("RFID mapping created.", "success")
+            flash(_("RFID mapping created."), "success")
             return redirect(url_for("rfid.list_rfid"))
 
-        flash(body.get("detail") or body.get("error") or "Could not create RFID mapping.", "warning")
+        flash(body.get("detail") or body.get("error") or _("Could not create RFID mapping."), "warning")
 
     return render_template(
         "rfid_add.html",
@@ -103,7 +104,7 @@ def add_rfid():
 def edit_rfid(card_id: int):
     card_resp, card_payload = api_json("GET", f"/api/rfid/cards/{card_id}")
     if card_resp.status_code != 200:
-        flash("RFID card not found.", "warning")
+        flash(_("RFID card not found."), "warning")
         return redirect(url_for("rfid.list_rfid"))
 
     card = card_payload
@@ -121,10 +122,10 @@ def edit_rfid(card_id: int):
 
         resp, body = api_json("PATCH", f"/api/rfid/cards/{card_id}", json=payload)
         if resp.status_code == 200:
-            flash("RFID mapping updated.", "success")
+            flash(_("RFID mapping updated."), "success")
             return redirect(url_for("rfid.list_rfid"))
 
-        flash(body.get("detail") or body.get("error") or "Could not update RFID mapping.", "warning")
+        flash(body.get("detail") or body.get("error") or _("Could not update RFID mapping."), "warning")
         card.update({"uid": uid, "number": number})
         if selected_team_id:
             team_info = next((t for t in teams if t.get("id") == selected_team_id), None)
@@ -190,9 +191,9 @@ def finish_console():
 def delete_rfid(card_id: int):
     resp, body = api_json("DELETE", f"/api/rfid/cards/{card_id}")
     if resp.status_code == 200:
-        flash("RFID mapping deleted.", "success")
+        flash(_("RFID mapping deleted."), "success")
     else:
-        flash(body.get("detail") or body.get("error") or "Could not delete RFID mapping.", "warning")
+        flash(body.get("detail") or body.get("error") or _("Could not delete RFID mapping."), "warning")
     return redirect(url_for("rfid.list_rfid"))
 
 

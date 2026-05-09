@@ -4,6 +4,7 @@ import secrets
 
 import requests
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from flask_babel import gettext as _
 from flask_login import current_user, login_required, login_user, logout_user
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -20,13 +21,13 @@ auth_bp = Blueprint("auth", __name__)
 
 def _validate_new_password(username: str, pw1: str, pw2: str) -> str | None:
     if not pw1 or not pw2:
-        return "Please fill in all fields."
+        return _("Please fill in all fields.")
     if pw1 != pw2:
-        return "New passwords do not match."
+        return _("New passwords do not match.")
     if len(pw1) < 8:
-        return "New password must be at least 8 characters."
+        return _("New password must be at least 8 characters.")
     if username.lower() in pw1.lower():
-        return "Password should not contain your username."
+        return _("Password should not contain your username.")
     return None
 
 
@@ -84,7 +85,7 @@ def login():  # endpoint: auth.login
             if user_obj:
                 _accept_pending_invites(user_obj)
                 login_user(user_obj)
-            flash("Signed in.", "success")
+            flash(_("Signed in."), "success")
             return redirect(
                 safe_redirect_target(
                     request.args.get("next"),
@@ -92,7 +93,7 @@ def login():  # endpoint: auth.login
                 )
             )
 
-        flash(payload.get("error") or "Invalid username or password.", "warning")
+        flash(payload.get("error") or _("Invalid username or password."), "warning")
 
     google_client_id = current_app.config.get("GOOGLE_OAUTH_CLIENT_ID")
     google_enabled = bool(google_client_id)
@@ -103,7 +104,7 @@ def login():  # endpoint: auth.login
 def login_google():
     client_id = current_app.config.get("GOOGLE_OAUTH_CLIENT_ID")
     if not client_id:
-        flash("Google OAuth is not configured.", "warning")
+        flash(_("Google OAuth is not configured."), "warning")
         return redirect(url_for("auth.login"))
     state = secrets.token_urlsafe(16)
     session["google_oauth_state"] = state
@@ -129,17 +130,17 @@ def login_google_callback():
     client_id = current_app.config.get("GOOGLE_OAUTH_CLIENT_ID")
     client_secret = current_app.config.get("GOOGLE_OAUTH_CLIENT_SECRET")
     if not client_id or not client_secret:
-        flash("Google OAuth is not configured.", "warning")
+        flash(_("Google OAuth is not configured."), "warning")
         return redirect(url_for("auth.login"))
 
     state = request.args.get("state")
     if not state or state != session.get("google_oauth_state"):
-        flash("Invalid OAuth state.", "warning")
+        flash(_("Invalid OAuth state."), "warning")
         return redirect(url_for("auth.login"))
 
     code = request.args.get("code")
     if not code:
-        flash("Google OAuth failed to return a code.", "warning")
+        flash(_("Google OAuth failed to return a code."), "warning")
         return redirect(url_for("auth.login"))
 
     token_resp = requests.post(
@@ -154,13 +155,13 @@ def login_google_callback():
         timeout=10,
     )
     if token_resp.status_code != 200:
-        flash("Google OAuth token exchange failed.", "warning")
+        flash(_("Google OAuth token exchange failed."), "warning")
         return redirect(url_for("auth.login"))
 
     tokens = token_resp.json() or {}
     raw_id_token = tokens.get("id_token")
     if not raw_id_token:
-        flash("Google OAuth did not return an id_token.", "warning")
+        flash(_("Google OAuth did not return an id_token."), "warning")
         return redirect(url_for("auth.login"))
 
     try:
@@ -172,15 +173,15 @@ def login_google_callback():
     except Exception as exc:
         current_app.logger.exception("Google OAuth token verification failed: %s", exc)
         if current_app.debug:
-            flash(f"Google OAuth token verification failed: {exc}", "warning")
+            flash(_("Google OAuth token verification failed: %(error)s", error=str(exc)), "warning")
         else:
-            flash("Google OAuth token verification failed.", "warning")
+            flash(_("Google OAuth token verification failed."), "warning")
         return redirect(url_for("auth.login"))
 
     sub = id_info.get("sub")
     email = (id_info.get("email") or "").strip().lower()
     if not sub:
-        flash("Google OAuth user info missing.", "warning")
+        flash(_("Google OAuth user info missing."), "warning")
         return redirect(url_for("auth.login"))
 
     user = User.query.filter_by(google_sub=sub).first()
@@ -192,7 +193,7 @@ def login_google_callback():
                 user.email = email
     if not user:
         if not email:
-            flash("Google account did not provide an email.", "warning")
+            flash(_("Google account did not provide an email."), "warning")
             return redirect(url_for("auth.login"))
         base_username = _normalize_username(email.split("@")[0])
         username = base_username
@@ -204,7 +205,7 @@ def login_google_callback():
         user.set_password(secrets.token_urlsafe(32))
         db.session.add(user)
         db.session.commit()
-        flash("Account created via Google.", "success")
+        flash(_("Account created via Google."), "success")
 
     if not user.email and email:
         user.email = email
@@ -219,7 +220,7 @@ def login_google_callback():
             "",
         )
 
-    flash("Signed in.", "success")
+    flash(_("Signed in."), "success")
     return redirect(next_url or url_for("main.select_competition"))
 
 
@@ -228,7 +229,7 @@ def login_google_callback():
 def logout():  # endpoint: auth.logout
     api_json("POST", "/api/auth/logout")
     logout_user()
-    flash("Signed out.", "success")
+    flash(_("Signed out."), "success")
     return redirect(url_for("main.index"))
 
 
@@ -242,7 +243,7 @@ def register():
         role = (request.form.get("role") or "viewer").strip()
 
         if not username or not password or role not in ("viewer", "judge", "admin"):
-            flash("Invalid form data.", "warning")
+            flash(_("Invalid form data."), "warning")
             return render_template("register.html")
 
         resp, payload = api_json(
@@ -252,10 +253,10 @@ def register():
         )
 
         if resp.status_code == 201:
-            flash(f"User '{username}' created with role '{role}'.", "success")
+            flash(_("User '%(username)s' created with role '%(role)s'.", username=username, role=role), "success")
             return redirect(url_for("main.select_competition"))
 
-        flash(payload.get("error") or "Could not create user.", "warning")
+        flash(payload.get("error") or _("Could not create user."), "warning")
 
     return render_template("register.html")
 
@@ -264,7 +265,7 @@ def register():
 @login_required
 def change_password():
     if current_user.google_sub:
-        flash("Password changes are disabled for Google accounts.", "warning")
+        flash(_("Password changes are disabled for Google accounts."), "warning")
         return redirect(url_for("main.select_competition"))
 
     if request.method == "POST":
@@ -288,10 +289,10 @@ def change_password():
         )
 
         if resp.status_code == 200:
-            flash("Password changed successfully.", "success")
+            flash(_("Password changed successfully."), "success")
             return redirect(url_for("main.select_competition"))
 
-        flash(payload.get("error") or "Could not change password.", "warning")
+        flash(payload.get("error") or _("Could not change password."), "warning")
         return render_template("change_password.html")
 
     return render_template("change_password.html")
@@ -305,7 +306,7 @@ def create_admin():
         password = request.form.get("password") or ""
 
         if not username or not password:
-            flash("Username and password are required.", "warning")
+            flash(_("Username and password are required."), "warning")
             return render_template("create_admin.html")
 
         resp, payload = api_json(
@@ -315,9 +316,9 @@ def create_admin():
         )
 
         if resp.status_code == 201:
-            flash(f"Admin user '{username}' created.", "success")
+            flash(_("Admin user '%(username)s' created.", username=username), "success")
             return redirect(url_for("auth.login"))
 
-        flash(payload.get("error") or "Could not create admin user.", "warning")
+        flash(payload.get("error") or _("Could not create admin user."), "warning")
 
     return render_template("create_admin.html")

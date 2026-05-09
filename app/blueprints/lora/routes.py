@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_babel import gettext as _
 
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
@@ -43,7 +44,7 @@ def _decorate_devices(devices):
 def _fetch_devices():
     resp, payload = api_json("GET", "/api/devices")
     if resp.status_code != 200:
-        flash("Could not load devices.", "warning")
+        flash(_("Could not load devices."), "warning")
         return []
     return _decorate_devices(payload.get("devices", []))
 
@@ -66,7 +67,7 @@ def add_device():
         active = bool(request.form.get("active", "on"))
 
         if not dev_num:
-            flash("Device number is required.", "warning")
+            flash(_("Device number is required."), "warning")
             return render_template("lora_add.html")
 
         resp, payload = api_json(
@@ -82,10 +83,10 @@ def add_device():
         )
 
         if resp.status_code == 201:
-            flash("Device added.", "success")
+            flash(_("Device added."), "success")
             return redirect(url_for("lora.lora_list"))
 
-        flash(payload.get("detail") or payload.get("error") or "Could not add device.", "warning")
+        flash(payload.get("detail") or payload.get("error") or _("Could not add device."), "warning")
 
     return render_template("lora_add.html")
 
@@ -95,7 +96,7 @@ def add_device():
 def edit_device(device_id: int):
     device_resp, device_payload = api_json("GET", f"/api/devices/{device_id}")
     if device_resp.status_code != 200:
-        flash("Device not found.", "warning")
+        flash(_("Device not found."), "warning")
         return redirect(url_for("lora.lora_list"))
 
     device = _decorate_devices([device_payload])[0] if device_payload else {}
@@ -108,7 +109,7 @@ def edit_device(device_id: int):
         active = bool(request.form.get("active"))
 
         if not dev_num:
-            flash("Device number is required.", "warning")
+            flash(_("Device number is required."), "warning")
             device.update(
                 {
                     "dev_num": dev_num,
@@ -133,10 +134,10 @@ def edit_device(device_id: int):
         )
 
         if resp.status_code == 200:
-            flash("Device updated.", "success")
+            flash(_("Device updated."), "success")
             return redirect(url_for("lora.lora_list"))
 
-        flash(payload.get("detail") or payload.get("error") or "Could not update device.", "warning")
+        flash(payload.get("detail") or payload.get("error") or _("Could not update device."), "warning")
         device.update(
             {
                 "dev_num": dev_num,
@@ -157,8 +158,8 @@ def delete_device(device_id: int):
     resp, payload = api_json("DELETE", f"/api/devices/{device_id}")
 
     if resp.status_code == 200:
-        flash("Device deleted.", "success")
+        flash(_("Device deleted."), "success")
     else:
-        flash(payload.get("detail") or payload.get("error") or "Could not delete device.", "warning")
+        flash(payload.get("detail") or payload.get("error") or _("Could not delete device."), "warning")
 
     return redirect(url_for("lora.lora_list"))

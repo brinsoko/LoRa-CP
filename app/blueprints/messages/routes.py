@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from flask import Blueprint, flash, render_template, request, url_for
+from flask_babel import gettext as _
 
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
@@ -69,7 +70,7 @@ def list_messages():
 
     resp, payload = api_json("GET", "/api/devices/messages", params=params)
     if resp.status_code != 200:
-        flash_msg = payload.get("detail") or payload.get("error") or "Could not load messages."
+        flash_msg = payload.get("detail") or payload.get("error") or _("Could not load messages.")
         flash(flash_msg, "warning")
         messages = []
         pagination = _build_pagination({"page": 1, "pages": 1}, dev_id, per_page)
