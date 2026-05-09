@@ -165,7 +165,12 @@ def attach_device_to_checkpoint(device: LoRaDevice, checkpoint: Checkpoint) -> N
 
 
 def create_rfid_card(team: Team, *, uid: str | None = None, number: int | None = None) -> RFIDCard:
-    card = RFIDCard(uid=uid or unique_name("UID").upper(), team_id=team.id, number=number)
+    card = RFIDCard(
+        competition_id=team.competition_id,
+        uid=uid or unique_name("UID").upper(),
+        team_id=team.id,
+        number=number,
+    )
     db.session.add(card)
     db.session.commit()
     return card

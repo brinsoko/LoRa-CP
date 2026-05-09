@@ -84,7 +84,12 @@ def _apply_group_assignment(team: Team, selected_group_id: int | None) -> tuple[
 
     to_remove = [gid for gid in existing_links if gid != selected_group_id]
     if to_remove:
+        # Drop links to other groups via orphan-delete cascade. Flush
+        # immediately so the DELETEs land before the INSERT below;
+        # otherwise the partial unique index uq_team_group_one_active
+        # would see two active rows for this team mid-flush.
         team.group_assignments[:] = [link for link in team.group_assignments if link.group_id == selected_group_id]
+        db.session.flush()
 
     link = next((assignment for assignment in team.group_assignments if assignment.group_id == selected_group_id), None)
     if link is None:

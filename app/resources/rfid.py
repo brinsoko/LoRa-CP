@@ -109,7 +109,7 @@ def rfid_card_create():
             }
         ), 409
 
-    card = RFIDCard(uid=uid, team_id=team_id, number=number)
+    card = RFIDCard(competition_id=comp_id, uid=uid, team_id=team_id, number=number)
     db.session.add(card)
     try:
         db.session.commit()
@@ -301,14 +301,14 @@ def rfid_bulk_import():
                 errors.append({"row": idx, "detail": "Invalid number"})
                 continue
 
-        card = RFIDCard.query.filter_by(uid=uid).first()
+        card = RFIDCard.query.filter_by(competition_id=comp_id, uid=uid).first()
         is_new = False
         if not card:
             if not team_id:
                 skipped += 1
                 errors.append({"row": idx, "detail": "Missing team_id or team_name"})
                 continue
-            card = RFIDCard(uid=uid)
+            card = RFIDCard(competition_id=comp_id, uid=uid)
             is_new = True
 
         if team_id:

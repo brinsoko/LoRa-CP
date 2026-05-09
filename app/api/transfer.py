@@ -279,10 +279,11 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
         team = team_map.get(card_data.get("team_name"))
         if team:
             uid = card_data.get("uid", "")
-            existing_uid = RFIDCard.query.filter_by(uid=uid).first()
+            existing_uid = RFIDCard.query.filter_by(competition_id=comp.id, uid=uid).first()
             if not existing_uid:
                 db.session.add(
                     RFIDCard(
+                        competition_id=comp.id,
                         uid=uid,
                         team_id=team.id,
                         number=card_data.get("number"),

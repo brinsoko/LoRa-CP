@@ -272,7 +272,16 @@ class RFIDCard(db.Model):
     __tablename__ = "rfid_cards"
 
     id = db.Column(db.Integer, primary_key=True)
-    uid = db.Column(db.String(100), unique=True, nullable=False)
+    competition_id = db.Column(
+        db.Integer,
+        db.ForeignKey("competitions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # UID is unique only within a competition — the same physical card
+    # can be reused across years/events. Globally-unique UID would have
+    # blocked re-issuance of the same scout card to a new team.
+    uid = db.Column(db.String(100), nullable=False)
     team_id = db.Column(
         db.Integer,
         db.ForeignKey("teams.id", ondelete="CASCADE"),
@@ -282,12 +291,16 @@ class RFIDCard(db.Model):
     # Optional human-friendly identifier, must be positive if set
     number = db.Column(db.Integer, nullable=True)
 
+    competition = db.relationship("Competition")
     team = db.relationship("Team", back_populates="rfid_card")
 
-    __table_args__ = (CheckConstraint("number IS NULL OR number > 0", name="ck_rfid_number_positive"),)
+    __table_args__ = (
+        UniqueConstraint("competition_id", "uid", name="uq_rfid_competition_uid"),
+        CheckConstraint("number IS NULL OR number > 0", name="ck_rfid_number_positive"),
+    )
 
     def __repr__(self) -> str:
-        return f"<RFIDCard id={self.id} uid={self.uid!r} team_id={self.team_id}>"
+        return f"<RFIDCard id={self.id} comp={self.competition_id} uid={self.uid!r} team_id={self.team_id}>"
 
 
 # ====================
@@ -477,8 +490,18 @@ class TeamGroup(db.Model):
     # group = db.relationship("CheckpointGroup", back_populates="team_assignments")
 
     __table_args__ = (
-        # A team cannot have the same group twice
+        # A team cannot have the same group twice.
         UniqueConstraint("team_id", "group_id", name="uq_team_group"),
+        # Enforce the docstring above: at most one active group per team.
+        # Live arrivals picks the first active group via list[0], which is
+        # nondeterministic when multiple actives exist; this index makes
+        # that state unrepresentable at the DB level.
+        Index(
+            "uq_team_group_one_active",
+            "team_id",
+            unique=True,
+            sqlite_where=db.text("active = 1"),
+        ),
     )
 
     def __repr__(self) -> str:

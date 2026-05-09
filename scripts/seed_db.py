@@ -172,21 +172,28 @@ def assign_team_to_groups(team: Team, group_ids: list[int]):
 
 def ensure_rfid(team: Team, uid: str, number: int | None):
     uid_norm = uid.strip().upper()
-    # If team already has a card, update it; else create (respecting UID uniqueness)
+    comp_id = team.competition_id
+    # If team already has a card, update it; else create (respecting UID
+    # uniqueness within this competition).
     existing_team_card = RFIDCard.query.filter_by(team_id=team.id).first()
     if existing_team_card:
-        # if UID is used by another card, skip change to avoid IntegrityError
-        used = RFIDCard.query.filter(RFIDCard.uid == uid_norm, RFIDCard.team_id != team.id).first()
+        # if UID is used by another card *in the same competition*, skip
+        # change to avoid IntegrityError.
+        used = RFIDCard.query.filter(
+            RFIDCard.competition_id == comp_id,
+            RFIDCard.uid == uid_norm,
+            RFIDCard.team_id != team.id,
+        ).first()
         if not used:
             existing_team_card.uid = uid_norm
             existing_team_card.number = number
         return existing_team_card
 
-    # Otherwise, ensure no one else has this UID
-    if RFIDCard.query.filter_by(uid=uid_norm).first():
+    # Otherwise, ensure no one else in this competition has this UID.
+    if RFIDCard.query.filter_by(competition_id=comp_id, uid=uid_norm).first():
         # generate a unique-ish UID variant
         uid_norm += f"-{team.id}"
-    card = RFIDCard(uid=uid_norm, team_id=team.id, number=number)
+    card = RFIDCard(competition_id=comp_id, uid=uid_norm, team_id=team.id, number=number)
     db.session.add(card)
     db.session.flush()
     return card

@@ -561,7 +561,7 @@ def score_resolve():
 
     team = None
     if uid:
-        card = RFIDCard.query.filter_by(uid=uid).first()
+        card = RFIDCard.query.filter_by(competition_id=comp_id, uid=uid).first()
         if not card:
             return jsonify({"error": "not_found", "detail": "Card not mapped to a team."}), 404
         team = Team.query.filter(Team.competition_id == comp_id, Team.id == card.team_id).first()

@@ -343,9 +343,11 @@ def ingest_post():
                     "detail": "Invalid checkpoint_id.",
                 }, 400
 
-        # 3) Auto check-in if payload matches RFID UID
+        # 3) Auto check-in if payload matches RFID UID. Scoped per
+        # competition so the same physical card can be reused across
+        # events without colliding.
         uid = str(payload).strip().upper()
-        card = RFIDCard.query.filter_by(uid=uid).first()
+        card = RFIDCard.query.filter_by(competition_id=competition_id, uid=uid).first()
 
         created_checkin = False
         team_name = None
