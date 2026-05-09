@@ -25,19 +25,20 @@ checkins_api_bp = Blueprint("api_checkins", __name__)
 
 # -------- helpers --------
 def _parse_date_range(date_from_str: str | None, date_to_str: str | None) -> tuple[datetime | None, datetime | None]:
-    """Build an inclusive range for YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS inputs."""
+    """Build an inclusive range for YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS inputs.
+
+    Raises ValueError for malformed inputs. Callers must catch this and
+    return a 400 — silently ignoring a typo would expand the result set
+    (e.g. exporting *all* check-ins instead of one day's)."""
     start = end = None
-    try:
-        if date_from_str:
-            start = datetime.fromisoformat(date_from_str)
-        if date_to_str:
-            end = datetime.fromisoformat(date_to_str)
-            if "T" not in date_to_str and " " not in date_to_str:
-                end = end + timedelta(days=1)
-            else:
-                end = end + timedelta(seconds=1)
-    except ValueError:
-        pass
+    if date_from_str:
+        start = datetime.fromisoformat(date_from_str)
+    if date_to_str:
+        end = datetime.fromisoformat(date_to_str)
+        if "T" not in date_to_str and " " not in date_to_str:
+            end = end + timedelta(days=1)
+        else:
+            end = end + timedelta(seconds=1)
     return start, end
 
 
@@ -168,7 +169,10 @@ def checkin_list():
     sort = (request.args.get("sort") or "new").lower()
     page, per_page = _parse_pagination()
 
-    q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
+    try:
+        q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
+    except ValueError as exc:
+        return jsonify({"error": "invalid_request", "detail": f"Invalid date filter: {exc}"}), 400
 
     if sort == "old":
         q = q.order_by(Checkin.timestamp.asc())
@@ -437,7 +441,7 @@ def _update_checkin(checkin_id: int, partial: bool):
     )
     db.session.commit()
     try:
-        mark_arrival_checkbox(new_team_id, new_cp_id)
+        mark_arrival_checkbox(new_team_id, new_cp_id, new_ts)
     except Exception:
         pass
     return {"ok": True, "updated": True, "checkin": _serialize_checkin(c)}, 200
@@ -502,7 +506,10 @@ def checkin_export():
     sort = (request.args.get("sort") or "new").lower()
     page, per_page = _parse_pagination()
 
-    q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
+    try:
+        q = _filtered_query(team_id, checkpoint_id, date_from, date_to)
+    except ValueError as exc:
+        return jsonify({"error": "invalid_request", "detail": f"Invalid date filter: {exc}"}), 400
 
     if sort == "old":
         q = q.order_by(Checkin.timestamp.asc())

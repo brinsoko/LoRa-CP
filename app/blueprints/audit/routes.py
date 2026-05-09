@@ -27,18 +27,18 @@ def _sanitize_key(raw_value: str | None) -> str | None:
 
 
 def _parse_date_range(date_from_str: str | None, date_to_str: str | None) -> tuple[datetime | None, datetime | None]:
+    """Parse YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS bounds. Raises ValueError
+    on malformed input — caller flashes a warning and continues with no
+    date filter."""
     start = end = None
-    try:
-        if date_from_str:
-            start = datetime.fromisoformat(date_from_str)
-        if date_to_str:
-            end = datetime.fromisoformat(date_to_str)
-            if "T" not in date_to_str and " " not in date_to_str:
-                end = end + timedelta(days=1)
-            else:
-                end = end + timedelta(seconds=1)
-    except ValueError:
-        return None, None
+    if date_from_str:
+        start = datetime.fromisoformat(date_from_str)
+    if date_to_str:
+        end = datetime.fromisoformat(date_to_str)
+        if "T" not in date_to_str and " " not in date_to_str:
+            end = end + timedelta(days=1)
+        else:
+            end = end + timedelta(seconds=1)
     return start, end
 
 
@@ -123,7 +123,11 @@ def list_audit_events():
 
     selected_date_from = request.args.get("date_from") or ""
     selected_date_to = request.args.get("date_to") or ""
-    date_from, date_to = _parse_date_range(selected_date_from, selected_date_to)
+    try:
+        date_from, date_to = _parse_date_range(selected_date_from, selected_date_to)
+    except ValueError:
+        flash(_("Invalid date filter; showing unfiltered results."), "warning")
+        date_from = date_to = None
 
     page = max(1, request.args.get("page", 1, type=int))
     per_page = 50

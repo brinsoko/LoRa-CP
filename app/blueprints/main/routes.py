@@ -129,14 +129,14 @@ def set_language(lang_code: str):
 
 
 def _parse_date_range(date_from_str, date_to_str):
+    """Parse YYYY-MM-DD bounds. Raises ValueError on malformed input —
+    callers must catch and either flash a warning or return 400. Silently
+    falling back to no filter could expand exports unexpectedly."""
     start = end = None
-    try:
-        if date_from_str:
-            start = datetime.fromisoformat(date_from_str)
-        if date_to_str:
-            end = datetime.fromisoformat(date_to_str) + timedelta(days=1)
-    except ValueError:
-        pass
+    if date_from_str:
+        start = datetime.fromisoformat(date_from_str)
+    if date_to_str:
+        end = datetime.fromisoformat(date_to_str) + timedelta(days=1)
     return start, end
 
 
@@ -169,7 +169,12 @@ def view_checkins():
     cp_id = request.args.get("checkpoint_id", type=int)
     df = request.args.get("date_from")
     dt = request.args.get("date_to")
-    checkins = _filtered_checkins(team_id, cp_id, df, dt).all()
+    try:
+        checkins = _filtered_checkins(team_id, cp_id, df, dt).all()
+    except ValueError:
+        flash(_("Invalid date filter; showing unfiltered results."), "warning")
+        df = dt = ""
+        checkins = _filtered_checkins(team_id, cp_id, None, None).all()
     return render_template(
         "view_checkins.html",
         checkins=checkins,
@@ -188,7 +193,10 @@ def export_checkins_csv():
     cp_id = request.args.get("checkpoint_id", type=int)
     df = request.args.get("date_from")
     dt = request.args.get("date_to")
-    rows = _filtered_checkins(team_id, cp_id, df, dt).all()
+    try:
+        rows = _filtered_checkins(team_id, cp_id, df, dt).all()
+    except ValueError:
+        return ("Invalid date filter.", 400)
     si = io.StringIO()
     w = csv.writer(si)
     w.writerow(["timestamp_utc", "team_id", "team_name", "checkpoint_id", "checkpoint_name"])
