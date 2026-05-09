@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -19,16 +20,33 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    with op.batch_alter_table('checkpoints', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('is_virtual', sa.Boolean(), server_default='0', nullable=False))
+    # Idempotent: the initial revision bootstraps the full schema via
+    # db.metadata.create_all, so is_virtual is already present on
+    # fresh DBs. Legacy DBs that ran the boot-time ALTER TABLE blocks
+    # may also already have it. Only ALTER what's actually missing.
+    insp = inspect(op.get_bind())
 
-    with op.batch_alter_table('score_entries', schema=None) as batch_op:
-        batch_op.alter_column('checkin_id', existing_type=sa.Integer(), nullable=True)
+    cp_cols = {c["name"] for c in insp.get_columns("checkpoints")}
+    if "is_virtual" not in cp_cols:
+        with op.batch_alter_table('checkpoints', schema=None) as batch_op:
+            batch_op.add_column(sa.Column('is_virtual', sa.Boolean(), server_default='0', nullable=False))
+
+    score_cols = {c["name"]: c for c in insp.get_columns("score_entries")}
+    checkin_col = score_cols.get("checkin_id")
+    if checkin_col is not None and not checkin_col.get("nullable", True):
+        with op.batch_alter_table('score_entries', schema=None) as batch_op:
+            batch_op.alter_column('checkin_id', existing_type=sa.Integer(), nullable=True)
 
 
 def downgrade() -> None:
-    with op.batch_alter_table('score_entries', schema=None) as batch_op:
-        batch_op.alter_column('checkin_id', existing_type=sa.Integer(), nullable=False)
+    insp = inspect(op.get_bind())
 
-    with op.batch_alter_table('checkpoints', schema=None) as batch_op:
-        batch_op.drop_column('is_virtual')
+    score_cols = {c["name"]: c for c in insp.get_columns("score_entries")}
+    if score_cols.get("checkin_id", {}).get("nullable", True):
+        with op.batch_alter_table('score_entries', schema=None) as batch_op:
+            batch_op.alter_column('checkin_id', existing_type=sa.Integer(), nullable=False)
+
+    cp_cols = {c["name"] for c in insp.get_columns("checkpoints")}
+    if "is_virtual" in cp_cols:
+        with op.batch_alter_table('checkpoints', schema=None) as batch_op:
+            batch_op.drop_column('is_virtual')

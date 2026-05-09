@@ -185,11 +185,16 @@ def create_app(config_overrides: dict | None = None) -> Flask:
         # The "ensure column exists" / "CREATE INDEX IF NOT EXISTS" blocks
         # that used to live here have been moved into Alembic revisions
         # (see alembic/versions/d4e5f6a7b8c9_codify_runtime_schema_drift.py).
-        db.create_all()
-        try:
-            ensure_default_competition()
-        except Exception:
-            app.logger.exception("Failed to ensure default competition")
+        #
+        # SKIP_DB_BOOTSTRAP is set by alembic/env.py when running
+        # migrations: we want metadata loaded but no DDL side effects,
+        # so Alembic can apply migrations against a real empty DB.
+        if not app.config.get("SKIP_DB_BOOTSTRAP"):
+            db.create_all()
+            try:
+                ensure_default_competition()
+            except Exception:
+                app.logger.exception("Failed to ensure default competition")
 
     def _http_detail(e: Exception, default: str) -> str:
         if isinstance(e, HTTPException):

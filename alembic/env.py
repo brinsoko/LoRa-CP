@@ -20,8 +20,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Create the Flask app to get the database URL from its config
-flask_app = create_app()
+# Create the Flask app *without* the boot-time DDL so Alembic can
+# apply migrations against a real empty DB. Otherwise create_all() runs
+# first and the migrations try to ADD columns that already exist, which
+# breaks `alembic upgrade head` on fresh installs.
+flask_app = create_app({"SKIP_DB_BOOTSTRAP": True})
 
 # Override sqlalchemy.url from the Flask app config
 config.set_main_option(
