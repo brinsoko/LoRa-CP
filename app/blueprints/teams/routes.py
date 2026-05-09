@@ -360,7 +360,7 @@ def randomize_numbers():
             r = res.get("range", [0, 0])
             flash(
                 _(
-                    "Not enough numbers available in range %(min)s\u2013%(max)s. %(available)s available, %(needed)s needed.",
+                    "Not enough numbers available in range %(min)s\u2013%(max)s. %(available)s available, %(needed)s needed.",  # noqa: E501
                     min=r[0],
                     max=r[1],
                     available=res.get("available", 0),

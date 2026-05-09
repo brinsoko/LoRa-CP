@@ -83,8 +83,8 @@ def _get_group_checkpoint_order_from_db() -> dict[str, list[str]]:
     ).all()
     for g in groups:
         # order by position asc
-        ordered = sorted(g.checkpoint_links, key=lambda l: l.position if l.position is not None else 0)
-        orders[g.name] = [l.checkpoint.name for l in ordered if l.checkpoint]
+        ordered = sorted(g.checkpoint_links, key=lambda cl: cl.position if cl.position is not None else 0)
+        orders[g.name] = [cl.checkpoint.name for cl in ordered if cl.checkpoint]
     return orders
 
 
@@ -826,13 +826,13 @@ def build_score_tab(
                 tcol = col_letter(b["num_col"])
                 pcol = col_letter(b["total_col"])
                 name_filters.append(
-                    f"FILTER({ncol}{b['start_row']}:{ncol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})"
+                    f"FILTER({ncol}{b['start_row']}:{ncol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})"  # noqa: E501
                 )
                 num_filters.append(
-                    f"FILTER({tcol}{b['start_row']}:{tcol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})"
+                    f"FILTER({tcol}{b['start_row']}:{tcol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})"  # noqa: E501
                 )
                 total_filters.append(
-                    f"FILTER({pcol}{b['start_row']}:{pcol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})"
+                    f"FILTER({pcol}{b['start_row']}:{pcol}{b['end_row']}; {ocol}{b['start_row']}:{ocol}{b['end_row']}=A{row_idx})"  # noqa: E501
                 )
             # assemble base arrays
             names_raw = "{" + "; ".join(name_filters) + "}"

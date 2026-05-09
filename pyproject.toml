@@ -17,14 +17,12 @@ extend-exclude = [
 
 [tool.ruff.lint]
 # Rule sets enabled, in order of strictness:
-#   "F"   — pyflakes: undefined names, unused imports, etc. (real bugs)
-#   "I"   — isort: deterministic import ordering
-#   "UP"  — pyupgrade: modern syntax (e.g. `dict[X]` over `Dict[X]`)
-#   "B"   — flake8-bugbear: real bug-prone patterns
-#
-# Future graduations to consider, one at a time:
-#   "E", "W" — pycodestyle (style warnings; lots of pre-existing noise)
-select = ["F", "I", "UP", "B"]
+#   "F"     — pyflakes: undefined names, unused imports, etc. (real bugs)
+#   "I"     — isort: deterministic import ordering
+#   "UP"    — pyupgrade: modern syntax (e.g. `dict[X]` over `Dict[X]`)
+#   "B"     — flake8-bugbear: real bug-prone patterns
+#   "E","W" — pycodestyle: style errors and warnings
+select = ["F", "I", "UP", "B", "E", "W"]
 
 # Keep the noqa intent we already had: `# noqa: F401` on the model
 # registration import in app/__init__.py is honored automatically by ruff.
@@ -35,6 +33,11 @@ select = ["F", "I", "UP", "B"]
 # stress_test imports rich modules conditionally inside try/except guards;
 # treat its imports as documentation rather than enforce strictness there.
 "tests/stress_test.py" = ["F401", "F841"]
+# CLI scripts and conftest legitimately manipulate sys.path before importing
+# `app.*` so they can run from arbitrary CWDs. E402 (import-not-at-top) is
+# the natural cost of that pattern.
+"scripts/*.py" = ["E402"]
+"tests/conftest.py" = ["E402"]
 
 [tool.ruff.format]
 # Black-compatible settings; not run automatically — invoked via `make format`

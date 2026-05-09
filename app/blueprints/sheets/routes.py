@@ -678,7 +678,7 @@ def add_tab():
             msg = _("Could not add tab: %(error)s", error=exc)
             if "PermissionError" in type(exc).__name__ or "permission" in str(exc).lower():
                 msg += " - " + _(
-                    "Check that the spreadsheet ID is correct and that the service account email has Editor access to it."
+                    "Check that the spreadsheet ID is correct and that the service account email has Editor access to it."  # noqa: E501
                 )
             flash(msg, "warning")
             return redirect(url_for("sheets_admin.list_sheets"))

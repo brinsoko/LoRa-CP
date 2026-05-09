@@ -255,7 +255,10 @@ def checkin_create():
             return {"ok": True, "replaced": True, "checkin": _serialize_checkin(existing)}, 200
         return {
             "error": "duplicate",
-            "detail": "Check-in for this team and checkpoint already exists. Use override=replace to update its timestamp.",
+            "detail": (
+                "Check-in for this team and checkpoint already exists. "
+                "Use override=replace to update its timestamp."
+            ),
             "checkin": _serialize_checkin(existing),
         }, 409
 
@@ -275,10 +278,15 @@ def checkin_create():
             db.session.add(c)
     except IntegrityError:
         db.session.rollback()
-        existing = Checkin.query.filter_by(team_id=team_id, checkpoint_id=checkpoint_id, competition_id=comp_id).first()
+        existing = Checkin.query.filter_by(
+            team_id=team_id, checkpoint_id=checkpoint_id, competition_id=comp_id
+        ).first()
         return {
             "error": "duplicate",
-            "detail": "Check-in for this team and checkpoint already exists. Use override=replace to update its timestamp.",
+            "detail": (
+                "Check-in for this team and checkpoint already exists. "
+                "Use override=replace to update its timestamp."
+            ),
             "checkin": _serialize_checkin(existing) if existing else None,
         }, 409
     record_audit_event(

@@ -738,7 +738,9 @@ def _assign_checkpoint_link_position(link: CheckpointGroupLink) -> None:
     if not group:
         return
 
-    existing_positions = [l.position for l in group.checkpoint_links if l is not link and l.position is not None]
+    existing_positions = [
+        cl.position for cl in group.checkpoint_links if cl is not link and cl.position is not None
+    ]
     link.position = (max(existing_positions) + 1) if existing_positions else 0
 
 

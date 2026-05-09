@@ -95,7 +95,7 @@ def _apply_groups(cp: Checkpoint, group_ids: list[int]) -> None:
             continue
         link = existing.pop(gid, None)
         if link is None:
-            next_position = max((l.position for l in group.checkpoint_links), default=-1) + 1
+            next_position = max((cl.position for cl in group.checkpoint_links), default=-1) + 1
             link = CheckpointGroupLink(group=group, checkpoint=cp, position=next_position)
         new_links.append(link)
 

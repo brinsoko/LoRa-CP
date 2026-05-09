@@ -319,7 +319,11 @@ def import_checkpoints_json():
     summary = payload.get("summary") or {}
     errors = payload.get("errors") or []
     flash(
-        f"Imported checkpoints: created {summary.get('created', 0)}, updated {summary.get('updated', 0)}, skipped {summary.get('skipped', 0)}.",
+        (
+            f"Imported checkpoints: created {summary.get('created', 0)}, "
+            f"updated {summary.get('updated', 0)}, "
+            f"skipped {summary.get('skipped', 0)}."
+        ),
         "success",
     )
     if errors:
