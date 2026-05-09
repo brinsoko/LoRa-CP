@@ -10,7 +10,6 @@
       {% if (read_only is not defined or not read_only) and has_role('judge','admin') %}
         <div class="d-flex gap-2">
           <a class="btn btn-sm btn-primary" href="{{ url_for('rfid.add_rfid') }}">{{ _('Add Mapping') }}</a>
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('rfid.rfid_upload_csv_form') }}">{{ _('Upload CSV') }}</a>
         </div>
       {% endif %}
     </div>

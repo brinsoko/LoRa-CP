@@ -202,17 +202,3 @@ def delete_rfid(card_id: int):
 def rfid_scan_once():
     resp, body = api_json("POST", "/api/rfid/scan")
     return jsonify(body), resp.status_code
-
-
-@rfid_bp.route("/upload_csv", methods=["GET"])
-@roles_required("admin")
-def rfid_upload_csv_form():
-    flash("CSV upload via UI is disabled. Use /api/rfid/import instead.", "warning")
-    return redirect(url_for("rfid.list_rfid"))
-
-
-@rfid_bp.route("/upload_csv", methods=["POST"])
-@roles_required("admin")
-def rfid_upload_csv():
-    flash("CSV upload via UI is disabled. Use /api/rfid/import instead.", "warning")
-    return redirect(url_for("rfid.list_rfid"))
