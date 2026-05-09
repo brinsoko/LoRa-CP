@@ -16,14 +16,14 @@ Flask-Limiter==3.8.0
 
 # --- Optional Serial / Hardware access ---
 pyserial==3.5
-requests==2.32.5
+requests==2.33.1
 
 # --- For Gunicorn (production server) ---
-gunicorn==22.0.0
+gunicorn==26.0.0
 
 # --- Google Sheets ---
-gspread==6.1.2
-google-auth==2.34.0
+gspread==6.2.1
+google-auth==2.52.0
 
 # --- ESP32 NVS partition generation (web flasher) ---
 esp-idf-nvs-partition-gen>=0.2.0
