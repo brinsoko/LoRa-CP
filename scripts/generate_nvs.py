@@ -147,11 +147,11 @@ def main() -> None:
             )
             print(f"dev {dev_num:>3d}:  {nvs_path}  {keys_path}")
 
-    print(f"\nDone. Flash each device with:")
-    print(f"  esptool.py --port /dev/ttyUSB0 --baud 460800 write_flash \\")
+    print("\nDone. Flash each device with:")
+    print("  esptool.py --port /dev/ttyUSB0 --baud 460800 write_flash \\")
     print(f"      0xC000 {args.outdir}/dev<N>_keys.bin \\")
     print(f"      0xD000 {args.outdir}/dev<N>_nvs_enc.bin \\")
-    print(f"      0x10000 firmware.bin")
+    print("      0x10000 firmware.bin")
 
 
 if __name__ == "__main__":

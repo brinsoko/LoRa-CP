@@ -19,13 +19,8 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    Checkin,
-    Checkpoint,
     CheckpointGroupLink,
-    GlobalScoreRule,
     ScoreEntry,
-    ScoreRule,
-    SheetConfig,
 )
 from tests.support import (
     add_membership,
@@ -368,10 +363,8 @@ class TestScoreTabFormulas:
             # Find Team-C row (group Beta, number 201)
             for row in all_vals[1:]:
                 if "201" in row:
-                    header = all_vals[0]  # might not be the right header if multi-group
-                    # Find a header row that contains CP-Two
-                    # In multi-group score tab, each group has its own header row
-                    # Just check that no cell shows #N/A or error
+                    # In multi-group score tab, each group has its own header row;
+                    # we only need to verify no cell shows #N/A or formula errors.
                     for cell in row:
                         assert "#N/A" not in str(cell), f"IFERROR not working: {row}"
                         assert "#REF" not in str(cell), f"Formula error: {row}"
@@ -513,7 +506,7 @@ class TestArrivalsColoring:
         _build_arrivals_tab(sheets_client, tab)
         sp = gc.open_by_key(SPREADSHEET_ID)
         try:
-            ws = sp.worksheet(tab)
+            sp.worksheet(tab)  # raises if the tab wasn't created
             # Fetch sheet metadata to inspect conditional format rules
             meta = sp.fetch_sheet_metadata()
             sheet_meta = None
@@ -587,7 +580,7 @@ class TestMarkArrival:
             # Time column is at index 2 when dead_time is enabled
             time_col = 2  # 0-based: Group(0), DeadTime(1), Time(2), Points(3)
             cell_val = str(all_vals[team_row - 1][time_col])
-            assert cell_val != "TRUE", f"Expected timestamp, got TRUE"
+            assert cell_val != "TRUE", "Expected timestamp, got TRUE"
             assert "2026" in cell_val or "08:" in cell_val, \
                 f"Expected timestamp at col {time_col}, got: {cell_val}. Header: {header}"
         finally:

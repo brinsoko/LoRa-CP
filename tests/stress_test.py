@@ -39,11 +39,9 @@ import argparse
 import hashlib
 import hmac
 import json
-import math
 import os
 import random
 import statistics
-import string
 import sys
 import threading
 import time
@@ -60,8 +58,6 @@ from urllib3.util.retry import Retry
 try:
     from rich.console import Console
     from rich.table import Table
-    from rich.progress import Progress, SpinnerColumn, BarColumn, TimeElapsedColumn
-    from rich.live import Live
     from rich.panel import Panel
     from rich import box
     RICH = True
@@ -979,7 +975,6 @@ def run_spike_test(args):
     results    = []
     lock       = threading.Lock()
     stop_event = threading.Event()
-    url        = args.base_url.rstrip("/") + INGEST_PATH
 
     spike_workers = args.workers * 3
     spike_rps     = args.ingest_rps * 10

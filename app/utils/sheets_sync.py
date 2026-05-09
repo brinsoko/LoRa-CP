@@ -352,7 +352,9 @@ def build_arrivals_tab(
     if not sheets_sync_enabled():
         return "Sheets sync is disabled."
     group_order = group_order_override or _get_default_group_order(spreadsheet_id, competition_id)
-    per_group_cp_order = per_group_checkpoint_order or _get_group_checkpoint_order_from_db()
+    # The per-group checkpoint ordering is computed inside the second pass
+    # (build_score_tab) when actually needed; the assignment that lived here
+    # was a refactor leftover that issued a redundant DB query on every call.
 
     cp_configs = (
         SheetConfig.query

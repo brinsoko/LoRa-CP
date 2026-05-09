@@ -399,7 +399,8 @@ class TestVerificationAndMessages:
         competition = create_competition(name="Finish Assignment Race")
         add_membership(judge, competition, role="judge")
         first = create_checkpoint(competition, name="Finish A")
-        second = create_checkpoint(competition, name="Finish B")
+        # Side-effect only: assert below verifies "Finish B" is hidden from the page.
+        create_checkpoint(competition, name="Finish B")
         assign_judge_checkpoint(judge, first, is_default=True)
         login_as(client, judge, competition)
 
@@ -647,7 +648,8 @@ class TestJudgeAssignments:
         add_membership(admin, competition, role="admin")
         add_membership(judge, competition, role="judge")
         first = create_checkpoint(competition, name="Gate A")
-        second = create_checkpoint(competition, name="Gate B")
+        # Side-effect only: assert below verifies "Gate B" is hidden from the page.
+        create_checkpoint(competition, name="Gate B")
         assign_judge_checkpoint(judge, first, is_default=True)
         login_as(client, judge, competition)
 

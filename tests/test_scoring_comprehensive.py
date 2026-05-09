@@ -12,14 +12,10 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    Checkpoint,
-    CheckpointGroup,
     CheckpointGroupLink,
     GlobalScoreRule,
     ScoreEntry,
-    ScoreRule,
     Team,
-    TeamGroup,
 )
 from app.resources.scores import (
     _apply_field_rule,
@@ -28,7 +24,6 @@ from app.resources.scores import (
     _compute_time_race_scores_from_checkins,
     _compute_total,
     _round_score,
-    _to_number,
 )
 from tests.support import (
     add_membership,
@@ -698,11 +693,9 @@ class TestDnf:
         db.session.commit()
 
         # Import the scoring context builder
-        from app.blueprints.scores.routes import _build_scores_context
         client = app.test_client()
         login_as(client, s["user"], s["comp"])
         with app.test_request_context():
-            from flask import session as flask_session
             # Just test the org_totals exclusion logic directly
             rows = [
                 {"organization": "Rod Jezerska scuka", "dnf": False, "total": 100},
@@ -742,7 +735,6 @@ class TestVirtualCheckpoint:
 
     def test_virtual_cp_scoring_fields_work(self, app, seeded):
         """Virtual CP scoring fields compute correctly."""
-        s = seeded
         # Mapping rule on virtual CP
         rule = {"type": "mapping", "map": {"0": 0, "1": 8, "2": 16, "3": 24, "4": 32, "5": 40}}
         assert _rule(rule, 5) == 40.0
