@@ -8,7 +8,6 @@ import pytest
 
 from app.utils.validators import validate_finite_float, validate_positive_int
 
-
 # -- pure unit tests for the validator helpers --
 
 @pytest.mark.parametrize(

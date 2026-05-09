@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import os, sys
+
+import os
+import sys
 
 # Ensure project root (where 'app/' lives) is importable
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -10,6 +12,7 @@ if ROOT not in sys.path:
 from app import create_app
 from app.extensions import db
 from app.models import User
+
 
 def main() -> None:
     username = os.environ.get("ADMIN_USER", "admin").strip()

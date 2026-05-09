@@ -1,26 +1,31 @@
 # app/resources/ingest.py
 from __future__ import annotations
-from datetime import datetime, timedelta
-from app.utils.time import utcnow_naive, utc_from_timestamp_naive
+
 import hmac
+from datetime import datetime, timedelta
 
-from flask import current_app
-from flask import Blueprint, request
+from flask import Blueprint, current_app, request
 from flask_login import current_user
-
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.exceptions import BadRequest
 
+from app.api.helpers import parse_int
 from app.extensions import db
 from app.models import (
-    LoRaMessage, RFIDCard, Team, Checkpoint, Checkin, LoRaDevice, Competition,
+    Checkin,
+    Checkpoint,
+    Competition,
     CompetitionMember,
+    LoRaDevice,
+    LoRaMessage,
+    RFIDCard,
+    Team,
 )
-from app.api.helpers import parse_int
 from app.utils.audit import format_device_label, record_audit_event
-from app.utils.sheets_sync import mark_arrival_checkbox
-from app.utils.payloads import parse_gps_payload
 from app.utils.card_tokens import compute_card_digest
+from app.utils.payloads import parse_gps_payload
+from app.utils.sheets_sync import mark_arrival_checkbox
+from app.utils.time import utc_from_timestamp_naive, utcnow_naive
 
 ingest_api_bp = Blueprint("api_ingest", __name__)
 

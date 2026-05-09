@@ -2,18 +2,17 @@
 from __future__ import annotations
 
 from datetime import datetime
-from app.utils.time import utcnow_naive
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, Response
+from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
 from flask_babel import gettext as _
 from flask_login import current_user
-from app.models import JudgeCheckpoint, Checkpoint, CheckpointGroup
-from app.utils.competition import get_current_competition_id, get_current_competition_role
 
+from app.models import Checkpoint, CheckpointGroup, JudgeCheckpoint
+from app.utils.competition import get_current_competition_id, get_current_competition_role
 from app.utils.frontend_api import api_json, api_request
 from app.utils.live_arrivals import build_live_arrivals
 from app.utils.perms import roles_required
-from app.utils.time import DEFAULT_TZ_NAME, format_datetime_input_local, get_timezone
+from app.utils.time import DEFAULT_TZ_NAME, format_datetime_input_local, get_timezone, utcnow_naive
 
 checkins_bp = Blueprint("checkins", __name__, template_folder="../../templates")
 

@@ -1,13 +1,14 @@
 # app/resources/map.py
 from __future__ import annotations
+
 from flask import Blueprint, jsonify, request
 from werkzeug.exceptions import BadRequest
-from app.models import LoRaMessage, Team
+
 from app.api.helpers import parse_int
+from app.models import LoRaMessage, Team
+from app.utils.competition import require_current_competition_id
 from app.utils.payloads import parse_gps_payload
 from app.utils.rest_auth import json_roles_required
-from app.utils.competition import require_current_competition_id
-
 from app.utils.status import all_checkpoints_for_map, compute_team_statuses
 
 map_api_bp = Blueprint("api_map", __name__)

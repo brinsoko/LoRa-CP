@@ -1,11 +1,11 @@
 # app/blueprints/teams/routes.py
 from __future__ import annotations
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_babel import gettext as _
 
-from app.utils.frontend_api import api_json
 from app.utils.competition import get_current_competition_role
+from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
 
 teams_bp = Blueprint("teams", __name__, template_folder="../../templates")

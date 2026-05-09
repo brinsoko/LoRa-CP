@@ -1,13 +1,13 @@
 # app/models.py
 from __future__ import annotations
-from app.utils.time import utcnow_naive
 
-from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
-
 from sqlalchemy import CheckConstraint, Index, UniqueConstraint, event
 from sqlalchemy.ext.associationproxy import association_proxy
+from werkzeug.security import check_password_hash, generate_password_hash
+
 from app.extensions import db
+from app.utils.time import utcnow_naive
 
 
 # =================

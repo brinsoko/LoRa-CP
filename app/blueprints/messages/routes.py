@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict
 
-from flask import Blueprint, render_template, request, url_for, flash
+from flask import Blueprint, flash, render_template, request, url_for
 
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required

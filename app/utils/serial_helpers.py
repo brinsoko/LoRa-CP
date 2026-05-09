@@ -1,5 +1,9 @@
-import re, serial
+import re
+
 from serial.tools import list_ports
+
+import serial
+
 
 def normalize_uid(uid: str) -> str:
     if not uid: return ""

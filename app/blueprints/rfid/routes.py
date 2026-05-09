@@ -1,13 +1,13 @@
 # app/blueprints/rfid/routes.py
 from __future__ import annotations
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask_login import current_user
 
+from app.models import Checkpoint, JudgeCheckpoint
+from app.utils.competition import get_current_competition_id, get_current_competition_role
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
-from flask_login import current_user
-from app.utils.competition import get_current_competition_id, get_current_competition_role
-from app.models import JudgeCheckpoint, Checkpoint
 
 rfid_bp = Blueprint("rfid", __name__, template_folder="../../templates")
 

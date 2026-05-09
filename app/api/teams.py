@@ -5,12 +5,11 @@ import re
 from typing import Iterable, List, Optional
 
 from flask import Blueprint, jsonify, request
+from flask_babel import gettext as _
 from flask_login import current_user
 from sqlalchemy import or_
-from sqlalchemy.orm import joinedload
-
-from flask_babel import gettext as _
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 
 from app.api.helpers import json_ok
 from app.extensions import db

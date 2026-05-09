@@ -3,12 +3,11 @@ from __future__ import annotations
 
 import json
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from flask_babel import gettext as _
 
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
-
 
 checkpoints_bp = Blueprint("checkpoints", __name__, template_folder="../../templates")
 

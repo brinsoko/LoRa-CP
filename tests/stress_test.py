@@ -56,10 +56,10 @@ from urllib3.util.retry import Retry
 
 # Rich for pretty terminal output (gracefully degraded if absent)
 try:
-    from rich.console import Console
-    from rich.table import Table
-    from rich.panel import Panel
     from rich import box
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
     RICH = True
     console = Console()
 except ImportError:

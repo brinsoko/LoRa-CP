@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from app.utils.time import utcnow_naive
 from typing import Any
 
 from flask_babel import gettext as _
@@ -9,6 +8,7 @@ from flask_login import current_user
 
 from app.extensions import db
 from app.models import AuditEvent, LoRaDevice, User
+from app.utils.time import utcnow_naive
 
 
 def format_device_label(device: LoRaDevice | None) -> str:

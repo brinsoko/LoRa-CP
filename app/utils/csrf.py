@@ -5,7 +5,6 @@ import secrets
 from flask import abort, current_app, request, session
 from markupsafe import Markup, escape
 
-
 _CSRF_SESSION_KEY = "_csrf_token"
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 _EXEMPT_PATHS = {

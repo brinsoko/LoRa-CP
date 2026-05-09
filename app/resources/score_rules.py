@@ -118,7 +118,7 @@ def score_rule_fields():
         if not checkpoint_id or not group_id:
             return jsonify({"error": "invalid_request", "detail": "checkpoint_id and group_id are required."}), 400
 
-        from app.models import SheetConfig, CheckpointGroup
+        from app.models import CheckpointGroup, SheetConfig
 
         cfg = (
             SheetConfig.query

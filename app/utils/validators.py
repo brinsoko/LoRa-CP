@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 import re
 
-
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 

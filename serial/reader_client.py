@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-import os, time, socket, re, signal
+import os
+import re
+import signal
+import socket
+import time
+
 import requests
 
 # ----------------- Config (via env) -----------------

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from app.utils.time import utcnow_naive
 from pathlib import Path
 
 import pytest
@@ -9,10 +8,11 @@ from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models import Checkin, Checkpoint, Competition, CompetitionMember, LoRaDevice, RFIDCard, Team
+from app.utils.time import utcnow_naive
 from tests.support import (
     add_membership,
-    create_checkpoint,
     create_checkin,
+    create_checkpoint,
     create_competition,
     create_device,
     create_group,

@@ -1,11 +1,14 @@
 # app/blueprints/users/routes.py
 from __future__ import annotations
+
 import re
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_babel import gettext as _
 from flask_login import current_user
+
 from app.extensions import db
-from app.models import User, CompetitionMember
+from app.models import CompetitionMember, User
 from app.utils.audit import record_audit_event
 from app.utils.competition import get_current_competition_id
 from app.utils.perms import roles_required  # already in your project

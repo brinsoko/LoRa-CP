@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from typing import List
 import time
 from datetime import datetime
-from app.utils.lang_store import load_lang
-from gspread.exceptions import APIError
+from typing import List
 
 from flask import current_app
+from gspread.exceptions import APIError
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models import SheetConfig, CheckpointGroup, Team, TeamGroup, Checkpoint, CheckpointGroupLink
+from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, SheetConfig, Team, TeamGroup
 from app.utils.competition import get_competition_group_order
+from app.utils.export_safety import escape_formula_cell
+from app.utils.lang_store import load_lang
 from app.utils.sheets_client import SheetsClient
 from app.utils.sheets_settings import sheets_sync_enabled
-from app.utils.export_safety import escape_formula_cell
 
 
 def _norm_name(value: str | None) -> str:

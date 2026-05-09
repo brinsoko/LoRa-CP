@@ -4,7 +4,8 @@ Rebuild the local SQLite DB: drop all tables and recreate them.
 Run from project root:
     python scripts/rebuild_db.py
 """
-import os, sys
+import os
+import sys
 
 # Ensure project root (where 'app/' lives) is on sys.path
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -13,6 +14,7 @@ if ROOT not in sys.path:
 
 from app import create_app
 from app.extensions import db
+
 
 def main():
     app = create_app()

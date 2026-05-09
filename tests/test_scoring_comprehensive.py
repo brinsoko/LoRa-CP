@@ -28,8 +28,8 @@ from app.resources.scores import (
 from tests.support import (
     add_membership,
     assign_team_group,
-    create_checkpoint,
     create_checkin,
+    create_checkpoint,
     create_competition,
     create_group,
     create_team,

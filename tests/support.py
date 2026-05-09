@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
-from app.utils.time import utcnow_naive
 import itertools
+from datetime import datetime
 
 from app.extensions import db
 from app.models import (
@@ -18,7 +17,7 @@ from app.models import (
     TeamGroup,
     User,
 )
-
+from app.utils.time import utcnow_naive
 
 _COUNTER = itertools.count(1)
 

@@ -1,19 +1,19 @@
 # app/blueprints/auth/routes.py
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
-from flask_login import login_required, current_user, login_user, logout_user
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
-import requests
-import secrets
 import re
-from app.utils.time import utcnow_naive
+import secrets
 
-from app.models import User, CompetitionInvite, CompetitionMember
+import requests
+from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required, login_user, logout_user
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
+
 from app.extensions import db, limiter
+from app.models import CompetitionInvite, CompetitionMember, User
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
 from app.utils.redirects import safe_redirect_target
-
+from app.utils.time import utcnow_naive
 
 auth_bp = Blueprint("auth", __name__)
 

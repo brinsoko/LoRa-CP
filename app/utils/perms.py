@@ -1,8 +1,11 @@
 # app/utils/perms.py
 from functools import wraps
-from flask import request, redirect, url_for, abort, current_app
+
+from flask import abort, current_app, redirect, request, url_for
 from flask_login import current_user
+
 from app.utils.competition import get_current_competition_role
+
 
 def _current_role_set():
     roles = set()

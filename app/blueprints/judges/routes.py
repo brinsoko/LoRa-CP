@@ -1,11 +1,11 @@
 # app/blueprints/judges/routes.py
 from __future__ import annotations
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_babel import gettext as _
 
 from app.extensions import db
-from app.models import User, CompetitionMember, Checkpoint, JudgeCheckpoint
+from app.models import Checkpoint, CompetitionMember, JudgeCheckpoint, User
 from app.utils.competition import get_current_competition_id
 from app.utils.perms import roles_required
 

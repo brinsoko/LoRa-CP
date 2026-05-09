@@ -1,18 +1,26 @@
-from flask import Blueprint, render_template, request, Response, session, redirect, url_for, current_app, abort, flash
+import csv
+import io
+from datetime import datetime, timedelta
+
+from flask import Blueprint, Response, abort, current_app, flash, redirect, render_template, request, session, url_for
 from flask_babel import gettext as _
-from flask_login import login_required, current_user
+from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
+
 from app.extensions import db
-from app.models import Team, Checkpoint, Checkin, Competition, CompetitionMember, CompetitionInvite, User
+from app.models import Checkin, Checkpoint, Competition, CompetitionInvite, CompetitionMember, Team, User
 from app.utils.audit import record_audit_event
-from app.utils.competition import get_current_competition_id, get_user_memberships, set_current_competition_id, create_invite
+from app.utils.competition import (
+    create_invite,
+    get_current_competition_id,
+    get_user_memberships,
+    set_current_competition_id,
+)
+from app.utils.export_safety import escape_formula_cell
 from app.utils.perms import roles_required
 from app.utils.redirects import safe_redirect_target
-from app.utils.export_safety import escape_formula_cell
-from app.utils.validators import validate_email, validate_text
-import io, csv
-from datetime import datetime, timedelta
 from app.utils.time import utcnow_naive
+from app.utils.validators import validate_email, validate_text
 
 main_bp = Blueprint('main', __name__)
 

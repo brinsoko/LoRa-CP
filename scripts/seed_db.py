@@ -13,13 +13,14 @@ fields (e.g., username, team name, checkpoint name, UID) before inserting.
 
 from __future__ import annotations
 
-import os
-import sys
-import random
 import csv
+import os
+import random
+import sys
 from datetime import datetime, timedelta
-from app.utils.time import utcnow_naive
 from pathlib import Path
+
+from app.utils.time import utcnow_naive
 
 # Ensure project root (where 'app/' lives) is importable
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -29,19 +30,19 @@ if ROOT not in sys.path:
 from app import create_app
 from app.extensions import db
 from app.models import (
-    User,
-    Team,
-    RFIDCard,
-    Checkpoint,
     Checkin,
+    Checkpoint,
     CheckpointGroup,
-    TeamGroup,
     CheckpointGroupLink,
     Competition,
     CompetitionMember,
+    RFIDCard,
     ScoreEntry,
+    Team,
+    TeamGroup,
+    User,
 )
-from app.utils.competition import ensure_default_competition, DEFAULT_COMPETITION_NAME
+from app.utils.competition import DEFAULT_COMPETITION_NAME, ensure_default_competition
 
 # ----------------------------- helpers -----------------------------
 

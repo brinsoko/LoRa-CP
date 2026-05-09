@@ -1,29 +1,29 @@
 # app/resources/scores.py
 from __future__ import annotations
 
-from app.utils.time import utcnow_naive
-
 from flask import Blueprint, jsonify, request
 from flask_login import current_user
 from sqlalchemy.exc import IntegrityError
+
 from app.extensions import db
 from app.models import (
     Checkin,
     Checkpoint,
     CompetitionMember,
+    GlobalScoreRule,
     JudgeCheckpoint,
     RFIDCard,
     ScoreEntry,
     ScoreRule,
-    GlobalScoreRule,
     Team,
     TeamGroup,
 )
 from app.utils.audit import record_audit_event
+from app.utils.card_tokens import compute_card_digest
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_roles_required
 from app.utils.sheets_sync import mark_arrival_checkbox, update_checkpoint_scores
-from app.utils.card_tokens import compute_card_digest
+from app.utils.time import utcnow_naive
 
 scores_api_bp = Blueprint("api_scores", __name__)
 

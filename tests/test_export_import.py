@@ -9,13 +9,13 @@ from app.extensions import db
 from app.models import Competition, Team
 from tests.support import (
     add_membership,
-    create_checkpoint,
+    assign_team_group,
     create_checkin,
+    create_checkpoint,
     create_competition,
     create_group,
     create_team,
     create_user,
-    assign_team_group,
     login_as,
 )
 

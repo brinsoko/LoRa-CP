@@ -22,7 +22,6 @@ import sys
 import tempfile
 from typing import NamedTuple
 
-
 NVS_NAMESPACE = "config"
 
 

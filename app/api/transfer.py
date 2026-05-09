@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from app.utils.time import utcnow_naive
 
-from flask import Blueprint, jsonify, request, make_response
+from flask import Blueprint, jsonify, make_response, request
 from flask_login import current_user
 
 from app.api.helpers import json_ok
@@ -25,6 +24,7 @@ from app.models import (
     TeamGroup,
 )
 from app.utils.rest_auth import json_roles_required
+from app.utils.time import utcnow_naive
 
 transfer_api_bp = Blueprint("api_transfer", __name__)
 

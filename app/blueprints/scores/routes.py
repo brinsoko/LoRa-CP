@@ -1,30 +1,31 @@
 # app/blueprints/scores/routes.py
 from __future__ import annotations
 
-from datetime import datetime
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask_babel import gettext as _
 import json
+from datetime import datetime
+
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_babel import gettext as _
+from flask_login import current_user
 from sqlalchemy.orm import joinedload
 
-from app.utils.perms import roles_required
-from app.utils.competition import get_current_competition_id, get_current_competition_role
-from app.resources.scores import recompute_scores_for_rule, _compute_global_contrib
+from app.extensions import db
 from app.models import (
-    JudgeCheckpoint,
+    Checkin,
     Checkpoint,
-    ScoreRule,
-    GlobalScoreRule,
     CheckpointGroup,
     CheckpointGroupLink,
+    Competition,
+    GlobalScoreRule,
+    JudgeCheckpoint,
+    ScoreEntry,
+    ScoreRule,
     Team,
     TeamGroup,
-    ScoreEntry,
-    Checkin,
-    Competition,
 )
-from app.extensions import db
-from flask_login import current_user
+from app.resources.scores import _compute_global_contrib, recompute_scores_for_rule
+from app.utils.competition import get_current_competition_id, get_current_competition_role
+from app.utils.perms import roles_required
 
 scores_bp = Blueprint("scores", __name__, template_folder="../../templates")
 

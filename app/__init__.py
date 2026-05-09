@@ -1,16 +1,24 @@
 # app/__init__.py
-from flask import Flask, request, current_app, session, g
+import logging
+import os
+import tempfile
+
+from flask import Flask, current_app, g, request, session
 from flask_babel import get_locale
 from flask_login import current_user
+from sqlalchemy import inspect, text
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
-from .extensions import db, login_manager, babel, limiter
-from sqlalchemy import inspect, text
+
+from app.utils.time import to_datetime_local
+
 from .api.auth import auth_api_bp
 from .api.checkpoints import checkpoints_api_bp
 from .api.groups import groups_api_bp
-from .api.teams import teams_api_bp
 from .api.helpers import json_error
+from .api.teams import teams_api_bp
+from .api.transfer import transfer_api_bp
+from .extensions import babel, db, limiter, login_manager
 from .resources.checkins import checkins_api_bp
 from .resources.docs_resource import docs_api_bp
 from .resources.ingest import ingest_api_bp
@@ -20,19 +28,15 @@ from .resources.messages import messages_api_bp
 from .resources.rfid import rfid_api_bp
 from .resources.score_rules import score_rules_api_bp
 from .resources.scores import scores_api_bp
-from .api.transfer import transfer_api_bp
-from app.utils.time import to_datetime_local
-from .utils.perms import inject_perms
-from .utils.csrf import protect_request, get_csrf_token, csrf_input
 from .utils.competition import (
     ensure_default_competition,
     get_current_competition,
     get_current_competition_role,
     get_user_competitions,
 )
-import logging
-import os
-import tempfile
+from .utils.csrf import csrf_input, get_csrf_token, protect_request
+from .utils.perms import inject_perms
+
 
 def create_app(config_overrides: dict | None = None) -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -123,26 +127,27 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.context_processor(inject_perms)
 
     # Ensure models are imported
+    from app.blueprints.audit.routes import audit_bp
+    from app.blueprints.docs.routes import docs_bp
+    from app.blueprints.firmware.routes import firmware_bp
+    from app.blueprints.judges.routes import judges_bp
+    from app.blueprints.messages.routes import messages_bp
+    from app.blueprints.scores.routes import scores_bp
+    from app.blueprints.sheets.routes import sheets_bp
+    from app.blueprints.users.routes import users_bp
+
     from . import models  # noqa: F401
 
     # ---- Blueprints (HTML) ----
     from .blueprints.auth.routes import auth_bp
-    from .blueprints.main.routes import main_bp
-    from .blueprints.teams.routes import teams_bp
-    from .blueprints.checkpoints.routes import checkpoints_bp
     from .blueprints.checkins.routes import checkins_bp
-    from .blueprints.rfid.routes import rfid_bp
-    from .blueprints.map.routes import maps_bp
+    from .blueprints.checkpoints.routes import checkpoints_bp
     from .blueprints.groups.routes import groups_bp
     from .blueprints.lora.routes import lora_bp
-    from app.blueprints.messages.routes import messages_bp
-    from app.blueprints.docs.routes import docs_bp
-    from app.blueprints.users.routes import users_bp
-    from app.blueprints.judges.routes import judges_bp
-    from app.blueprints.scores.routes import scores_bp
-    from app.blueprints.sheets.routes import sheets_bp
-    from app.blueprints.audit.routes import audit_bp
-    from app.blueprints.firmware.routes import firmware_bp
+    from .blueprints.main.routes import main_bp
+    from .blueprints.map.routes import maps_bp
+    from .blueprints.rfid.routes import rfid_bp
+    from .blueprints.teams.routes import teams_bp
 
     app.register_blueprint(users_bp, url_prefix="/users")
     app.register_blueprint(judges_bp, url_prefix="/judges")

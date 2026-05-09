@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from app.utils.time import utcnow_naive
 
 from sqlalchemy.orm import joinedload
 
@@ -14,8 +13,7 @@ from app.models import (
     Team,
     TeamGroup,
 )
-from app.utils.time import format_datetime_display
-
+from app.utils.time import format_datetime_display, utcnow_naive
 
 VALID_TEAM_SORTS = {"number_asc", "number_desc", "name_asc", "name_desc", "status", "latest"}
 

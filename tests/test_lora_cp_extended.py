@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 import importlib
 from datetime import timedelta
-from app.utils.time import utcnow_naive
 from types import SimpleNamespace
 
 import pytest
@@ -12,12 +11,13 @@ from app.extensions import db
 from app.models import Checkin, LoRaMessage
 from app.utils import serial_helpers, sheets_sync
 from app.utils.card_tokens import compute_card_digest, match_digests
+from app.utils.time import utcnow_naive
 from tests.support import (
     add_membership,
     assign_judge_checkpoint,
     assign_team_group,
-    create_checkpoint,
     create_checkin,
+    create_checkpoint,
     create_competition,
     create_device,
     create_group,

@@ -1,8 +1,11 @@
 # app/utils/status.py
 from __future__ import annotations
+
 from typing import Dict, List, Optional
+
 from app.extensions import db
-from app.models import TeamGroup, CheckpointGroup, Checkpoint, Checkin
+from app.models import Checkin, Checkpoint, CheckpointGroup, TeamGroup
+
 
 def get_active_group_for_team(team_id: int, competition_id: int) -> Optional[CheckpointGroup]:
     """Return the currently-active CheckpointGroup for a team (if any)."""

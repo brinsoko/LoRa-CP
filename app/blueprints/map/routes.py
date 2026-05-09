@@ -1,8 +1,9 @@
 # app/blueprints/map/routes.py
 from flask import Blueprint, render_template
-from app.models import Team, LoRaDevice
-from app.utils.perms import roles_required
+
+from app.models import LoRaDevice, Team
 from app.utils.competition import get_current_competition_id
+from app.utils.perms import roles_required
 
 maps_bp = Blueprint("maps", __name__, template_folder="../../templates")
 

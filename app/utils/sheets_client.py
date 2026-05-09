@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Iterable, List, Optional
 import time
+from typing import Iterable, List, Optional
 
 import gspread
-from gspread.utils import rowcol_to_a1
 from google.oauth2.service_account import Credentials
+from gspread.utils import rowcol_to_a1
+
 from app.utils.export_safety import escape_formula_cell, escape_formula_cells
 
 log = logging.getLogger(__name__)

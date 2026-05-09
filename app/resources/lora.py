@@ -8,8 +8,8 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import LoRaDevice
 from app.utils.audit import record_audit_event
-from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.competition import require_current_competition_id
+from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.validators import validate_text
 
 lora_devices_api_bp = Blueprint("api_lora_devices", __name__)

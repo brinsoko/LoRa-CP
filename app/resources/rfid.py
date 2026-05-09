@@ -7,16 +7,16 @@ from typing import Optional
 
 from flask import Blueprint, jsonify, request
 from flask_babel import gettext as _
-from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 
 from app.extensions import db
-from app.models import RFIDCard, Team, LoRaDevice, Checkpoint, Checkin
-from app.utils.rest_auth import json_login_required, json_roles_required
+from app.models import Checkin, Checkpoint, LoRaDevice, RFIDCard, Team
+from app.utils.card_tokens import match_digests
 from app.utils.competition import require_current_competition_id
+from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.serial_helpers import normalize_uid, read_uid_once
 from config import Config
-from app.utils.card_tokens import match_digests
 
 BAUD = Config.SERIAL_BAUDRATE
 HINT = Config.SERIAL_HINT

@@ -1,9 +1,9 @@
 # app/resources/checkins.py
 from __future__ import annotations
 
+import csv
+import io
 from datetime import datetime, timedelta
-from app.utils.time import utcnow_naive
-import io, csv
 from typing import Optional, Tuple
 
 from flask import Blueprint, jsonify, make_response, request
@@ -12,15 +12,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
-from app.models import Checkin, Team, Checkpoint, JudgeCheckpoint
+from app.models import Checkin, Checkpoint, JudgeCheckpoint, Team
 from app.utils.audit import actor_label_for, record_audit_event
+from app.utils.competition import get_current_competition_role, require_current_competition_id
 from app.utils.export_safety import escape_formula_cell
-from app.utils.time import from_datetime_local
-
-from app.utils.rest_auth import json_roles_required
-from app.utils.competition import require_current_competition_id, get_current_competition_role
 from app.utils.live_arrivals import build_live_arrivals
+from app.utils.rest_auth import json_roles_required
 from app.utils.sheets_sync import mark_arrival_checkbox
+from app.utils.time import from_datetime_local, utcnow_naive
 
 checkins_api_bp = Blueprint("api_checkins", __name__)
 

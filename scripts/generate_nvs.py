@@ -39,7 +39,6 @@ import subprocess
 import sys
 import tempfile
 
-
 NVS_NAMESPACE = "config"
 DEFAULT_PARTITION_SIZE = 0x3000  # must match sec_nvs in partitions.csv
 

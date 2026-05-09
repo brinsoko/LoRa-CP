@@ -1,18 +1,17 @@
 # app/utils/competition.py
 from __future__ import annotations
 
-from datetime import timedelta
-from app.utils.time import utcnow_naive
-from typing import Optional
-from types import SimpleNamespace
 import secrets
+from datetime import timedelta
+from types import SimpleNamespace
+from typing import Optional
 
 from flask import session
 from flask_login import current_user
 
 from app.extensions import db
-from app.models import Competition, CompetitionMember, CompetitionInvite, User, CheckpointGroup
-
+from app.models import CheckpointGroup, Competition, CompetitionInvite, CompetitionMember, User
+from app.utils.time import utcnow_naive
 
 DEFAULT_COMPETITION_NAME = "Default Competition"
 INVITE_EXPIRY_DAYS = 7

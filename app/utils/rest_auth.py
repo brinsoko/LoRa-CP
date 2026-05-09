@@ -1,8 +1,11 @@
 # app/utils/rest_auth.py
+from functools import wraps
+
 from flask import jsonify
 from flask_login import current_user
-from functools import wraps
+
 from app.utils.competition import get_current_competition_role, require_current_competition_id
+
 
 def _current_role_set():
     roles = set()

@@ -16,17 +16,20 @@ import time
 import pytest
 
 from app.extensions import db
-from app.models import ScoreEntry, SheetConfig
-from app.models import CheckpointGroupLink  # used in _seeded fixture
+from app.models import (
+    CheckpointGroupLink,  # used in _seeded fixture
+    ScoreEntry,
+    SheetConfig,
+)
 from tests.support import (
     add_membership,
-    create_checkpoint,
+    assign_team_group,
     create_checkin,
+    create_checkpoint,
     create_competition,
     create_group,
     create_team,
     create_user,
-    assign_team_group,
     login_as,
 )
 

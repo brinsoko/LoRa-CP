@@ -1,9 +1,9 @@
 # app/extensions.py
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
 from flask_babel import Babel
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_login import LoginManager
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 

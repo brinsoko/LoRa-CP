@@ -17,7 +17,6 @@ from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.validators import validate_text
 
-
 _PREFIX_RE = re.compile(r"^(\d+)(x+)$", re.IGNORECASE)
 
 

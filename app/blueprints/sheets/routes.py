@@ -4,22 +4,31 @@ from __future__ import annotations
 import json
 from typing import List
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, session
+from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 from flask_babel import gettext as _
 
 from app.extensions import db
-from app.models import SheetConfig, Checkpoint, CheckpointGroup, Team, TeamGroup, CheckpointGroupLink
-from app.utils.perms import roles_required
+from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, SheetConfig, Team, TeamGroup
 from app.utils.competition import get_current_competition_id
-from app.utils.sheets_client import SheetsClient
-from app.utils.sheets_sync import sync_all_checkpoint_tabs
-from app.utils.sheets_sync import build_arrivals_tab, build_teams_tab, build_score_tab
-from app.utils.sheets_sync import wizard_build_checkpoint_tabs, wizard_create_checkpoint_configs
 from app.utils.lang_store import load_lang, save_lang
+from app.utils.perms import roles_required
+from app.utils.sheets_client import SheetsClient
 from app.utils.sheets_settings import (
     load_settings as load_sheet_settings,
+)
+from app.utils.sheets_settings import (
     save_settings as save_sheet_settings,
+)
+from app.utils.sheets_settings import (
     sheets_sync_enabled,
+)
+from app.utils.sheets_sync import (
+    build_arrivals_tab,
+    build_score_tab,
+    build_teams_tab,
+    sync_all_checkpoint_tabs,
+    wizard_build_checkpoint_tabs,
+    wizard_create_checkpoint_configs,
 )
 
 sheets_bp = Blueprint("sheets_admin", __name__, template_folder="../../templates")

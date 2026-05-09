@@ -1,10 +1,9 @@
 # app/blueprints/docs/routes.py
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, render_template, request, abort, current_app
+from flask import Blueprint, abort, current_app, jsonify, render_template, request
 
 from app.utils.frontend_api import api_json, api_request
-
 
 docs_bp = Blueprint("docs", __name__, template_folder="../../templates")
 

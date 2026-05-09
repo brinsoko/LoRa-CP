@@ -16,16 +16,15 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-# Conservative starter set: just F (pyflakes) — catches real bugs like
-# undefined names and unused imports without flagging stylistic things
-# that would require a code-wide cleanup pass.
+# Rule sets enabled, in order of strictness:
+#   "F"   — pyflakes: undefined names, unused imports, etc. (real bugs)
+#   "I"   — isort: deterministic import ordering
 #
 # Future graduations to consider, one at a time:
-#   "I"   — isort import ordering (creates churn, fix in a separate pass)
 #   "B"   — flake8-bugbear (real bug-prone patterns; usually low noise)
 #   "UP"  — pyupgrade (suggests modern syntax, useful after Python bumps)
 #   "E", "W" — pycodestyle (style warnings; lots of pre-existing noise)
-select = ["F"]
+select = ["F", "I"]
 
 # Keep the noqa intent we already had: `# noqa: F401` on the model
 # registration import in app/__init__.py is honored automatically by ruff.

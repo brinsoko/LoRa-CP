@@ -1,4 +1,7 @@
-import os, socket, serial
+import os
+import socket
+
+import serial
 
 # Configurable via env for quick tweaks without editing the file
 SER = os.getenv("SERIAL_DEVICE", "/dev/cu.usbserial-589A0002751")

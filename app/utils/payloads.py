@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 
 def parse_gps_payload(payload: str) -> Optional[Dict[str, float]]:
