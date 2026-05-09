@@ -28,7 +28,6 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from app import create_app
-from app.utils.time import utcnow_naive
 from app.extensions import db
 from app.models import (
     Checkin,
@@ -44,6 +43,7 @@ from app.models import (
     User,
 )
 from app.utils.competition import DEFAULT_COMPETITION_NAME, ensure_default_competition
+from app.utils.time import utcnow_naive
 
 # ----------------------------- helpers -----------------------------
 
