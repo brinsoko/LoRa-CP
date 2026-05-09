@@ -5,7 +5,7 @@ including Alembic migrations.
 
 ## Prerequisites
 
-- Python 3.10 or newer
+- Python 3.13 (older 3.x may work but isn't tested in CI)
 - `pip` and `venv` (included with most Python installs)
 - SQLite (ships with Python; no separate install needed)
 - Git

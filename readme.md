@@ -42,7 +42,7 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 
 ##  Tech Stack
 
-- **Backend:** Flask (Python 3.10+)
+- **Backend:** Flask (Python 3.13)
 - **API layer:** Plain Flask blueprints
 - **Database:** SQLite (SQLAlchemy ORM via Flask-SQLAlchemy)
 - **Migrations:** Alembic (batch mode for SQLite)
@@ -163,7 +163,7 @@ The repo also contains some packages in `requirements.txt` that are not part of 
 
 ### Requirements
 
-- Python 3.10+
+- Python 3.13
 - `venv` recommended
 - SQLite for local development
 
