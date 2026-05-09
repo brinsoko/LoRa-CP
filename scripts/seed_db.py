@@ -18,6 +18,7 @@ import sys
 import random
 import csv
 from datetime import datetime, timedelta
+from app.utils.time import utcnow_naive
 from pathlib import Path
 
 # Ensure project root (where 'app/' lives) is importable
@@ -407,7 +408,7 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
                 ensure_rfid(t, f"SEED{idx:04X}0000", 100 + idx)
 
             print("Seeding demo check-ins...")
-            now = datetime.utcnow()
+            now = utcnow_naive()
 
             def checkpoints_for_team(team: Team) -> list[Checkpoint]:
                 group_ids = [tg.group_id for tg in team.group_assignments]
