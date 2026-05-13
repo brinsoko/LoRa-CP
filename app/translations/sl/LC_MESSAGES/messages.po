@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LoRa KT\n"
 "Report-Msgid-Bugs-To: brin.soko@gmail.com\n"
-"POT-Creation-Date: 2026-05-09 23:06+0200\n"
+"POT-Creation-Date: 2026-05-10 00:36+0200\n"
 "PO-Revision-Date: 2025-12-04 00:00+0100\n"
 "Last-Translator: Brin Soko <brin.soko@gmail.com>\n"
 "Language: sl\n"
@@ -85,7 +85,7 @@ msgstr "Uporabnik %(user)s je bil odstranjen iz tekmovanja."
 msgid "Competition %(name)s created."
 msgstr "Tekmovanje %(name)s je bilo ustvarjeno."
 
-#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:356
+#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:360
 msgid "Competition settings updated."
 msgstr "Nastavitve tekmovanja so posodobljene."
 
@@ -170,8 +170,8 @@ msgstr "Naprava %(name)s je bila izbrisana."
 #: app/blueprints/audit/routes.py:115 app/blueprints/checkins/routes.py:170
 #: app/blueprints/firmware/routes.py:41 app/blueprints/judges/routes.py:18
 #: app/blueprints/main/routes.py:164 app/blueprints/main/routes.py:223
-#: app/blueprints/main/routes.py:395 app/blueprints/main/routes.py:432
-#: app/blueprints/main/routes.py:460 app/blueprints/scores/routes.py:75
+#: app/blueprints/main/routes.py:399 app/blueprints/main/routes.py:436
+#: app/blueprints/main/routes.py:464 app/blueprints/scores/routes.py:75
 #: app/blueprints/scores/routes.py:157 app/blueprints/scores/routes.py:175
 #: app/blueprints/scores/routes.py:250 app/blueprints/scores/routes.py:534
 #: app/blueprints/scores/routes.py:561 app/blueprints/scores/routes.py:772
@@ -203,9 +203,8 @@ msgid "Password should not contain your username."
 msgstr "Geslo ne sme vsebovati uporabniškega imena."
 
 #: app/blueprints/auth/routes.py:88 app/blueprints/auth/routes.py:223
-#, fuzzy
 msgid "Signed in."
-msgstr "Prijavi se"
+msgstr "Prijavljeni."
 
 #: app/blueprints/auth/routes.py:96
 msgid "Invalid username or password."
@@ -216,9 +215,8 @@ msgid "Google OAuth is not configured."
 msgstr "Google OAuth ni nastavljen."
 
 #: app/blueprints/auth/routes.py:138
-#, fuzzy
 msgid "Invalid OAuth state."
-msgstr "Neveljavni podatki obrazca."
+msgstr "Neveljavno stanje OAuth."
 
 #: app/blueprints/auth/routes.py:143
 msgid "Google OAuth failed to return a code."
@@ -229,9 +227,8 @@ msgid "Google OAuth token exchange failed."
 msgstr "Izmenjava Google OAuth žetona ni uspela."
 
 #: app/blueprints/auth/routes.py:164
-#, fuzzy
 msgid "Google OAuth did not return an id_token."
-msgstr "Ingest ni vrnil podatka za zapis na kartico."
+msgstr "Google OAuth ni vrnil id_token."
 
 #: app/blueprints/auth/routes.py:176
 #, python-format
@@ -239,9 +236,8 @@ msgid "Google OAuth token verification failed: %(error)s"
 msgstr "Preverjanje Google OAuth žetona ni uspelo: %(error)s"
 
 #: app/blueprints/auth/routes.py:178
-#, fuzzy
 msgid "Google OAuth token verification failed."
-msgstr "Preverjanje ni uspelo."
+msgstr "Preverjanje Google OAuth žetona ni uspelo."
 
 #: app/blueprints/auth/routes.py:184
 msgid "Google OAuth user info missing."
@@ -406,7 +402,7 @@ msgstr "Prilepite vsebino JSON za uvoz."
 msgid "Invalid JSON: %(error)s"
 msgstr "Neveljaven JSON: %(error)s"
 
-#: app/blueprints/checkpoints/routes.py:310
+#: app/blueprints/checkpoints/routes.py:311
 #, fuzzy
 msgid ""
 "JSON must be an array of checkpoints, an object with 'items', or an "
@@ -415,17 +411,17 @@ msgstr ""
 "Prilepi JSON ali naloži datoteko. Sprejemljivo: seznam točk, objekt z "
 "items ali mapa s cps (e/n/name) kot pri izvozu zemljevida."
 
-#: app/blueprints/checkpoints/routes.py:315
+#: app/blueprints/checkpoints/routes.py:318
 #: app/templates/competition_transfer.html:88
 msgid "Import failed."
 msgstr "Uvoz ni uspel."
 
-#: app/blueprints/checkpoints/routes.py:316
-#, fuzzy, python-format
+#: app/blueprints/checkpoints/routes.py:319
+#,, python-format
 msgid "Import failed: %(detail)s"
-msgstr "Uvoz ni uspel."
+msgstr "Uvoz ni uspel: %(detail)s"
 
-#: app/blueprints/checkpoints/routes.py:323
+#: app/blueprints/checkpoints/routes.py:326
 #, fuzzy, python-format
 msgid ""
 "Imported checkpoints: created %(created)s, updated %(updated)s, skipped "
@@ -435,7 +431,7 @@ msgstr ""
 "obstoječih: %(skipped)s.Carovnik koncan. Ustvarjenih %(created)s "
 "zavihkov, preskocenih %(skipped)s obstoječih."
 
-#: app/blueprints/checkpoints/routes.py:331
+#: app/blueprints/checkpoints/routes.py:334
 #, python-format
 msgid "%(count)s row(s) reported errors; see logs."
 msgstr "%(count)s vrstic je prijavilo napake; glej dnevnik."
@@ -575,7 +571,7 @@ msgstr "Naprava je bila posodobljena."
 msgid "Could not delete device."
 msgstr "Ekipe ni bilo mogoče izbrisati."
 
-#: app/blueprints/main/routes.py:63 app/blueprints/main/routes.py:326
+#: app/blueprints/main/routes.py:63 app/blueprints/main/routes.py:330
 msgid "A competition with that name already exists."
 msgstr "Tekmovanje s tem imenom že obstaja."
 
@@ -591,40 +587,40 @@ msgstr "Nimaš dostopa do tega tekmovanja."
 msgid "Competition selected."
 msgstr "Tekmovanje izbrano."
 
-#: app/blueprints/main/routes.py:228 app/blueprints/main/routes.py:437
-#: app/blueprints/main/routes.py:465
+#: app/blueprints/main/routes.py:228 app/blueprints/main/routes.py:441
+#: app/blueprints/main/routes.py:469
 msgid "Competition not found."
 msgstr "Tekmovanje ni bilo najdeno."
 
-#: app/blueprints/main/routes.py:237
+#: app/blueprints/main/routes.py:241
 msgid "Valid email is required."
 msgstr "Veljaven e-poštni naslov je obvezen."
 
-#: app/blueprints/main/routes.py:240 app/blueprints/users/routes.py:79
+#: app/blueprints/main/routes.py:244 app/blueprints/users/routes.py:79
 msgid "Invalid role selected."
 msgstr "Izbrana vloga ni veljavna."
 
-#: app/blueprints/main/routes.py:249
+#: app/blueprints/main/routes.py:253
 msgid "An active invite already exists for this email."
 msgstr "Aktivno povabilo za ta e-poštni naslov že obstaja."
 
-#: app/blueprints/main/routes.py:306
+#: app/blueprints/main/routes.py:310
 msgid "Invite saved."
 msgstr "Povabilo shranjeno."
 
-#: app/blueprints/main/routes.py:403
+#: app/blueprints/main/routes.py:407
 msgid "Invite not found."
 msgstr "Povabilo ni bilo najdeno."
 
-#: app/blueprints/main/routes.py:423
+#: app/blueprints/main/routes.py:427
 msgid "Invite revoked."
 msgstr "Povabilo preklicano."
 
-#: app/blueprints/main/routes.py:448
+#: app/blueprints/main/routes.py:452
 msgid "Competition deleted."
 msgstr "Tekmovanje je izbrisano."
 
-#: app/blueprints/main/routes.py:451
+#: app/blueprints/main/routes.py:455
 msgid "Could not delete competition."
 msgstr "Tekmovanja ni bilo mogoče izbrisati."
 
@@ -1152,10 +1148,12 @@ msgstr "Zabeleži prihod"
 #: app/templates/add_team.html:57 app/templates/change_password.html:22
 #: app/templates/checkin_edit.html:67 app/templates/checkpoint_edit.html:83
 #: app/templates/checkpoints_import_json.html:32
-#: app/templates/firmware_upload.html:59 app/templates/group_edit.html:71
-#: app/templates/login.html:17 app/templates/lora_add.html:22
-#: app/templates/lora_edit.html:26 app/templates/register.html:31
-#: app/templates/team_edit.html:72 app/templates/user_edit.html:44
+#: app/templates/create_admin.html:17 app/templates/firmware_upload.html:59
+#: app/templates/group_edit.html:71 app/templates/login.html:17
+#: app/templates/lora_add.html:22 app/templates/lora_edit.html:26
+#: app/templates/register.html:31 app/templates/rfid_add.html:43
+#: app/templates/rfid_edit.html:38 app/templates/team_edit.html:72
+#: app/templates/user_edit.html:44
 msgid "Cancel"
 msgstr "Prekliči"
 
@@ -1261,7 +1259,8 @@ msgstr "Skupina"
 msgid "No group"
 msgstr "Brez skupine"
 
-#: app/templates/add_team.html:40 app/templates/team_edit.html:50
+#: app/templates/add_team.html:40 app/templates/rfid_add.html:11
+#: app/templates/rfid_edit.html:10 app/templates/team_edit.html:50
 msgid "RFID UID"
 msgstr "RFID UID"
 
@@ -1273,11 +1272,13 @@ msgstr "Prisloni značko ali prilepi UID"
 msgid "Optional; creates an RFID mapping for this team."
 msgstr "Neobvezno; ustvari RFID povezavo za to ekipo."
 
-#: app/templates/add_team.html:44 app/templates/team_edit.html:59
+#: app/templates/add_team.html:44 app/templates/rfid_edit.html:14
+#: app/templates/team_edit.html:59
 msgid "Read via Web NFC"
 msgstr "Preberi z Web NFC"
 
-#: app/templates/add_team.html:45 app/templates/team_edit.html:60
+#: app/templates/add_team.html:45 app/templates/rfid_edit.html:15
+#: app/templates/team_edit.html:60
 msgid "Not checked"
 msgstr "Ni preverjeno"
 
@@ -2054,6 +2055,26 @@ msgstr "Posodobljeno"
 msgid "Skipped:"
 msgstr "preskoči"
 
+#: app/templates/create_admin.html:2 app/templates/create_admin.html:16
+#, fuzzy
+msgid "Create Admin"
+msgstr "Ustvarjeno"
+
+#: app/templates/create_admin.html:5
+#, fuzzy
+msgid "Create Admin Account"
+msgstr "Ustvari tekmovanje"
+
+#: app/templates/create_admin.html:9 app/templates/register.html:9
+#: app/templates/user_edit.html:9 app/templates/users_list.html:49
+msgid "Username"
+msgstr "Uporabniško ime"
+
+#: app/templates/create_admin.html:13 app/templates/login.html:13
+#: app/templates/register.html:18 app/templates/user_edit.html:16
+msgid "Password"
+msgstr "Geslo"
+
 #: app/templates/firmware_flash.html:2
 msgid "Flash Device"
 msgstr "Naloži na napravo"
@@ -2576,11 +2597,6 @@ msgstr "Prijava"
 msgid "Username or Email"
 msgstr "Uporabniško ime ali e-pošta"
 
-#: app/templates/login.html:13 app/templates/register.html:18
-#: app/templates/user_edit.html:16
-msgid "Password"
-msgstr "Geslo"
-
 #: app/templates/login.html:16
 msgid "Sign in"
 msgstr "Prijavi se"
@@ -2741,11 +2757,6 @@ msgstr "Ogled statistike"
 msgid "No public results yet."
 msgstr "Še ni javnih rezultatov."
 
-#: app/templates/register.html:9 app/templates/user_edit.html:9
-#: app/templates/users_list.html:49
-msgid "Username"
-msgstr "Uporabniško ime"
-
 #: app/templates/register.html:13
 msgid "Email (Google login)"
 msgstr "E-pošta (Google prijava)"
@@ -2765,6 +2776,70 @@ msgstr "Vloga v tekmovanju"
 #: app/templates/register.html:28 app/templates/user_edit.html:39
 msgid "Roles apply per competition."
 msgstr "Vloge veljajo ločeno za vsako tekmovanje."
+
+#: app/templates/rfid_add.html:2 app/templates/rfid_add.html:6
+msgid "Add RFID Card"
+msgstr "Dodaj kartico RFID"
+
+#: app/templates/rfid_add.html:15
+msgid "Enter RFID UID"
+msgstr "Vnesite UID RFID"
+
+#: app/templates/rfid_add.html:17
+msgid "Scan UID"
+msgstr "Skeniraj UID"
+
+#: app/templates/rfid_add.html:18 app/templates/rfid_finish.html:52
+#: app/templates/rfid_judge.html:65
+msgid "Web NFC"
+msgstr "Web NFC"
+
+#: app/templates/rfid_add.html:20
+msgid ""
+"UID is case-insensitive; colons/dashes are OK. Web NFC works on Android "
+"Chrome."
+msgstr ""
+
+#: app/templates/rfid_add.html:24 app/templates/rfid_edit.html:21
+msgid "Card Number (optional)"
+msgstr "Številka kartice (neobvezno)"
+
+#: app/templates/rfid_add.html:26
+msgid "e.g. 101"
+msgstr "npr. 101"
+
+#: app/templates/rfid_add.html:28
+msgid "Must be a positive integer if provided."
+msgstr "Če je naveden, mora biti pozitivno celo število."
+
+#: app/templates/rfid_add.html:32
+msgid "Assign to Team"
+msgstr "Dodeli ekipi"
+
+#: app/templates/rfid_add.html:34
+msgid "— Select Team —"
+msgstr "— Izberi ekipo —"
+
+#: app/templates/rfid_add.html:42
+msgid "Add RFID"
+msgstr "Dodaj RFID"
+
+#: app/templates/rfid_edit.html:5
+msgid "Edit RFID Mapping"
+msgstr "Uredi preslikavo RFID"
+
+#: app/templates/rfid_edit.html:12
+msgid "Paste or scan with Web NFC on supported devices."
+msgstr "Prilepite ali skenirajte z Web NFC na podprtih napravah."
+
+#: app/templates/rfid_edit.html:26
+msgid "Assigned Team"
+msgstr "Dodeljena ekipa"
+
+#: app/templates/rfid_edit.html:37
+#, fuzzy
+msgid "Save Changes"
+msgstr "Shrani povabilo"
 
 #: app/templates/rfid_finish.html:9
 msgid "Finish-line Check"
@@ -2809,10 +2884,6 @@ msgstr "Rezultati"
 #: app/templates/rfid_finish.html:49
 msgid "Awaiting scan..."
 msgstr "Čakam na skeniranje…"
-
-#: app/templates/rfid_finish.html:52 app/templates/rfid_judge.html:65
-msgid "Web NFC"
-msgstr "Web NFC"
 
 #: app/templates/rfid_finish.html:53 app/templates/rfid_judge.html:66
 msgid "Checking…"

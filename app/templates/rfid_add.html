@@ -1,37 +1,37 @@
 {% extends "base.html" %}
-{% block title %}Add RFID Card{% endblock %}
+{% block title %}{{ _('Add RFID Card') }}{% endblock %}
 {% block content %}
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title mb-3">Add RFID Card</h5>
+    <h5 class="card-title mb-3">{{ _('Add RFID Card') }}</h5>
 
     <form method="post" id="rfidForm" novalidate>
       {{ csrf_input() }}
       <div class="mb-3">
-        <label class="form-label">RFID UID</label>
+        <label class="form-label">{{ _('RFID UID') }}</label>
         <div class="input-group">
           <input type="text" class="form-control" name="uid" id="uidInput"
                  value="{{ uid_value or '' }}"
-                 placeholder="Enter RFID UID" required>
+                 placeholder="{{ _('Enter RFID UID') }}" required>
           <!-- Optional: scan button (works if serial reader is connected & endpoint enabled) -->
-          <button class="btn btn-outline-secondary" type="button" id="scanBtn">Scan UID</button>
-          <button class="btn btn-outline-primary" type="button" id="webNfcBtn">Web NFC</button>
+          <button class="btn btn-outline-secondary" type="button" id="scanBtn">{{ _('Scan UID') }}</button>
+          <button class="btn btn-outline-primary" type="button" id="webNfcBtn">{{ _('Web NFC') }}</button>
         </div>
-        <div class="form-text">UID is case-insensitive; colons/dashes are OK. Web NFC works on Android Chrome.</div>
+        <div class="form-text">{{ _('UID is case-insensitive; colons/dashes are OK. Web NFC works on Android Chrome.') }}</div>
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Card Number (optional)</label>
+        <label class="form-label">{{ _('Card Number (optional)') }}</label>
         <input type="number" class="form-control" name="number" id="numberInput"
-               inputmode="numeric" min="1" step="1" placeholder="e.g. 101"
+               inputmode="numeric" min="1" step="1" placeholder="{{ _('e.g. 101') }}"
                value="{{ number_value or '' }}">
-        <div class="form-text">Must be a positive integer if provided.</div>
+        <div class="form-text">{{ _('Must be a positive integer if provided.') }}</div>
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Assign to Team</label>
+        <label class="form-label">{{ _('Assign to Team') }}</label>
         <select name="team_id" class="form-select" required>
-          <option value="">— Select Team —</option>
+          <option value="">{{ _('— Select Team —') }}</option>
           {% for team in teams %}
             <option value="{{ team.id }}" {% if selected_team_id == team.id %}selected{% endif %}>{{ team.name }}{% if team.number %} ({{ team.number }}){% endif %}</option>
           {% endfor %}
@@ -39,8 +39,8 @@
       </div>
 
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">Add RFID</button>
-        <a href="{{ url_for('rfid.list_rfid') }}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">{{ _('Add RFID') }}</button>
+        <a href="{{ url_for('rfid.list_rfid') }}" class="btn btn-secondary">{{ _('Cancel') }}</a>
       </div>
     </form>
   </div>

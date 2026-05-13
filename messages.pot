@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-05-09 23:06+0200\n"
+"POT-Creation-Date: 2026-05-10 00:36+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -80,7 +80,7 @@ msgstr ""
 msgid "Competition %(name)s created."
 msgstr ""
 
-#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:356
+#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:360
 msgid "Competition settings updated."
 msgstr ""
 
@@ -165,8 +165,8 @@ msgstr ""
 #: app/blueprints/audit/routes.py:115 app/blueprints/checkins/routes.py:170
 #: app/blueprints/firmware/routes.py:41 app/blueprints/judges/routes.py:18
 #: app/blueprints/main/routes.py:164 app/blueprints/main/routes.py:223
-#: app/blueprints/main/routes.py:395 app/blueprints/main/routes.py:432
-#: app/blueprints/main/routes.py:460 app/blueprints/scores/routes.py:75
+#: app/blueprints/main/routes.py:399 app/blueprints/main/routes.py:436
+#: app/blueprints/main/routes.py:464 app/blueprints/scores/routes.py:75
 #: app/blueprints/scores/routes.py:157 app/blueprints/scores/routes.py:175
 #: app/blueprints/scores/routes.py:250 app/blueprints/scores/routes.py:534
 #: app/blueprints/scores/routes.py:561 app/blueprints/scores/routes.py:772
@@ -392,30 +392,30 @@ msgstr ""
 msgid "Invalid JSON: %(error)s"
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:310
+#: app/blueprints/checkpoints/routes.py:311
 msgid ""
 "JSON must be an array of checkpoints, an object with 'items', or an "
 "object with 'cps' list."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:315
+#: app/blueprints/checkpoints/routes.py:318
 #: app/templates/competition_transfer.html:88
 msgid "Import failed."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:316
+#: app/blueprints/checkpoints/routes.py:319
 #, python-format
 msgid "Import failed: %(detail)s"
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:323
+#: app/blueprints/checkpoints/routes.py:326
 #, python-format
 msgid ""
 "Imported checkpoints: created %(created)s, updated %(updated)s, skipped "
 "%(skipped)s."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:331
+#: app/blueprints/checkpoints/routes.py:334
 #, python-format
 msgid "%(count)s row(s) reported errors; see logs."
 msgstr ""
@@ -546,7 +546,7 @@ msgstr ""
 msgid "Could not delete device."
 msgstr ""
 
-#: app/blueprints/main/routes.py:63 app/blueprints/main/routes.py:326
+#: app/blueprints/main/routes.py:63 app/blueprints/main/routes.py:330
 msgid "A competition with that name already exists."
 msgstr ""
 
@@ -562,40 +562,40 @@ msgstr ""
 msgid "Competition selected."
 msgstr ""
 
-#: app/blueprints/main/routes.py:228 app/blueprints/main/routes.py:437
-#: app/blueprints/main/routes.py:465
+#: app/blueprints/main/routes.py:228 app/blueprints/main/routes.py:441
+#: app/blueprints/main/routes.py:469
 msgid "Competition not found."
 msgstr ""
 
-#: app/blueprints/main/routes.py:237
+#: app/blueprints/main/routes.py:241
 msgid "Valid email is required."
 msgstr ""
 
-#: app/blueprints/main/routes.py:240 app/blueprints/users/routes.py:79
+#: app/blueprints/main/routes.py:244 app/blueprints/users/routes.py:79
 msgid "Invalid role selected."
 msgstr ""
 
-#: app/blueprints/main/routes.py:249
+#: app/blueprints/main/routes.py:253
 msgid "An active invite already exists for this email."
 msgstr ""
 
-#: app/blueprints/main/routes.py:306
+#: app/blueprints/main/routes.py:310
 msgid "Invite saved."
 msgstr ""
 
-#: app/blueprints/main/routes.py:403
+#: app/blueprints/main/routes.py:407
 msgid "Invite not found."
 msgstr ""
 
-#: app/blueprints/main/routes.py:423
+#: app/blueprints/main/routes.py:427
 msgid "Invite revoked."
 msgstr ""
 
-#: app/blueprints/main/routes.py:448
+#: app/blueprints/main/routes.py:452
 msgid "Competition deleted."
 msgstr ""
 
-#: app/blueprints/main/routes.py:451
+#: app/blueprints/main/routes.py:455
 msgid "Could not delete competition."
 msgstr ""
 
@@ -1090,10 +1090,12 @@ msgstr ""
 #: app/templates/add_team.html:57 app/templates/change_password.html:22
 #: app/templates/checkin_edit.html:67 app/templates/checkpoint_edit.html:83
 #: app/templates/checkpoints_import_json.html:32
-#: app/templates/firmware_upload.html:59 app/templates/group_edit.html:71
-#: app/templates/login.html:17 app/templates/lora_add.html:22
-#: app/templates/lora_edit.html:26 app/templates/register.html:31
-#: app/templates/team_edit.html:72 app/templates/user_edit.html:44
+#: app/templates/create_admin.html:17 app/templates/firmware_upload.html:59
+#: app/templates/group_edit.html:71 app/templates/login.html:17
+#: app/templates/lora_add.html:22 app/templates/lora_edit.html:26
+#: app/templates/register.html:31 app/templates/rfid_add.html:43
+#: app/templates/rfid_edit.html:38 app/templates/team_edit.html:72
+#: app/templates/user_edit.html:44
 msgid "Cancel"
 msgstr ""
 
@@ -1195,7 +1197,8 @@ msgstr ""
 msgid "No group"
 msgstr ""
 
-#: app/templates/add_team.html:40 app/templates/team_edit.html:50
+#: app/templates/add_team.html:40 app/templates/rfid_add.html:11
+#: app/templates/rfid_edit.html:10 app/templates/team_edit.html:50
 msgid "RFID UID"
 msgstr ""
 
@@ -1207,11 +1210,13 @@ msgstr ""
 msgid "Optional; creates an RFID mapping for this team."
 msgstr ""
 
-#: app/templates/add_team.html:44 app/templates/team_edit.html:59
+#: app/templates/add_team.html:44 app/templates/rfid_edit.html:14
+#: app/templates/team_edit.html:59
 msgid "Read via Web NFC"
 msgstr ""
 
-#: app/templates/add_team.html:45 app/templates/team_edit.html:60
+#: app/templates/add_team.html:45 app/templates/rfid_edit.html:15
+#: app/templates/team_edit.html:60
 msgid "Not checked"
 msgstr ""
 
@@ -1963,6 +1968,24 @@ msgstr ""
 msgid "Skipped:"
 msgstr ""
 
+#: app/templates/create_admin.html:2 app/templates/create_admin.html:16
+msgid "Create Admin"
+msgstr ""
+
+#: app/templates/create_admin.html:5
+msgid "Create Admin Account"
+msgstr ""
+
+#: app/templates/create_admin.html:9 app/templates/register.html:9
+#: app/templates/user_edit.html:9 app/templates/users_list.html:49
+msgid "Username"
+msgstr ""
+
+#: app/templates/create_admin.html:13 app/templates/login.html:13
+#: app/templates/register.html:18 app/templates/user_edit.html:16
+msgid "Password"
+msgstr ""
+
 #: app/templates/firmware_flash.html:2
 msgid "Flash Device"
 msgstr ""
@@ -2469,11 +2492,6 @@ msgstr ""
 msgid "Username or Email"
 msgstr ""
 
-#: app/templates/login.html:13 app/templates/register.html:18
-#: app/templates/user_edit.html:16
-msgid "Password"
-msgstr ""
-
 #: app/templates/login.html:16
 msgid "Sign in"
 msgstr ""
@@ -2633,11 +2651,6 @@ msgstr ""
 msgid "No public results yet."
 msgstr ""
 
-#: app/templates/register.html:9 app/templates/user_edit.html:9
-#: app/templates/users_list.html:49
-msgid "Username"
-msgstr ""
-
 #: app/templates/register.html:13
 msgid "Email (Google login)"
 msgstr ""
@@ -2656,6 +2669,69 @@ msgstr ""
 
 #: app/templates/register.html:28 app/templates/user_edit.html:39
 msgid "Roles apply per competition."
+msgstr ""
+
+#: app/templates/rfid_add.html:2 app/templates/rfid_add.html:6
+msgid "Add RFID Card"
+msgstr ""
+
+#: app/templates/rfid_add.html:15
+msgid "Enter RFID UID"
+msgstr ""
+
+#: app/templates/rfid_add.html:17
+msgid "Scan UID"
+msgstr ""
+
+#: app/templates/rfid_add.html:18 app/templates/rfid_finish.html:52
+#: app/templates/rfid_judge.html:65
+msgid "Web NFC"
+msgstr ""
+
+#: app/templates/rfid_add.html:20
+msgid ""
+"UID is case-insensitive; colons/dashes are OK. Web NFC works on Android "
+"Chrome."
+msgstr ""
+
+#: app/templates/rfid_add.html:24 app/templates/rfid_edit.html:21
+msgid "Card Number (optional)"
+msgstr ""
+
+#: app/templates/rfid_add.html:26
+msgid "e.g. 101"
+msgstr ""
+
+#: app/templates/rfid_add.html:28
+msgid "Must be a positive integer if provided."
+msgstr ""
+
+#: app/templates/rfid_add.html:32
+msgid "Assign to Team"
+msgstr ""
+
+#: app/templates/rfid_add.html:34
+msgid "— Select Team —"
+msgstr ""
+
+#: app/templates/rfid_add.html:42
+msgid "Add RFID"
+msgstr ""
+
+#: app/templates/rfid_edit.html:5
+msgid "Edit RFID Mapping"
+msgstr ""
+
+#: app/templates/rfid_edit.html:12
+msgid "Paste or scan with Web NFC on supported devices."
+msgstr ""
+
+#: app/templates/rfid_edit.html:26
+msgid "Assigned Team"
+msgstr ""
+
+#: app/templates/rfid_edit.html:37
+msgid "Save Changes"
 msgstr ""
 
 #: app/templates/rfid_finish.html:9
@@ -2698,10 +2774,6 @@ msgstr ""
 
 #: app/templates/rfid_finish.html:49
 msgid "Awaiting scan..."
-msgstr ""
-
-#: app/templates/rfid_finish.html:52 app/templates/rfid_judge.html:65
-msgid "Web NFC"
 msgstr ""
 
 #: app/templates/rfid_finish.html:53 app/templates/rfid_judge.html:66

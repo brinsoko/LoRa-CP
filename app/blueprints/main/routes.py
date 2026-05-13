@@ -234,7 +234,11 @@ def competition_settings():
             email, email_error = validate_email(request.form.get("invite_email"))
             role = (request.form.get("invite_role") or "judge").strip().lower()
             if email_error or not email:
-                flash(_(email_error or "Valid email is required."), "warning")
+                # email_error comes from validate_email() and is already
+                # an English message; gettext can't extract a runtime
+                # variable, so use the validator's message verbatim and
+                # fall back to a literal that pybabel CAN extract.
+                flash(email_error or _("Valid email is required."), "warning")
                 return redirect(url_for("main.competition_settings"))
             if role not in ("viewer", "judge", "admin"):
                 flash(_("Invalid role selected."), "warning")
