@@ -23,6 +23,7 @@ from app.models import (
     ScoreEntry,
     Team,
     TeamGroup,
+    User,
 )
 from app.utils.rest_auth import json_roles_required
 from app.utils.time import utcnow_naive
@@ -86,6 +87,7 @@ def _export_competition(comp: Competition) -> dict:
                 "description": cp.description,
                 "easting": cp.easting,
                 "northing": cp.northing,
+                "is_virtual": bool(cp.is_virtual),
             }
             for cp in checkpoints
         ],
@@ -94,6 +96,12 @@ def _export_competition(comp: Competition) -> dict:
                 "team_name": c.team.name if c.team else None,
                 "checkpoint_name": c.checkpoint.name if c.checkpoint else None,
                 "timestamp": c.timestamp.isoformat() if c.timestamp else None,
+                "created_by_username": (
+                    c.created_by_user.username if c.created_by_user else None
+                ),
+                "created_by_dev_num": (
+                    c.created_by_device.dev_num if c.created_by_device else None
+                ),
             }
             for c in checkins
         ],
@@ -217,6 +225,7 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
             description=cp_data.get("description"),
             easting=cp_data.get("easting"),
             northing=cp_data.get("northing"),
+            is_virtual=bool(cp_data.get("is_virtual", False)),
         )
         db.session.add(cp)
         db.session.flush()
@@ -291,6 +300,11 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                 )
 
     # Check-ins
+    # Resolve user and device references from the export so the
+    # round-trip preserves who created each row. Users are looked up
+    # globally by username (they may already exist in the destination);
+    # devices are looked up within the destination competition by
+    # dev_num. Missing references degrade gracefully to None.
     for ci_data in data.get("checkins", []):
         team = team_map.get(ci_data.get("team_name"))
         cp = cp_map.get(ci_data.get("checkpoint_name"))
@@ -301,12 +315,31 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                     ts = datetime.fromisoformat(ci_data["timestamp"])
                 except Exception:
                     ts = utcnow_naive()
+
+            created_by_user_id = None
+            created_by_username = ci_data.get("created_by_username")
+            if created_by_username:
+                u = User.query.filter_by(username=created_by_username).first()
+                if u:
+                    created_by_user_id = u.id
+
+            created_by_device_id = None
+            created_by_dev_num = ci_data.get("created_by_dev_num")
+            if created_by_dev_num is not None:
+                d = LoRaDevice.query.filter_by(
+                    competition_id=comp.id, dev_num=created_by_dev_num
+                ).first()
+                if d:
+                    created_by_device_id = d.id
+
             db.session.add(
                 Checkin(
                     competition_id=comp.id,
                     team_id=team.id,
                     checkpoint_id=cp.id,
                     timestamp=ts or utcnow_naive(),
+                    created_by_user_id=created_by_user_id,
+                    created_by_device_id=created_by_device_id,
                 )
             )
 

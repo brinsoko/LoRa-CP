@@ -180,6 +180,10 @@
             "items": {
               "$ref": "#/components/schemas/TeamGroup"
             }
+          },
+          "checkins_count": {
+            "type": "integer",
+            "description": "Total number of check-ins this team has recorded in the current competition."
           }
         },
         "required": [
