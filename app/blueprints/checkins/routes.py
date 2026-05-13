@@ -5,7 +5,7 @@ from datetime import datetime
 
 from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
 from flask_babel import gettext as _
-from flask_login import current_user
+from flask_login import current_user, login_required
 
 from app.models import Checkpoint, CheckpointGroup, JudgeCheckpoint
 from app.utils.competition import get_current_competition_id, get_current_competition_role
@@ -110,6 +110,7 @@ def _decorate_checkins(items):
 
 
 @checkins_bp.route("/", methods=["GET"])
+@login_required
 def list_checkins():
     team_id = request.args.get("team_id", type=int)
     checkpoint_id = request.args.get("checkpoint_id", type=int)
@@ -131,7 +132,7 @@ def list_checkins():
 
     resp, payload = api_json("GET", "/api/checkins", params=params)
     if resp.status_code != 200:
-        flash(payload.get("detail") or payload.get("error") or "Could not load check-ins.", "warning")
+        flash(payload.get("detail") or payload.get("error") or _("Could not load check-ins."), "warning")
         checkins = []
         pagination = {"page": page, "per_page": per_page, "pages": 0, "total": 0, "has_prev": False, "has_next": False}
     else:
@@ -192,6 +193,7 @@ def live_arrivals():
 
 
 @checkins_bp.route("/export.csv", methods=["GET"])
+@login_required
 def export_checkins_csv():
     params = {
         key: value

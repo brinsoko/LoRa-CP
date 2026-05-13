@@ -158,6 +158,7 @@ def _filtered_checkins(team_id, checkpoint_id, date_from_str, date_to_str):
 
 
 @main_bp.route("/checkins")
+@login_required
 def view_checkins():
     comp_id = get_current_competition_id()
     if not comp_id:
@@ -188,6 +189,7 @@ def view_checkins():
 
 
 @main_bp.route("/checkins.csv")
+@login_required
 def export_checkins_csv():
     team_id = request.args.get("team_id", type=int)
     cp_id = request.args.get("checkpoint_id", type=int)
