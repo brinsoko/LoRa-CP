@@ -21,6 +21,7 @@ from app.utils.audit import record_audit_event
 from app.utils.card_tokens import compute_card_digest
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_roles_required
+from app.utils.serial_helpers import normalize_uid
 from app.utils.sheets_sync import mark_arrival_checkbox, update_checkpoint_scores
 from app.utils.time import utcnow_naive
 
@@ -530,7 +531,10 @@ def score_resolve():
         return jsonify({"error": "no_competition"}), 400
 
     payload = request.get_json(silent=True) or {}
-    uid = (payload.get("uid") or "").strip().upper()
+    # Same normalization as /api/ingest: drop any "|HMAC" suffix from v2
+    # LoRa-format clients, strip ':'/'-', uppercase — so Web NFC scans
+    # (colon-separated UIDs) match the canonical form stored on rfid_cards.
+    uid = normalize_uid((payload.get("uid") or "").split("|", 1)[0])
     team_id = payload.get("team_id")
     checkpoint_id = payload.get("checkpoint_id")
     try:
@@ -641,7 +645,8 @@ def score_submit():
     team_id = payload.get("team_id")
     checkpoint_id = payload.get("checkpoint_id")
     fields = payload.get("fields") or {}
-    uid = (payload.get("uid") or "").strip().upper()
+    # Same normalization as /api/ingest — see note in score_resolve.
+    uid = normalize_uid((payload.get("uid") or "").split("|", 1)[0])
 
     # Validate no negative numeric inputs (dead_time excluded — it's always >= 0)
     for key, val in fields.items():
