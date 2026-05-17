@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PYTHON = str(ROOT / "venv313" / "bin" / "python")
 
 
 def _run_script(script: str, env_overrides: dict[str, str], tmp_path) -> subprocess.CompletedProcess:
@@ -28,8 +28,10 @@ def _run_script(script: str, env_overrides: dict[str, str], tmp_path) -> subproc
         "LORA_WEBHOOK_SECRET": "test-guard-webhook",
     }
     env.update(env_overrides)
+    # Use the current Python interpreter so the test works in CI
+    # (no venv on disk) and locally regardless of venv naming.
     return subprocess.run(
-        [PYTHON, script],
+        [sys.executable, script],
         cwd=str(ROOT),
         env=env,
         capture_output=True,

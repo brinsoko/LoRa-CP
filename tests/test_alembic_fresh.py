@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,8 +25,10 @@ def test_alembic_upgrade_head_on_fresh_db(tmp_path):
     env = dict(os.environ)
     env["DATABASE_URL"] = f"sqlite:///{db_path}"
 
+    # Use the current Python interpreter so this works in CI (no venv on
+    # disk) and locally regardless of venv naming.
     result = subprocess.run(
-        [str(ROOT / "venv313" / "bin" / "alembic"), "upgrade", "head"],
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
         cwd=str(ROOT),
         env=env,
         capture_output=True,

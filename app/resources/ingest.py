@@ -24,6 +24,7 @@ from app.models import (
 from app.utils.audit import format_device_label, record_audit_event
 from app.utils.card_tokens import compute_card_digest
 from app.utils.payloads import parse_gps_payload
+from app.utils.serial_helpers import normalize_uid
 from app.utils.sheets_sync import mark_arrival_checkbox
 from app.utils.time import utc_from_timestamp_naive, utcnow_naive
 
@@ -346,7 +347,13 @@ def ingest_post():
         # 3) Auto check-in if payload matches RFID UID. Scoped per
         # competition so the same physical card can be reused across
         # events without colliding.
-        uid = str(payload).strip().upper()
+        #
+        # Some senders (v2 LoRa protocol) append "|<HMAC>" to the payload
+        # for offline tag verification; drop the suffix before lookup.
+        # Then normalize the same way /api/rfid/cards normalizes on write
+        # (strip ':' and '-', uppercase) so colon-separated NFC UIDs match
+        # the canonical DB form.
+        uid = normalize_uid(str(payload).split("|", 1)[0])
         card = RFIDCard.query.filter_by(competition_id=competition_id, uid=uid).first()
 
         created_checkin = False

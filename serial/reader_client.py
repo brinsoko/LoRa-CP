@@ -17,9 +17,18 @@ BACKOFF_MAX = float(os.getenv("BACKOFF_MAX", "10"))  # max backoff cap
 DEBUG = os.getenv("DEBUG", "0") == "1"
 POST_TIMEOUT = float(os.getenv("POST_TIMEOUT", "5"))  # HTTP POST timeout
 INGEST_PASSWORD = os.getenv("INGEST_PASSWORD")
+# Device-grade auth: matches the server's LORA_WEBHOOK_SECRET. Sent as the
+# X-Webhook-Secret header so we don't need a logged-in session.
+WEBHOOK_SECRET = os.getenv("LORA_WEBHOOK_SECRET")
 
-# dev_id|payload|rssi|snr   (e.g. 1|A1B2C3D4|-66.0|9.5)
-LINE_RE = re.compile(r"^\s*(?P<dev>\d+)\|(?P<payload>[^|]+)\|(?P<rssi>-?\d+(?:\.\d+)?)\|(?P<snr>-?\d+(?:\.\d+)?)\s*$")
+# Receiver emits: competition_id|dev_id|payload|rssi|snr
+# Payload itself can contain '|' (e.g. v2 scans send "<UID>|<HMAC>"), so we
+# anchor on the last two pipe-delimited numbers (rssi, snr) and the leading
+# two integers (competition_id, dev_id); whatever sits between is payload.
+LINE_RE = re.compile(
+    r"^\s*(?P<comp>\d+)\|(?P<dev>\d+)\|(?P<payload>.+)\|"
+    r"(?P<rssi>-?\d+(?:\.\d+)?)\|(?P<snr>-?\d+(?:\.\d+)?)\s*$"
+)
 
 running = True
 
@@ -101,8 +110,15 @@ def run():
                             continue
 
                         try:
+                            comp_from_line = int(m.group("comp"))
                             dev = int(m.group("dev"))
                             payload = m.group("payload").strip()
+                            # v2 senders append "|<HMAC>" for offline tag
+                            # verification; the backend doesn't need it
+                            # (it recomputes its own writeback HMAC), and
+                            # forwarding it makes the RFIDCard lookup miss.
+                            if "|" in payload:
+                                payload = payload.split("|", 1)[0].strip()
                             rssi = float(m.group("rssi"))
                             snr = float(m.group("snr"))
                         except Exception as e:
@@ -112,19 +128,27 @@ def run():
                         # POST to API
                         try:
                             body = {"dev_id": dev, "payload": payload, "rssi": rssi, "snr": snr}
+                            # Env override wins; otherwise use what the receiver said.
                             if COMPETITION_ID:
                                 try:
                                     body["competition_id"] = int(COMPETITION_ID)
                                 except Exception:
                                     body["competition_id"] = COMPETITION_ID
+                            elif comp_from_line:
+                                body["competition_id"] = comp_from_line
                             if INGEST_PASSWORD:
                                 body["ingest_password"] = INGEST_PASSWORD
-                            resp = session.post(API_URL, json=body, timeout=POST_TIMEOUT)
+                            headers = {"X-Webhook-Secret": WEBHOOK_SECRET} if WEBHOOK_SECRET else None
+                            resp = session.post(API_URL, json=body, headers=headers, timeout=POST_TIMEOUT)
                             resp.raise_for_status()
                             print(f"[reader] OK dev={dev} payload={payload} -> {resp.json()}", flush=True)
                             backoff = BACKOFF_0  # reset backoff on success
                         except requests.RequestException as e:
-                            print(f"[reader] ingest error: {e}", flush=True)
+                            # Include the server's error body — the 4xx detail tells us which
+                            # auth check failed (webhook secret vs. competition ingest password).
+                            err_resp = getattr(e, "response", None)
+                            detail = f" body={err_resp.text[:300]!r}" if err_resp is not None else ""
+                            print(f"[reader] ingest error: {e}{detail}", flush=True)
                             time.sleep(min(backoff, BACKOFF_MAX))
                             backoff = min(backoff * 2, BACKOFF_MAX)
 

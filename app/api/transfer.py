@@ -26,6 +26,7 @@ from app.models import (
     User,
 )
 from app.utils.rest_auth import json_roles_required
+from app.utils.serial_helpers import normalize_uid
 from app.utils.time import utcnow_naive
 
 transfer_api_bp = Blueprint("api_transfer", __name__)
@@ -287,7 +288,11 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
     for card_data in data.get("rfid_cards", []):
         team = team_map.get(card_data.get("team_name"))
         if team:
-            uid = card_data.get("uid", "")
+            # Normalize on import — older exports may carry colon-separated
+            # UIDs that wouldn't match the canonical /api/ingest lookup form.
+            uid = normalize_uid(card_data.get("uid", ""))
+            if not uid:
+                continue
             existing_uid = RFIDCard.query.filter_by(competition_id=comp.id, uid=uid).first()
             if not existing_uid:
                 db.session.add(

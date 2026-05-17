@@ -43,6 +43,7 @@ from app.models import (
     User,
 )
 from app.utils.competition import DEFAULT_COMPETITION_NAME, ensure_default_competition
+from app.utils.serial_helpers import normalize_uid
 from app.utils.time import utcnow_naive
 
 # ----------------------------- helpers -----------------------------
@@ -172,7 +173,10 @@ def assign_team_to_groups(team: Team, group_ids: list[int]):
 
 
 def ensure_rfid(team: Team, uid: str, number: int | None):
-    uid_norm = uid.strip().upper()
+    # Drop any "<UID>|<HMAC>" suffix from v2 LoRa-format inputs, then run
+    # through the canonical normalizer (strips ':' and '-', uppercases) so
+    # cards seeded here match what /api/ingest looks up at scan time.
+    uid_norm = normalize_uid(uid.split("|", 1)[0])
     comp_id = team.competition_id
     # If team already has a card, update it; else create (respecting UID
     # uniqueness within this competition).

@@ -6,18 +6,19 @@ planned for late May 2026.
 
 ## Working environment
 
-- **Python interpreter:** `venv313/bin/python` (3.13). The older `venv/`
-  exists but is Python 3.10 and incompatible with current code (uses
-  `from datetime import UTC`, etc.). Always use `venv313`.
-- **Lint:** `venv313/bin/ruff check .` (config in `pyproject.toml`,
+- **Python interpreter:** `venv/bin/python` (3.13). Single venv at the
+  project root.
+- **Lint:** `venv/bin/ruff check .` (config in `pyproject.toml`,
   rules `F, I, UP, B, E, W`).
-- **Tests:** `venv313/bin/python -m pytest -q`. Full suite is ~70s,
+- **Tests:** `venv/bin/python -m pytest -q`. Full suite is ~70s,
   ~400 tests, ~23 skipped (Sheets tests need a service-account file).
-- **Translations:** `venv313/bin/pybabel extract -F babel.cfg -o messages.pot app scripts`,
-  then `pybabel update -d app/translations -l sl`, then
-  `pybabel compile -d app/translations`. **Always pass `app scripts`
-  explicitly to `extract`** — the bare `babel.cfg` glob slurps in venv
-  contents.
+  Test subprocesses use `sys.executable` (not a hardcoded venv path)
+  so they work in CI too.
+- **Translations:** `venv/bin/pybabel extract -F babel.cfg -o messages.pot app scripts`,
+  then `venv/bin/pybabel update -d app/translations -l sl`, then
+  `venv/bin/pybabel compile -d app/translations`. **Always pass
+  `app scripts` explicitly to `extract`** — the bare `babel.cfg` glob
+  slurps in venv contents.
 - **Migrations:** Alembic, batch mode for SQLite. Two-step deploy:
   fresh installs use `db.create_all()` + `alembic stamp head`;
   in-place upgrades use `alembic upgrade head`.
