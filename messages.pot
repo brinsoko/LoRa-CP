@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-05-10 00:36+0200\n"
+"POT-Creation-Date: 2026-05-18 23:22+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -42,11 +42,11 @@ msgstr ""
 msgid "Check-in recorded for team %(team)s at %(checkpoint)s."
 msgstr ""
 
-#: app/blueprints/audit/routes.py:56 app/blueprints/checkins/routes.py:340
+#: app/blueprints/audit/routes.py:56 app/blueprints/checkins/routes.py:342
 msgid "Check-in updated."
 msgstr ""
 
-#: app/blueprints/audit/routes.py:58 app/blueprints/checkins/routes.py:375
+#: app/blueprints/audit/routes.py:58 app/blueprints/checkins/routes.py:377
 msgid "Check-in deleted."
 msgstr ""
 
@@ -80,7 +80,7 @@ msgstr ""
 msgid "Competition %(name)s created."
 msgstr ""
 
-#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:360
+#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:362
 msgid "Competition settings updated."
 msgstr ""
 
@@ -162,11 +162,11 @@ msgstr ""
 msgid "Device %(name)s deleted."
 msgstr ""
 
-#: app/blueprints/audit/routes.py:115 app/blueprints/checkins/routes.py:170
+#: app/blueprints/audit/routes.py:115 app/blueprints/checkins/routes.py:171
 #: app/blueprints/firmware/routes.py:41 app/blueprints/judges/routes.py:18
-#: app/blueprints/main/routes.py:164 app/blueprints/main/routes.py:223
-#: app/blueprints/main/routes.py:399 app/blueprints/main/routes.py:436
-#: app/blueprints/main/routes.py:464 app/blueprints/scores/routes.py:75
+#: app/blueprints/main/routes.py:165 app/blueprints/main/routes.py:225
+#: app/blueprints/main/routes.py:401 app/blueprints/main/routes.py:438
+#: app/blueprints/main/routes.py:466 app/blueprints/scores/routes.py:75
 #: app/blueprints/scores/routes.py:157 app/blueprints/scores/routes.py:175
 #: app/blueprints/scores/routes.py:250 app/blueprints/scores/routes.py:534
 #: app/blueprints/scores/routes.py:561 app/blueprints/scores/routes.py:772
@@ -176,7 +176,7 @@ msgstr ""
 msgid "Select a competition first."
 msgstr ""
 
-#: app/blueprints/audit/routes.py:129 app/blueprints/main/routes.py:175
+#: app/blueprints/audit/routes.py:129 app/blueprints/main/routes.py:176
 msgid "Invalid date filter; showing unfiltered results."
 msgstr ""
 
@@ -297,35 +297,39 @@ msgstr ""
 msgid "Could not load checkpoints."
 msgstr ""
 
-#: app/blueprints/checkins/routes.py:181 app/blueprints/groups/routes.py:123
+#: app/blueprints/checkins/routes.py:135
+msgid "Could not load check-ins."
+msgstr ""
+
+#: app/blueprints/checkins/routes.py:182 app/blueprints/groups/routes.py:123
 msgid "Group not found."
 msgstr ""
 
-#: app/blueprints/checkins/routes.py:257
+#: app/blueprints/checkins/routes.py:259
 msgid "Existing check-in replaced."
 msgstr ""
 
-#: app/blueprints/checkins/routes.py:257
+#: app/blueprints/checkins/routes.py:259
 msgid "Check-in recorded."
 msgstr ""
 
-#: app/blueprints/checkins/routes.py:272
+#: app/blueprints/checkins/routes.py:274
 msgid "Could not record check-in."
 msgstr ""
 
-#: app/blueprints/checkins/routes.py:302
+#: app/blueprints/checkins/routes.py:304
 msgid "Check-in not found."
 msgstr ""
 
-#: app/blueprints/checkins/routes.py:356
+#: app/blueprints/checkins/routes.py:358
 msgid "Could not update check-in."
 msgstr ""
 
-#: app/blueprints/checkins/routes.py:377
+#: app/blueprints/checkins/routes.py:379
 msgid "Could not delete check-in."
 msgstr ""
 
-#: app/blueprints/checkins/routes.py:385
+#: app/blueprints/checkins/routes.py:387
 msgid "JSON import via UI is disabled. Use the /api/checkins endpoint instead."
 msgstr ""
 
@@ -546,7 +550,7 @@ msgstr ""
 msgid "Could not delete device."
 msgstr ""
 
-#: app/blueprints/main/routes.py:63 app/blueprints/main/routes.py:330
+#: app/blueprints/main/routes.py:63 app/blueprints/main/routes.py:332
 msgid "A competition with that name already exists."
 msgstr ""
 
@@ -562,40 +566,40 @@ msgstr ""
 msgid "Competition selected."
 msgstr ""
 
-#: app/blueprints/main/routes.py:228 app/blueprints/main/routes.py:441
-#: app/blueprints/main/routes.py:469
+#: app/blueprints/main/routes.py:230 app/blueprints/main/routes.py:443
+#: app/blueprints/main/routes.py:471
 msgid "Competition not found."
 msgstr ""
 
-#: app/blueprints/main/routes.py:241
+#: app/blueprints/main/routes.py:243
 msgid "Valid email is required."
 msgstr ""
 
-#: app/blueprints/main/routes.py:244 app/blueprints/users/routes.py:79
+#: app/blueprints/main/routes.py:246 app/blueprints/users/routes.py:79
 msgid "Invalid role selected."
 msgstr ""
 
-#: app/blueprints/main/routes.py:253
+#: app/blueprints/main/routes.py:255
 msgid "An active invite already exists for this email."
 msgstr ""
 
-#: app/blueprints/main/routes.py:310
+#: app/blueprints/main/routes.py:312
 msgid "Invite saved."
 msgstr ""
 
-#: app/blueprints/main/routes.py:407
+#: app/blueprints/main/routes.py:409
 msgid "Invite not found."
 msgstr ""
 
-#: app/blueprints/main/routes.py:427
+#: app/blueprints/main/routes.py:429
 msgid "Invite revoked."
 msgstr ""
 
-#: app/blueprints/main/routes.py:452
+#: app/blueprints/main/routes.py:454
 msgid "Competition deleted."
 msgstr ""
 
-#: app/blueprints/main/routes.py:455
+#: app/blueprints/main/routes.py:457
 msgid "Could not delete competition."
 msgstr ""
 
@@ -1020,7 +1024,7 @@ msgstr ""
 msgid "No UID read (check device, cable, or increase timeout)."
 msgstr ""
 
-#: app/resources/scores.py:652
+#: app/resources/scores.py:657
 msgid "Score cannot be negative."
 msgstr ""
 
@@ -3137,15 +3141,17 @@ msgid "Time threshold (minutes)"
 msgstr ""
 
 #: app/templates/score_rules.html:157
-msgid "Penalty per minutes"
+msgid "Penalty window (minutes)"
 msgstr ""
 
-#: app/templates/score_rules.html:161 app/templates/score_rules.html:466
-msgid "Penalty points"
+#: app/templates/score_rules.html:161
+msgid "Points per window"
 msgstr ""
 
 #: app/templates/score_rules.html:169
-msgid "If time exceeds threshold, deduct points per penalty window."
+msgid ""
+"For every N minutes over the threshold, M points are deducted "
+"(proportional to partial windows)."
 msgstr ""
 
 #: app/templates/score_rules.html:171
@@ -3246,6 +3252,10 @@ msgstr ""
 
 #: app/templates/score_rules.html:458
 msgid "Target"
+msgstr ""
+
+#: app/templates/score_rules.html:466
+msgid "Penalty points"
 msgstr ""
 
 #: app/templates/score_rules.html:470

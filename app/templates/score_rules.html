@@ -154,11 +154,11 @@
                   <input type="number" class="form-control" id="globalTimeThreshold" name="global_time_threshold" value="0">
                 </div>
                 <div class="col-md-4">
-                  <label class="form-label">{{ _('Penalty per minutes') }}</label>
+                  <label class="form-label">{{ _('Penalty window (minutes)') }}</label>
                   <input type="number" class="form-control" id="globalTimePenaltyMinutes" name="global_time_penalty_minutes" value="1">
                 </div>
                 <div class="col-md-4">
-                  <label class="form-label">{{ _('Penalty points') }}</label>
+                  <label class="form-label">{{ _('Points per window') }}</label>
                   <input type="number" class="form-control" id="globalTimePenaltyPoints" name="global_time_penalty_points" value="1">
                 </div>
                 <div class="col-md-4">
@@ -166,7 +166,7 @@
                   <input type="number" class="form-control" id="globalTimeMinPoints" name="global_time_min_points" value="0">
                 </div>
               </div>
-              <div class="form-text">{{ _('If time exceeds threshold, deduct points per penalty window.') }}</div>
+              <div class="form-text">{{ _('For every N minutes over the threshold, M points are deducted (proportional to partial windows).') }}</div>
             </div>
             <button class="btn btn-primary">{{ _('Save Global Rules') }}</button>
           </form>

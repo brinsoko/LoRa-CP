@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LoRa KT\n"
 "Report-Msgid-Bugs-To: brin.soko@gmail.com\n"
-"POT-Creation-Date: 2026-05-10 00:36+0200\n"
+"POT-Creation-Date: 2026-05-18 23:22+0200\n"
 "PO-Revision-Date: 2025-12-04 00:00+0100\n"
 "Last-Translator: Brin Soko <brin.soko@gmail.com>\n"
 "Language: sl\n"
@@ -45,11 +45,11 @@ msgstr "Številka ekipe mora biti pozitivno celo število."
 msgid "Check-in recorded for team %(team)s at %(checkpoint)s."
 msgstr "Prihod ekipe %(team)s na kontrolni točki %(checkpoint)s je zabeležen."
 
-#: app/blueprints/audit/routes.py:56 app/blueprints/checkins/routes.py:340
+#: app/blueprints/audit/routes.py:56 app/blueprints/checkins/routes.py:342
 msgid "Check-in updated."
 msgstr "Prihod je bil posodobljen."
 
-#: app/blueprints/audit/routes.py:58 app/blueprints/checkins/routes.py:375
+#: app/blueprints/audit/routes.py:58 app/blueprints/checkins/routes.py:377
 msgid "Check-in deleted."
 msgstr "Prihod je bil izbrisan."
 
@@ -85,7 +85,7 @@ msgstr "Uporabnik %(user)s je bil odstranjen iz tekmovanja."
 msgid "Competition %(name)s created."
 msgstr "Tekmovanje %(name)s je bilo ustvarjeno."
 
-#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:360
+#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:362
 msgid "Competition settings updated."
 msgstr "Nastavitve tekmovanja so posodobljene."
 
@@ -167,11 +167,11 @@ msgstr "Naprava je bila posodobljena."
 msgid "Device %(name)s deleted."
 msgstr "Naprava %(name)s je bila izbrisana."
 
-#: app/blueprints/audit/routes.py:115 app/blueprints/checkins/routes.py:170
+#: app/blueprints/audit/routes.py:115 app/blueprints/checkins/routes.py:171
 #: app/blueprints/firmware/routes.py:41 app/blueprints/judges/routes.py:18
-#: app/blueprints/main/routes.py:164 app/blueprints/main/routes.py:223
-#: app/blueprints/main/routes.py:399 app/blueprints/main/routes.py:436
-#: app/blueprints/main/routes.py:464 app/blueprints/scores/routes.py:75
+#: app/blueprints/main/routes.py:165 app/blueprints/main/routes.py:225
+#: app/blueprints/main/routes.py:401 app/blueprints/main/routes.py:438
+#: app/blueprints/main/routes.py:466 app/blueprints/scores/routes.py:75
 #: app/blueprints/scores/routes.py:157 app/blueprints/scores/routes.py:175
 #: app/blueprints/scores/routes.py:250 app/blueprints/scores/routes.py:534
 #: app/blueprints/scores/routes.py:561 app/blueprints/scores/routes.py:772
@@ -181,7 +181,7 @@ msgstr "Naprava %(name)s je bila izbrisana."
 msgid "Select a competition first."
 msgstr "Najprej izberi tekmovanje."
 
-#: app/blueprints/audit/routes.py:129 app/blueprints/main/routes.py:175
+#: app/blueprints/audit/routes.py:129 app/blueprints/main/routes.py:176
 msgid "Invalid date filter; showing unfiltered results."
 msgstr "Neveljaven filter datuma; prikazani so vsi rezultati."
 
@@ -304,35 +304,40 @@ msgstr "Ekip ni bilo mogoče naložiti."
 msgid "Could not load checkpoints."
 msgstr "Ni bilo mogoče naložiti kontrolnih točk."
 
-#: app/blueprints/checkins/routes.py:181 app/blueprints/groups/routes.py:123
+#: app/blueprints/checkins/routes.py:135
+#, fuzzy
+msgid "Could not load check-ins."
+msgstr "Ni bilo mogoče naložiti kontrolnih točk."
+
+#: app/blueprints/checkins/routes.py:182 app/blueprints/groups/routes.py:123
 msgid "Group not found."
 msgstr "Skupina ni najdena."
 
-#: app/blueprints/checkins/routes.py:257
+#: app/blueprints/checkins/routes.py:259
 msgid "Existing check-in replaced."
 msgstr "Obstoječi prihod je bil zamenjan."
 
-#: app/blueprints/checkins/routes.py:257
+#: app/blueprints/checkins/routes.py:259
 msgid "Check-in recorded."
 msgstr "Prihod zabeležen."
 
-#: app/blueprints/checkins/routes.py:272
+#: app/blueprints/checkins/routes.py:274
 msgid "Could not record check-in."
 msgstr "Prihoda ni bilo mogoče zabeležiti."
 
-#: app/blueprints/checkins/routes.py:302
+#: app/blueprints/checkins/routes.py:304
 msgid "Check-in not found."
 msgstr "Prihod ni bil najden."
 
-#: app/blueprints/checkins/routes.py:356
+#: app/blueprints/checkins/routes.py:358
 msgid "Could not update check-in."
 msgstr "Prihoda ni bilo mogoče posodobiti."
 
-#: app/blueprints/checkins/routes.py:377
+#: app/blueprints/checkins/routes.py:379
 msgid "Could not delete check-in."
 msgstr "Prihoda ni bilo mogoče izbrisati."
 
-#: app/blueprints/checkins/routes.py:385
+#: app/blueprints/checkins/routes.py:387
 msgid "JSON import via UI is disabled. Use the /api/checkins endpoint instead."
 msgstr ""
 "Uvoz JSON prek vmesnika je onemogočen. Uporabite končno točko "
@@ -417,7 +422,7 @@ msgid "Import failed."
 msgstr "Uvoz ni uspel."
 
 #: app/blueprints/checkpoints/routes.py:319
-#,, python-format
+#, , python-format
 msgid "Import failed: %(detail)s"
 msgstr "Uvoz ni uspel: %(detail)s"
 
@@ -571,7 +576,7 @@ msgstr "Naprava je bila posodobljena."
 msgid "Could not delete device."
 msgstr "Ekipe ni bilo mogoče izbrisati."
 
-#: app/blueprints/main/routes.py:63 app/blueprints/main/routes.py:330
+#: app/blueprints/main/routes.py:63 app/blueprints/main/routes.py:332
 msgid "A competition with that name already exists."
 msgstr "Tekmovanje s tem imenom že obstaja."
 
@@ -587,40 +592,40 @@ msgstr "Nimaš dostopa do tega tekmovanja."
 msgid "Competition selected."
 msgstr "Tekmovanje izbrano."
 
-#: app/blueprints/main/routes.py:228 app/blueprints/main/routes.py:441
-#: app/blueprints/main/routes.py:469
+#: app/blueprints/main/routes.py:230 app/blueprints/main/routes.py:443
+#: app/blueprints/main/routes.py:471
 msgid "Competition not found."
 msgstr "Tekmovanje ni bilo najdeno."
 
-#: app/blueprints/main/routes.py:241
+#: app/blueprints/main/routes.py:243
 msgid "Valid email is required."
 msgstr "Veljaven e-poštni naslov je obvezen."
 
-#: app/blueprints/main/routes.py:244 app/blueprints/users/routes.py:79
+#: app/blueprints/main/routes.py:246 app/blueprints/users/routes.py:79
 msgid "Invalid role selected."
 msgstr "Izbrana vloga ni veljavna."
 
-#: app/blueprints/main/routes.py:253
+#: app/blueprints/main/routes.py:255
 msgid "An active invite already exists for this email."
 msgstr "Aktivno povabilo za ta e-poštni naslov že obstaja."
 
-#: app/blueprints/main/routes.py:310
+#: app/blueprints/main/routes.py:312
 msgid "Invite saved."
 msgstr "Povabilo shranjeno."
 
-#: app/blueprints/main/routes.py:407
+#: app/blueprints/main/routes.py:409
 msgid "Invite not found."
 msgstr "Povabilo ni bilo najdeno."
 
-#: app/blueprints/main/routes.py:427
+#: app/blueprints/main/routes.py:429
 msgid "Invite revoked."
 msgstr "Povabilo preklicano."
 
-#: app/blueprints/main/routes.py:452
+#: app/blueprints/main/routes.py:454
 msgid "Competition deleted."
 msgstr "Tekmovanje je izbrisano."
 
-#: app/blueprints/main/routes.py:455
+#: app/blueprints/main/routes.py:457
 msgid "Could not delete competition."
 msgstr "Tekmovanja ni bilo mogoče izbrisati."
 
@@ -1075,7 +1080,7 @@ msgid "No UID read (check device, cable, or increase timeout)."
 msgstr "UID ni bil prebran (preveri napravo, kabel ali povečaj časovno omejitev)."
 
 # Score validation
-#: app/resources/scores.py:652
+#: app/resources/scores.py:657
 msgid "Score cannot be negative."
 msgstr "Rezultat ne more biti negativen."
 
@@ -3260,16 +3265,20 @@ msgid "Time threshold (minutes)"
 msgstr "Časovni prag (minute)"
 
 #: app/templates/score_rules.html:157
-msgid "Penalty per minutes"
-msgstr "Kazenska na minute"
+msgid "Penalty window (minutes)"
+msgstr "Kazenski interval (minute)"
 
-#: app/templates/score_rules.html:161 app/templates/score_rules.html:466
-msgid "Penalty points"
-msgstr "Kazenske točke"
+#: app/templates/score_rules.html:161
+msgid "Points per window"
+msgstr "Točke na interval"
 
 #: app/templates/score_rules.html:169
-msgid "If time exceeds threshold, deduct points per penalty window."
-msgstr "Če čas preseže prag, se točke odštejejo po kazenskem intervalu."
+msgid ""
+"For every N minutes over the threshold, M points are deducted "
+"(proportional to partial windows)."
+msgstr ""
+"Za vsakih N minut nad pragom se odšteje M točk (sorazmerno za delne "
+"intervale)."
 
 #: app/templates/score_rules.html:171
 msgid "Save Global Rules"
@@ -3370,6 +3379,10 @@ msgstr "Točkovanje odstopanja (penaliziraj po razdalji)"
 #: app/templates/score_rules.html:458
 msgid "Target"
 msgstr "Cilj"
+
+#: app/templates/score_rules.html:466
+msgid "Penalty points"
+msgstr "Kazenske točke"
 
 #: app/templates/score_rules.html:470
 msgid "Penalty distance"
@@ -4510,4 +4523,7 @@ msgstr "Sistem"
 
 #~ msgid "Time (GMT)"
 #~ msgstr "Čas (GMT)"
+
+#~ msgid "If time exceeds threshold, deduct points per penalty window."
+#~ msgstr "Če čas preseže prag, se točke odštejejo po kazenskem intervalu."
 
