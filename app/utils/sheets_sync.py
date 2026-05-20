@@ -448,6 +448,19 @@ def build_arrivals_tab(
         values.append([])
         values.append([])
 
+    # Guard the silent-success path: if every group was skipped (no teams
+    # with numbers, or no SheetConfig.config "groups" entry whose name
+    # matches a current CheckpointGroup name), values is empty. The Sheets
+    # API treats an empty values write as a no-op, so the worksheet would
+    # get cleared and refilled with nothing while the caller still flashes
+    # success. Surface a real warning instead, and don't touch the tab.
+    if not any(values):
+        return (
+            "No arrivals data to write. Check that groups have teams with "
+            "numbers assigned and that the checkpoint tab configs reference "
+            "the current group names."
+        )
+
     client = get_sheets_client(current_app)
     ss = client._call(client.gc.open_by_key, spreadsheet_id)
     try:
@@ -575,6 +588,15 @@ def build_teams_tab(
             else:
                 row.extend([""] * col_count)
         values.append(row)
+
+    # Same guard as build_arrivals_tab: when no group has rows the only
+    # content is empty header/subheader rows. Return a warning so the
+    # caller doesn't flash a misleading success.
+    if not group_blocks or not any(values):
+        return (
+            "No team data to write. Check that the competition has groups "
+            "with teams assigned."
+        )
 
     client = get_sheets_client(current_app)
     ss = client._call(client.gc.open_by_key, spreadsheet_id)
@@ -844,6 +866,15 @@ def build_score_tab(
                 f"=SUM({totals_expr})",
             ]
             values.append(org_row)
+
+    # Same guard as build_arrivals_tab: empty values means no group had
+    # teams and no checkpoint config matched any current group name. The
+    # write would silently no-op and the caller would flash success.
+    if not any(values):
+        return (
+            "No score data to write. Check that groups have teams assigned "
+            "and that checkpoint tab configs reference the current group names."
+        )
 
     client = get_sheets_client(current_app)
     ss = client._call(client.gc.open_by_key, spreadsheet_id)
