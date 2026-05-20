@@ -872,26 +872,6 @@ def score_submissions():
         query = query.filter(ScoreEntry.checkpoint_id == checkpoint_id)
     entries = query.limit(300).all()
 
-    entry_team_ids = sorted({e.team_id for e in entries if e.team_id})
-    team_group_map = {}
-    if entry_team_ids:
-        links = TeamGroup.query.filter(TeamGroup.team_id.in_(entry_team_ids), TeamGroup.active.is_(True)).all()
-        for link in links:
-            if link.team_id not in team_group_map:
-                team_group_map[link.team_id] = link.group_id
-
-    global_rules = GlobalScoreRule.query.filter(GlobalScoreRule.competition_id == comp_id).all()
-    global_rules_map = {rule.group_id: rule.rules for rule in global_rules}
-    team_time_points: dict[int, float | None] = {}
-    for team_id in entry_team_ids:
-        group_id_for_team = team_group_map.get(team_id)
-        if not group_id_for_team:
-            team_time_points[team_id] = None
-            continue
-        global_rule = global_rules_map.get(group_id_for_team)
-        global_data = _compute_global_contrib(comp_id, team_id, group_id_for_team, global_rule)
-        team_time_points[team_id] = global_data.get("time_points")
-
     rows = []
     for entry in entries:
         raw = entry.raw_fields or {}
@@ -912,7 +892,6 @@ def score_submissions():
                 "submitted_by": entry.judge_user.username if entry.judge_user else _("Legacy or unknown"),
                 "total": entry.total,
                 "dead_time": dead_num,
-                "time_points": team_time_points.get(entry.team_id),
                 "raw_fields": raw,
             }
         )
