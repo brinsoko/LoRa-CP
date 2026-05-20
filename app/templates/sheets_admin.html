@@ -187,13 +187,13 @@
       <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
       <div class="col-12">
         <div class="form-text mb-2">
-          {{ _('Promote local-only configs (from an imported or local-only setup) to a real Google Sheet. Creates one tab per checkpoint with headers + team numbers + any existing score data, then builds the Teams / Arrivals / Score summary tabs so the spreadsheet is a self-contained backup.') }}
+          {{ _('Publish the competition to the target Google Sheet. Works for both first-time publishing (local-only configs) and switching to a different spreadsheet (rebinds all configs to the new sheet ID). Creates one tab per checkpoint with headers + team numbers + any existing score data, then builds the Teams / Arrivals / Score summary tabs so the spreadsheet is a self-contained backup. Re-publishing to the same target is a safe no-op.') }}
         </div>
       </div>
       <div class="col-md-3 d-flex align-items-end">
         <button class="btn btn-outline-warning w-100" type="submit"
-                onclick="return confirm('{{ _('This will create new tabs on the target spreadsheet and rebind all local SheetConfigs. Continue?') }}');">
-          {{ _('Publish local -> remote') }}
+                onclick="return confirm('{{ _('This will create or overwrite tabs on the target spreadsheet and rebind every SheetConfig (including any currently bound to another sheet). Continue?') }}');">
+          {{ _('Publish / repoint to sheet') }}
         </button>
       </div>
     </form>

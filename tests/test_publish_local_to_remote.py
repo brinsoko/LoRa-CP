@@ -345,7 +345,7 @@ def test_publish_is_idempotent_when_rerun(sheets_app, monkeypatch):
             competition_id=s["comp"].id, spreadsheet_id="REAL-SHEET-ID"
         )
         assert second["published"] == 0
-        assert any("No local" in e for e in second["errors"]), second
+        assert any("already point at the target" in e for e in second["errors"]), second
 
 
 def test_publish_rejects_local_sentinel_target(sheets_app, monkeypatch):
@@ -391,6 +391,35 @@ def test_publish_continues_when_one_cp_fails(sheets_app, monkeypatch):
         cfgs = {c.tab_name: c for c in SheetConfig.query.filter_by(competition_id=s["comp"].id).all()}
         assert cfgs["CP-One"].spreadsheet_id == "REAL-SHEET-ID"
         assert cfgs["CP-Two"].spreadsheet_id.startswith("local:")
+
+
+def test_publish_repoints_configs_already_on_a_different_remote(sheets_app, monkeypatch):
+    """User switches the target spreadsheet: configs currently bound to
+    SHEET-A get rewritten and rebound to SHEET-B. Previously this was a
+    silent no-op because the publish filter only matched 'local:' rows."""
+    with sheets_app.app_context():
+        s = _seed_imported_competition()
+        _install_fake_client(monkeypatch)
+
+        # First publish lands all configs on SHEET-A.
+        first = sheets_sync.publish_local_configs_to_spreadsheet(
+            competition_id=s["comp"].id, spreadsheet_id="SHEET-A"
+        )
+        assert first["published"] == 2, first
+        assert all(
+            c.spreadsheet_id == "SHEET-A"
+            for c in SheetConfig.query.filter_by(competition_id=s["comp"].id).all()
+        )
+
+        # Now switch to SHEET-B. Every config must rebind to SHEET-B.
+        second = sheets_sync.publish_local_configs_to_spreadsheet(
+            competition_id=s["comp"].id, spreadsheet_id="SHEET-B"
+        )
+        assert second["published"] == 2, second
+        refreshed = SheetConfig.query.filter_by(competition_id=s["comp"].id).all()
+        assert all(c.spreadsheet_id == "SHEET-B" for c in refreshed), (
+            f"Expected all configs on SHEET-B, got {[c.spreadsheet_id for c in refreshed]}"
+        )
 
 
 def test_publish_is_noop_when_sheets_sync_disabled(app_factory, monkeypatch):

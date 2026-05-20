@@ -1706,17 +1706,21 @@ def publish_local_configs_to_spreadsheet(
     *,
     build_summary_tabs: bool = True,
 ) -> dict:
-    """Promote a competition's local-only SheetConfigs to a real Google
-    Sheet.
+    """Publish a competition's SheetConfigs to a real Google Sheet.
 
-    For each SheetConfig whose spreadsheet_id starts with "local:":
+    For each SheetConfig whose spreadsheet_id != the target (covers both
+    fresh "local:N" sentinels and configs currently bound to a different
+    remote sheet - so this also handles "repoint to a new sheet"):
       1. Build the full per-CP grid (headers + team rows + any existing
          ScoreEntry data + check-in timestamps) in memory.
       2. Create (or reuse) the remote tab and write the grid in one
          batched update. Two Sheets API calls per CP.
-      3. Rebind SheetConfig.spreadsheet_id from "local:N" to
-         spreadsheet_id, committed per-CP so partial progress survives a
-         mid-batch failure.
+      3. Rebind SheetConfig.spreadsheet_id to the target, committed per-CP
+         so partial progress survives a mid-batch failure.
+
+    Configs already pointing at the target are skipped, so re-running
+    publish with the same target is a no-op aside from rebuilding summary
+    tabs.
 
     After the per-CP loop, (re)build the Teams / Arrivals / Score summary
     tabs so the spreadsheet is a self-contained backup: Arrivals and
@@ -1753,12 +1757,14 @@ def publish_local_configs_to_spreadsheet(
     configs = (
         SheetConfig.query.filter(SheetConfig.competition_id == competition_id)
         .filter(SheetConfig.tab_type == "checkpoint")
-        .filter(SheetConfig.spreadsheet_id.like("local:%"))
+        .filter(SheetConfig.spreadsheet_id != spreadsheet_id)
         .order_by(SheetConfig.tab_name.asc())
         .all()
     )
     if not configs:
-        result["errors"].append("No local SheetConfigs to publish for this competition.")
+        result["errors"].append(
+            "No SheetConfigs need publishing (all already point at the target)."
+        )
         return result
 
     try:
