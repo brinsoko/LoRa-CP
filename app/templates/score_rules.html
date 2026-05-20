@@ -214,7 +214,7 @@
                 </tr>
                 <tr>
                   <td colspan="4">
-                    <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ r.rules | tojson(indent=2) }}</pre>
+                    <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ r.rules | pretty_json }}</pre>
                   </td>
                 </tr>
                 {% endfor %}
@@ -260,7 +260,7 @@
                 </tr>
                 <tr>
                   <td colspan="3">
-                    <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ r.rules | tojson(indent=2) }}</pre>
+                    <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ r.rules | pretty_json }}</pre>
                   </td>
                 </tr>
                 {% endfor %}

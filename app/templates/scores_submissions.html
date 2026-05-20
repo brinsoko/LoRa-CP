@@ -53,7 +53,7 @@
               <td class="text-end">{{ '%.2f'|format(row.dead_time or 0) }}</td>
               <td class="text-end">{{ '%.2f'|format(row.total or 0) }}</td>
               <td style="min-width: 240px;">
-                <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ row.raw_fields | tojson(indent=2) }}</pre>
+                <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ row.raw_fields | pretty_json }}</pre>
               </td>
             </tr>
           {% else %}

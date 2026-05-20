@@ -543,25 +543,6 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         place_by_team[row["id"]] = current_place
         row["place"] = current_place
 
-    group_totals_map = {}
-    for row in rows:
-        group_name = (row.get("group") or "").strip()
-        if not group_name or row.get("dnf"):
-            continue
-        group_totals_map[group_name] = group_totals_map.get(group_name, 0.0) + float(row.get("total") or 0.0)
-
-    def _group_rank_sort(item):
-        name, total = item
-        norm = name.lower().strip()
-        order_idx = group_order_norm.index(norm) if norm in group_order_norm else len(group_order_norm)
-        return (-total, order_idx, name)
-
-    group_totals_sorted = sorted(group_totals_map.items(), key=_group_rank_sort)
-    group_ranks = {name: idx + 1 for idx, (name, _total) in enumerate(group_totals_sorted)}
-    group_totals = [
-        {"name": name, "total": total, "rank": group_ranks.get(name)} for name, total in group_totals_sorted
-    ]
-
     org_totals_map = {}
     for row in rows:
         org = (row.get("organization") or "").strip()
@@ -588,8 +569,6 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         "per_team_points": per_team_points,
         "org_totals": org_totals,
         "allowed_checkpoint_ids": allowed_checkpoint_ids,
-        "group_totals": group_totals,
-        "group_ranks": group_ranks,
     }
 
 

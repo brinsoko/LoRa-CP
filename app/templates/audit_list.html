@@ -78,7 +78,7 @@
               <td>{{ row.summary }}</td>
               <td style="min-width: 260px;">
                 {% if row.details %}
-                  <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ row.details | tojson(indent=2) }}</pre>
+                  <pre class="bg-body-tertiary rounded p-2 small mb-0">{{ row.details | pretty_json }}</pre>
                 {% else %}
                   <span class="text-muted">—</span>
                 {% endif %}

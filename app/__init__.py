@@ -45,6 +45,24 @@ def create_app(config_overrides: dict | None = None) -> Flask:
         app.config.update(config_overrides)
     app.jinja_env.filters["local_dt"] = to_datetime_local
 
+    # Pretty-print a dict/list as JSON for human display, preserving
+    # UTF-8 characters (emoji, š/č/ž, etc.) instead of escaping them as
+    # \uXXXX. Jinja's built-in `tojson` is meant for embedding in HTML
+    # script blocks and always ASCII-escapes, which looks awful when
+    # we're showing a row of raw_fields to a judge or an audit detail
+    # blob to an admin. Output is HTML-escaped so XSS in field values
+    # can't break out of the <pre>.
+    import json as _json
+
+    from markupsafe import Markup as _Markup
+    from markupsafe import escape as _escape
+
+    def _pretty_json(value):
+        text = _json.dumps(value, indent=2, ensure_ascii=False, default=str)
+        return _Markup(str(_escape(text)))
+
+    app.jinja_env.filters["pretty_json"] = _pretty_json
+
     # Trust X-Forwarded-* headers from a single reverse proxy hop (Caddy in
     # prod). Without this, OAuth redirect_uri uses the internal scheme/host
     # (`http://web:5000/...`) which Google rejects as a redirect mismatch.
