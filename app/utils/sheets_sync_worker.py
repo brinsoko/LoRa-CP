@@ -136,3 +136,107 @@ def enqueue_update_scores(
     from app.utils.sheets_sync import update_checkpoint_scores_sync
 
     _submit(app, update_checkpoint_scores_sync, team_id, checkpoint_id, group_name, values, scored_at)
+
+
+# ---------------------------------------------------------------------------
+# Admin-triggered bulk Sheets operations (publish, sync-team-numbers, build
+# summary tabs). These can take 30+ seconds when they hit the SheetsClient
+# throttle, which exceeds the default gunicorn worker timeout. Routes
+# enqueue them and return immediately; failures land in the server log.
+# ---------------------------------------------------------------------------
+
+
+def enqueue_publish_local(
+    app,
+    competition_id: int,
+    spreadsheet_id: str,
+    *,
+    build_summary_tabs: bool = True,
+) -> None:
+    from app.utils.sheets_sync import publish_local_configs_to_spreadsheet
+
+    _submit(
+        app,
+        publish_local_configs_to_spreadsheet,
+        competition_id,
+        spreadsheet_id,
+        build_summary_tabs=build_summary_tabs,
+    )
+
+
+def enqueue_sync_all_checkpoint_tabs(app, competition_id: int | None = None) -> None:
+    from app.utils.sheets_sync import sync_all_checkpoint_tabs
+
+    _submit(app, sync_all_checkpoint_tabs, competition_id=competition_id)
+
+
+def enqueue_build_arrivals_tab(
+    app,
+    spreadsheet_id: str,
+    tab_name: str,
+    *,
+    competition_id: int | None = None,
+    group_order_override: list | None = None,
+    checkpoint_order_override: list | None = None,
+    per_group_checkpoint_order: dict | None = None,
+) -> None:
+    from app.utils.sheets_sync import build_arrivals_tab
+
+    _submit(
+        app,
+        build_arrivals_tab,
+        spreadsheet_id,
+        tab_name,
+        competition_id=competition_id,
+        group_order_override=group_order_override,
+        checkpoint_order_override=checkpoint_order_override,
+        per_group_checkpoint_order=per_group_checkpoint_order,
+    )
+
+
+def enqueue_build_teams_tab(
+    app,
+    spreadsheet_id: str,
+    tab_name: str,
+    *,
+    headers: list | None = None,
+    group_order_override: list | None = None,
+    competition_id: int | None = None,
+) -> None:
+    from app.utils.sheets_sync import build_teams_tab
+
+    _submit(
+        app,
+        build_teams_tab,
+        spreadsheet_id,
+        tab_name,
+        headers=headers,
+        group_order_override=group_order_override,
+        competition_id=competition_id,
+    )
+
+
+def enqueue_build_score_tab(
+    app,
+    spreadsheet_id: str,
+    tab_name: str,
+    *,
+    include_dead_time_sum: bool = True,
+    group_order_override: list | None = None,
+    checkpoint_order_override: list | None = None,
+    per_group_checkpoint_order: dict | None = None,
+    competition_id: int | None = None,
+) -> None:
+    from app.utils.sheets_sync import build_score_tab
+
+    _submit(
+        app,
+        build_score_tab,
+        spreadsheet_id,
+        tab_name,
+        include_dead_time_sum=include_dead_time_sum,
+        group_order_override=group_order_override,
+        checkpoint_order_override=checkpoint_order_override,
+        per_group_checkpoint_order=per_group_checkpoint_order,
+        competition_id=competition_id,
+    )

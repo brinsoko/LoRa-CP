@@ -198,8 +198,32 @@ def build_arrivals():
         flash(_("Spreadsheet ID is required to build arrivals."), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
 
-    try:
-        err = build_arrivals_tab(
+    if current_app.config.get("SHEETS_SYNC_INLINE"):
+        try:
+            err = build_arrivals_tab(
+                spreadsheet_id,
+                tab_name,
+                competition_id=comp_id,
+                group_order_override=group_order,
+                checkpoint_order_override=cp_order,
+                per_group_checkpoint_order=per_group_cp_order or None,
+            )
+            if err:
+                flash(err, "warning")
+                return redirect(url_for("sheets_admin.list_sheets"))
+        except Exception as exc:
+            current_app.logger.exception("Failed to build arrivals tab")
+            flash(_("Failed to build arrivals tab: %(error)s", error=exc), "warning")
+            return redirect(url_for("sheets_admin.list_sheets"))
+        flash(_("Arrivals tab '%(tab)s' updated.", tab=tab_name), "success")
+    else:
+        # Async dispatch: the gunicorn worker returns immediately so the
+        # admin's page doesn't spin while the Sheets API runs. Errors land
+        # in the server log; visually verify the tab on the spreadsheet.
+        from app.utils.sheets_sync_worker import enqueue_build_arrivals_tab
+
+        enqueue_build_arrivals_tab(
+            current_app._get_current_object(),
             spreadsheet_id,
             tab_name,
             competition_id=comp_id,
@@ -207,15 +231,10 @@ def build_arrivals():
             checkpoint_order_override=cp_order,
             per_group_checkpoint_order=per_group_cp_order or None,
         )
-        if err:
-            flash(err, "warning")
-            return redirect(url_for("sheets_admin.list_sheets"))
-    except Exception as exc:
-        current_app.logger.exception("Failed to build arrivals tab")
-        flash(_("Failed to build arrivals tab: %(error)s", error=exc), "warning")
-        return redirect(url_for("sheets_admin.list_sheets"))
-
-    flash(_("Arrivals tab '%(tab)s' updated.", tab=tab_name), "success")
+        flash(
+            _("Arrivals tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
+            "info",
+        )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -240,22 +259,38 @@ def build_teams():
     if not spreadsheet_id:
         flash(_("Spreadsheet ID is required."), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
-    try:
-        err = build_teams_tab(
+    if current_app.config.get("SHEETS_SYNC_INLINE"):
+        try:
+            err = build_teams_tab(
+                spreadsheet_id,
+                tab_name,
+                headers=headers,
+                group_order_override=group_order,
+                competition_id=comp_id,
+            )
+            if err:
+                flash(err, "warning")
+                return redirect(url_for("sheets_admin.list_sheets"))
+        except Exception as exc:
+            current_app.logger.exception("Failed to build teams tab")
+            flash(_("Failed to build teams tab: %(error)s", error=exc), "warning")
+            return redirect(url_for("sheets_admin.list_sheets"))
+        flash(_("Teams tab '%(tab)s' updated.", tab=tab_name), "success")
+    else:
+        from app.utils.sheets_sync_worker import enqueue_build_teams_tab
+
+        enqueue_build_teams_tab(
+            current_app._get_current_object(),
             spreadsheet_id,
             tab_name,
             headers=headers,
             group_order_override=group_order,
             competition_id=comp_id,
         )
-        if err:
-            flash(err, "warning")
-            return redirect(url_for("sheets_admin.list_sheets"))
-    except Exception as exc:
-        current_app.logger.exception("Failed to build teams tab")
-        flash(_("Failed to build teams tab: %(error)s", error=exc), "warning")
-        return redirect(url_for("sheets_admin.list_sheets"))
-    flash(_("Teams tab '%(tab)s' updated.", tab=tab_name), "success")
+        flash(
+            _("Teams tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
+            "info",
+        )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -280,16 +315,38 @@ def build_score():
     if not spreadsheet_id:
         flash(_("Spreadsheet ID is required."), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
-    try:
-        per_group_cp_order = {}
-        if per_group_cp_order_raw:
-            try:
-                import json
+    per_group_cp_order = {}
+    if per_group_cp_order_raw:
+        try:
+            import json
 
-                per_group_cp_order = json.loads(per_group_cp_order_raw)
-            except Exception:
-                per_group_cp_order = {}
-        err = build_score_tab(
+            per_group_cp_order = json.loads(per_group_cp_order_raw)
+        except Exception:
+            per_group_cp_order = {}
+    if current_app.config.get("SHEETS_SYNC_INLINE"):
+        try:
+            err = build_score_tab(
+                spreadsheet_id,
+                tab_name,
+                include_dead_time_sum=include_dead_time_sum,
+                group_order_override=group_order,
+                checkpoint_order_override=cp_order,
+                per_group_checkpoint_order=per_group_cp_order or None,
+                competition_id=comp_id,
+            )
+            if err:
+                flash(err, "warning")
+                return redirect(url_for("sheets_admin.list_sheets"))
+        except Exception as exc:
+            current_app.logger.exception("Failed to build score tab")
+            flash(_("Failed to build score tab: %(error)s", error=exc), "warning")
+            return redirect(url_for("sheets_admin.list_sheets"))
+        flash(_("Score tab '%(tab)s' updated.", tab=tab_name), "success")
+    else:
+        from app.utils.sheets_sync_worker import enqueue_build_score_tab
+
+        enqueue_build_score_tab(
+            current_app._get_current_object(),
             spreadsheet_id,
             tab_name,
             include_dead_time_sum=include_dead_time_sum,
@@ -298,14 +355,10 @@ def build_score():
             per_group_checkpoint_order=per_group_cp_order or None,
             competition_id=comp_id,
         )
-        if err:
-            flash(err, "warning")
-            return redirect(url_for("sheets_admin.list_sheets"))
-    except Exception as exc:
-        current_app.logger.exception("Failed to build score tab")
-        flash(_("Failed to build score tab: %(error)s", error=exc), "warning")
-        return redirect(url_for("sheets_admin.list_sheets"))
-    flash(_("Score tab '%(tab)s' updated.", tab=tab_name), "success")
+        flash(
+            _("Score tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
+            "info",
+        )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -543,14 +596,24 @@ def sync_team_numbers(config_id: int):
         flash(_("Config is missing groups; cannot sync."), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
 
-    try:
-        sync_all_checkpoint_tabs(competition_id=comp_id)
-    except Exception as exc:
-        current_app.logger.exception("Failed to sync team numbers")
-        flash(_("Failed to sync team numbers: %(error)s", error=exc), "warning")
-        return redirect(url_for("sheets_admin.list_sheets"))
+    if current_app.config.get("SHEETS_SYNC_INLINE"):
+        try:
+            sync_all_checkpoint_tabs(competition_id=comp_id)
+        except Exception as exc:
+            current_app.logger.exception("Failed to sync team numbers")
+            flash(_("Failed to sync team numbers: %(error)s", error=exc), "warning")
+            return redirect(url_for("sheets_admin.list_sheets"))
+        flash(_("Synced team numbers for checkpoint tabs."), "success")
+    else:
+        from app.utils.sheets_sync_worker import enqueue_sync_all_checkpoint_tabs
 
-    flash(_("Synced team numbers for checkpoint tabs."), "success")
+        enqueue_sync_all_checkpoint_tabs(
+            current_app._get_current_object(), competition_id=comp_id
+        )
+        flash(
+            _("Team-number sync queued — refresh the spreadsheet in a few seconds."),
+            "info",
+        )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -581,25 +644,41 @@ def publish_local():
         )
         return redirect(url_for("sheets_admin.list_sheets"))
 
-    try:
-        result = publish_local_configs_to_spreadsheet(comp_id, spreadsheet_id)
-    except Exception as exc:
-        current_app.logger.exception("Publish-local failed")
-        flash(_("Publish failed: %(error)s", error=exc), "warning")
-        return redirect(url_for("sheets_admin.list_sheets"))
+    if current_app.config.get("SHEETS_SYNC_INLINE"):
+        try:
+            result = publish_local_configs_to_spreadsheet(comp_id, spreadsheet_id)
+        except Exception as exc:
+            current_app.logger.exception("Publish-local failed")
+            flash(_("Publish failed: %(error)s", error=exc), "warning")
+            return redirect(url_for("sheets_admin.list_sheets"))
 
-    summary_tabs = ", ".join(result.get("summary_tabs") or []) or "-"
-    flash(
-        _(
-            "Published %(count)s checkpoint tab(s), skipped %(skip)s. Summary tabs built: %(s)s.",
-            count=result.get("published", 0),
-            skip=result.get("skipped", 0),
-            s=summary_tabs,
-        ),
-        "success",
-    )
-    for err in result.get("errors") or []:
-        flash(err, "warning")
+        summary_tabs = ", ".join(result.get("summary_tabs") or []) or "-"
+        flash(
+            _(
+                "Published %(count)s checkpoint tab(s), skipped %(skip)s. Summary tabs built: %(s)s.",
+                count=result.get("published", 0),
+                skip=result.get("skipped", 0),
+                s=summary_tabs,
+            ),
+            "success",
+        )
+        for err in result.get("errors") or []:
+            flash(err, "warning")
+    else:
+        from app.utils.sheets_sync_worker import enqueue_publish_local
+
+        enqueue_publish_local(
+            current_app._get_current_object(), comp_id, spreadsheet_id
+        )
+        flash(
+            _(
+                "Publish to %(sid)s queued. This takes ~30 seconds for a 15-CP "
+                "competition; check the spreadsheet shortly. Errors land in the "
+                "server log.",
+                sid=spreadsheet_id[:24] + ("..." if len(spreadsheet_id) > 24 else ""),
+            ),
+            "info",
+        )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 

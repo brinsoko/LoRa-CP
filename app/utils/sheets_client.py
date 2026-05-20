@@ -158,6 +158,50 @@ class SheetsClient:
             value_input_option="USER_ENTERED",
         )
 
+    def batch_update_columns(
+        self,
+        spreadsheet_id: str,
+        tab_name: str,
+        columns: list[dict],
+    ) -> None:
+        """Write multiple column ranges in a single Sheets API call.
+
+        `columns` is a list of dicts like:
+          [{"col": 1, "start_row": 2, "values": [101, 102, 103]},
+           {"col": 6, "start_row": 2, "values": [201, 202]}]
+
+        Each entry becomes a range update bundled into one ws.batch_update
+        request. String values are escape_formula_cell'd; everything else
+        (numbers, formulas the caller has authored) passes through.
+
+        Used by sync_all_checkpoint_tabs to refresh team numbers across
+        every group block on a CP tab in one call instead of N — the
+        prior per-group pattern hit the 40-calls/60s throttle on big
+        competitions and timed out the gunicorn worker.
+        """
+        if not columns:
+            return
+        ss = self._call(self.gc.open_by_key, spreadsheet_id)
+        ws = self._call(ss.worksheet, tab_name)
+        data = []
+        for col_spec in columns:
+            col = col_spec["col"]
+            start_row = col_spec["start_row"]
+            values = col_spec["values"]
+            if not values:
+                continue
+            end_row = start_row + len(values) - 1
+            rng = f"{rowcol_to_a1(start_row, col)}:{rowcol_to_a1(end_row, col)}"
+            data.append(
+                {
+                    "range": rng,
+                    "values": [[escape_formula_cell(v) if isinstance(v, str) else v] for v in values],
+                }
+            )
+        if not data:
+            return
+        self._call(ws.batch_update, data, value_input_option="USER_ENTERED")
+
     def update_cell(self, spreadsheet_id: str, tab_name: str, row: int, col: int, value) -> None:
         ss = self._call(self.gc.open_by_key, spreadsheet_id)
         ws = self._call(ss.worksheet, tab_name)

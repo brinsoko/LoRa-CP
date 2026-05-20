@@ -260,7 +260,17 @@ def _build_global_rule_formulas(
 
 
 def sync_all_checkpoint_tabs(competition_id: int | None = None):
-    """Refresh team numbers and checkbox validation for all checkpoint-type tab configs."""
+    """Refresh team numbers across every checkpoint-type tab.
+
+    Batches all column writes per CP into one Sheets API call (one
+    ws.batch_update per tab) so a large competition can finish well
+    inside the gunicorn worker timeout. The earlier implementation did
+    one update_column per (CP × group), which on a 15-CP × 5-group
+    competition hit the 40-calls/60s throttle and forced a 60-second
+    sleep mid-request — the worker then timed out at 30 s and returned
+    500. Batched, the same work is ~15 API calls total and finishes in
+    a few seconds.
+    """
     if not sheets_sync_enabled():
         return
     configs = SheetConfig.query.filter(SheetConfig.tab_type == "checkpoint")
@@ -284,6 +294,7 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
             continue
         group_cols = _group_start_cols_from_config(cfg.config or {})
 
+        columns_for_this_cp: list[dict] = []
         for grp, start_col in zip(groups, group_cols, strict=False):
             db_group = _resolve_group_from_cfg(comp_id, grp, group_cache)
             if not db_group:
@@ -297,7 +308,23 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
             )
             values = [n[1] if n[1] is not None else (n[2] or "") for n in nums]
             if values:
-                client.update_column(cfg.spreadsheet_id, cfg.tab_name, start_col, 2, values)
+                columns_for_this_cp.append(
+                    {"col": start_col, "start_row": 2, "values": values}
+                )
+
+        if columns_for_this_cp:
+            try:
+                client.batch_update_columns(cfg.spreadsheet_id, cfg.tab_name, columns_for_this_cp)
+            except Exception as exc:
+                # Skip this CP, keep going. A single bad tab name shouldn't
+                # abort the whole sync; the caller flashes whatever errors
+                # surface.
+                try:
+                    current_app.logger.warning(
+                        "sync_all_checkpoint_tabs: %s failed: %s", cfg.tab_name, exc
+                    )
+                except Exception:
+                    pass
 
 
 def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime | None = None):
