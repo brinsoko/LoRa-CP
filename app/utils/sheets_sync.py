@@ -117,6 +117,135 @@ def _group_start_cols_from_config(cfg: dict) -> list[int]:
     return cols
 
 
+def _time_col_for_group_in_cp(cfg_blob: dict, group_name: str) -> int | None:
+    """Return the 1-based Time column index for `group_name` in a CP's
+    SheetConfig.config, or None when time_enabled is off or the group
+    isn't present. Used by the Score tab's časovnica + found formulas
+    to look up arrival timestamps across per-CP tabs."""
+    if not cfg_blob.get("time_enabled"):
+        return None
+    dead_time_enabled = bool(cfg_blob.get("dead_time_enabled"))
+    cols = _group_start_cols_from_config(cfg_blob)
+    target = (group_name or "").strip().lower()
+    for grp, start_col in zip(cfg_blob.get("groups", []), cols, strict=False):
+        name = (grp.get("name") or "").strip().lower()
+        if name == target:
+            # Layout per group: [group_name, dead_time?, time, fields..., points]
+            return start_col + 1 + (1 if dead_time_enabled else 0)
+    return None
+
+
+def _team_col_for_group_in_cp(cfg_blob: dict, group_name: str) -> int | None:
+    """1-based column of the team-number column inside a group's block
+    on a per-CP tab. The publish grid puts the team label in the first
+    column of each group block."""
+    cols = _group_start_cols_from_config(cfg_blob)
+    target = (group_name or "").strip().lower()
+    for grp, start_col in zip(cfg_blob.get("groups", []), cols, strict=False):
+        if (grp.get("name") or "").strip().lower() == target:
+            return start_col
+    return None
+
+
+def _build_global_rule_formulas(
+    *,
+    group,
+    global_rule: dict,
+    cp_id_to_name: dict[int, str],
+    relevant_cfgs: list,
+    row_idx: int,
+    dead_time_sum_expr: str,
+) -> tuple[str, str]:
+    """Construct the per-team Časovnica + Found-points formulas for the
+    Score tab so the spreadsheet computes the final score without our
+    system. Both formulas reach across per-CP tabs via INDEX/MATCH
+    against the Time column.
+
+    Returns (casovnica_formula, found_formula). When the rule can't be
+    expressed (no start/end CP, or those tabs don't have time_enabled),
+    returns "=0" placeholders so the Total column still adds cleanly.
+    """
+    from gspread.utils import rowcol_to_a1
+
+    def _col_letter(col: int) -> str:
+        return rowcol_to_a1(1, col).rstrip("1")
+
+    # --- Časovnica (Article 39) ---
+    cas_formula = "=0"
+    time_rule = global_rule.get("time") or {}
+    start_cp_name = cp_id_to_name.get(time_rule.get("start_checkpoint_id"))
+    end_cp_name = cp_id_to_name.get(time_rule.get("end_checkpoint_id"))
+    if start_cp_name and end_cp_name:
+        # Find the Time/Team columns on each of those tabs for this
+        # group. If either tab's time_enabled is off (no Time column
+        # was written), we can't compute the duration on the sheet.
+        start_cfg = next((c for c in relevant_cfgs if c.tab_name == start_cp_name), None)
+        end_cfg = next((c for c in relevant_cfgs if c.tab_name == end_cp_name), None)
+        if start_cfg is not None and end_cfg is not None:
+            s_time_col = _time_col_for_group_in_cp(start_cfg.config or {}, group.name)
+            s_team_col = _team_col_for_group_in_cp(start_cfg.config or {}, group.name)
+            e_time_col = _time_col_for_group_in_cp(end_cfg.config or {}, group.name)
+            e_team_col = _team_col_for_group_in_cp(end_cfg.config or {}, group.name)
+            if all(c is not None for c in (s_time_col, s_team_col, e_time_col, e_team_col)):
+                s_t = _col_letter(s_time_col)
+                s_a = _col_letter(s_team_col)
+                e_t = _col_letter(e_time_col)
+                e_a = _col_letter(e_team_col)
+                start_lookup = (
+                    f"INDEX('{start_cp_name}'!{s_t}:{s_t}; MATCH(B{row_idx}; '{start_cp_name}'!{s_a}:{s_a}; 0))"
+                )
+                end_lookup = (
+                    f"INDEX('{end_cp_name}'!{e_t}:{e_t}; MATCH(B{row_idx}; '{end_cp_name}'!{e_a}:{e_a}; 0))"
+                )
+                max_p = _fmt_num(time_rule.get("max_points") or 0)
+                threshold = _fmt_num(time_rule.get("threshold_minutes") or 0)
+                penalty_p = _fmt_num(time_rule.get("penalty_points") or 0)
+                # penalty_minutes is the "per N minutes" denominator;
+                # never let it be 0 (would divide-by-zero in the sheet).
+                try:
+                    pm = float(time_rule.get("penalty_minutes") or 0)
+                except (TypeError, ValueError):
+                    pm = 0
+                penalty_m = _fmt_num(pm) if pm > 0 else "1"
+                min_p = _fmt_num(time_rule.get("min_points") or 0)
+                cas_formula = (
+                    f"=IFERROR(IF({end_lookup}=\"\"; 0; "
+                    f"MAX({max_p}-MAX(0; ({end_lookup}-{start_lookup})*1440-({dead_time_sum_expr})-{threshold})"
+                    f"/{penalty_m}*{penalty_p}; {min_p})); 0)"
+                )
+
+    # --- Found-points (Article 38) ---
+    found_formula = "=0"
+    found_rule = global_rule.get("found") or {}
+    points_per = found_rule.get("points_per")
+    if points_per is not None:
+        excluded_names: set[str] = set()
+        if found_rule.get("exclude_start_checkpoint") and start_cp_name:
+            excluded_names.add(start_cp_name)
+        if found_rule.get("exclude_end_checkpoint") and end_cp_name:
+            excluded_names.add(end_cp_name)
+        per_cp_terms: list[str] = []
+        for cfg in relevant_cfgs:
+            if cfg.tab_name in excluded_names:
+                continue
+            t_col = _time_col_for_group_in_cp(cfg.config or {}, group.name)
+            a_col = _team_col_for_group_in_cp(cfg.config or {}, group.name)
+            if t_col is None or a_col is None:
+                # CP doesn't track time for this group; can't tell
+                # arrival from the sheet alone, so it doesn't contribute.
+                continue
+            tcl = _col_letter(t_col)
+            acl = _col_letter(a_col)
+            lookup = (
+                f"INDEX('{cfg.tab_name}'!{tcl}:{tcl}; MATCH(B{row_idx}; '{cfg.tab_name}'!{acl}:{acl}; 0))"
+            )
+            per_cp_terms.append(f"IFERROR(IF({lookup}<>\"\"; 1; 0); 0)")
+        if per_cp_terms:
+            found_formula = f"={_fmt_num(points_per)}*({'+'.join(per_cp_terms)})"
+
+    return cas_formula, found_formula
+
+
 def sync_all_checkpoint_tabs(competition_id: int | None = None):
     """Refresh team numbers and checkbox validation for all checkpoint-type tab configs."""
     if not sheets_sync_enabled():
@@ -342,10 +471,16 @@ def update_checkpoint_scores_sync(
                     client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(field_name))
                 col += 1
 
-            if points_header in values or "points" in values:
-                client.update_cell(
-                    cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(points_header, values.get("points"))
-                )
+            # Points cell: when this group's config flags points_formula
+            # (set by publish_local_configs_to_spreadsheet after embedding
+            # a per-row formula), skip the write so we don't clobber the
+            # formula with a raw number. The spreadsheet then recomputes
+            # Points from the raw field cells we just wrote.
+            if not grp_def.get("points_formula"):
+                if points_header in values or "points" in values:
+                    client.update_cell(
+                        cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(points_header, values.get("points"))
+                    )
 
 
 def build_arrivals_tab(
@@ -650,6 +785,23 @@ def build_score_tab(
         groups_query = groups_query.filter(CheckpointGroup.competition_id == competition_id)
     groups = _sort_groups(groups_query.all(), group_order)
 
+    # Phase 2 independence: read GlobalScoreRule per group so we can
+    # emit Časovnica (Article 39) and Found-points (Article 38) columns
+    # on the Score tab as formulas, not as system-computed values.
+    # Resolve start/end checkpoint names from the local Checkpoint
+    # rows; without those, no time-race formula is possible.
+    from app.models import Checkpoint as _CP
+    from app.models import GlobalScoreRule
+
+    global_rules_by_group: dict[int, dict] = {}
+    if competition_id is not None:
+        for gr in GlobalScoreRule.query.filter_by(competition_id=competition_id).all():
+            global_rules_by_group[gr.group_id] = gr.rules or {}
+    cp_id_to_name = {
+        c.id: c.name
+        for c in _CP.query.filter(_CP.competition_id == competition_id).all()
+    } if competition_id is not None else {}
+
     values = []
     blocks = []  # track ranges for org summary
 
@@ -722,6 +874,10 @@ def build_score_tab(
         header.extend([escape_formula_cell(cfg.tab_name) for cfg in relevant])
         if include_dead_time_sum:
             header.append(lang.get("score_dead_time_sum_header", "Mrtvi čas (sum)"))
+        # Phase 2: dedicated columns for the two global contributions
+        # so the spreadsheet can sum the final score on its own.
+        header.append(lang.get("score_casovnica_header", "Časovnica"))
+        header.append(lang.get("score_found_header", "Najdene KT"))
         header.append(lang.get("score_total_header", "Skupaj točke"))
         start_row = len(values) + 1  # header row index (1-based)
         values.append(header)
@@ -781,15 +937,39 @@ def build_score_tab(
             def _strip_eq(expr: str) -> str:
                 return expr[1:] if expr.startswith("=") else expr
 
+            dead_time_sum_expr = "0"
             if include_dead_time_sum:
                 if dead_time_formulas and any(f not in ("=0", "0") for f in dead_time_formulas):
                     dt_total_formula = f"=SUM({';'.join(_strip_eq(f) for f in dead_time_formulas)})"
+                    dead_time_sum_expr = (
+                        f"SUM({';'.join(_strip_eq(f) for f in dead_time_formulas)})"
+                    )
                 else:
                     dt_total_formula = "=0"
                 row.append(dt_total_formula)
 
-            if cp_formulas:
-                pts_total_formula = f"=SUM({';'.join(_strip_eq(f) for f in cp_formulas)})"
+            # Phase 2: Časovnica + Found formulas, derived from the
+            # per-CP tabs' Time columns. Each is computed entirely from
+            # cells on this spreadsheet so the system can be offline
+            # and the Score tab still produces the correct final total.
+            cas_formula, found_formula = _build_global_rule_formulas(
+                group=g,
+                global_rule=global_rules_by_group.get(g.id) or {},
+                cp_id_to_name=cp_id_to_name,
+                relevant_cfgs=relevant,
+                row_idx=row_idx,
+                dead_time_sum_expr=dead_time_sum_expr,
+            )
+            row.append(cas_formula)
+            row.append(found_formula)
+
+            # Total is now the sum of per-CP points + časovnica + found,
+            # all computed from cells on the spreadsheet.
+            total_pieces = [_strip_eq(f) for f in cp_formulas]
+            total_pieces.append(_strip_eq(cas_formula))
+            total_pieces.append(_strip_eq(found_formula))
+            if total_pieces:
+                pts_total_formula = f"=SUM({';'.join(total_pieces)})"
             else:
                 pts_total_formula = "=0"
             row.append(pts_total_formula)
@@ -1134,17 +1314,164 @@ def wizard_create_checkpoint_configs(
 # ---------------------------------------------------------------------------
 
 
-def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> list[list]:
+def _fmt_num(value) -> str:
+    """Format a number for inclusion in a Sheets formula. Integer values
+    render without a trailing .0 to keep formulas readable."""
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return "0"
+    if n == int(n):
+        return str(int(n))
+    return repr(n)
+
+
+def _field_rule_to_formula(rule, cell_ref: str) -> str | None:
+    """Translate one ScoreRule field rule into a Sheets formula expression
+    (no leading '=') that reads `cell_ref` and produces the field's
+    point contribution.
+
+    Returns None when the rule cannot be expressed as a static formula
+    (time_race, found across other tabs, interpolate — handled
+    elsewhere or system-dependent). Callers fall back to a system-
+    written raw value for those.
+    """
+    if rule is None:
+        # No rule means raw passthrough; Sheets treats empty cells as 0
+        # in arithmetic.
+        return cell_ref
+    if isinstance(rule, list):
+        # Rule chains aren't used in this race; if one shows up, just
+        # apply the first rule and ignore the rest (matches the app's
+        # _apply_field_rule which would compose but we don't need that).
+        if not rule:
+            return cell_ref
+        return _field_rule_to_formula(rule[0], cell_ref)
+    if not isinstance(rule, dict) or not rule:
+        return cell_ref
+
+    rule_type = (rule.get("type") or "").lower()
+
+    if rule_type == "multiplier":
+        return f"({cell_ref}*{_fmt_num(rule.get('factor'))})"
+
+    if rule_type == "mapping":
+        m = rule.get("map") or {}
+        if not m:
+            return "0"
+        # Build IFS(cell=k1; v1; cell=k2; v2; ...; TRUE; 0). Sort by key
+        # so the output is stable across publishes. Quote non-numeric
+        # keys so the formula compares strings correctly.
+        parts: list[tuple[str, str]] = []
+        for k, v in m.items():
+            try:
+                key_repr = _fmt_num(float(k))
+            except (TypeError, ValueError):
+                key_repr = f'"{str(k)}"'
+            parts.append((key_repr, _fmt_num(v)))
+        parts.sort(key=lambda p: p[0])
+        ifs_args: list[str] = []
+        for key_repr, val_num in parts:
+            ifs_args.append(f"{cell_ref}={key_repr}")
+            ifs_args.append(val_num)
+        ifs_args.append("TRUE")
+        ifs_args.append("0")
+        return f"IFS({'; '.join(ifs_args)})"
+
+    if rule_type == "deviation":
+        target = _fmt_num(rule.get("target"))
+        max_p = _fmt_num(rule.get("max_points"))
+        penalty_p = _fmt_num(rule.get("penalty_points"))
+        # Guard against a zero penalty_distance which would divide-by-zero.
+        try:
+            pd_num = float(rule.get("penalty_distance") or 0)
+        except (TypeError, ValueError):
+            pd_num = 0
+        if pd_num == 0:
+            return _fmt_num(rule.get("min_points") or 0)
+        penalty_d = _fmt_num(pd_num)
+        min_p = _fmt_num(rule.get("min_points") or 0)
+        # Empty cell -> deviation would compute |0-target| which is
+        # spurious; explicitly return 0 for empty inputs.
+        deviation_expr = (
+            f"MAX({max_p}-ABS({cell_ref}-{target})/{penalty_d}*{penalty_p}; {min_p})"
+        )
+        return f'IF({cell_ref}=""; 0; {deviation_expr})'
+
+    # Unknown / unsupported rule type (interpolate, found, time_race
+    # when nested inside field_rules) — bail out so the caller falls
+    # back to system-written raw values.
+    return None
+
+
+def _points_formula_from_rule(
+    rule_blob: dict | None,
+    field_columns: dict[str, int],
+    row: int,
+) -> str | None:
+    """Compose the Points-cell formula for one (CP, group) from a
+    ScoreRule blob.
+
+    `field_columns` maps each field name to its 1-based column index
+    inside the group block; `row` is the spreadsheet row of the team.
+
+    Returns the cell formula (with leading '=') or None if the rule
+    isn't expressible as a formula (e.g., the rule is time_race-only,
+    or any single field rule comes back unsupported).
+    """
+    if not rule_blob:
+        return None
+    # time_race owns the whole Points cell; the system writes it and
+    # nothing on the sheet can recompute it without RANK/LET helpers.
+    if rule_blob.get("time_race"):
+        return None
+
+    field_rules = rule_blob.get("field_rules") or {}
+    total_fields = rule_blob.get("total_fields") or list(field_rules.keys())
+    # Skip dead_time from the total — matches _compute_total's behavior
+    # which excludes "dead_time" from total_fields.
+    total_fields = [f for f in total_fields if f != "dead_time"]
+    if not total_fields:
+        return None
+
+    from gspread.utils import rowcol_to_a1
+
+    pieces: list[str] = []
+    for f in total_fields:
+        col = field_columns.get(f)
+        if col is None:
+            continue
+        cell_ref = rowcol_to_a1(row, col)
+        rule = field_rules.get(f)
+        piece = _field_rule_to_formula(rule, cell_ref)
+        if piece is None:
+            # One unsupported rule type drops the whole formula — falls
+            # back to system-written value at this Points cell.
+            return None
+        pieces.append(piece)
+    if not pieces:
+        return None
+    return "=" + "+".join(pieces)
+
+
+def _build_local_cp_grid(
+    cfg: SheetConfig, competition_id: int
+) -> tuple[list[list], dict[int, bool]]:
     """Build the full per-checkpoint grid (headers + all team rows) from a
     SheetConfig, including any existing ScoreEntry data and check-in
     timestamps. Returned as a 2D list suitable for a single
-    ws.update("A1", values, value_input_option="USER_ENTERED") call.
+    ws.update("A1", values, value_input_option="USER_ENTERED") call,
+    along with a per-group dict marking which groups now have a
+    Points cell that's a Sheets *formula* (so the system knows not to
+    clobber it on subsequent score writes).
 
     Writing the entire tab in one batched update is intentional: each CP
     costs ~2 Sheets API calls (add_tab + update) instead of the
     per-column wizard pattern that costs 1 per group, so a 14-CP publish
     stays comfortably under the 40-calls-per-60s quota.
     """
+    from app.models import ScoreRule
+
     cfg_blob = cfg.config or {}
     groups_def = cfg_blob.get("groups") or []
     dead_time_enabled = bool(cfg_blob.get("dead_time_enabled"))
@@ -1179,7 +1506,7 @@ def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> list[list]:
 
     total_cols = current_col - 1
     if total_cols <= 0:
-        return [headers]
+        return [headers], {}
 
     # Per group: ordered team list + their latest score + check-in timestamp
     cp_id = cfg.checkpoint_id
@@ -1225,6 +1552,43 @@ def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> list[list]:
         teams_per_group.append(rows)
         max_rows = max(max_rows, len(rows))
 
+    # Precompute per-group field-column maps and the ScoreRule blob so
+    # we can emit a Points formula per team row when the rule is
+    # expressible. group_has_formula tells the caller which (CP, group)
+    # pairs become formula-driven; the per-CP SheetConfig stores this
+    # as a flag so future score writes skip the Points cell.
+    rule_by_group: dict[int, dict] = {}
+    field_cols_by_group: dict[int, dict[str, int]] = {}
+    group_has_formula: dict[int, bool] = {}
+    points_col_by_group: dict[int, int] = {}
+    if cp_id is not None:
+        for spec in group_specs:
+            gid = spec["group_id"]
+            if not gid:
+                continue
+            field_cols: dict[str, int] = {}
+            col_cursor = spec["start_col"]
+            col_cursor += 1  # group name column
+            if dead_time_enabled:
+                field_cols["dead_time"] = col_cursor
+                col_cursor += 1
+            if time_enabled:
+                col_cursor += 1  # time column (no field rule applies)
+            for f in spec["fields"]:
+                field_cols[f] = col_cursor
+                col_cursor += 1
+            points_col_by_group[gid] = col_cursor  # 1-based column of Points
+            field_cols_by_group[gid] = field_cols
+            rule = (
+                ScoreRule.query.filter_by(
+                    competition_id=competition_id, checkpoint_id=cp_id, group_id=gid
+                )
+                .order_by(ScoreRule.created_at.desc())
+                .first()
+            )
+            if rule is not None:
+                rule_by_group[gid] = rule.rules or {}
+
     # Header row (escape any user-supplied strings)
     values: list[list] = [[escape_formula_cell(h) if isinstance(h, str) else h for h in headers]]
 
@@ -1254,13 +1618,37 @@ def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> list[list]:
                     if val is not None and val != "":
                         row[cursor] = escape_formula_cell(val) if isinstance(val, str) else val
                 cursor += 1
-            # Points column
-            if t["score"] is not None and t["score"].total is not None:
+            # Points column. Prefer a formula computed from the raw field
+            # cells in this row so the spreadsheet stays independent of
+            # the system; fall back to the system-written total when the
+            # rule isn't expressible (time_race, unknown rule type).
+            gid = spec["group_id"]
+            sheet_row = i + 2  # row 1 = headers
+            points_formula = None
+            if gid in rule_by_group:
+                points_formula = _points_formula_from_rule(
+                    rule_by_group[gid], field_cols_by_group.get(gid, {}), sheet_row
+                )
+            if points_formula is not None:
+                row[cursor] = points_formula
+                group_has_formula[gid] = True
+            elif t["score"] is not None and t["score"].total is not None:
                 row[cursor] = t["score"].total
+                # If we have a rule but it's not expressible (time_race),
+                # mark this group explicitly as non-formula so callers
+                # don't set the points_formula flag.
+                group_has_formula.setdefault(gid, False)
             cursor += 1
         values.append(row)
 
-    return values
+    # For groups that never got a Points formula (because no rule, or
+    # rule is time_race / unsupported), leave group_has_formula at False.
+    for spec in group_specs:
+        gid = spec["group_id"]
+        if gid and gid not in group_has_formula:
+            group_has_formula[gid] = False
+
+    return values, group_has_formula
 
 
 def publish_local_configs_to_spreadsheet(
@@ -1340,7 +1728,7 @@ def publish_local_configs_to_spreadsheet(
 
     for cfg in configs:
         try:
-            grid = _build_local_cp_grid(cfg, competition_id)
+            grid, group_has_formula = _build_local_cp_grid(cfg, competition_id)
             if not grid or not grid[0]:
                 result["skipped"] += 1
                 continue
@@ -1377,6 +1765,26 @@ def publish_local_configs_to_spreadsheet(
 
             cfg.spreadsheet_id = spreadsheet_id
             cfg.spreadsheet_name = spreadsheet_name
+            # Persist per-group flag so update_checkpoint_scores_sync
+            # knows which Points cells are formula-driven and must not
+            # be overwritten by future raw writes.
+            if group_has_formula:
+                new_cfg_blob = dict(cfg.config or {})
+                groups_blob = list(new_cfg_blob.get("groups") or [])
+                rewritten = []
+                for g in groups_blob:
+                    if not isinstance(g, dict):
+                        rewritten.append(g)
+                        continue
+                    g2 = dict(g)
+                    gid = g2.get("group_id")
+                    if gid is not None and group_has_formula.get(gid):
+                        g2["points_formula"] = True
+                    else:
+                        g2.pop("points_formula", None)
+                    rewritten.append(g2)
+                new_cfg_blob["groups"] = rewritten
+                cfg.config = new_cfg_blob
             db.session.commit()
             result["published"] += 1
         except Exception as exc:
