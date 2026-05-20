@@ -620,6 +620,41 @@ def public_scores(competition_id: int):
     return render_template("scores_view.html", **context)
 
 
+@scores_bp.route("/public/<int:competition_id>/qr.svg", methods=["GET"])
+def public_scores_qr(competition_id: int):
+    """Generate a QR code SVG for the public scores URL of this competition.
+
+    Refuses to render when public_results is off so we don't accidentally
+    leak a scannable handle to a private competition. SVG is pure-Python
+    in the qrcode library (no PIL), and inline-able by the browser, so
+    it's a one-API-call zero-dependency feature.
+    """
+    from flask import make_response
+
+    competition = Competition.query.filter(Competition.id == competition_id).first()
+    if not competition or not competition.public_results:
+        return make_response(("", 404))
+
+    import io
+
+    import qrcode
+    from qrcode.image.svg import SvgPathImage
+
+    public_url = url_for(
+        "scores.public_scores",
+        competition_id=competition_id,
+        _external=True,
+    )
+    img = qrcode.make(public_url, image_factory=SvgPathImage, box_size=10)
+    buf = io.BytesIO()
+    img.save(buf)
+    resp = make_response(buf.getvalue())
+    resp.headers["Content-Type"] = "image/svg+xml; charset=utf-8"
+    # Spectators stay on the page; 5-minute cache is plenty and keeps load light.
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
+
+
 @scores_bp.route("/stats", methods=["GET"])
 @roles_required("judge", "admin")
 def score_stats():

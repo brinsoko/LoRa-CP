@@ -27,3 +27,7 @@ google-auth==2.52.0
 
 # --- ESP32 NVS partition generation (web flasher) ---
 esp-idf-nvs-partition-gen>=0.2.0
+
+# --- QR codes for the public-results spectator URL ---
+# pure-python; SVG renderer needs no extra deps (PIL only required for PNG)
+qrcode==8.0

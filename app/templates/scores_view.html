@@ -2,6 +2,28 @@
 {% block title %}{{ _('Scores') }}{% endblock %}
 
 {% block content %}
+{% if public_competition %}
+<div class="card shadow-sm mb-3" id="publicScoresHeader">
+  <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <div>
+      <h5 class="card-title mb-1">{{ public_competition.name }}</h5>
+      <div class="text-muted small">
+        {{ _('Live results. The page auto-refreshes every 30 seconds.') }}
+        <span class="ms-2">{{ _('Next refresh') }}:
+          <span id="publicScoresCountdown">30</span>s
+        </span>
+      </div>
+    </div>
+    <div class="text-center">
+      <img src="{{ url_for('scores.public_scores_qr', competition_id=public_competition.id) }}"
+           alt="{{ _('QR code to public results') }}"
+           width="120" height="120"
+           style="background:#fff;padding:6px;border-radius:6px;">
+      <div class="text-muted small mt-1">{{ _('Scan to view') }}</div>
+    </div>
+  </div>
+</div>
+{% endif %}
 <div class="card shadow-sm">
   <div class="card-body">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
@@ -265,4 +287,32 @@
     toggleBtn.textContent = extended.classList.contains("d-none") ? showLabel : hideLabel;
   });
 </script>
+{% if public_competition %}
+<script>
+  // Auto-refresh the public results page every 30 seconds. Spectator
+  // page only — admin /scores/view stays untouched. A countdown is
+  // shown in the header so it's clear the page is live.
+  (function () {
+    const REFRESH_SECONDS = 30;
+    let remaining = REFRESH_SECONDS;
+    const countdown = document.getElementById("publicScoresCountdown");
+
+    // Skip auto-refresh if the tab is hidden (browser throttles timers
+    // anyway; this avoids unnecessary reloads when nobody is watching).
+    function tick() {
+      if (document.hidden) {
+        remaining = REFRESH_SECONDS;
+        if (countdown) countdown.textContent = remaining;
+        return;
+      }
+      remaining -= 1;
+      if (countdown) countdown.textContent = Math.max(0, remaining);
+      if (remaining <= 0) {
+        window.location.reload();
+      }
+    }
+    window.setInterval(tick, 1000);
+  })();
+</script>
+{% endif %}
 {% endblock %}
