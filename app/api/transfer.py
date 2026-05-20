@@ -202,6 +202,81 @@ def _local_spreadsheet_id(comp_id: int) -> str:
     return f"local:{comp_id}"
 
 
+def _remap_score_rule_blob(
+    rule_blob: dict | None,
+    cp_map: dict[str, Checkpoint],
+) -> dict | None:
+    """Resolve name-based checkpoint references inside a ScoreRule /
+    GlobalScoreRule.rules blob to local checkpoint IDs.
+
+    Hand-authored import payloads use names because the source's
+    checkpoint IDs don't exist in the destination DB. Supported
+    name fields (each takes precedence over the corresponding _id
+    if present):
+
+    - rules["time_race"]["start_checkpoint_name"] -> start_checkpoint_id
+    - rules["time_race"]["end_checkpoint_name"]   -> end_checkpoint_id
+    - rules["time"]["start_checkpoint_name"]      -> start_checkpoint_id
+    - rules["time"]["end_checkpoint_name"]        -> end_checkpoint_id
+    - rules["field_rules"][f]["checkpoint_names"] -> checkpoint_ids (for type="found")
+      (and the same inside list-form field rules)
+
+    Names that don't resolve are dropped so the runtime's name-based
+    fallback can kick in, mirroring _remap_sheet_config.
+    """
+    if not rule_blob or not isinstance(rule_blob, dict):
+        return rule_blob
+    out = dict(rule_blob)
+
+    for key in ("time_race", "time"):
+        block = out.get(key)
+        if not isinstance(block, dict):
+            continue
+        block = dict(block)
+        for name_key, id_key in (
+            ("start_checkpoint_name", "start_checkpoint_id"),
+            ("end_checkpoint_name", "end_checkpoint_id"),
+        ):
+            ref = block.pop(name_key, None)
+            if not ref:
+                continue
+            local = cp_map.get(ref)
+            if local is not None:
+                block[id_key] = local.id
+        out[key] = block
+
+    field_rules = out.get("field_rules")
+    if isinstance(field_rules, dict):
+        new_fr = {}
+        for field_name, raw_rule in field_rules.items():
+            new_fr[field_name] = _remap_field_rule(raw_rule, cp_map)
+        out["field_rules"] = new_fr
+
+    return out
+
+
+def _remap_field_rule(rule, cp_map: dict[str, Checkpoint]):
+    """field_rules entries can be a single rule dict or a list of rule
+    dicts (the chain form). Recurse for the list form; for the dict
+    form, swap checkpoint_names -> checkpoint_ids when present.
+    """
+    if isinstance(rule, list):
+        return [_remap_field_rule(r, cp_map) for r in rule]
+    if not isinstance(rule, dict):
+        return rule
+    out = dict(rule)
+    names = out.pop("checkpoint_names", None)
+    if names:
+        resolved: list[int] = []
+        for nm in names:
+            local = cp_map.get(nm)
+            if local is not None:
+                resolved.append(local.id)
+        if resolved:
+            out["checkpoint_ids"] = resolved
+    return out
+
+
 def _remap_sheet_config(cfg_blob: dict | None, group_map: dict[str, CheckpointGroup]) -> dict | None:
     """Rewrite stale group_id references inside a SheetConfig.config blob.
 
@@ -469,6 +544,8 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
 
     # Score rules (per checkpoint+group). Without these the destination
     # has scoring layouts but no logic to turn raw_fields into a total.
+    # Name-based checkpoint references inside the rule blob (e.g.
+    # time_race.start_checkpoint_name) are resolved to local IDs here.
     for sr_data in data.get("score_rules", []):
         cp = cp_map.get(sr_data.get("checkpoint_name"))
         group = group_map.get(sr_data.get("group_name"))
@@ -479,7 +556,7 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                 competition_id=comp.id,
                 checkpoint_id=cp.id,
                 group_id=group.id,
-                rules=sr_data.get("rules") or {},
+                rules=_remap_score_rule_blob(sr_data.get("rules"), cp_map) or {},
             )
         )
 
@@ -492,7 +569,7 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
             GlobalScoreRule(
                 competition_id=comp.id,
                 group_id=group.id,
-                rules=gr_data.get("rules") or {},
+                rules=_remap_score_rule_blob(gr_data.get("rules"), cp_map) or {},
             )
         )
 
@@ -892,7 +969,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                 competition_id=comp.id,
                 checkpoint_id=cp.id,
                 group_id=group.id,
-                rules=sr_data.get("rules") or {},
+                rules=_remap_score_rule_blob(sr_data.get("rules"), cp_map) or {},
             )
         )
         existing_score_rules.add((cp.id, group.id))
@@ -912,7 +989,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
             GlobalScoreRule(
                 competition_id=comp.id,
                 group_id=group.id,
-                rules=gr_data.get("rules") or {},
+                rules=_remap_score_rule_blob(gr_data.get("rules"), cp_map) or {},
             )
         )
         existing_global_rules.add(group.id)

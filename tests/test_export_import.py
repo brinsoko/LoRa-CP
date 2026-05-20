@@ -690,6 +690,89 @@ class TestMerge:
         # UID is normalized on the way in.
         assert RFIDCard.query.filter_by(competition_id=comp.id).count() == 1
 
+    def test_merge_resolves_name_based_checkpoint_refs_in_score_rules(self, client, _seeded):
+        """Score rules authored with name-based checkpoint references
+        (e.g. time_race.start_checkpoint_name) must resolve to local
+        IDs at merge time. Without this, a hand-authored import file
+        is brittle — the source's integer IDs don't exist locally."""
+        comp, _, group, cp, _, _ = _seeded
+        # Add a second checkpoint so the time_race references something
+        # other than the existing one.
+        extra_cp = create_checkpoint(comp, name="CP-Export-2")
+        db.session.commit()
+
+        export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
+        export_data["score_rules"] = [
+            {
+                "checkpoint_name": cp.name,
+                "group_name": group.name,
+                "rules": {
+                    "time_race": {
+                        "start_checkpoint_name": cp.name,
+                        "end_checkpoint_name": extra_cp.name,
+                        "min_points": 10,
+                        "max_points": 100,
+                    },
+                    "field_rules": {
+                        "bonus": [
+                            {
+                                "type": "found",
+                                "points_per": 5,
+                                "checkpoint_names": [cp.name, extra_cp.name],
+                            }
+                        ]
+                    },
+                },
+            }
+        ]
+        export_data["global_score_rules"] = [
+            {
+                "group_name": group.name,
+                "rules": {
+                    "time": {
+                        "start_checkpoint_name": cp.name,
+                        "end_checkpoint_name": extra_cp.name,
+                        "max_points": 195,
+                        "threshold_minutes": 195,
+                        "penalty_minutes": 1,
+                        "penalty_points": 2,
+                        "min_points": 0,
+                    },
+                    "found": {"points_per": 100, "exclude_start_checkpoint": True},
+                },
+            }
+        ]
+        export_data["resolutions"] = {}
+
+        resp = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
+        assert resp.status_code == 200
+        summary = resp.get_json()["summary"]
+        assert summary["added"]["score_rules"] == 1
+        assert summary["added"]["global_score_rules"] == 1
+
+        landed_rule = ScoreRule.query.filter_by(
+            competition_id=comp.id, checkpoint_id=cp.id, group_id=group.id
+        ).one()
+        # Name fields removed, id fields populated with local IDs.
+        tr = landed_rule.rules["time_race"]
+        assert "start_checkpoint_name" not in tr
+        assert "end_checkpoint_name" not in tr
+        assert tr["start_checkpoint_id"] == cp.id
+        assert tr["end_checkpoint_id"] == extra_cp.id
+        # Same for the chained "found" rule.
+        bonus_chain = landed_rule.rules["field_rules"]["bonus"]
+        assert isinstance(bonus_chain, list) and len(bonus_chain) == 1
+        bonus = bonus_chain[0]
+        assert "checkpoint_names" not in bonus
+        assert sorted(bonus["checkpoint_ids"]) == sorted([cp.id, extra_cp.id])
+
+        gr = GlobalScoreRule.query.filter_by(
+            competition_id=comp.id, group_id=group.id
+        ).one()
+        assert gr.rules["time"]["start_checkpoint_id"] == cp.id
+        assert gr.rules["time"]["end_checkpoint_id"] == extra_cp.id
+        assert "start_checkpoint_name" not in gr.rules["time"]
+
     def test_merge_admin_only(self, app, client):
         viewer = create_user(username="viewer-merge", role="public")
         comp = create_competition(name="Viewer Merge")
