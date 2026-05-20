@@ -22,10 +22,12 @@
             <label class="form-label">{{ _('Group') }}</label>
             <select class="form-select" name="group_id" id="groupSelect" required>
               <option value="">{{ _('Choose...') }}</option>
+              <option value="__all__">{{ _('All groups (apply to every group at this checkpoint)') }}</option>
               {% for g in groups %}
                 <option value="{{ g.id }}">{{ g.name }}</option>
               {% endfor %}
             </select>
+            <div class="form-text">{{ _('Pick "All groups" to fan the same rule out to every group linked to this checkpoint in one shot.') }}</div>
           </div>
           <div class="mb-3">
             <button class="btn btn-outline-primary" type="button" id="loadFieldsBtn">{{ _('Load Fields') }}</button>

@@ -90,9 +90,16 @@ def score_rules():
 
     if request.method == "POST":
         checkpoint_id = request.form.get("checkpoint_id", type=int)
-        group_id = request.form.get("group_id", type=int)
+        raw_group_id = (request.form.get("group_id") or "").strip()
+        apply_all = raw_group_id == "__all__"
+        group_id = None
+        if not apply_all:
+            try:
+                group_id = int(raw_group_id) if raw_group_id else None
+            except ValueError:
+                group_id = None
         rules_text = (request.form.get("rules_json") or "").strip()
-        if not checkpoint_id or not group_id or not rules_text:
+        if not checkpoint_id or (not apply_all and not group_id) or not rules_text:
             flash(_("Checkpoint, group, and rules JSON are required."), "warning")
             return redirect(url_for("scores.score_rules"))
 
@@ -114,6 +121,66 @@ def score_rules():
             if not tr.get("start_checkpoint_id") or not tr.get("end_checkpoint_id"):
                 flash(_("Time-based scoring requires start and end checkpoints."), "warning")
                 return redirect(url_for("scores.score_rules"))
+
+        if apply_all:
+            # Fan out the rule to every group linked to this checkpoint via
+            # CheckpointGroupLink. Groups that don't participate at this
+            # checkpoint are skipped so we don't leave dead rule rows behind.
+            linked_group_ids = [
+                row[0]
+                for row in db.session.query(CheckpointGroupLink.group_id)
+                .join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
+                .filter(
+                    CheckpointGroupLink.checkpoint_id == checkpoint_id,
+                    CheckpointGroup.competition_id == comp_id,
+                )
+                .all()
+            ]
+            if not linked_group_ids:
+                flash(
+                    _("No groups are linked to this checkpoint, nothing to apply."),
+                    "warning",
+                )
+                return redirect(url_for("scores.score_rules"))
+
+            created = 0
+            updated = 0
+            for gid in linked_group_ids:
+                existing = ScoreRule.query.filter(
+                    ScoreRule.competition_id == comp_id,
+                    ScoreRule.checkpoint_id == checkpoint_id,
+                    ScoreRule.group_id == gid,
+                ).first()
+                if existing:
+                    existing.rules = rules_json
+                    updated += 1
+                else:
+                    db.session.add(
+                        ScoreRule(
+                            competition_id=comp_id,
+                            checkpoint_id=checkpoint_id,
+                            group_id=gid,
+                            rules=rules_json,
+                        )
+                    )
+                    created += 1
+            db.session.commit()
+            flash(
+                _(
+                    "Applied to %(count)s groups (created %(created)s, updated %(updated)s).",
+                    count=len(linked_group_ids),
+                    created=created,
+                    updated=updated,
+                ),
+                "success",
+            )
+            for gid in linked_group_ids:
+                try:
+                    recompute_scores_for_rule(comp_id, checkpoint_id, gid)
+                except Exception:
+                    pass
+            return redirect(url_for("scores.score_rules"))
+
         existing = ScoreRule.query.filter(
             ScoreRule.competition_id == comp_id,
             ScoreRule.checkpoint_id == checkpoint_id,

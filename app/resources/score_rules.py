@@ -112,8 +112,15 @@ def score_rule_fields():
     if not comp_id:
         return jsonify({"error": "no_competition"}), 400
     checkpoint_id = request.args.get("checkpoint_id", type=int)
-    group_id = request.args.get("group_id", type=int)
-    if not checkpoint_id or not group_id:
+    raw_group_id = (request.args.get("group_id") or "").strip()
+    apply_all = raw_group_id == "__all__"
+    group_id = None
+    if not apply_all and raw_group_id:
+        try:
+            group_id = int(raw_group_id)
+        except ValueError:
+            group_id = None
+    if not checkpoint_id or (not apply_all and not group_id):
         return jsonify({"error": "invalid_request", "detail": "checkpoint_id and group_id are required."}), 400
 
     from app.models import CheckpointGroup, SheetConfig
@@ -130,18 +137,35 @@ def score_rule_fields():
     if not cfg:
         return {"fields": [], "headers": {}}, 200
 
-    group = CheckpointGroup.query.filter(
-        CheckpointGroup.competition_id == comp_id,
-        CheckpointGroup.id == group_id,
-    ).first()
-    group_name = group.name if group else ""
-
     headers = {
         "dead_time": (cfg.config or {}).get("dead_time_header"),
         "time": (cfg.config or {}).get("time_header"),
         "points": (cfg.config or {}).get("points_header"),
     }
     group_defs = (cfg.config or {}).get("groups", [])
+
+    if apply_all:
+        # Union the field lists across every group at this checkpoint so
+        # the rule UI can build a single shared rule that covers all of
+        # them. Insertion order is preserved (first-seen wins).
+        seen: dict[str, None] = {}
+        for grp_def in group_defs:
+            for f in grp_def.get("fields") or []:
+                if f not in seen:
+                    seen[f] = None
+        return {
+            "fields": list(seen.keys()),
+            "headers": headers,
+            "config": cfg.config or {},
+            "all_groups": True,
+        }, 200
+
+    group = CheckpointGroup.query.filter(
+        CheckpointGroup.competition_id == comp_id,
+        CheckpointGroup.id == group_id,
+    ).first()
+    group_name = group.name if group else ""
+
     group_def = next(
         (g for g in group_defs if (g.get("name") or "").strip().lower() == group_name.strip().lower()),
         None,
