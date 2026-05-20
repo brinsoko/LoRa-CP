@@ -18,9 +18,11 @@ from app.models import (
     CheckpointGroupLink,
     Competition,
     CompetitionMember,
+    GlobalScoreRule,
     LoRaDevice,
     RFIDCard,
     ScoreEntry,
+    ScoreRule,
     SheetConfig,
     Team,
     TeamGroup,
@@ -47,6 +49,8 @@ def _export_competition(comp: Competition) -> dict:
     devices = LoRaDevice.query.filter_by(competition_id=comp.id).all()
     scores = ScoreEntry.query.filter_by(competition_id=comp.id).all()
     sheet_configs = SheetConfig.query.filter_by(competition_id=comp.id).all()
+    score_rules = ScoreRule.query.filter_by(competition_id=comp.id).all()
+    global_score_rules = GlobalScoreRule.query.filter_by(competition_id=comp.id).all()
     rfid_cards = RFIDCard.query.join(Team, RFIDCard.team_id == Team.id).filter(Team.competition_id == comp.id).all()
     team_groups = TeamGroup.query.join(Team, TeamGroup.team_id == Team.id).filter(Team.competition_id == comp.id).all()
     group_links = (
@@ -124,8 +128,31 @@ def _export_competition(comp: Competition) -> dict:
                 "checkpoint_name": s.checkpoint.name if s.checkpoint else None,
                 "raw_fields": s.raw_fields,
                 "total": s.total,
+                # Matches the Checkin export fidelity (created_by_username
+                # + timestamp): preserve who scored and when so a
+                # round-trip doesn't lose audit context.
+                "judge_username": s.judge_user.username if s.judge_user else None,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
             }
             for s in scores
+        ],
+        # Scoring rules — without these the destination has scoring
+        # layouts (SheetConfig) but no way to compute totals from raw
+        # fields, and judge submissions can't be re-scored.
+        "score_rules": [
+            {
+                "checkpoint_name": r.checkpoint.name if r.checkpoint else None,
+                "group_name": r.group.name if r.group else None,
+                "rules": r.rules,
+            }
+            for r in score_rules
+        ],
+        "global_score_rules": [
+            {
+                "group_name": r.group.name if r.group else None,
+                "rules": r.rules,
+            }
+            for r in global_score_rules
         ],
         # SheetConfig holds the per-checkpoint scoring layout (which fields
         # the judge UI exposes, dead-time / time toggles, headers, per-group
@@ -412,16 +439,62 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                 checkpoint_id=cp.id,
                 competition_id=comp.id,
             ).first()
-            db.session.add(
-                ScoreEntry(
-                    competition_id=comp.id,
-                    checkin_id=checkin.id if checkin else None,
-                    team_id=team.id,
-                    checkpoint_id=cp.id,
-                    raw_fields=s_data.get("raw_fields"),
-                    total=s_data.get("total"),
-                )
+            # Preserve who scored and when, mirroring the Checkin import
+            # fidelity. Older exports without these fields still work.
+            judge_user_id = None
+            judge_username = s_data.get("judge_username")
+            if judge_username:
+                ju = User.query.filter_by(username=judge_username).first()
+                if ju:
+                    judge_user_id = ju.id
+            created_at = None
+            ts_raw = s_data.get("created_at")
+            if ts_raw:
+                try:
+                    created_at = datetime.fromisoformat(ts_raw)
+                except Exception:
+                    created_at = None
+            score_kwargs = {
+                "competition_id": comp.id,
+                "checkin_id": checkin.id if checkin else None,
+                "team_id": team.id,
+                "checkpoint_id": cp.id,
+                "judge_user_id": judge_user_id,
+                "raw_fields": s_data.get("raw_fields"),
+                "total": s_data.get("total"),
+            }
+            if created_at is not None:
+                score_kwargs["created_at"] = created_at
+            db.session.add(ScoreEntry(**score_kwargs))
+
+    # Score rules (per checkpoint+group). Without these the destination
+    # has scoring layouts but no logic to turn raw_fields into a total.
+    for sr_data in data.get("score_rules", []):
+        cp = cp_map.get(sr_data.get("checkpoint_name"))
+        group = group_map.get(sr_data.get("group_name"))
+        if not (cp and group):
+            continue
+        db.session.add(
+            ScoreRule(
+                competition_id=comp.id,
+                checkpoint_id=cp.id,
+                group_id=group.id,
+                rules=sr_data.get("rules") or {},
             )
+        )
+
+    # Global score rules (per group: found-points, time race, etc.).
+    for gr_data in data.get("global_score_rules", []):
+        group = group_map.get(gr_data.get("group_name"))
+        if not group:
+            continue
+        db.session.add(
+            GlobalScoreRule(
+                competition_id=comp.id,
+                group_id=group.id,
+                rules=gr_data.get("rules") or {},
+            )
+        )
 
     # Sheet configs (per-checkpoint scoring field layout). Created with a
     # local-only spreadsheet_id so the destination never tries to write to
@@ -527,7 +600,20 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
     they intentionally bypass the Google Sheets sync helpers so a local
     merge never requires sheets write permission.
     """
-    added = {"teams": 0, "checkpoints": 0, "groups": 0, "checkins": 0, "scores": 0, "sheet_configs": 0}
+    added = {
+        "teams": 0,
+        "checkpoints": 0,
+        "groups": 0,
+        "checkins": 0,
+        "scores": 0,
+        "sheet_configs": 0,
+        "team_groups": 0,
+        "group_checkpoint_links": 0,
+        "score_rules": 0,
+        "global_score_rules": 0,
+        "devices": 0,
+        "rfid_cards": 0,
+    }
     updated = {"teams": 0, "checkpoints": 0, "groups": 0}
     skipped = 0
 
@@ -621,6 +707,63 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
             team_map[name] = t
             added["teams"] += 1
 
+    # Team -> group assignments. Without this, teams that came in via the
+    # merge (or pre-existed locally) are not linked to the groups that
+    # carried them in the source competition, so the scoring UI shows
+    # them as orphaned. Add-new-only semantics: existing (team, group)
+    # pairs are left alone.
+    db.session.flush()
+    existing_team_groups = {
+        (tg.team_id, tg.group_id)
+        for tg in TeamGroup.query.join(Team, TeamGroup.team_id == Team.id)
+        .filter(Team.competition_id == comp.id)
+        .all()
+    }
+    for tg_data in data.get("team_groups", []):
+        team = team_map.get(tg_data.get("team_name"))
+        group = group_map.get(tg_data.get("group_name"))
+        if not (team and group):
+            continue
+        if (team.id, group.id) in existing_team_groups:
+            continue
+        db.session.add(
+            TeamGroup(
+                team_id=team.id,
+                group_id=group.id,
+                active=tg_data.get("active", True),
+            )
+        )
+        existing_team_groups.add((team.id, group.id))
+        added["team_groups"] += 1
+
+    # Group -> checkpoint links. Same shape: without this, newly merged
+    # groups or checkpoints have no link rows, so they don't appear in
+    # arrivals/score builds that gate on CheckpointGroupLink.
+    existing_group_links = {
+        (gl.group_id, gl.checkpoint_id)
+        for gl in CheckpointGroupLink.query.join(
+            CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id
+        )
+        .filter(CheckpointGroup.competition_id == comp.id)
+        .all()
+    }
+    for gl_data in data.get("group_checkpoint_links", []):
+        group = group_map.get(gl_data.get("group_name"))
+        cp = cp_map.get(gl_data.get("checkpoint_name"))
+        if not (group and cp):
+            continue
+        if (group.id, cp.id) in existing_group_links:
+            continue
+        db.session.add(
+            CheckpointGroupLink(
+                group_id=group.id,
+                checkpoint_id=cp.id,
+                position=gl_data.get("position", 0),
+            )
+        )
+        existing_group_links.add((group.id, cp.id))
+        added["group_checkpoint_links"] += 1
+
     # Check-ins (add only new ones, matched by team+checkpoint)
     for ci_data in data.get("checkins", []):
         team = team_map.get(ci_data.get("team_name"))
@@ -669,16 +812,33 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
             checkpoint_id=cp.id,
             competition_id=comp.id,
         ).first()
-        db.session.add(
-            ScoreEntry(
-                competition_id=comp.id,
-                checkin_id=checkin.id if checkin else None,
-                team_id=team.id,
-                checkpoint_id=cp.id,
-                raw_fields=s_data.get("raw_fields"),
-                total=s_data.get("total"),
-            )
-        )
+        # Preserve judge attribution + timestamp on merge so a re-export
+        # is faithful and the audit trail survives a merge cycle.
+        judge_user_id = None
+        judge_username = s_data.get("judge_username")
+        if judge_username:
+            ju = User.query.filter_by(username=judge_username).first()
+            if ju:
+                judge_user_id = ju.id
+        created_at = None
+        ts_raw = s_data.get("created_at")
+        if ts_raw:
+            try:
+                created_at = datetime.fromisoformat(ts_raw)
+            except Exception:
+                created_at = None
+        score_kwargs = {
+            "competition_id": comp.id,
+            "checkin_id": checkin.id if checkin else None,
+            "team_id": team.id,
+            "checkpoint_id": cp.id,
+            "judge_user_id": judge_user_id,
+            "raw_fields": s_data.get("raw_fields"),
+            "total": s_data.get("total"),
+        }
+        if created_at is not None:
+            score_kwargs["created_at"] = created_at
+        db.session.add(ScoreEntry(**score_kwargs))
         added["scores"] += 1
 
     # Sheet configs (per-checkpoint scoring field layout). Add only configs
@@ -712,6 +872,96 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
         )
         existing_configs.add((tab_type, tab_name))
         added["sheet_configs"] += 1
+
+    # Score rules (per checkpoint+group). Add only rules whose
+    # (checkpoint_name, group_name) pair has no local rule yet — admins
+    # often hand-tune these so a merge must not clobber existing logic.
+    existing_score_rules = {
+        (r.checkpoint_id, r.group_id)
+        for r in ScoreRule.query.filter_by(competition_id=comp.id).all()
+    }
+    for sr_data in data.get("score_rules", []):
+        cp = cp_map.get(sr_data.get("checkpoint_name"))
+        group = group_map.get(sr_data.get("group_name"))
+        if not (cp and group):
+            continue
+        if (cp.id, group.id) in existing_score_rules:
+            continue
+        db.session.add(
+            ScoreRule(
+                competition_id=comp.id,
+                checkpoint_id=cp.id,
+                group_id=group.id,
+                rules=sr_data.get("rules") or {},
+            )
+        )
+        existing_score_rules.add((cp.id, group.id))
+        added["score_rules"] += 1
+
+    # Global score rules (per group). Same add-new-only semantics.
+    existing_global_rules = {
+        r.group_id for r in GlobalScoreRule.query.filter_by(competition_id=comp.id).all()
+    }
+    for gr_data in data.get("global_score_rules", []):
+        group = group_map.get(gr_data.get("group_name"))
+        if not group:
+            continue
+        if group.id in existing_global_rules:
+            continue
+        db.session.add(
+            GlobalScoreRule(
+                competition_id=comp.id,
+                group_id=group.id,
+                rules=gr_data.get("rules") or {},
+            )
+        )
+        existing_global_rules.add(group.id)
+        added["global_score_rules"] += 1
+
+    # LoRa devices (matched by dev_num within the competition).
+    existing_dev_nums = {
+        d.dev_num for d in LoRaDevice.query.filter_by(competition_id=comp.id).all()
+    }
+    for d_data in data.get("devices", []):
+        dev_num = d_data.get("dev_num")
+        if dev_num is None or dev_num in existing_dev_nums:
+            continue
+        db.session.add(
+            LoRaDevice(
+                competition_id=comp.id,
+                dev_num=dev_num,
+                name=d_data.get("name"),
+                note=d_data.get("note"),
+                model=d_data.get("model"),
+                active=d_data.get("active", True),
+            )
+        )
+        existing_dev_nums.add(dev_num)
+        added["devices"] += 1
+
+    # RFID cards (matched by uid within the competition). UIDs are
+    # normalized to the canonical /api/ingest lookup form.
+    db.session.flush()
+    existing_uids = {
+        card.uid for card in RFIDCard.query.filter_by(competition_id=comp.id).all()
+    }
+    for card_data in data.get("rfid_cards", []):
+        uid = normalize_uid(card_data.get("uid", ""))
+        if not uid or uid in existing_uids:
+            continue
+        team = team_map.get(card_data.get("team_name"))
+        if not team:
+            continue
+        db.session.add(
+            RFIDCard(
+                competition_id=comp.id,
+                uid=uid,
+                team_id=team.id,
+                number=card_data.get("number"),
+            )
+        )
+        existing_uids.add(uid)
+        added["rfid_cards"] += 1
 
     db.session.flush()
     return {"added": added, "updated": updated, "skipped": skipped}
