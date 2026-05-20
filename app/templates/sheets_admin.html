@@ -182,6 +182,22 @@
       </div>
     </form>
     <hr>
+    <form method="post" action="{{ url_for('sheets_admin.publish_local') }}" class="row g-2 mb-3">
+      {{ csrf_input() }}
+      <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
+      <div class="col-12">
+        <div class="form-text mb-2">
+          {{ _('Promote local-only configs (from an imported or local-only setup) to a real Google Sheet. Creates one tab per checkpoint with headers + team numbers + any existing score data, then builds the Teams / Arrivals / Score summary tabs so the spreadsheet is a self-contained backup.') }}
+        </div>
+      </div>
+      <div class="col-md-3 d-flex align-items-end">
+        <button class="btn btn-outline-warning w-100" type="submit"
+                onclick="return confirm('{{ _('This will create new tabs on the target spreadsheet and rebind all local SheetConfigs. Continue?') }}');">
+          {{ _('Publish local -> remote') }}
+        </button>
+      </div>
+    </form>
+    <hr>
     <form method="post" action="{{ url_for('sheets_admin.build_arrivals') }}" class="row g-2 mb-2">
       {{ csrf_input() }}
       <input type="hidden" name="spreadsheet_id" class="sheet-id-target">

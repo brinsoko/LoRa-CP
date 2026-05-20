@@ -7,7 +7,16 @@ from flask import current_app
 from sqlalchemy import func
 
 from app.extensions import db
-from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, SheetConfig, Team, TeamGroup
+from app.models import (
+    Checkin,
+    Checkpoint,
+    CheckpointGroup,
+    CheckpointGroupLink,
+    ScoreEntry,
+    SheetConfig,
+    Team,
+    TeamGroup,
+)
 from app.utils.competition import get_competition_group_order
 from app.utils.export_safety import escape_formula_cell
 from app.utils.lang_store import load_lang
@@ -1118,3 +1127,288 @@ def wizard_create_checkpoint_configs(
 
     db.session.commit()
     return created, skipped
+
+
+# ---------------------------------------------------------------------------
+# Publish local-only configs to a real Google Sheet
+# ---------------------------------------------------------------------------
+
+
+def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> list[list]:
+    """Build the full per-checkpoint grid (headers + all team rows) from a
+    SheetConfig, including any existing ScoreEntry data and check-in
+    timestamps. Returned as a 2D list suitable for a single
+    ws.update("A1", values, value_input_option="USER_ENTERED") call.
+
+    Writing the entire tab in one batched update is intentional: each CP
+    costs ~2 Sheets API calls (add_tab + update) instead of the
+    per-column wizard pattern that costs 1 per group, so a 14-CP publish
+    stays comfortably under the 40-calls-per-60s quota.
+    """
+    cfg_blob = cfg.config or {}
+    groups_def = cfg_blob.get("groups") or []
+    dead_time_enabled = bool(cfg_blob.get("dead_time_enabled"))
+    time_enabled = bool(cfg_blob.get("time_enabled"))
+    dead_time_header = cfg_blob.get("dead_time_header") or "Dead Time"
+    time_header = cfg_blob.get("time_header") or "Time"
+    points_header = cfg_blob.get("points_header") or "Points"
+
+    headers: list[str] = []
+    group_specs: list[dict] = []
+    current_col = 1
+    for grp in groups_def:
+        block_start = current_col
+        headers.append(grp.get("name") or "")
+        if dead_time_enabled:
+            headers.append(dead_time_header)
+        if time_enabled:
+            headers.append(time_header)
+        fields = list(grp.get("fields") or [])
+        headers.extend(fields)
+        headers.append(points_header)
+        block_width = 1 + (1 if dead_time_enabled else 0) + (1 if time_enabled else 0) + len(fields) + 1
+        group_specs.append(
+            {
+                "group_id": grp.get("group_id"),
+                "fields": fields,
+                "start_col": block_start,
+                "width": block_width,
+            }
+        )
+        current_col += block_width
+
+    total_cols = current_col - 1
+    if total_cols <= 0:
+        return [headers]
+
+    # Per group: ordered team list + their latest score + check-in timestamp
+    cp_id = cfg.checkpoint_id
+    teams_per_group: list[list[dict]] = []
+    max_rows = 0
+    for spec in group_specs:
+        gid = spec["group_id"]
+        if not gid:
+            teams_per_group.append([])
+            continue
+        teams = (
+            db.session.query(Team.id, Team.number, Team.name)
+            .join(TeamGroup, TeamGroup.team_id == Team.id)
+            .filter(TeamGroup.group_id == gid)
+            .filter(Team.competition_id == competition_id)
+            .order_by(Team.number.asc().nulls_last(), Team.name.asc())
+            .all()
+        )
+        rows: list[dict] = []
+        for t_id, t_num, t_name in teams:
+            score = None
+            checkin_ts = None
+            if cp_id is not None:
+                score = (
+                    ScoreEntry.query.filter_by(
+                        competition_id=competition_id, team_id=t_id, checkpoint_id=cp_id
+                    )
+                    .order_by(ScoreEntry.created_at.desc())
+                    .first()
+                )
+                ci = Checkin.query.filter_by(
+                    competition_id=competition_id, team_id=t_id, checkpoint_id=cp_id
+                ).first()
+                if ci and ci.timestamp:
+                    checkin_ts = ci.timestamp
+            rows.append(
+                {
+                    "team_label": t_num if t_num is not None else (t_name or ""),
+                    "score": score,
+                    "checkin_ts": checkin_ts,
+                }
+            )
+        teams_per_group.append(rows)
+        max_rows = max(max_rows, len(rows))
+
+    # Header row (escape any user-supplied strings)
+    values: list[list] = [[escape_formula_cell(h) if isinstance(h, str) else h for h in headers]]
+
+    for i in range(max_rows):
+        row: list = [""] * total_cols
+        for spec, group_rows in zip(group_specs, teams_per_group, strict=False):
+            if i >= len(group_rows):
+                continue
+            t = group_rows[i]
+            cursor = spec["start_col"] - 1  # 0-indexed
+            label = t["team_label"]
+            row[cursor] = label if not isinstance(label, str) else escape_formula_cell(label)
+            cursor += 1
+            if dead_time_enabled:
+                if t["score"] is not None:
+                    dt = (t["score"].raw_fields or {}).get("dead_time")
+                    if dt is not None and dt != "":
+                        row[cursor] = dt if not isinstance(dt, str) else escape_formula_cell(dt)
+                cursor += 1
+            if time_enabled:
+                if t["checkin_ts"] is not None:
+                    row[cursor] = t["checkin_ts"].strftime("%Y-%m-%d %H:%M:%S")
+                cursor += 1
+            for f in spec["fields"]:
+                if t["score"] is not None:
+                    val = (t["score"].raw_fields or {}).get(f)
+                    if val is not None and val != "":
+                        row[cursor] = escape_formula_cell(val) if isinstance(val, str) else val
+                cursor += 1
+            # Points column
+            if t["score"] is not None and t["score"].total is not None:
+                row[cursor] = t["score"].total
+            cursor += 1
+        values.append(row)
+
+    return values
+
+
+def publish_local_configs_to_spreadsheet(
+    competition_id: int,
+    spreadsheet_id: str,
+    *,
+    build_summary_tabs: bool = True,
+) -> dict:
+    """Promote a competition's local-only SheetConfigs to a real Google
+    Sheet.
+
+    For each SheetConfig whose spreadsheet_id starts with "local:":
+      1. Build the full per-CP grid (headers + team rows + any existing
+         ScoreEntry data + check-in timestamps) in memory.
+      2. Create (or reuse) the remote tab and write the grid in one
+         batched update. Two Sheets API calls per CP.
+      3. Rebind SheetConfig.spreadsheet_id from "local:N" to
+         spreadsheet_id, committed per-CP so partial progress survives a
+         mid-batch failure.
+
+    After the per-CP loop, (re)build the Teams / Arrivals / Score summary
+    tabs so the spreadsheet is a self-contained backup: Arrivals and
+    Score use formula-based lookups (=INDEX(...;MATCH(...))) against the
+    per-CP tabs, so manual edits on the CP tabs propagate without our
+    system. Future score submissions also replicate into the per-CP tabs
+    via the existing update_checkpoint_scores hook because every
+    SheetConfig now points at the real spreadsheet.
+
+    All Google calls route through the throttled SheetsClient (40 calls
+    per 60s window, 3 retries on 429), so a publish stays under quota
+    even on a large competition. Per-CP failures are caught and recorded
+    in `errors` so one bad tab doesn't abort the whole batch.
+
+    Returns: {"published": int, "skipped": int, "errors": [str],
+              "summary_tabs": [str], "spreadsheet_name": str}
+    """
+    result: dict = {
+        "published": 0,
+        "skipped": 0,
+        "errors": [],
+        "summary_tabs": [],
+        "spreadsheet_name": None,
+    }
+
+    if not sheets_sync_enabled():
+        result["errors"].append("Sheets sync is disabled.")
+        return result
+
+    if not spreadsheet_id or spreadsheet_id.startswith("local:"):
+        result["errors"].append("Target spreadsheet_id must be a real Google Sheets ID.")
+        return result
+
+    configs = (
+        SheetConfig.query.filter(SheetConfig.competition_id == competition_id)
+        .filter(SheetConfig.tab_type == "checkpoint")
+        .filter(SheetConfig.spreadsheet_id.like("local:%"))
+        .order_by(SheetConfig.tab_name.asc())
+        .all()
+    )
+    if not configs:
+        result["errors"].append("No local SheetConfigs to publish for this competition.")
+        return result
+
+    try:
+        client = get_sheets_client(current_app)
+    except Exception as exc:
+        result["errors"].append(f"Sheets client init: {exc}")
+        return result
+
+    try:
+        ss = client._call(client.gc.open_by_key, spreadsheet_id)
+        spreadsheet_name = getattr(ss, "title", None) or "Google Sheet"
+        result["spreadsheet_name"] = spreadsheet_name
+    except Exception as exc:
+        result["errors"].append(f"Could not open target spreadsheet: {exc}")
+        return result
+
+    for cfg in configs:
+        try:
+            grid = _build_local_cp_grid(cfg, competition_id)
+            if not grid or not grid[0]:
+                result["skipped"] += 1
+                continue
+            tab_name = cfg.tab_name
+            n_rows = max(len(grid) + 10, 50)
+            n_cols = max(len(grid[0]) + 5, 26)
+
+            # Create or reuse the remote tab. gspread raises an APIError
+            # whose message contains "already exists" when the tab name
+            # collides; we treat that as "reuse" rather than failure so
+            # partial reruns of publish are safe.
+            tab_existed = False
+            try:
+                client.add_tab(spreadsheet_id, tab_name, rows=n_rows, cols=n_cols)
+            except Exception as exc:
+                msg = str(exc).lower()
+                if "already exists" in msg or "duplicate" in msg:
+                    tab_existed = True
+                else:
+                    raise
+
+            ws = client._call(ss.worksheet, tab_name)
+            if tab_existed:
+                # Clear before re-write so we don't keep stale rows from
+                # a previous publish or a manual edit that shifted columns.
+                client._call(ws.clear)
+
+            client._call(
+                ws.update,
+                range_name="A1",
+                values=grid,
+                value_input_option="USER_ENTERED",
+            )
+
+            cfg.spreadsheet_id = spreadsheet_id
+            cfg.spreadsheet_name = spreadsheet_name
+            db.session.commit()
+            result["published"] += 1
+        except Exception as exc:
+            db.session.rollback()
+            result["errors"].append(f"{cfg.tab_name}: {exc}")
+            try:
+                current_app.logger.exception("Publish failed for tab %s", cfg.tab_name)
+            except Exception:
+                pass
+
+    if build_summary_tabs and result["published"] > 0:
+        lang = load_lang()
+        for label, fn, tab_label in [
+            ("teams", build_teams_tab, lang.get("teams_tab") or "Teams"),
+            ("arrivals", build_arrivals_tab, lang.get("arrivals_tab") or "Arrivals"),
+            ("score", build_score_tab, lang.get("score_tab") or "Score"),
+        ]:
+            try:
+                err = fn(
+                    spreadsheet_id,
+                    tab_label,
+                    competition_id=competition_id,
+                )
+                if err:
+                    result["errors"].append(f"{label}: {err}")
+                else:
+                    result["summary_tabs"].append(tab_label)
+            except Exception as exc:
+                result["errors"].append(f"{label} build raised: {exc}")
+                try:
+                    current_app.logger.exception("Summary tab %s build failed", label)
+                except Exception:
+                    pass
+
+    return result

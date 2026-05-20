@@ -25,6 +25,7 @@ from app.utils.sheets_sync import (
     build_arrivals_tab,
     build_score_tab,
     build_teams_tab,
+    publish_local_configs_to_spreadsheet,
     sync_all_checkpoint_tabs,
     wizard_build_checkpoint_tabs,
     wizard_create_checkpoint_configs,
@@ -550,6 +551,55 @@ def sync_team_numbers(config_id: int):
         return redirect(url_for("sheets_admin.list_sheets"))
 
     flash(_("Synced team numbers for checkpoint tabs."), "success")
+    return redirect(url_for("sheets_admin.list_sheets"))
+
+
+@sheets_bp.route("/publish-local", methods=["POST"])
+@roles_required("admin")
+def publish_local():
+    """Promote a competition's local-only SheetConfigs to a real Google
+    Sheet: create every per-CP tab on the remote (with headers + team
+    numbers + any existing score data), rebind each SheetConfig from
+    local:N -> the real spreadsheet ID, then build the Teams / Arrivals
+    / Score summary tabs so the sheet is a self-contained backup.
+    """
+    redirect_resp = _require_sheets_enabled()
+    if redirect_resp:
+        return redirect_resp
+    comp_id, redirect_resp = _require_competition()
+    if redirect_resp:
+        return redirect_resp
+
+    spreadsheet_id = (request.form.get("spreadsheet_id") or "").strip()
+    if not spreadsheet_id:
+        flash(_("Target spreadsheet ID is required."), "warning")
+        return redirect(url_for("sheets_admin.list_sheets"))
+    if spreadsheet_id.startswith("local:"):
+        flash(
+            _("Target spreadsheet must be a real Google Sheets ID, not a local: sentinel."),
+            "warning",
+        )
+        return redirect(url_for("sheets_admin.list_sheets"))
+
+    try:
+        result = publish_local_configs_to_spreadsheet(comp_id, spreadsheet_id)
+    except Exception as exc:
+        current_app.logger.exception("Publish-local failed")
+        flash(_("Publish failed: %(error)s", error=exc), "warning")
+        return redirect(url_for("sheets_admin.list_sheets"))
+
+    summary_tabs = ", ".join(result.get("summary_tabs") or []) or "-"
+    flash(
+        _(
+            "Published %(count)s checkpoint tab(s), skipped %(skip)s. Summary tabs built: %(s)s.",
+            count=result.get("published", 0),
+            skip=result.get("skipped", 0),
+            s=summary_tabs,
+        ),
+        "success",
+    )
+    for err in result.get("errors") or []:
+        flash(err, "warning")
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
