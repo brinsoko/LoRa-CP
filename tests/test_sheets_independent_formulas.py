@@ -515,6 +515,100 @@ def test_update_checkpoint_scores_sync_still_writes_points_without_flag(sheets_a
         assert 3 in cols_written, f"Points should be written: {written}"
 
 
+def test_score_tab_found_formula_excludes_virtual_checkpoints(sheets_app, monkeypatch):
+    """Virtual CPs (Topo&Vrisovanje, Lokostrelstvo) carry no physical
+    arrival — the in-app _compute_global_contrib naturally skips them
+    (no Checkin row gets auto-created for virtual CPs), so the
+    spreadsheet's Found formula must too. Otherwise a team that scored
+    Topo would get +100 on the sheet but not in the app."""
+    with sheets_app.app_context():
+        user = create_user(username="virt-excl-admin", role="admin")
+        comp = create_competition(name="Virtual Excl Race")
+        add_membership(user, comp, role="admin")
+        grp = create_group(comp, name="Alpha", prefix="1xx")
+        start = create_checkpoint(comp, name="Start")
+        cilj = create_checkpoint(comp, name="Cilj")
+        mid = create_checkpoint(comp, name="CP-Mid")
+        # Virtual CPs — same shape as the real race's Topo&Vrisovanje
+        # and Lokostrelstvo.
+        topo = create_checkpoint(comp, name="Topo&Vrisovanje")
+        topo.is_virtual = True
+        loko = create_checkpoint(comp, name="Lokostrelstvo")
+        loko.is_virtual = True
+        team = create_team(comp, name="T1", number=101)
+        assign_team_group(team, grp)
+        for pos, cp in enumerate([start, topo, mid, loko, cilj]):
+            db.session.add(CheckpointGroupLink(group_id=grp.id, checkpoint_id=cp.id, position=pos))
+        # SheetConfigs with time_enabled so the Time column exists
+        # (otherwise the formula short-circuits on missing column).
+        for cp in (start, topo, mid, loko, cilj):
+            db.session.add(
+                SheetConfig(
+                    competition_id=comp.id,
+                    spreadsheet_id="REAL-SHEET",
+                    spreadsheet_name="Sheet",
+                    tab_name=cp.name,
+                    tab_type="checkpoint",
+                    checkpoint_id=cp.id,
+                    config={
+                        "points_header": "Points",
+                        "dead_time_enabled": False,
+                        "time_enabled": True,
+                        "time_header": "Time",
+                        "groups": [{"group_id": grp.id, "name": "Alpha", "fields": []}],
+                    },
+                )
+            )
+        db.session.add(
+            GlobalScoreRule(
+                competition_id=comp.id,
+                group_id=grp.id,
+                rules={
+                    "time": {
+                        "start_checkpoint_id": start.id,
+                        "end_checkpoint_id": cilj.id,
+                        "max_points": 195,
+                        "threshold_minutes": 195,
+                        "penalty_minutes": 1,
+                        "penalty_points": 2,
+                        "min_points": 0,
+                    },
+                    "found": {
+                        "points_per": 100,
+                        "exclude_start_checkpoint": True,
+                        "exclude_end_checkpoint": True,
+                    },
+                },
+            )
+        )
+        db.session.commit()
+        fake = _install_fake_client(monkeypatch)
+
+        sheets_sync.build_score_tab(
+            "REAL-SHEET", tab_name="Score", competition_id=comp.id, include_dead_time_sum=False
+        )
+        ws = fake.spreadsheet.worksheet("Score")
+        grid = ws.updates[-1]["values"]
+        header = grid[0]
+        found_idx = next(i for i, h in enumerate(header) if "Najden" in str(h))
+        team_row = grid[1]
+        found_cell = team_row[found_idx]
+        assert isinstance(found_cell, str)
+        # Only CP-Mid is a physical CP between Start and Cilj. Topo and
+        # Lokostrelstvo are virtual and excluded; Start and Cilj are
+        # excluded via the exclude_start/end flags.
+        assert "'CP-Mid'!" in found_cell, found_cell
+        assert "'Topo&Vrisovanje'!" not in found_cell, (
+            f"Topo (virtual) leaked into Found formula: {found_cell}"
+        )
+        assert "'Lokostrelstvo'!" not in found_cell, (
+            f"Lokostrelstvo (virtual) leaked into Found formula: {found_cell}"
+        )
+        # Start and Cilj also stay out (already covered by exclude_* flags).
+        assert "'Start'!" not in found_cell
+        assert "'Cilj'!" not in found_cell
+
+
 def test_score_tab_has_casovnica_and_found_columns(sheets_app, monkeypatch):
     """build_score_tab emits Časovnica + Found-points columns whose
     formulas reach into the per-CP tabs' Time columns. With a

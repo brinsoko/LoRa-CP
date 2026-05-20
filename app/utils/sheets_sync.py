@@ -155,16 +155,24 @@ def _build_global_rule_formulas(
     relevant_cfgs: list,
     row_idx: int,
     dead_time_sum_expr: str,
+    virtual_cp_names: set[str] | None = None,
 ) -> tuple[str, str]:
     """Construct the per-team Časovnica + Found-points formulas for the
     Score tab so the spreadsheet computes the final score without our
     system. Both formulas reach across per-CP tabs via INDEX/MATCH
     against the Time column.
 
+    Virtual CPs (Topo&Vrisovanje, Lokostrelstvo, etc.) are skipped from
+    the Found-points sum: by Article 38's spirit, "found" means physical
+    arrival; the in-app _compute_global_contrib enforces this naturally
+    (no Checkin row gets auto-created for virtual CPs), so the
+    spreadsheet must match.
+
     Returns (casovnica_formula, found_formula). When the rule can't be
     expressed (no start/end CP, or those tabs don't have time_enabled),
     returns "=0" placeholders so the Total column still adds cleanly.
     """
+    virtual_cp_names = set(virtual_cp_names or ())
     from gspread.utils import rowcol_to_a1
 
     def _col_letter(col: int) -> str:
@@ -227,6 +235,11 @@ def _build_global_rule_formulas(
         per_cp_terms: list[str] = []
         for cfg in relevant_cfgs:
             if cfg.tab_name in excluded_names:
+                continue
+            if cfg.tab_name in virtual_cp_names:
+                # Virtual CPs don't represent a physical arrival, so
+                # they don't earn the Article 38 found bonus — matches
+                # what _compute_global_contrib does in the app.
                 continue
             t_col = _time_col_for_group_in_cp(cfg.config or {}, group.name)
             a_col = _team_col_for_group_in_cp(cfg.config or {}, group.name)
@@ -801,6 +814,14 @@ def build_score_tab(
         c.id: c.name
         for c in _CP.query.filter(_CP.competition_id == competition_id).all()
     } if competition_id is not None else {}
+    # Virtual CPs are excluded from the spreadsheet's Found-points sum
+    # so it matches the in-app calculation (no physical arrival = no
+    # +100 per Article 38). Compute once; the helper consults this set
+    # per row.
+    virtual_cp_names = {
+        c.name
+        for c in _CP.query.filter(_CP.competition_id == competition_id, _CP.is_virtual.is_(True)).all()
+    } if competition_id is not None else set()
 
     values = []
     blocks = []  # track ranges for org summary
@@ -959,6 +980,7 @@ def build_score_tab(
                 relevant_cfgs=relevant,
                 row_idx=row_idx,
                 dead_time_sum_expr=dead_time_sum_expr,
+                virtual_cp_names=virtual_cp_names,
             )
             row.append(cas_formula)
             row.append(found_formula)
