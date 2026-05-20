@@ -11,7 +11,7 @@ from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, SheetCo
 from app.utils.competition import get_current_competition_id
 from app.utils.lang_store import load_lang, save_lang
 from app.utils.perms import roles_required
-from app.utils.sheets_client import SheetsClient
+from app.utils.sheets_client import SheetsClient, get_sheets_client
 from app.utils.sheets_settings import (
     load_settings as load_sheet_settings,
 )
@@ -45,11 +45,7 @@ def _remember_spreadsheet_id():
 
 
 def _get_sheets_client() -> SheetsClient:
-    cfg = current_app.config
-    return SheetsClient(
-        service_account_file=cfg.get("GOOGLE_SERVICE_ACCOUNT_FILE"),
-        service_account_json=cfg.get("GOOGLE_SERVICE_ACCOUNT_JSON"),
-    )
+    return get_sheets_client(current_app)
 
 
 def _require_competition():
@@ -340,8 +336,8 @@ def prune_missing():
 
     for sheet_id, cfgs in by_sheet.items():
         try:
-            ss = client.gc.open_by_key(sheet_id)
-            titles = {ws.title for ws in ss.worksheets()}
+            ss = client._call(client.gc.open_by_key, sheet_id)
+            titles = {ws.title for ws in client._call(ss.worksheets)}
         except Exception:
             # if we cannot open, skip deleting to avoid accidental loss
             continue
@@ -575,9 +571,9 @@ def delete_config(config_id: int):
     if delete_remote and sheets_sync_enabled() and not cfg.spreadsheet_id.startswith("local:"):
         try:
             client = _get_sheets_client()
-            ss = client.gc.open_by_key(cfg.spreadsheet_id)
-            ws = ss.worksheet(tab_name)
-            ss.del_worksheet(ws)
+            ss = client._call(client.gc.open_by_key, cfg.spreadsheet_id)
+            ws = client._call(ss.worksheet, tab_name)
+            client._call(ss.del_worksheet, ws)
         except Exception as exc:
             current_app.logger.warning("Could not delete remote tab %s: %s", tab_name, exc)
             flash(_("Remote tab could not be deleted: %(error)s", error=exc), "warning")

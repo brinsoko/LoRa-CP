@@ -4,7 +4,6 @@ import time
 from datetime import datetime
 
 from flask import current_app
-from gspread.exceptions import APIError
 from sqlalchemy import func
 
 from app.extensions import db
@@ -12,7 +11,7 @@ from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, SheetCo
 from app.utils.competition import get_competition_group_order
 from app.utils.export_safety import escape_formula_cell
 from app.utils.lang_store import load_lang
-from app.utils.sheets_client import SheetsClient
+from app.utils.sheets_client import get_sheets_client
 from app.utils.sheets_settings import sheets_sync_enabled
 
 
@@ -120,12 +119,8 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
     if not configs:
         return
 
-    cfg_app = current_app.config
     try:
-        client = SheetsClient(
-            service_account_file=cfg_app.get("GOOGLE_SERVICE_ACCOUNT_FILE"),
-            service_account_json=cfg_app.get("GOOGLE_SERVICE_ACCOUNT_JSON"),
-        )
+        client = get_sheets_client(current_app)
     except Exception as exc:
         current_app.logger.warning("Sheets sync skipped: %s", exc)
         return
@@ -189,10 +184,7 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
         return
 
     try:
-        client = SheetsClient(
-            service_account_file=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_FILE"),
-            service_account_json=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_JSON"),
-        )
+        client = get_sheets_client(current_app)
     except Exception as exc:
         current_app.logger.warning("Sheets arrival sync skipped: %s", exc)
         return
@@ -276,10 +268,7 @@ def update_checkpoint_scores_sync(
         return
 
     try:
-        client = SheetsClient(
-            service_account_file=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_FILE"),
-            service_account_json=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_JSON"),
-        )
+        client = get_sheets_client(current_app)
     except Exception as exc:
         current_app.logger.warning("Sheets score sync skipped: %s", exc)
         return
@@ -459,18 +448,20 @@ def build_arrivals_tab(
         values.append([])
         values.append([])
 
-    client = SheetsClient(
-        service_account_file=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_FILE"),
-        service_account_json=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_JSON"),
-    )
-    ss = client.gc.open_by_key(spreadsheet_id)
+    client = get_sheets_client(current_app)
+    ss = client._call(client.gc.open_by_key, spreadsheet_id)
     try:
-        ws = ss.worksheet(tab_name)
-        ws.clear()
+        ws = client._call(ss.worksheet, tab_name)
+        client._call(ws.clear)
     except Exception:
-        ws = ss.add_worksheet(title=tab_name, rows=500, cols=100)
-    ws.update("A1", values, value_input_option="USER_ENTERED")
-    # Apply conditional formatting: non-empty (arrived) → green, empty (not arrived) → red
+        ws = client._call(ss.add_worksheet, title=tab_name, rows=500, cols=100)
+    client._call(
+        ws.update,
+        range_name="A1",
+        values=values,
+        value_input_option="USER_ENTERED",
+    )
+    # Apply conditional formatting: non-empty (arrived) -> green, empty (not arrived) -> red
     try:
         last_row = len(values)
         last_col = max((len(r) for r in values), default=1)
@@ -522,7 +513,7 @@ def build_arrivals_tab(
                 }
             },
         ]
-        ss.batch_update({"requests": requests})
+        client._call(ss.batch_update, {"requests": requests})
     except Exception as exc:
         current_app.logger.warning("Could not apply arrivals conditional formatting: %s", exc)
     return None
@@ -585,17 +576,19 @@ def build_teams_tab(
                 row.extend([""] * col_count)
         values.append(row)
 
-    client = SheetsClient(
-        service_account_file=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_FILE"),
-        service_account_json=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_JSON"),
-    )
-    ss = client.gc.open_by_key(spreadsheet_id)
+    client = get_sheets_client(current_app)
+    ss = client._call(client.gc.open_by_key, spreadsheet_id)
     try:
-        ws = ss.worksheet(tab_name)
-        ws.clear()
+        ws = client._call(ss.worksheet, tab_name)
+        client._call(ws.clear)
     except Exception:
-        ws = ss.add_worksheet(title=tab_name, rows=500, cols=20)
-    ws.update("A1", values, value_input_option="USER_ENTERED")
+        ws = client._call(ss.add_worksheet, title=tab_name, rows=500, cols=20)
+    client._call(
+        ws.update,
+        range_name="A1",
+        values=values,
+        value_input_option="USER_ENTERED",
+    )
 
 
 def build_score_tab(
@@ -852,17 +845,19 @@ def build_score_tab(
             ]
             values.append(org_row)
 
-    client = SheetsClient(
-        service_account_file=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_FILE"),
-        service_account_json=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_JSON"),
-    )
-    ss = client.gc.open_by_key(spreadsheet_id)
+    client = get_sheets_client(current_app)
+    ss = client._call(client.gc.open_by_key, spreadsheet_id)
     try:
-        ws = ss.worksheet(tab_name)
-        ws.clear()
+        ws = client._call(ss.worksheet, tab_name)
+        client._call(ws.clear)
     except Exception:
-        ws = ss.add_worksheet(title=tab_name, rows=800, cols=50)
-    ws.update("A1", values, value_input_option="USER_ENTERED")
+        ws = client._call(ss.add_worksheet, title=tab_name, rows=800, cols=50)
+    client._call(
+        ws.update,
+        range_name="A1",
+        values=values,
+        value_input_option="USER_ENTERED",
+    )
 
 
 def wizard_build_checkpoint_tabs(
@@ -896,24 +891,7 @@ def wizard_build_checkpoint_tabs(
 
     group_order_norm = [g.lower().strip() for g in group_order]
 
-    def _with_retry(func, *args, retries: int = 3, delay: int = 65, **kwargs):
-        for attempt in range(1, retries + 1):
-            try:
-                return func(*args, **kwargs)
-            except APIError as exc:
-                resp = getattr(exc, "response", None)
-                status = getattr(resp, "status_code", None) or getattr(resp, "status", None)
-                text = str(exc)
-                quota = status == 429 or "429" in text or "Quota exceeded" in text
-                if quota and attempt < retries:
-                    time.sleep(delay)
-                    continue
-                raise
-
-    client = SheetsClient(
-        service_account_file=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_FILE"),
-        service_account_json=current_app.config.get("GOOGLE_SERVICE_ACCOUNT_JSON"),
-    )
+    client = get_sheets_client(current_app)
 
     created = 0
     skipped = 0
@@ -968,8 +946,8 @@ def wizard_build_checkpoint_tabs(
                 1 + (1 if dead_time_enabled else 0) + (1 if time_enabled else 0) + len(grp.get("fields", [])) + 1
             )
 
-        ws = _with_retry(client.add_tab, spreadsheet_id, tab_title)
-        _with_retry(client.set_header_row, spreadsheet_id, tab_title, headers)
+        ws = client.add_tab(spreadsheet_id, tab_title)
+        client.set_header_row(spreadsheet_id, tab_title, headers)
 
         for grp, start_col in zip(groups_def, group_start_cols, strict=False):
             db_group = db.session.get(CheckpointGroup, grp.get("group_id"))
@@ -989,7 +967,7 @@ def wizard_build_checkpoint_tabs(
             nums = nums_q.order_by(Team.number.asc().nulls_last(), Team.name.asc()).all()
             values = [n[1] if n[1] is not None else (n[2] or "") for n in nums]
             if values:
-                _with_retry(client.update_column, spreadsheet_id, tab_title, start_col, 2, values)
+                client.update_column(spreadsheet_id, tab_title, start_col, 2, values)
 
         record = SheetConfig(
             competition_id=competition_id or cp.competition_id,

@@ -886,9 +886,9 @@ class TestGroupsAndSheets:
         application = app_factory(SHEETS_SYNC_ENABLED=False)
 
         def fail_if_called(*args, **kwargs):
-            raise AssertionError("SheetsClient should not be constructed when sync is disabled")
+            raise AssertionError("Sheets client should not be requested when sync is disabled")
 
-        monkeypatch.setattr(sheets_sync, "SheetsClient", fail_if_called)
+        monkeypatch.setattr(sheets_sync, "get_sheets_client", fail_if_called)
 
         with application.app_context():
             competition = create_competition(name="Sheets Guard Race")
