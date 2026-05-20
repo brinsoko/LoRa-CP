@@ -21,6 +21,7 @@ from app.models import (
     LoRaDevice,
     RFIDCard,
     ScoreEntry,
+    SheetConfig,
     Team,
     TeamGroup,
     User,
@@ -45,6 +46,7 @@ def _export_competition(comp: Competition) -> dict:
     checkins = Checkin.query.filter_by(competition_id=comp.id).all()
     devices = LoRaDevice.query.filter_by(competition_id=comp.id).all()
     scores = ScoreEntry.query.filter_by(competition_id=comp.id).all()
+    sheet_configs = SheetConfig.query.filter_by(competition_id=comp.id).all()
     rfid_cards = RFIDCard.query.join(Team, RFIDCard.team_id == Team.id).filter(Team.competition_id == comp.id).all()
     team_groups = TeamGroup.query.join(Team, TeamGroup.team_id == Team.id).filter(Team.competition_id == comp.id).all()
     group_links = (
@@ -125,6 +127,21 @@ def _export_competition(comp: Competition) -> dict:
             }
             for s in scores
         ],
+        # SheetConfig holds the per-checkpoint scoring layout (which fields
+        # the judge UI exposes, dead-time / time toggles, headers, per-group
+        # field lists). The spreadsheet_id is environment-specific, so the
+        # export omits it; the import re-creates each config with a
+        # local-only spreadsheet_id so it never auto-syncs to a Google Sheet
+        # the destination installation doesn't own.
+        "sheet_configs": [
+            {
+                "tab_name": cfg.tab_name,
+                "tab_type": cfg.tab_type,
+                "checkpoint_name": cfg.checkpoint.name if cfg.checkpoint else None,
+                "config": cfg.config,
+            }
+            for cfg in sheet_configs
+        ],
         "rfid_cards": [
             {
                 "uid": card.uid,
@@ -150,6 +167,42 @@ def _export_competition(comp: Competition) -> dict:
             for gl in group_links
         ],
     }
+
+
+def _local_spreadsheet_id(comp_id: int) -> str:
+    """Match the convention used by app/blueprints/sheets/routes.py for
+    SheetConfig records that have no remote spreadsheet to sync to."""
+    return f"local:{comp_id}"
+
+
+def _remap_sheet_config(cfg_blob: dict | None, group_map: dict[str, CheckpointGroup]) -> dict | None:
+    """Rewrite stale group_id references inside a SheetConfig.config blob.
+
+    The exported config carries group_id values from the source competition;
+    those IDs do not exist in the destination DB. Resolve each entry by name
+    to the new group's id, or drop the field so the runtime falls back to
+    the name-based lookup in _resolve_group_from_cfg.
+    """
+    if not cfg_blob or not isinstance(cfg_blob, dict):
+        return cfg_blob
+    out = dict(cfg_blob)
+    groups = out.get("groups")
+    if isinstance(groups, list):
+        new_groups = []
+        for grp in groups:
+            if not isinstance(grp, dict):
+                new_groups.append(grp)
+                continue
+            grp_copy = dict(grp)
+            name = (grp_copy.get("name") or "").strip()
+            local = group_map.get(name)
+            if local is not None:
+                grp_copy["group_id"] = local.id
+            else:
+                grp_copy.pop("group_id", None)
+            new_groups.append(grp_copy)
+        out["groups"] = new_groups
+    return out
 
 
 def _validate_export_json(data: dict) -> list[str]:
@@ -370,6 +423,26 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                 )
             )
 
+    # Sheet configs (per-checkpoint scoring field layout). Created with a
+    # local-only spreadsheet_id so the destination never tries to write to
+    # the source's Google Sheet. The admin can later re-point a config at
+    # a real spreadsheet via the wizard.
+    local_ss_id = _local_spreadsheet_id(comp.id)
+    for sc_data in data.get("sheet_configs", []):
+        cp_name = sc_data.get("checkpoint_name")
+        target_cp = cp_map.get(cp_name) if cp_name else None
+        db.session.add(
+            SheetConfig(
+                competition_id=comp.id,
+                spreadsheet_id=local_ss_id,
+                spreadsheet_name="Local",
+                tab_name=sc_data.get("tab_name") or (cp_name or "Tab"),
+                tab_type=sc_data.get("tab_type") or "checkpoint",
+                checkpoint_id=target_cp.id if target_cp else None,
+                config=_remap_sheet_config(sc_data.get("config"), group_map),
+            )
+        )
+
     db.session.flush()
     return comp, warnings
 
@@ -447,8 +520,14 @@ def _find_conflicts(data: dict, comp: Competition) -> list[dict]:
 
 
 def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
-    """Apply merge with conflict resolutions. Returns summary."""
-    added = {"teams": 0, "checkpoints": 0, "groups": 0, "checkins": 0}
+    """Apply merge with conflict resolutions. Returns summary.
+
+    Score entries are merged with add-new-only semantics matched by
+    (team_name, checkpoint_name): merge writes go to the local DB only;
+    they intentionally bypass the Google Sheets sync helpers so a local
+    merge never requires sheets write permission.
+    """
+    added = {"teams": 0, "checkpoints": 0, "groups": 0, "checkins": 0, "scores": 0, "sheet_configs": 0}
     updated = {"teams": 0, "checkpoints": 0, "groups": 0}
     skipped = 0
 
@@ -568,6 +647,71 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                     )
                 )
                 added["checkins"] += 1
+
+    # Flush so newly-added checkins above are visible to the score lookup.
+    db.session.flush()
+
+    # Score entries (add only new ones, matched by team+checkpoint).
+    # Local-only: no Google Sheets sync helpers are invoked here.
+    existing_scores = {
+        (s.team_id, s.checkpoint_id): s
+        for s in ScoreEntry.query.filter_by(competition_id=comp.id).all()
+    }
+    for s_data in data.get("scores", []):
+        team = team_map.get(s_data.get("team_name"))
+        cp = cp_map.get(s_data.get("checkpoint_name"))
+        if not (team and cp):
+            continue
+        if (team.id, cp.id) in existing_scores:
+            continue
+        checkin = Checkin.query.filter_by(
+            team_id=team.id,
+            checkpoint_id=cp.id,
+            competition_id=comp.id,
+        ).first()
+        db.session.add(
+            ScoreEntry(
+                competition_id=comp.id,
+                checkin_id=checkin.id if checkin else None,
+                team_id=team.id,
+                checkpoint_id=cp.id,
+                raw_fields=s_data.get("raw_fields"),
+                total=s_data.get("total"),
+            )
+        )
+        added["scores"] += 1
+
+    # Sheet configs (per-checkpoint scoring field layout). Add only configs
+    # whose (tab_type, tab_name) pair isn't already present locally; existing
+    # ones are left alone so a merge can't clobber the admin's hand-tuned
+    # Google Sheets wiring. New configs get a local-only spreadsheet_id.
+    existing_configs = {
+        (sc.tab_type, sc.tab_name)
+        for sc in SheetConfig.query.filter_by(competition_id=comp.id).all()
+    }
+    local_ss_id = _local_spreadsheet_id(comp.id)
+    for sc_data in data.get("sheet_configs", []):
+        tab_type = sc_data.get("tab_type") or "checkpoint"
+        tab_name = sc_data.get("tab_name")
+        if not tab_name:
+            continue
+        if (tab_type, tab_name) in existing_configs:
+            continue
+        cp_name = sc_data.get("checkpoint_name")
+        target_cp = cp_map.get(cp_name) if cp_name else None
+        db.session.add(
+            SheetConfig(
+                competition_id=comp.id,
+                spreadsheet_id=local_ss_id,
+                spreadsheet_name="Local",
+                tab_name=tab_name,
+                tab_type=tab_type,
+                checkpoint_id=target_cp.id if target_cp else None,
+                config=_remap_sheet_config(sc_data.get("config"), group_map),
+            )
+        )
+        existing_configs.add((tab_type, tab_name))
+        added["sheet_configs"] += 1
 
     db.session.flush()
     return {"added": added, "updated": updated, "skipped": skipped}

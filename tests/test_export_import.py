@@ -7,7 +7,7 @@ import io
 import pytest
 
 from app.extensions import db
-from app.models import Competition, Team
+from app.models import CheckpointGroup, Competition, ScoreEntry, SheetConfig, Team
 from tests.support import (
     add_membership,
     assign_team_group,
@@ -130,6 +130,70 @@ class TestImport:
         )
         assert resp.status_code == 400
 
+    def test_import_round_trips_scoring_fields(self, client, _seeded):
+        """Per-checkpoint scoring layout (SheetConfig.config) must survive an
+        export -> import cycle. Without this the destination installation has
+        no field list, no headers, and no group mapping for the score UI."""
+        comp, _, group, cp, _, _ = _seeded
+        db.session.add(
+            SheetConfig(
+                competition_id=comp.id,
+                spreadsheet_id="local:src",
+                spreadsheet_name="Local",
+                tab_name=cp.name,
+                tab_type="checkpoint",
+                checkpoint_id=cp.id,
+                config={
+                    "arrived_header": "Arrived",
+                    "points_header": "Points",
+                    "dead_time_header": "Dead",
+                    "dead_time_enabled": True,
+                    "time_header": "Time",
+                    "time_enabled": False,
+                    "groups": [
+                        {
+                            "group_id": group.id,
+                            "name": group.name,
+                            "fields": ["task1", "task2", "topo"],
+                        }
+                    ],
+                },
+            )
+        )
+        db.session.commit()
+
+        export = client.get(f"/api/competition/{comp.id}/export").get_json()
+        assert "sheet_configs" in export
+        assert len(export["sheet_configs"]) == 1
+        assert export["sheet_configs"][0]["config"]["groups"][0]["fields"] == [
+            "task1",
+            "task2",
+            "topo",
+        ]
+
+        export["competition"]["name"] = "Imported Scoring"
+        resp = client.post("/api/competition/import", json=export)
+        assert resp.status_code == 201
+        new_id = resp.get_json()["competition_id"]
+
+        new_configs = SheetConfig.query.filter_by(competition_id=new_id).all()
+        assert len(new_configs) == 1
+        cfg = new_configs[0]
+        # Spreadsheet ID was rewritten to the local-only form so the import
+        # never grants implicit write access to the source's Google Sheet.
+        assert cfg.spreadsheet_id == f"local:{new_id}"
+        # Scoring fields preserved.
+        assert cfg.config["groups"][0]["fields"] == ["task1", "task2", "topo"]
+        # group_id remapped to the destination competition's group.
+        new_group = next(
+            g for g in cfg.config["groups"] if g["name"] == group.name
+        )
+        local_group = CheckpointGroup.query.filter_by(
+            competition_id=new_id, name=group.name
+        ).first()
+        assert local_group is not None
+        assert new_group["group_id"] == local_group.id
+
     def test_import_version_mismatch_warning(self, client, _seeded):
         comp, *_ = _seeded
         export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
@@ -239,6 +303,118 @@ class TestMerge:
         assert resp.status_code == 200
         data = resp.get_json()
         assert any("mismatch" in w.lower() for w in data.get("warnings", []))
+
+    def test_merge_syncs_scores_without_sheets_writes(self, client, _seeded, monkeypatch):
+        """Score entries land via /merge and the Sheets sync helpers are
+        never invoked. A merge into the local DB must not require sheets
+        write permission to succeed.
+        """
+        comp, _, _, cp, t1, _ = _seeded
+        export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
+
+        # Inject a synthetic score on a team+checkpoint that doesn't have one
+        # locally yet. The export payload may already contain scores; replace
+        # with a single known one for a clean assertion.
+        export_data["scores"] = [
+            {
+                "team_name": t1.name,
+                "checkpoint_name": cp.name,
+                "raw_fields": {"task": 17, "points": 17},
+                "total": 17.0,
+            }
+        ]
+        export_data["resolutions"] = {}
+
+        # Guard: neither sheets helper should be invoked during a local merge.
+        from app.utils import sheets_sync
+
+        def fail_if_called(*args, **kwargs):
+            raise AssertionError("Sheets sync must not run during /merge")
+
+        monkeypatch.setattr(sheets_sync, "mark_arrival_checkbox", fail_if_called)
+        monkeypatch.setattr(sheets_sync, "update_checkpoint_scores", fail_if_called)
+
+        resp = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["ok"] is True
+        assert data["summary"]["added"]["scores"] == 1
+
+        landed = ScoreEntry.query.filter_by(
+            competition_id=comp.id, team_id=t1.id, checkpoint_id=cp.id
+        ).all()
+        assert len(landed) == 1
+        assert landed[0].total == pytest.approx(17.0)
+        assert landed[0].raw_fields == {"task": 17, "points": 17}
+
+    def test_merge_skips_score_when_already_present(self, client, _seeded):
+        """Re-merging the same payload doesn't duplicate scores."""
+        comp, _, _, cp, t1, _ = _seeded
+        export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
+        export_data["scores"] = [
+            {
+                "team_name": t1.name,
+                "checkpoint_name": cp.name,
+                "raw_fields": {"points": 9},
+                "total": 9.0,
+            }
+        ]
+        export_data["resolutions"] = {}
+
+        first = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
+        assert first.get_json()["summary"]["added"]["scores"] == 1
+
+        second = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
+        assert second.get_json()["summary"]["added"]["scores"] == 0
+
+        rows = ScoreEntry.query.filter_by(
+            competition_id=comp.id, team_id=t1.id, checkpoint_id=cp.id
+        ).count()
+        assert rows == 1
+
+    def test_merge_syncs_sheet_configs_locally(self, client, _seeded):
+        """Per-checkpoint scoring layouts must also land via /merge, with
+        spreadsheet_id rewritten to the local-only form so the merge does
+        not require Google Sheets write permission on the destination."""
+        comp, _, group, cp, _, _ = _seeded
+        export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
+        export_data["sheet_configs"] = [
+            {
+                "tab_name": cp.name,
+                "tab_type": "checkpoint",
+                "checkpoint_name": cp.name,
+                "config": {
+                    "arrived_header": "Arr",
+                    "points_header": "Pts",
+                    "dead_time_header": "DT",
+                    "dead_time_enabled": True,
+                    "time_header": "T",
+                    "time_enabled": False,
+                    # group_id is stale (from another comp); merge must remap.
+                    "groups": [
+                        {"group_id": 99999, "name": group.name, "fields": ["taskX"]}
+                    ],
+                },
+            }
+        ]
+        export_data["resolutions"] = {}
+
+        resp = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["summary"]["added"]["sheet_configs"] == 1
+
+        cfg = SheetConfig.query.filter_by(competition_id=comp.id, tab_name=cp.name).first()
+        assert cfg is not None
+        assert cfg.spreadsheet_id == f"local:{comp.id}"
+        assert cfg.config["groups"][0]["fields"] == ["taskX"]
+        # Stale group_id remapped to the local group with the same name.
+        assert cfg.config["groups"][0]["group_id"] == group.id
+
+        # Re-merge does not duplicate.
+        resp2 = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
+        assert resp2.get_json()["summary"]["added"]["sheet_configs"] == 0
+        assert SheetConfig.query.filter_by(competition_id=comp.id).count() == 1
 
     def test_merge_admin_only(self, app, client):
         viewer = create_user(username="viewer-merge", role="public")
