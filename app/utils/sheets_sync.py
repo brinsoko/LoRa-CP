@@ -1801,6 +1801,32 @@ def publish_local_configs_to_spreadsheet(
 
     for cfg in configs:
         try:
+            # Dedupe: when the wizard runs multiple times the same tab_name
+            # can land in several rows with distinct "local:N" placeholders.
+            # The publish loop would otherwise try to re-point each to the
+            # same (target_spreadsheet_id, tab_name) slot and the second
+            # commit blows up on UNIQUE(spreadsheet_id, tab_name). Drop the
+            # duplicate before doing any Sheets API work — the row that
+            # already owns the slot has the published state.
+            duplicate = (
+                SheetConfig.query.filter(SheetConfig.spreadsheet_id == spreadsheet_id)
+                .filter(SheetConfig.tab_name == cfg.tab_name)
+                .filter(SheetConfig.id != cfg.id)
+                .first()
+            )
+            if duplicate is not None:
+                current_app.logger.info(
+                    "publish: dropping duplicate SheetConfig id=%s tab=%r "
+                    "(slot already owned by id=%s)",
+                    cfg.id,
+                    cfg.tab_name,
+                    duplicate.id,
+                )
+                db.session.delete(cfg)
+                db.session.commit()
+                result["skipped"] += 1
+                continue
+
             grid, group_has_formula = _build_local_cp_grid(cfg, competition_id)
             if not grid or not grid[0]:
                 result["skipped"] += 1

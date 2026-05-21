@@ -422,6 +422,61 @@ def test_publish_repoints_configs_already_on_a_different_remote(sheets_app, monk
         )
 
 
+def test_publish_dedupes_duplicate_tab_name_rows(sheets_app, monkeypatch):
+    """If two SheetConfig rows share the same tab_name (e.g. the wizard
+    ran twice and left both `local:5` and `local:12` placeholders for the
+    same checkpoint), publish must drop one before committing instead of
+    blowing up on UNIQUE(spreadsheet_id, tab_name).
+
+    Regression: previously this raised sqlite3.IntegrityError per duplicate
+    row, ate Sheets API quota until the throttle kicked in, and eventually
+    killed the gunicorn worker."""
+    with sheets_app.app_context():
+        s = _seed_imported_competition()
+        _install_fake_client(monkeypatch)
+
+        # Add a second, stale local config that shares CP-One's tab_name.
+        # Different spreadsheet_id keeps it within the UNIQUE(spreadsheet_id,
+        # tab_name) constraint at insert time, but it WILL collide once we
+        # try to re-point it at the target.
+        db.session.add(
+            SheetConfig(
+                competition_id=s["comp"].id,
+                spreadsheet_id="local:stale",
+                spreadsheet_name="Stale",
+                tab_name=s["cp1"].name,  # same tab_name as the live cfg1
+                tab_type="checkpoint",
+                checkpoint_id=s["cp1"].id,
+                config={"groups": []},
+            )
+        )
+        db.session.commit()
+
+        result = sheets_sync.publish_local_configs_to_spreadsheet(
+            competition_id=s["comp"].id,
+            spreadsheet_id="REAL-SHEET-ID",
+        )
+
+        assert result["errors"] == [], result
+        # Two distinct tab_names land on the remote (CP-One + CP-Two). The
+        # stale duplicate is dropped, counted as skipped rather than
+        # published.
+        assert result["published"] == 2, result
+        assert result["skipped"] >= 1, result
+
+        remaining = SheetConfig.query.filter_by(competition_id=s["comp"].id).all()
+        # No duplicates: every (spreadsheet_id, tab_name) pair appears once.
+        seen = set()
+        for c in remaining:
+            key = (c.spreadsheet_id, c.tab_name)
+            assert key not in seen, f"duplicate slot after publish: {key}"
+            seen.add(key)
+        # And no orphan local: rows are left behind.
+        assert all(not c.spreadsheet_id.startswith("local:") for c in remaining), (
+            [c.spreadsheet_id for c in remaining]
+        )
+
+
 def test_publish_is_noop_when_sheets_sync_disabled(app_factory, monkeypatch):
     application = app_factory(SHEETS_SYNC_ENABLED=False)
     with application.app_context():
