@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Bulk add users — results') }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">{{ _('Created %(n)d user(s)', n=created|length) }}</h4>
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('superadmin.bulk_add_users') }}">{{ _('Create more') }}</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('superadmin.index') }}">{{ _('Back to console') }}</a>
+  </div>
+</div>
+
+<div class="alert alert-warning" role="alert">
+  <strong>{{ _('Save these passwords now.') }}</strong>
+  {{ _('They are shown once and are not stored in plaintext anywhere. Leaving or refreshing this page loses them.') }}
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="small text-body-secondary">{{ _('Global role: %(role)s', role=role) }}</span>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="copyAllBtn">{{ _('Copy as CSV') }}</button>
+    </div>
+    <pre id="credsCsv" class="border rounded p-2 small mb-3" style="white-space: pre-wrap;">username,password
+{% for username, password in created -%}
+{{ username }},{{ password }}
+{% endfor %}</pre>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>{{ _('Username') }}</th>
+            <th>{{ _('Password') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for username, password in created %}
+            <tr>
+              <td class="font-monospace">{{ username }}</td>
+              <td class="font-monospace">{{ password }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const btn = document.getElementById("copyAllBtn");
+  const pre = document.getElementById("credsCsv");
+  if (!btn || !pre) return;
+  btn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(pre.textContent.trim());
+      btn.textContent = "{{ _('Copied!') }}";
+      setTimeout(() => { btn.textContent = "{{ _('Copy as CSV') }}"; }, 1500);
+    } catch (err) {
+      btn.textContent = "{{ _('Copy failed') }}";
+    }
+  });
+})();
+</script>
+
+{% endblock %}

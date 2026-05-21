@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Bulk add users') }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">{{ _('Bulk add users') }}</h4>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('superadmin.index') }}">{{ _('Back to console') }}</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <p class="text-body-secondary">
+      {{ _('One username per line. Passwords are generated automatically and shown once after submit — save them before leaving the next page.') }}
+    </p>
+    <form method="post" action="{{ url_for('superadmin.bulk_add_users') }}">
+      {{ csrf_input() }}
+      <div class="mb-3">
+        <label class="form-label" for="usernames">{{ _('Usernames') }}</label>
+        <textarea class="form-control font-monospace" id="usernames" name="usernames" rows="12"
+                  placeholder="judge1&#10;judge2&#10;judge3" required></textarea>
+        <div class="form-text">
+          {{ _('Allowed characters: letters, numbers, dot, underscore, hyphen. Max 50 characters per username.') }}
+        </div>
+      </div>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label" for="role">{{ _('Global role for the whole batch') }}</label>
+          <select class="form-select" id="role" name="role" required>
+            <option value="public" selected>public</option>
+            <option value="superadmin">superadmin</option>
+          </select>
+          <div class="form-text">
+            {{ _('Per-competition roles (judge/admin/viewer) are assigned separately on each competition.') }}
+          </div>
+        </div>
+        <div class="col-md-4 d-flex">
+          <button class="btn btn-primary w-100" type="submit">{{ _('Create users') }}</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
