@@ -3,105 +3,72 @@
 The judge's scoring form should not show raw slugs ("dolzina_plavuti") or
 bare number inputs. This module turns a (field_key, rule) pair into:
 
-  * display_label  - a Slovene human-readable label (for example
-                     "Dolzina plavuti")
-  * hint           - a short instructional string describing the expected
-                     input and how points are awarded (for example
-                     "Cilj 0.6 L, +/- 0.05 = -2.5 pts, max 50 pts")
-  * widget         - "buttons" when the rule is a mapping with a small
-                     fixed value set (pass/fail or multi-choice), else
-                     "number" for free numeric entry
+  * display_label  - human-readable label
+  * hint           - short instructional string ("Cilj 0.6 L, +/- 0.05
+                     = -2.5 pts, max 50 pts")
+  * widget         - "buttons" for small mapping rules, else "number"
   * widget_choices - for "buttons", a list of {value, label, points}
 
-Curated entries live in FIELD_LABEL_SL; anything else falls back to
-slug.replace("_", " ").capitalize(). Add new field names to FIELD_LABEL_SL
-when you onboard new judge fields - keeps labels under source control
-without growing the SheetConfig schema.
+**Polish metadata lives on each per-competition field_rule.** A rule
+entry in ScoreRule.rules.field_rules can carry optional polish keys
+alongside the scoring shape:
+
+    "dolzina_plavuti": {
+        "type": "mapping", "map": {"0": 0, "1": 10},
+        "label": "Dolžina plavuti",     # display label
+        "hint": "30-60 cm",             # optional explicit hint override
+    },
+    "izgled": {
+        "label": "Izgled",
+        "max": 20,                       # soft cap for raw entry (0-20)
+    },
+    "vris_correct": {
+        "type": "multiplier", "factor": 20,
+        "label": "Pravilne vrisane KT",
+        "max_input": 10,                 # max input value for multipliers
+    }
+
+Resolution order:
+  1. The rule dict's own label / hint / max / max_input keys.
+  2. The tiny FRAMEWORK_LABELS dict below (only for app-managed slugs
+     like dead_time / time / points - these are not per-competition).
+  3. Slug-derived fallback (replace underscores, capitalize first letter).
+
+So the same code runs any competition. Slovene labels for the
+Ščukanujanje rulebook live in that competition's exported JSON, not in
+this module.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-# Curated "soft cap" max for raw-entry fields (rule is empty `{}`, judge
-# enters any non-negative number; we just want to remind them of the
-# expected range). Keep in sync with the CP descriptions in the rules
-# JSON. Values come from the race rulebook, not the rule shape itself.
-FIELD_RAW_MAX_SL: dict[str, int] = {
-    "izgled": 20,          # Vesla appearance grading
-    "tematski_test": 50,   # Tematski test, 0-50 pts
-    "logicna_uganka": 50,  # G - Logicna uganka
-    "suhadolica": 50,      # I - test Suhadolica
-    "lokostrelstvo": 100,  # Lokostrelstvo, 0-100 pts
-    "roza 1": 10,          # Dolocevanje rastlin - 10 pts each
-    "roza 2": 10,
-    "roza 3": 10,
-}
-
-
-def soft_cap_hint(field_key: str) -> str:
-    """Hint shown for raw-entry fields whose accepted range is known.
-
-    Returns "" when the field isn't in FIELD_RAW_MAX_SL, so derive_hint
-    can keep returning empty for genuinely uncapped fields.
-    """
-    n = FIELD_RAW_MAX_SL.get(field_key)
-    if n is None:
-        return ""
-    return f"0-{n} tock"
-
-
-# Curated slug -> Slovene label table. Keep ordered roughly by CP appearance
-# (A -> Cilj + virtuals).
-FIELD_LABEL_SL: dict[str, str] = {
-    # Vesla (A / D depending on group direction)
-    "dolzina_plavuti": "Dolzina plavuti",
-    "sirina_plavuti": "Sirina plavuti",
-    "sirina_rocaja": "Sirina rocaja",
-    "izgled": "Izgled",
-    # Tematski (A / D)
-    "tematski_test": "Tematski test",
-    # E
-    "gasilci": "Gasilci",
-    # F
-    "prihod_pod_kotom": "Prihod pod kotom",
-    # G / H / I (PP, RR+)
-    "logicna_uganka": "Logicna uganka",
-    "prostornina_l": "Prostornina (L)",
-    "suhadolica": "Test Suhadolica",
-    # J
-    "signalizacija_correct": "Pravilna signalizacija",
-    "fraca": "Fraca (zadetki)",
-    # K
-    "prva_pomoc": "Prva pomoc",
-    # Topo & Vrisovanje (virtual)
-    "topo_p1": "Topografija P1",
-    "topo_p2": "Topografija P2",
-    "topo_p3": "Topografija P3",
-    "vris_correct": "Pravilne vrisane KT",
-    # Lokostrelstvo (virtual)
-    "lokostrelstvo": "Lokostrelstvo (zadetki)",
-    # Dolocevanje rastlin (virtual)
-    "roza 1": "Roza 1",
-    "roza 2": "Roza 2",
-    "roza 3": "Roza 3",
-    # Time tracking
+# App-managed slugs that the framework writes (not authored per
+# competition). These get a stable label here; competitions can still
+# override via the rule dict if they want different wording.
+FRAMEWORK_LABELS: dict[str, str] = {
     "dead_time": "Mrtvi cas (min)",
     "time": "Cas",
+    "points": "Tocke",
+    "score": "Tocke",
 }
 
 
-def display_label(field_key: str) -> str:
-    """Return a human-readable Slovene label for a slug.
+def display_label(field_key: str, rule: dict | None = None) -> str:
+    """Resolve a Slovene/localized display label for a slug.
 
-    Curated entries take precedence; unknown slugs are prettified by
-    replacing underscores with spaces and capitalizing the first letter.
+    1. rule["label"] if the rule supplies one.
+    2. FRAMEWORK_LABELS for the few app-managed slugs.
+    3. Slug-derived: 'foo_bar' -> 'Foo bar'.
     """
+    if rule and isinstance(rule, dict):
+        label = rule.get("label")
+        if isinstance(label, str) and label.strip():
+            return label.strip()
     if not field_key:
         return ""
-    label = FIELD_LABEL_SL.get(field_key)
-    if label:
-        return label
+    if field_key in FRAMEWORK_LABELS:
+        return FRAMEWORK_LABELS[field_key]
     pretty = field_key.replace("_", " ").strip()
     if not pretty:
         return field_key
@@ -119,20 +86,42 @@ def _fmt_num(value: Any) -> str:
     return f"{f:g}"
 
 
+def _soft_cap_hint_from_rule(rule: dict | None) -> str:
+    """Return '0-N tock' when the rule supplies a `max` and is otherwise
+    raw (no `type`). Empty string otherwise."""
+    if not rule or not isinstance(rule, dict):
+        return ""
+    if rule.get("type"):
+        # Structured rules carry their own derivable hint; don't double up.
+        return ""
+    cap = rule.get("max")
+    if cap is None:
+        return ""
+    return f"0-{_fmt_num(cap)} tock"
+
+
 def derive_hint(rule: dict | None) -> str:
     """Generate a short Slovene hint describing the rule.
 
-    Returns "" when no useful hint can be derived (raw entry with no
-    metadata, time_race, or empty rule).
+    Priority:
+      1. rule["hint"] (explicit per-competition override).
+      2. Rule-shape-derived hint (mapping/deviation/multiplier).
+      3. Soft-cap hint from rule["max"] for raw fields.
+
+    Returns "" when no useful hint can be derived.
     """
     if not rule or not isinstance(rule, dict):
         return ""
+    # 1. Explicit override.
+    explicit = rule.get("hint")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+    # 2. Rule-shape-derived hint.
     rtype = rule.get("type")
     if rtype == "mapping":
         mp = rule.get("map") or {}
         if not mp:
             return ""
-        # The widget renders buttons, so hint is just the points scale.
         pts = sorted({int(v) for v in mp.values()})
         if pts == [0]:
             return ""
@@ -151,9 +140,14 @@ def derive_hint(rule: dict | None) -> str:
         return ", ".join(parts)
     if rtype == "multiplier":
         factor = rule.get("factor") or 0
-        return f"Vsaka enota = {_fmt_num(factor)} tock"
-    # Empty rule {} -> raw entry, no derivable hint.
-    return ""
+        base = f"Vsaka enota = {_fmt_num(factor)} tock"
+        max_input = rule.get("max_input")
+        if max_input is not None:
+            total = _fmt_num(max_input * factor) if factor else _fmt_num(max_input)
+            return f"{base} (max {max_input}, = {total} tock)"
+        return base
+    # 3. Soft cap on raw field (rule has no type but supplies max).
+    return _soft_cap_hint_from_rule(rule)
 
 
 def derive_widget(rule: dict | None, max_button_choices: int = 6) -> dict:
@@ -175,8 +169,6 @@ def derive_widget(rule: dict | None, max_button_choices: int = 6) -> dict:
     if not mp or len(mp) > max_button_choices:
         return {"widget": "number"}
 
-    # Determine the order: numeric keys sorted ascending. Fall back to
-    # insertion order when keys aren't all numeric.
     items = list(mp.items())
     try:
         items.sort(key=lambda kv: float(kv[0]))
@@ -207,19 +199,10 @@ def derive_widget(rule: dict | None, max_button_choices: int = 6) -> dict:
 
 
 def auto_scoring_text(rule: dict | None, field_keys: list[str] | None = None) -> str:
-    """Build a short Slovene scoring summary for a CP from its score rule.
+    """Build a short scoring summary for a CP from its score rule.
 
-    Used as the default body when Checkpoint.scoring_text is NULL - judges
-    see a one-line-per-field description like
-
-        Dolzina plavuti: Max 10 tock
-        Sirina plavuti: Max 10 tock
-        Izgled: 0-20 tock
-
-    Admins can override with a curated string in scoring_text; the route
-    chooses curated > auto > empty. field_keys lets the caller hold the
-    field ordering (matches the SheetConfig groups[].fields order), since
-    rule["total_fields"] may differ slightly.
+    Used as the default body when Checkpoint.scoring_text is NULL. Each
+    line is "<label>: <hint>" or just the label if no hint resolves.
     """
     if not rule or not isinstance(rule, dict):
         return ""
@@ -228,8 +211,8 @@ def auto_scoring_text(rule: dict | None, field_keys: list[str] | None = None) ->
     lines = []
     for key in ordering:
         sub = field_rules.get(key, {})
-        label = display_label(key)
-        hint = derive_hint(sub) or soft_cap_hint(key)
+        label = display_label(key, sub)
+        hint = derive_hint(sub)
         if hint:
             lines.append(f"{label}: {hint}")
         else:
@@ -245,17 +228,26 @@ def auto_scoring_text(rule: dict | None, field_keys: list[str] | None = None) ->
 
 
 def enrich_field_def(field_def: dict, rule: dict | None) -> dict:
-    """Add display_label/hint/widget keys to a field_def in place and return it.
+    """Attach display_label / hint / widget keys to a field_def.
 
-    `field_def` must already have at least a "key" key (and typically
-    "label" + "type" from the resolve endpoint). Hint priority:
-      1. Rule-derived hint (mapping/deviation/multiplier).
-      2. Soft-cap from FIELD_RAW_MAX_SL for known raw-entry fields.
-      3. Empty.
+    `field_def` must already have at least a "key". Polish metadata is
+    pulled from the rule dict (label / hint / max / max_input keys);
+    framework-level slugs (dead_time / time) get a stable Slovene label
+    from FRAMEWORK_LABELS as a fallback.
     """
     key = field_def.get("key") or ""
-    field_def.setdefault("display_label", display_label(key))
-    hint = derive_hint(rule) or soft_cap_hint(key)
-    field_def.setdefault("hint", hint)
+    field_def.setdefault("display_label", display_label(key, rule))
+    field_def.setdefault("hint", derive_hint(rule))
     field_def.update(derive_widget(rule))
     return field_def
+
+
+# ---------------------------------------------------------------------------
+# Backwards-compat shim. Older tests / external callers reference
+# soft_cap_hint(key) on the assumption a hardcoded dict provides caps.
+# We now look up the per-rule max, but keep the public name available
+# returning "" when no rule is in hand. Direct callers should pass the
+# rule dict.
+# ---------------------------------------------------------------------------
+def soft_cap_hint(field_key: str, rule: dict | None = None) -> str:
+    return _soft_cap_hint_from_rule(rule) if rule else ""

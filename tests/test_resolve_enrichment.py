@@ -64,10 +64,21 @@ def _seed_vesla_setup(app):
             group_id=group.id,
             rules={
                 "field_rules": {
-                    "dolzina_plavuti": {"type": "mapping", "map": {"0": 0, "1": 10}},
-                    "sirina_plavuti": {"type": "mapping", "map": {"0": 0, "1": 10}},
-                    "sirina_rocaja": {"type": "mapping", "map": {"0": 0, "1": 10}},
-                    "izgled": {},
+                    # Per-competition polish lives in the rule dict, not
+                    # in hardcoded Python dicts.
+                    "dolzina_plavuti": {
+                        "type": "mapping", "map": {"0": 0, "1": 10},
+                        "label": "Dolžina plavuti",
+                    },
+                    "sirina_plavuti": {
+                        "type": "mapping", "map": {"0": 0, "1": 10},
+                        "label": "Širina plavuti",
+                    },
+                    "sirina_rocaja": {
+                        "type": "mapping", "map": {"0": 0, "1": 10},
+                        "label": "Širina ročaja",
+                    },
+                    "izgled": {"label": "Izgled", "max": 20},
                 },
                 "total_fields": ["dolzina_plavuti", "sirina_plavuti", "sirina_rocaja", "izgled"],
             },
@@ -113,8 +124,8 @@ def test_resolve_includes_display_label_hint_widget_for_each_field(client, app):
             # display_label is the human form of the slug.
             assert f["display_label"] and f["display_label"] != k
 
-        # Raw entry keeps the number widget, but izgled is in
-        # FIELD_RAW_MAX_SL so the judge sees a 0-20 hint.
+        # Raw entry keeps the number widget; the per-rule 'max' supplies
+        # the 0-20 hint (no hardcoded slug dict needed).
         izgled = fields["izgled"]
         assert izgled["widget"] == "number"
         assert izgled["hint"] == "0-20 tock"
@@ -162,6 +173,7 @@ def test_resolve_renders_deviation_rule_with_target_hint(client, app):
                             "penalty_points": 2.5,
                             "penalty_distance": 0.05,
                             "min_points": 0,
+                            "label": "Prostornina (L)",
                         },
                     },
                     "total_fields": ["prostornina_l"],
