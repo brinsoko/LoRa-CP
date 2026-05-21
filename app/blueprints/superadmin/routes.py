@@ -44,7 +44,7 @@ from flask_babel import gettext as _
 from flask_login import current_user, login_required
 
 from app.extensions import db
-from app.models import User
+from app.models import Competition, CompetitionMember, User
 
 superadmin_bp = Blueprint(
     "superadmin",
@@ -54,10 +54,11 @@ superadmin_bp = Blueprint(
 
 # Mirrors the regex used in users.routes for consistency. Per CLAUDE.md,
 # User.role is reserved for "superadmin" / "public" (system-level only);
-# per-competition roles (judge/admin/viewer) live on CompetitionMember
-# and are not settable from this bulk-add flow.
+# per-competition roles (judge/admin/viewer) live on CompetitionMember,
+# so bulk-add creates the User with role="public" and writes the chosen
+# per-comp role onto the CompetitionMember row.
 _USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,50}$")
-_VALID_GLOBAL_ROLES = ("public", "superadmin")
+_VALID_MEMBERSHIP_ROLES = ("viewer", "judge", "admin")
 
 
 def _superadmin_only(view):
@@ -124,12 +125,22 @@ def sheets_status():
 @_superadmin_only
 def bulk_add_users():
     if request.method == "GET":
-        return render_template("superadmin_bulk_add.html")
+        competitions = Competition.query.order_by(Competition.name.asc()).all()
+        return render_template("superadmin_bulk_add.html", competitions=competitions)
 
     raw = request.form.get("usernames") or ""
-    role = (request.form.get("role") or "public").strip().lower()
-    if role not in _VALID_GLOBAL_ROLES:
+    role = (request.form.get("role") or "").strip().lower()
+    if role not in _VALID_MEMBERSHIP_ROLES:
         flash(_("Invalid role."), "warning")
+        return redirect(url_for("superadmin.bulk_add_users"))
+
+    try:
+        competition_id = int(request.form.get("competition_id") or 0)
+    except (TypeError, ValueError):
+        competition_id = 0
+    competition = db.session.get(Competition, competition_id) if competition_id else None
+    if not competition:
+        flash(_("Pick a competition to attach the new users to."), "warning")
         return redirect(url_for("superadmin.bulk_add_users"))
 
     seen: set[str] = set()
@@ -164,30 +175,79 @@ def bulk_add_users():
         flash(_("Provide at least one valid username."), "warning")
         return redirect(url_for("superadmin.bulk_add_users"))
 
-    existing = {u.username for u in User.query.filter(User.username.in_(usernames)).all()}
-    to_create = [u for u in usernames if u not in existing]
-    already = [u for u in usernames if u in existing]
+    existing_users = {u.username: u for u in User.query.filter(User.username.in_(usernames)).all()}
 
-    if already:
-        flash(
-            _("Already exist (skipped): %(list)s", list=", ".join(already[:20])),
-            "warning",
-        )
-
+    # For users that already exist, attach them to the chosen competition
+    # if they aren't already a member (and report which were re-used vs
+    # created fresh).
     created: list[tuple[str, str]] = []
-    for username in to_create:
-        pw = _generate_password()
-        u = User(username=username, role=role)
-        u.set_password(pw)
-        db.session.add(u)
-        created.append((username, pw))
+    attached_existing: list[str] = []
+    already_in_comp: list[str] = []
+
+    for username in usernames:
+        u = existing_users.get(username)
+        if u is None:
+            pw = _generate_password()
+            # System-level role stays public — per CLAUDE.md, per-comp
+            # roles never leak onto User.role.
+            u = User(username=username, role="public")
+            u.set_password(pw)
+            db.session.add(u)
+            db.session.flush()
+            created.append((username, pw))
+        else:
+            # Check whether they're already in the target competition.
+            existing_member = CompetitionMember.query.filter(
+                CompetitionMember.user_id == u.id,
+                CompetitionMember.competition_id == competition.id,
+            ).first()
+            if existing_member and existing_member.active:
+                already_in_comp.append(username)
+                continue
+            attached_existing.append(username)
+            if existing_member:
+                existing_member.active = True
+                existing_member.role = role
+                continue
+
+        db.session.add(
+            CompetitionMember(
+                competition_id=competition.id,
+                user_id=u.id,
+                role=role,
+                active=True,
+            )
+        )
 
     db.session.commit()
 
+    if already_in_comp:
+        flash(
+            _(
+                "Already in %(comp)s (skipped): %(list)s",
+                comp=competition.name,
+                list=", ".join(already_in_comp[:20]),
+            ),
+            "info",
+        )
+    if attached_existing:
+        flash(
+            _(
+                "Existing user(s) attached to %(comp)s as %(role)s: %(list)s",
+                comp=competition.name,
+                role=role,
+                list=", ".join(attached_existing[:20]),
+            ),
+            "info",
+        )
+
     current_app.logger.info(
-        "superadmin %s bulk-created %d user(s) with role=%s",
+        "superadmin %s bulk-created %d new user(s) and attached %d existing user(s) "
+        "to competition %s as %s",
         getattr(current_user, "username", "?"),
         len(created),
+        len(attached_existing),
+        competition.name,
         role,
     )
 
@@ -198,6 +258,7 @@ def bulk_add_users():
         "superadmin_bulk_results.html",
         created=created,
         role=role,
+        competition=competition,
     )
 
 

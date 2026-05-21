@@ -23,17 +23,32 @@
         </div>
       </div>
       <div class="row g-3 align-items-end">
-        <div class="col-md-4">
-          <label class="form-label" for="role">{{ _('Global role for the whole batch') }}</label>
-          <select class="form-select" id="role" name="role" required>
-            <option value="public" selected>public</option>
-            <option value="superadmin">superadmin</option>
+        <div class="col-md-5">
+          <label class="form-label" for="competition_id">{{ _('Competition') }}</label>
+          <select class="form-select" id="competition_id" name="competition_id" required>
+            <option value="" disabled selected>{{ _('Choose a competition…') }}</option>
+            {% for c in competitions %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+            {% else %}
+              <option value="" disabled>{{ _('No competitions exist yet.') }}</option>
+            {% endfor %}
           </select>
           <div class="form-text">
-            {{ _('Per-competition roles (judge/admin/viewer) are assigned separately on each competition.') }}
+            {{ _('Every user gets a membership row in this competition with the chosen role.') }}
           </div>
         </div>
-        <div class="col-md-4 d-flex">
+        <div class="col-md-4">
+          <label class="form-label" for="role">{{ _('Role in the competition') }}</label>
+          <select class="form-select" id="role" name="role" required>
+            <option value="viewer">{{ _('viewer') }}</option>
+            <option value="judge" selected>{{ _('judge') }}</option>
+            <option value="admin">{{ _('admin') }}</option>
+          </select>
+          <div class="form-text">
+            {{ _("System-level role stays 'public'; only the per-competition membership role is set here.") }}
+          </div>
+        </div>
+        <div class="col-md-3 d-flex">
           <button class="btn btn-primary w-100" type="submit">{{ _('Create users') }}</button>
         </div>
       </div>

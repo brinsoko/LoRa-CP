@@ -18,7 +18,13 @@
 <div class="card shadow-sm">
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-2">
-      <span class="small text-body-secondary">{{ _('Global role: %(role)s', role=role) }}</span>
+      <span class="small text-body-secondary">
+        {% if competition %}
+          {{ _('Competition: %(comp)s · membership role: %(role)s', comp=competition.name, role=role) }}
+        {% else %}
+          {{ _('Role: %(role)s', role=role) }}
+        {% endif %}
+      </span>
       <button type="button" class="btn btn-sm btn-outline-primary" id="copyAllBtn">{{ _('Copy as CSV') }}</button>
     </div>
     <pre id="credsCsv" class="border rounded p-2 small mb-3" style="white-space: pre-wrap;">username,password

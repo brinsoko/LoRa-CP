@@ -113,16 +113,20 @@ def test_sheets_status_endpoint_with_initialised_client(client, app, monkeypatch
 
 
 def test_bulk_add_users_creates_with_generated_passwords(client, app):
-    """Bulk-add: valid usernames become real, loginable users."""
+    """Bulk-add: valid usernames become real, loginable users, all
+    attached to the chosen competition with the chosen per-comp role.
+    User.role stays 'public' (CLAUDE.md policy)."""
     with app.app_context():
         sa_user = create_user(username="super-bulk", role="superadmin")
+        comp = create_competition(name="Bulk Target")
         login_as(client, sa_user, None)
 
         resp = client.post(
             "/superadmin/users/bulk-add",
             data={
                 "usernames": "alpha\nbravo\ncharlie\n",
-                "role": "public",
+                "role": "judge",
+                "competition_id": comp.id,
             },
         )
         assert resp.status_code == 200, resp.data[:300]
@@ -130,42 +134,109 @@ def test_bulk_add_users_creates_with_generated_passwords(client, app):
         for name in ("alpha", "bravo", "charlie"):
             assert name.encode() in resp.data
 
-        # All three exist in the DB with role=public and a usable password.
         for name in ("alpha", "bravo", "charlie"):
             u = User.query.filter_by(username=name).first()
             assert u is not None, f"{name} missing"
+            # Global role stays 'public' — per-comp role goes on the
+            # CompetitionMember row only.
             assert u.role == "public"
             assert u.password_hash, "password should be set"
+            member = CompetitionMember.query.filter_by(
+                user_id=u.id, competition_id=comp.id
+            ).first()
+            assert member is not None, f"{name} not attached to comp"
+            assert member.role == "judge"
+            assert member.active is True
 
 
-def test_bulk_add_users_skips_dupes_and_invalid_and_existing(client, app):
+def test_bulk_add_users_skips_dupes_and_invalid_and_attaches_existing(client, app):
+    """Existing users get attached to the chosen competition (not skipped
+    outright). Duplicates within the input + invalid usernames are
+    skipped. Existing users already in the comp are reported as no-ops."""
     with app.app_context():
         sa_user = create_user(username="super-bulk-skip", role="superadmin")
-        # Pre-existing user with one of the requested usernames.
-        existing = create_user(username="already-there", role="public")
-        login_as(client, sa_user, None)
+        comp = create_competition(name="Attach Target")
+        # Pre-existing user already in the target competition: should be
+        # detected and left alone.
+        already_in = create_user(username="already-in-comp", role="public")
+        add_membership(already_in, comp, role="judge")
+        # Pre-existing user NOT in the target competition: should be
+        # attached fresh.
+        existing_unattached = create_user(username="existing-unattached", role="public")
 
+        login_as(client, sa_user, None)
         resp = client.post(
             "/superadmin/users/bulk-add",
             data={
-                # already-there: exists; dupe-row: appears twice; bad!name:
-                # invalid chars; fresh1/fresh2: should be created.
-                "usernames": "already-there\nfresh1\ndupe-row\ndupe-row\nbad!name\nfresh2",
-                "role": "public",
+                "usernames": "already-in-comp\nexisting-unattached\nfresh1\ndupe-row\ndupe-row\nbad!name\nfresh2",
+                "role": "viewer",
+                "competition_id": comp.id,
             },
             follow_redirects=False,
         )
         assert resp.status_code == 200, resp.data[:300]
-        # Only the two fresh names land in the DB.
-        assert User.query.filter_by(username="fresh1").first() is not None
-        assert User.query.filter_by(username="fresh2").first() is not None
+        # Fresh users created + attached.
+        for name in ("fresh1", "fresh2"):
+            u = User.query.filter_by(username=name).first()
+            assert u is not None, f"{name} missing"
+            member = CompetitionMember.query.filter_by(
+                user_id=u.id, competition_id=comp.id
+            ).first()
+            assert member is not None and member.role == "viewer"
         # dupe-row appears once (the first occurrence), not twice.
         assert User.query.filter_by(username="dupe-row").count() == 1
         # bad!name never lands.
         assert User.query.filter_by(username="bad!name").first() is None
-        # Existing user untouched (same id, same hash).
-        still = User.query.filter_by(username="already-there").first()
-        assert still is not None and still.id == existing.id
+        # Existing-unattached got attached.
+        member = CompetitionMember.query.filter_by(
+            user_id=existing_unattached.id, competition_id=comp.id
+        ).first()
+        assert member is not None and member.role == "viewer"
+        # already-in-comp: membership untouched — still judge (the role we
+        # seeded with), not the requested viewer.
+        member = CompetitionMember.query.filter_by(
+            user_id=already_in.id, competition_id=comp.id
+        ).first()
+        assert member is not None and member.role == "judge", (
+            "existing membership should be left untouched, not overwritten"
+        )
+
+
+def test_bulk_add_users_requires_competition(client, app):
+    """The form must reject submissions without a competition_id, since
+    bulk-add now attaches users to a chosen competition."""
+    with app.app_context():
+        sa_user = create_user(username="super-bulk-nocomp", role="superadmin")
+        login_as(client, sa_user, None)
+
+        resp = client.post(
+            "/superadmin/users/bulk-add",
+            data={"usernames": "shouldnt-land", "role": "judge"},
+            follow_redirects=False,
+        )
+        # Redirects back to the form with a flash, no user created.
+        assert resp.status_code in (301, 302)
+        assert User.query.filter_by(username="shouldnt-land").first() is None
+
+
+def test_bulk_add_users_rejects_invalid_role(client, app):
+    """superadmin and public are no longer valid roles here — only the
+    per-comp ones (viewer/judge/admin)."""
+    with app.app_context():
+        sa_user = create_user(username="super-bulk-role", role="superadmin")
+        comp = create_competition(name="Role Gate")
+        login_as(client, sa_user, None)
+        resp = client.post(
+            "/superadmin/users/bulk-add",
+            data={
+                "usernames": "shouldnt-land",
+                "role": "superadmin",
+                "competition_id": comp.id,
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code in (301, 302)
+        assert User.query.filter_by(username="shouldnt-land").first() is None
 
 
 def test_bulk_add_users_requires_superadmin(client, app):
@@ -178,7 +249,7 @@ def test_bulk_add_users_requires_superadmin(client, app):
 
         resp = client.post(
             "/superadmin/users/bulk-add",
-            data={"usernames": "shouldnt-land", "role": "public"},
+            data={"usernames": "shouldnt-land", "role": "judge", "competition_id": comp.id},
         )
         assert resp.status_code == 403
         assert User.query.filter_by(username="shouldnt-land").first() is None
