@@ -4,7 +4,7 @@ import random
 import re
 from collections.abc import Iterable
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_babel import gettext as _
 from flask_login import current_user
 from sqlalchemy import or_
@@ -18,7 +18,26 @@ from app.utils.audit import record_audit_event
 from app.utils.competition import get_current_competition_role, require_current_competition_id
 from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.sheets_sync import sync_all_checkpoint_tabs
+from app.utils.sheets_sync_worker import enqueue_sync_all_checkpoint_tabs
 from app.utils.validators import validate_text
+
+
+def _dispatch_sync_all(comp_id: int) -> None:
+    """Hand off the per-CP team-number refresh. Inline in tests so existing
+    assertions hold; async in prod so a slow Sheets API (throttle, 429,
+    network) can't tie up the gunicorn worker handling the team write."""
+    if current_app.config.get("SHEETS_SYNC_INLINE"):
+        try:
+            sync_all_checkpoint_tabs(competition_id=comp_id)
+        except Exception:
+            pass
+        return
+    try:
+        enqueue_sync_all_checkpoint_tabs(
+            current_app._get_current_object(), competition_id=comp_id
+        )
+    except Exception:
+        pass
 
 teams_api_bp = Blueprint("api_teams", __name__)
 
@@ -228,10 +247,7 @@ def team_create():
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
-    try:
-        sync_all_checkpoint_tabs(competition_id=comp_id)
-    except Exception:
-        pass
+    _dispatch_sync_all(comp_id)
     return json_ok({"ok": True, "team": _serialize_team(team)}, status=201)
 
 
@@ -353,10 +369,7 @@ def _update_team(team_id: int, partial: bool):
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
-    try:
-        sync_all_checkpoint_tabs(competition_id=comp_id)
-    except Exception:
-        pass
+    _dispatch_sync_all(comp_id)
     return json_ok({"ok": True, "team": _serialize_team(team)})
 
 

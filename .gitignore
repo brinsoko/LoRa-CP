@@ -28,6 +28,7 @@ ESP_*/
 #
 2025_data/
 google_sa.json
+data/
 
 # Deployment artifacts
 deploy/.env
