@@ -62,13 +62,24 @@ class SheetsClient:
         Used by the superadmin console quota indicator. Returns a fresh
         snapshot under the lock so the read can't race with a concurrent
         _throttle() update.
+
+        The window only resets inside _throttle() on the next API call. If
+        the app stays idle past 60s, the counter and start-time stay
+        frozen, which would otherwise show as "24/40, resets in 0s" forever.
+        Detect that here and report a clean 0/40 with a full 60s window —
+        the next call will reset the underlying state to match.
         """
         with self._lock:
             now = time.monotonic()
             elapsed = max(0.0, now - self._call_window_start)
-            # The window auto-resets every 60s inside _throttle(); for the
-            # status snapshot we report the in-progress count even when
-            # elapsed > 60 - the next call will reset it.
+            if elapsed >= 60:
+                return {
+                    "used": 0,
+                    "limit": 40,
+                    "window_seconds": 60,
+                    "elapsed_seconds": 0.0,
+                    "remaining_seconds": 60.0,
+                }
             return {
                 "used": int(self._call_count),
                 "limit": 40,

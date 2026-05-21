@@ -170,6 +170,59 @@ def _seed_competition_with_n_cps(n_cps: int, groups_per_cp: int = 5, teams_per_g
     return comp
 
 
+def test_sync_team_numbers_route_also_rebuilds_ekipe_tab(sheets_app, monkeypatch, client):
+    """The /sheets/sync-team-numbers/<id> route must rebuild the Ekipe
+    (Teams) summary tab in addition to the per-CP tabs. Without this
+    the team-number column and members (Člani) on the Ekipe tab go stale
+    after any roster change — the user-facing "sync team numbers" label
+    implies a roster-wide refresh, not just CP tabs."""
+    with sheets_app.app_context():
+        comp = _seed_competition_with_n_cps(n_cps=2, groups_per_cp=2, teams_per_group=3)
+        admin = (
+            db.session.query(__import__("app.models", fromlist=["User"]).User)
+            .filter_by(username=f"sync-admin-{2}")
+            .first()
+        )
+        fake = _install_fake_client(monkeypatch)
+
+        # Force the inline path so we can synchronously inspect the writes.
+        sheets_app.config["SHEETS_SYNC_INLINE"] = True
+
+        from tests.support import login_as
+        login_as(client, admin, comp)
+
+        # Pick any CP config — the route only uses it as a guard against
+        # syncing a competition with no configs.
+        cfg = SheetConfig.query.filter_by(competition_id=comp.id).first()
+        resp = client.post(
+            f"/sheets/sync-team-numbers/{cfg.id}",
+            follow_redirects=False,
+        )
+        # Successful redirect back to the sheets admin list.
+        assert resp.status_code in (301, 302), resp.data[:200]
+
+        # Per-CP path: batch_update_columns was called per CP tab.
+        cp_tabs_synced = {tab for tab, _cols in fake.batch_update_columns_calls}
+        assert "CP-0" in cp_tabs_synced and "CP-1" in cp_tabs_synced, fake.batch_update_columns_calls
+
+        # New behaviour: the Ekipe tab was also rebuilt. We don't pin the
+        # tab name (it comes from sheets_lang.json which can legitimately
+        # be "Ekipe" or "Teams" depending on environment) — what matters
+        # is that build_teams_tab wrote an A1 grid on *some* worksheet
+        # that isn't one of the per-CP tabs.
+        cp_tab_names = {f"CP-{i}" for i in range(2)}
+        teams_like = [
+            (name, ws) for name, ws in fake.spreadsheet._ws.items() if name not in cp_tab_names
+        ]
+        assert teams_like, f"No Ekipe/Teams tab was created; got {list(fake.spreadsheet._ws)}"
+        # And the new tab actually received an A1 grid write from
+        # build_teams_tab (not just an autocreate from `ss.worksheet(...)`).
+        a1_writes = [
+            u for _name, ws in teams_like for u in ws.updates if u.get("range_name") == "A1"
+        ]
+        assert a1_writes, f"Expected A1 grid write on the teams tab; got {[ws.updates for _, ws in teams_like]}"
+
+
 def test_sync_uses_one_batch_call_per_cp_not_one_per_group(sheets_app, monkeypatch):
     """With 5 CPs × 5 groups = 25 (CP,group) pairs, the old code made
     25 update_column calls. The new code must make at most 5 batched

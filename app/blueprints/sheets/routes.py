@@ -596,6 +596,26 @@ def sync_team_numbers(config_id: int):
         flash(_("Config is missing groups; cannot sync."), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
 
+    # The Ekipe (Teams) tab carries the canonical roster — number, name,
+    # organisation, members (Člani), and member count. Rebuild it for
+    # every distinct real spreadsheet this competition writes to, so the
+    # operator's mental model ("sync team numbers" = roster is current)
+    # holds across the per-CP tabs *and* the Ekipe tab. local:N rows are
+    # skipped because there's no remote sheet to push to.
+    lang = load_lang()
+    teams_tab_name = lang.get("teams_tab") or "Ekipe"
+    teams_sheet_ids = sorted(
+        {
+            sid
+            for (sid,) in db.session.query(SheetConfig.spreadsheet_id)
+            .filter(SheetConfig.competition_id == comp_id)
+            .filter(SheetConfig.tab_type == "checkpoint")
+            .filter(~SheetConfig.spreadsheet_id.like("local:%"))
+            .distinct()
+            .all()
+        }
+    )
+
     if current_app.config.get("SHEETS_SYNC_INLINE"):
         try:
             sync_all_checkpoint_tabs(competition_id=comp_id)
@@ -603,13 +623,46 @@ def sync_team_numbers(config_id: int):
             current_app.logger.exception("Failed to sync team numbers")
             flash(_("Failed to sync team numbers: %(error)s", error=exc), "warning")
             return redirect(url_for("sheets_admin.list_sheets"))
-        flash(_("Synced team numbers for checkpoint tabs."), "success")
+        teams_errors: list[str] = []
+        for sid in teams_sheet_ids:
+            try:
+                err = build_teams_tab(sid, teams_tab_name, competition_id=comp_id)
+                if err:
+                    teams_errors.append(f"{sid}: {err}")
+            except Exception as exc:
+                current_app.logger.exception(
+                    "Failed to rebuild Ekipe tab on %s during sync_team_numbers", sid
+                )
+                teams_errors.append(f"{sid}: {exc}")
+        if teams_errors:
+            flash(
+                _(
+                    "Synced checkpoint tabs but the Ekipe rebuild reported: %(errs)s",
+                    errs="; ".join(teams_errors),
+                ),
+                "warning",
+            )
+        else:
+            flash(
+                _("Synced team numbers for checkpoint tabs and the Ekipe tab."),
+                "success",
+            )
     else:
-        from app.utils.sheets_sync_worker import enqueue_sync_all_checkpoint_tabs
+        from app.utils.sheets_sync_worker import (
+            enqueue_build_teams_tab,
+            enqueue_sync_all_checkpoint_tabs,
+        )
 
         enqueue_sync_all_checkpoint_tabs(
             current_app._get_current_object(), competition_id=comp_id
         )
+        for sid in teams_sheet_ids:
+            enqueue_build_teams_tab(
+                current_app._get_current_object(),
+                sid,
+                teams_tab_name,
+                competition_id=comp_id,
+            )
         flash(
             _("Team-number sync queued — refresh the spreadsheet in a few seconds."),
             "info",
