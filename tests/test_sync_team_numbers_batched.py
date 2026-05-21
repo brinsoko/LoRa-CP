@@ -50,9 +50,13 @@ class _FakeWS:
 
 
 class _FakeSS:
-    def __init__(self):
+    def __init__(self, *, strict_worksheet: bool = False):
         self.title = "Sync Test Sheet"
         self._ws: dict[str, _FakeWS] = {}
+        # When strict, worksheet(title) on a missing tab raises
+        # WorksheetNotFound (mirroring gspread). Used to drive the
+        # 404-auto-heal path in sync_all_checkpoint_tabs.
+        self.strict_worksheet = strict_worksheet
 
     def add_worksheet(self, *, title, rows, cols, **_):
         ws = _FakeWS(title)
@@ -61,7 +65,11 @@ class _FakeSS:
 
     def worksheet(self, title):
         if title not in self._ws:
-            # Auto-create so the test fixture doesn't have to pre-build them.
+            if self.strict_worksheet:
+                from gspread.exceptions import WorksheetNotFound
+
+                raise WorksheetNotFound(title)
+            # Auto-create so the legacy test fixture doesn't have to pre-build them.
             self._ws[title] = _FakeWS(title)
         return self._ws[title]
 
@@ -73,10 +81,11 @@ class _FakeClient:
     """Mirrors SheetsClient.batch_update_columns precisely so we can
     assert the per-tab batched behavior."""
 
-    def __init__(self):
-        self.spreadsheet = _FakeSS()
+    def __init__(self, *, strict_worksheet: bool = False):
+        self.spreadsheet = _FakeSS(strict_worksheet=strict_worksheet)
         self.batch_update_columns_calls: list[tuple[str, list[dict]]] = []
         self.update_column_calls: list[tuple] = []
+        self.add_tab_calls: list[tuple[str, str]] = []
 
         class _GC:
             def open_by_key(_, _key):
@@ -88,14 +97,24 @@ class _FakeClient:
         return fn(*args, **kwargs)
 
     def batch_update_columns(self, spreadsheet_id, tab_name, columns):
+        # Mirror real client behaviour: opening the worksheet first so we
+        # can surface WorksheetNotFound when the tab doesn't exist on the
+        # remote spreadsheet (drives the auto-heal path in tests).
+        ss = self.gc.open_by_key(spreadsheet_id)
+        ss.worksheet(tab_name)
         self.batch_update_columns_calls.append((tab_name, list(columns)))
 
     def update_column(self, spreadsheet_id, tab_name, col, start_row, values):
         # If this gets called we're back on the per-group pattern — fail loud.
         self.update_column_calls.append((tab_name, col, start_row, values))
 
-    def add_tab(self, *args, **kwargs):
-        pass
+    def add_tab(self, spreadsheet_id, title, rows=100, cols=26):
+        # Real client creates a new worksheet on the spreadsheet. Mirror
+        # that so the auto-heal flow can pick the fresh tab up via
+        # ss.worksheet(title) immediately afterwards.
+        self.add_tab_calls.append((spreadsheet_id, title))
+        ss = self.gc.open_by_key(spreadsheet_id)
+        ss.add_worksheet(title=title, rows=rows, cols=cols)
 
     def set_header_row(self, *args, **kwargs):
         pass
@@ -122,8 +141,8 @@ def sheets_app(app_factory):
         yield application
 
 
-def _install_fake_client(monkeypatch) -> _FakeClient:
-    fake = _FakeClient()
+def _install_fake_client(monkeypatch, *, strict_worksheet: bool = False) -> _FakeClient:
+    fake = _FakeClient(strict_worksheet=strict_worksheet)
 
     def _get(_app):
         return fake
@@ -168,6 +187,40 @@ def _seed_competition_with_n_cps(n_cps: int, groups_per_cp: int = 5, teams_per_g
         )
     db.session.commit()
     return comp
+
+
+def test_sync_auto_heals_missing_worksheet(sheets_app, monkeypatch):
+    """When a SheetConfig points at a tab that no longer exists on the
+    remote spreadsheet (deleted, half-published, never created), sync
+    must recreate it inline instead of logging-and-skipping forever.
+
+    Regression: production hit this after a publish crash left every
+    per-CP SheetConfig pointing at the target spreadsheet, but the
+    actual worksheets had never been created. Without auto-heal,
+    sync_all_checkpoint_tabs 404'd on every tab on every click."""
+    with sheets_app.app_context():
+        comp = _seed_competition_with_n_cps(n_cps=2, groups_per_cp=2, teams_per_group=3)
+        fake = _install_fake_client(monkeypatch, strict_worksheet=True)
+
+        # Pre-condition: the fake spreadsheet has no worksheets — every
+        # tab lookup will raise WorksheetNotFound.
+        assert fake.spreadsheet._ws == {}
+
+        sheets_sync.sync_all_checkpoint_tabs(competition_id=comp.id)
+
+        # Both CP tabs were created via add_tab and now exist on the
+        # fake spreadsheet.
+        created_titles = {title for _sid, title in fake.add_tab_calls}
+        assert created_titles == {"CP-0", "CP-1"}, fake.add_tab_calls
+        assert {"CP-0", "CP-1"} <= set(fake.spreadsheet._ws.keys())
+
+        # Each healed tab got the full grid written at A1 (headers + team
+        # rows from _build_local_cp_grid) — proves auto-heal did a real
+        # rebuild, not just a no-op add_tab.
+        for title in ("CP-0", "CP-1"):
+            ws = fake.spreadsheet._ws[title]
+            a1_writes = [u for u in ws.updates if u.get("range_name") == "A1"]
+            assert a1_writes, f"{title} healed but no A1 write recorded: {ws.updates}"
 
 
 def test_sync_team_numbers_route_also_rebuilds_ekipe_tab(sheets_app, monkeypatch, client):

@@ -316,15 +316,130 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
             try:
                 client.batch_update_columns(cfg.spreadsheet_id, cfg.tab_name, columns_for_this_cp)
             except Exception as exc:
-                # Skip this CP, keep going. A single bad tab name shouldn't
-                # abort the whole sync; the caller flashes whatever errors
-                # surface.
+                if _is_missing_worksheet(exc):
+                    # The Sheets tab this SheetConfig binds to doesn't exist
+                    # on the remote spreadsheet anymore — either it was
+                    # never created, the operator deleted it, or a prior
+                    # half-finished publish left an orphan binding.
+                    # Recreate it inline (the moral equivalent of a
+                    # single-tab publish) so the next sync isn't a no-op.
+                    try:
+                        _heal_missing_checkpoint_tab(client, cfg, comp_id)
+                        current_app.logger.info(
+                            "sync_all_checkpoint_tabs: auto-healed missing tab %r on %s",
+                            cfg.tab_name,
+                            cfg.spreadsheet_id,
+                        )
+                        continue
+                    except Exception as heal_exc:
+                        try:
+                            current_app.logger.warning(
+                                "sync_all_checkpoint_tabs: auto-heal of %r failed: %s",
+                                cfg.tab_name,
+                                heal_exc,
+                            )
+                        except Exception:
+                            pass
+                        continue
+                # Non-404 failures: log + skip as before. A single bad tab
+                # shouldn't abort the whole sync.
                 try:
                     current_app.logger.warning(
                         "sync_all_checkpoint_tabs: %s failed: %s", cfg.tab_name, exc
                     )
                 except Exception:
                     pass
+
+
+def _is_missing_worksheet(exc: Exception) -> bool:
+    """True if `exc` looks like a Google "worksheet not found" / 404."""
+    # gspread raises WorksheetNotFound for `ss.worksheet("name")` when the
+    # tab doesn't exist; deeper API failures land as APIError with the raw
+    # requests.Response attached. Both reach here through `client._call`.
+    try:
+        from gspread.exceptions import WorksheetNotFound
+
+        if isinstance(exc, WorksheetNotFound):
+            return True
+    except Exception:
+        pass
+    resp = getattr(exc, "response", None)
+    status = getattr(resp, "status_code", None) or getattr(resp, "status", None)
+    if status == 404:
+        return True
+    # Fallback: the warning in the wild shows up as "<Response [404]>"
+    # because Response.__repr__ leaks through. Catch that too so the heal
+    # path works even when the exception type drifts between gspread
+    # versions.
+    return "404" in str(exc) and "Response" in str(exc)
+
+
+class TabAlreadyPresent(Exception):
+    """Heal aborted: the tab is reported as missing on read but present
+    on write. The operator likely points cfg.spreadsheet_id at the wrong
+    spreadsheet, or the tab has subtly different content from the DB —
+    either way, blindly overwriting the live cells is the wrong action."""
+
+
+def _heal_missing_checkpoint_tab(client, cfg: SheetConfig, competition_id: int) -> None:
+    """Recreate a missing per-CP worksheet from its SheetConfig.
+
+    Refuses to overwrite if the tab turns out to exist after all. That
+    case shouldn't happen in normal use (the caller only enters here on
+    a verified 404), but in the wild we've seen it when the DB's
+    cfg.spreadsheet_id pointed at the wrong spreadsheet — gspread's
+    metadata-lookup 404s for the tab name we asked, but add_tab against
+    that same spreadsheet succeeds-or-collides depending on which side
+    of the mismatch the operator put their real tabs. Bailing out
+    preserves any manual data and lets the operator fix the binding.
+    """
+    grid, group_has_formula = _build_local_cp_grid(cfg, competition_id)
+    if not grid or not grid[0]:
+        raise RuntimeError(f"empty grid for tab {cfg.tab_name!r} — nothing to write")
+    n_rows = max(len(grid) + 10, 50)
+    n_cols = max(len(grid[0]) + 5, 26)
+
+    try:
+        client.add_tab(cfg.spreadsheet_id, cfg.tab_name, rows=n_rows, cols=n_cols)
+    except Exception as add_exc:
+        msg = str(add_exc).lower()
+        if "already exists" in msg or "duplicate" in msg or "worksheet_title_taken" in msg:
+            # The tab IS there. Don't clobber.
+            raise TabAlreadyPresent(
+                f"tab {cfg.tab_name!r} already exists on spreadsheet "
+                f"{cfg.spreadsheet_id!r} — refusing to overwrite. "
+                "Run scripts/diagnose_sheet_configs.py to inspect the binding."
+            ) from add_exc
+        raise
+
+    # add_tab created the tab fresh, so we know A1 is empty — safe to
+    # write the full grid (headers + team rows + existing scores).
+    ss = client._call(client.gc.open_by_key, cfg.spreadsheet_id)
+    ws = client._call(ss.worksheet, cfg.tab_name)
+    client._call(
+        ws.update,
+        range_name="A1",
+        values=grid,
+        value_input_option="USER_ENTERED",
+    )
+    if group_has_formula:
+        new_cfg_blob = dict(cfg.config or {})
+        groups_blob = list(new_cfg_blob.get("groups") or [])
+        rewritten = []
+        for g in groups_blob:
+            if not isinstance(g, dict):
+                rewritten.append(g)
+                continue
+            g2 = dict(g)
+            gid = g2.get("group_id")
+            if gid is not None and group_has_formula.get(gid):
+                g2["points_formula"] = True
+            else:
+                g2.pop("points_formula", None)
+            rewritten.append(g2)
+        new_cfg_blob["groups"] = rewritten
+        cfg.config = new_cfg_blob
+        db.session.commit()
 
 
 def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime | None = None):
