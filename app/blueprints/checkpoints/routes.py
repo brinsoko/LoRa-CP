@@ -79,6 +79,7 @@ def _normalize_checkpoint_form(form):
     location = (form.get("location") or "").strip() or None
     description = (form.get("description") or "").strip() or None
     scoring_text = (form.get("scoring_text") or "").strip() or None
+    judges_note = (form.get("judges_note") or "").strip() or None
     easting_raw = form.get("easting")
     northing_raw = form.get("northing")
     easting = float(easting_raw) if easting_raw else None
@@ -93,6 +94,7 @@ def _normalize_checkpoint_form(form):
         "location": location,
         "description": description,
         "scoring_text": scoring_text,
+        "judges_note": judges_note,
         "easting": easting,
         "northing": northing,
         "lora_device_id": lora_device_id,

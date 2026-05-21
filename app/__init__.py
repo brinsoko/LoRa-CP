@@ -161,6 +161,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     from app.blueprints.messages.routes import messages_bp
     from app.blueprints.scores.routes import scores_bp
     from app.blueprints.sheets.routes import sheets_bp
+    from app.blueprints.superadmin.routes import superadmin_bp
     from app.blueprints.users.routes import users_bp
 
     from . import models  # noqa: F401
@@ -185,6 +186,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.register_blueprint(lora_bp, url_prefix="/lora")
     app.register_blueprint(groups_bp, url_prefix="/groups")
     app.register_blueprint(maps_bp, url_prefix="/map")
+    app.register_blueprint(superadmin_bp, url_prefix="/superadmin")
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(teams_bp, url_prefix="/teams")

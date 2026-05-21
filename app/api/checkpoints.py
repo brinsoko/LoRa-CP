@@ -18,12 +18,31 @@ checkpoints_api_bp = Blueprint("api_checkpoints", __name__)
 
 
 def _serialize_checkpoint(cp: Checkpoint) -> dict:
+    # Read assigned judges via JudgeCheckpoint -> User for the read-only
+    # roster the admin sees on the edit page. Free-text judges_note is
+    # separate so admins can record sub-judges / volunteers without
+    # creating user accounts for them.
+    from app.models import JudgeCheckpoint
+    from app.models import User as _User
+
+    assigned_users = (
+        db.session.query(_User.id, _User.username)
+        .join(JudgeCheckpoint, JudgeCheckpoint.user_id == _User.id)
+        .filter(JudgeCheckpoint.checkpoint_id == cp.id)
+        .order_by(_User.username.asc())
+        .all()
+    )
+
     return {
         "id": cp.id,
         "name": cp.name,
         "location": cp.location,
         "description": cp.description,
         "scoring_text": cp.scoring_text,
+        "judges_note": cp.judges_note,
+        "assigned_judges": [
+            {"id": uid, "username": uname} for (uid, uname) in assigned_users
+        ],
         "easting": cp.easting,
         "northing": cp.northing,
         "is_virtual": cp.is_virtual,
@@ -301,6 +320,17 @@ def _update_checkpoint(checkpoint_id: int, partial: bool):
         if scoring_text_error:
             return jsonify({"error": "validation_error", "detail": scoring_text_error}), 400
         cp.scoring_text = scoring_text or None
+
+    if "judges_note" in payload or not partial:
+        judges_note, judges_note_error = validate_text(
+            payload.get("judges_note"),
+            field_name="judges_note",
+            max_length=2000,
+            multiline=True,
+        )
+        if judges_note_error:
+            return jsonify({"error": "validation_error", "detail": judges_note_error}), 400
+        cp.judges_note = judges_note or None
 
     if "easting" in payload or not partial:
         easting, easting_err = validate_finite_float(payload.get("easting"), field_name="easting")

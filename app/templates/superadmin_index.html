@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Superadmin console') }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">{{ _('Superadmin console') }}</h4>
+  <span class="badge text-bg-danger">{{ _('Cross-competition') }}</span>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-4">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body">
+        <h6 class="card-title">{{ _('Sheets API quota') }}</h6>
+        <p class="small text-body-secondary mb-3">
+          {{ _('Calls used in the rolling 40-per-60-second throttle window. Updates every 2 seconds.') }}
+        </p>
+        <div class="d-flex flex-column align-items-center">
+          <svg id="quotaSvg" width="180" height="180" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="#e9ecef" stroke-width="8"></circle>
+            <circle id="quotaArc" cx="50" cy="50" r="42" fill="none" stroke="#0d6efd" stroke-width="8"
+                    stroke-linecap="round"
+                    stroke-dasharray="0 999" transform="rotate(-90 50 50)"></circle>
+            <text id="quotaText" x="50" y="50" text-anchor="middle" dominant-baseline="middle"
+                  font-size="18" font-weight="600" fill="#212529">0/40</text>
+            <text id="quotaSub" x="50" y="66" text-anchor="middle" dominant-baseline="middle"
+                  font-size="8" fill="#6c757d">{{ _('this minute') }}</text>
+          </svg>
+          <div class="small text-body-secondary mt-2" id="quotaMeta">
+            {{ _('Awaiting first sample...') }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body">
+        <h6 class="card-title">{{ _('All registered users') }} <span class="text-body-secondary">({{ users|length }})</span></h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>{{ _('Username') }}</th>
+                <th>{{ _('Email') }}</th>
+                <th>{{ _('Role') }}</th>
+                <th>{{ _('Created') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for u in users %}
+                <tr>
+                  <td>{{ u.id }}</td>
+                  <td>{{ u.username }}</td>
+                  <td class="small">{{ u.email or '-' }}</td>
+                  <td>
+                    {% if u.role == 'superadmin' %}
+                      <span class="badge text-bg-danger">superadmin</span>
+                    {% elif u.role == 'public' %}
+                      <span class="badge text-bg-secondary">public</span>
+                    {% else %}
+                      <span class="badge text-bg-light text-dark">{{ u.role or '-' }}</span>
+                    {% endif %}
+                  </td>
+                  <td class="small">{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else '-' }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="5" class="text-center text-body-secondary">{{ _('No users.') }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const arc = document.getElementById("quotaArc");
+  const text = document.getElementById("quotaText");
+  const meta = document.getElementById("quotaMeta");
+  const r = 42;
+  const circumference = 2 * Math.PI * r;
+  arc.setAttribute("stroke-dasharray", `0 ${circumference}`);
+
+  async function tick() {
+    try {
+      const resp = await fetch("/superadmin/sheets-status.json", {credentials: "same-origin"});
+      if (!resp.ok) {
+        meta.textContent = "HTTP " + resp.status;
+        return;
+      }
+      const data = await resp.json();
+      const used = data.used || 0;
+      const limit = data.limit || 40;
+      const frac = Math.min(1, used / limit);
+      const dash = circumference * frac;
+      arc.setAttribute("stroke-dasharray", `${dash} ${circumference - dash}`);
+      // Colour shifts from blue -> amber at >=30, red at >=40.
+      if (used >= limit) {
+        arc.setAttribute("stroke", "#dc3545");
+      } else if (used >= 30) {
+        arc.setAttribute("stroke", "#fd7e14");
+      } else {
+        arc.setAttribute("stroke", "#0d6efd");
+      }
+      text.textContent = `${used}/${limit}`;
+      const remaining = (data.remaining_seconds != null) ? data.remaining_seconds : "-";
+      const initStr = data.client_initialized
+        ? `{{ _('window resets in') }} ${remaining}s`
+        : "{{ _('client not initialised yet') }}";
+      meta.textContent = initStr;
+    } catch (err) {
+      meta.textContent = "{{ _('Status fetch failed.') }}";
+    }
+  }
+
+  tick();
+  setInterval(tick, 2000);
+})();
+</script>
+
+{% endblock %}

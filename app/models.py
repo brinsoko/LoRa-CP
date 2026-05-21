@@ -401,6 +401,7 @@ class Checkpoint(db.Model):
     location = db.Column(db.String(255))
     description = db.Column(db.Text)
     scoring_text = db.Column(db.Text)
+    judges_note = db.Column(db.Text)
     easting = db.Column(db.Float)
     northing = db.Column(db.Float)
     is_virtual = db.Column(db.Boolean, nullable=False, default=False, server_default="0")

@@ -101,6 +101,7 @@ def _export_competition(comp: Competition) -> dict:
                 "location": cp.location,
                 "description": cp.description,
                 "scoring_text": cp.scoring_text,
+                "judges_note": cp.judges_note,
                 "easting": cp.easting,
                 "northing": cp.northing,
                 "is_virtual": bool(cp.is_virtual),
@@ -771,6 +772,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                 cp.location = cp_data.get("location")
                 cp.description = cp_data.get("description")
                 cp.scoring_text = cp_data.get("scoring_text")
+                cp.judges_note = cp_data.get("judges_note")
                 updated["checkpoints"] += 1
             elif action == "skip":
                 skipped += 1
@@ -781,6 +783,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                 location=cp_data.get("location"),
                 description=cp_data.get("description"),
                 scoring_text=cp_data.get("scoring_text"),
+                judges_note=cp_data.get("judges_note"),
                 easting=cp_data.get("easting"),
                 northing=cp_data.get("northing"),
             )

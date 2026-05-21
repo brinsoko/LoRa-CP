@@ -180,7 +180,10 @@
       <a href="{{ url_for('main.competition_settings') }}" class="btn btn-outline-secondary">{{ _('Settings') }}</a>
       {% endif %}
     {% endif %}
-    
+    {% if current_user.is_authenticated and current_user.role == 'superadmin' %}
+      <a href="{{ url_for('superadmin.index') }}" class="btn btn-outline-danger">{{ _('Superadmin') }}</a>
+    {% endif %}
+
   </div>
 
   <!-- FLASH MESSAGES -->

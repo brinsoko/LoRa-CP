@@ -29,6 +29,25 @@
         <div class="form-text">{{ _('Shown on the judge scoring form. If blank, an auto-generated summary from the score rules is used.') }}</div>
       </div>
 
+      <div class="mb-3">
+        <label class="form-label">{{ _('Judges / notes at this checkpoint') }}</label>
+        {% if cp.assigned_judges %}
+          <div class="mb-2 small">
+            <span class="text-body-secondary">{{ _('App-assigned judges:') }}</span>
+            {% for j in cp.assigned_judges %}
+              <span class="badge text-bg-success me-1">{{ j.username }}</span>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="mb-2 small text-body-secondary">
+            {{ _('No app-assigned judges yet.') }}
+          </div>
+        {% endif %}
+        <textarea name="judges_note" rows="3" class="form-control"
+                  placeholder="{{ _('Free-text list of judges, sub-judges, helpers. People without app logins go here.') }}">{{ cp.judges_note or '' }}</textarea>
+        <div class="form-text">{{ _('Use this for planning who will staff the checkpoint - it is informational only, not enforced.') }}</div>
+      </div>
+
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label">{{ _('Easting') }}</label>
