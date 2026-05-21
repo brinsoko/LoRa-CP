@@ -30,6 +30,12 @@ from app.utils.sheets_sync import (
     wizard_build_checkpoint_tabs,
     wizard_create_checkpoint_configs,
 )
+from app.utils.sheets_sync_worker import (
+    enqueue_build_arrivals_tab,
+    enqueue_build_score_tab,
+    enqueue_build_teams_tab,
+    enqueue_sync_all_checkpoint_tabs,
+)
 
 sheets_bp = Blueprint("sheets_admin", __name__, template_folder="../../templates")
 
@@ -596,15 +602,35 @@ def sync_team_numbers(config_id: int):
         flash(_("Config is missing groups; cannot sync."), "warning")
         return redirect(url_for("sheets_admin.list_sheets"))
 
-    # The Ekipe (Teams) tab carries the canonical roster — number, name,
-    # organisation, members (Člani), and member count. Rebuild it for
-    # every distinct real spreadsheet this competition writes to, so the
-    # operator's mental model ("sync team numbers" = roster is current)
-    # holds across the per-CP tabs *and* the Ekipe tab. local:N rows are
-    # skipped because there's no remote sheet to push to.
+    # "Sync team numbers" is the operator's blanket refresh button.
+    # Beyond pushing team numbers to each per-CP tab, it must also rebuild
+    # the three summary tabs — Ekipe (roster + Člani), Prihodi (arrivals
+    # matrix), and Skupni seštevek (rankings) — so the visible state of
+    # the spreadsheet stays consistent with the DB after roster, group,
+    # or check-in changes. Mirrors the publish-flow's summary-rebuild
+    # loop ([sheets_sync.py: build_summary_tabs path]).
     lang = load_lang()
-    teams_tab_name = lang.get("teams_tab") or "Ekipe"
-    teams_sheet_ids = sorted(
+    summary_builders = [
+        (
+            "Ekipe",
+            lang.get("teams_tab") or "Ekipe",
+            build_teams_tab,
+            enqueue_build_teams_tab,
+        ),
+        (
+            "Prihodi",
+            lang.get("arrivals_tab") or "Prihodi",
+            build_arrivals_tab,
+            enqueue_build_arrivals_tab,
+        ),
+        (
+            "Skupni seštevek",
+            lang.get("score_tab") or "Skupni seštevek",
+            build_score_tab,
+            enqueue_build_score_tab,
+        ),
+    ]
+    real_sheet_ids = sorted(
         {
             sid
             for (sid,) in db.session.query(SheetConfig.spreadsheet_id)
@@ -623,46 +649,45 @@ def sync_team_numbers(config_id: int):
             current_app.logger.exception("Failed to sync team numbers")
             flash(_("Failed to sync team numbers: %(error)s", error=exc), "warning")
             return redirect(url_for("sheets_admin.list_sheets"))
-        teams_errors: list[str] = []
-        for sid in teams_sheet_ids:
-            try:
-                err = build_teams_tab(sid, teams_tab_name, competition_id=comp_id)
-                if err:
-                    teams_errors.append(f"{sid}: {err}")
-            except Exception as exc:
-                current_app.logger.exception(
-                    "Failed to rebuild Ekipe tab on %s during sync_team_numbers", sid
-                )
-                teams_errors.append(f"{sid}: {exc}")
-        if teams_errors:
+
+        summary_errors: list[str] = []
+        for label, tab_name, build_fn, _enqueue_fn in summary_builders:
+            for sid in real_sheet_ids:
+                try:
+                    err = build_fn(sid, tab_name, competition_id=comp_id)
+                    if err:
+                        summary_errors.append(f"{label} on {sid}: {err}")
+                except Exception as exc:
+                    current_app.logger.exception(
+                        "Failed to rebuild %s on %s during sync_team_numbers", label, sid
+                    )
+                    summary_errors.append(f"{label} on {sid}: {exc}")
+
+        if summary_errors:
             flash(
                 _(
-                    "Synced checkpoint tabs but the Ekipe rebuild reported: %(errs)s",
-                    errs="; ".join(teams_errors),
+                    "Synced checkpoint tabs but some summary rebuilds reported errors: %(errs)s",
+                    errs="; ".join(summary_errors),
                 ),
                 "warning",
             )
         else:
             flash(
-                _("Synced team numbers for checkpoint tabs and the Ekipe tab."),
+                _("Synced team numbers and rebuilt Ekipe, Prihodi, and Skupni seštevek."),
                 "success",
             )
     else:
-        from app.utils.sheets_sync_worker import (
-            enqueue_build_teams_tab,
-            enqueue_sync_all_checkpoint_tabs,
-        )
-
         enqueue_sync_all_checkpoint_tabs(
             current_app._get_current_object(), competition_id=comp_id
         )
-        for sid in teams_sheet_ids:
-            enqueue_build_teams_tab(
-                current_app._get_current_object(),
-                sid,
-                teams_tab_name,
-                competition_id=comp_id,
-            )
+        for _label, tab_name, _build_fn, enqueue_fn in summary_builders:
+            for sid in real_sheet_ids:
+                enqueue_fn(
+                    current_app._get_current_object(),
+                    sid,
+                    tab_name,
+                    competition_id=comp_id,
+                )
         flash(
             _("Team-number sync queued — refresh the spreadsheet in a few seconds."),
             "info",

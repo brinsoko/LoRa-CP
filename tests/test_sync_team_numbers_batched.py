@@ -258,22 +258,22 @@ def test_sync_team_numbers_route_also_rebuilds_ekipe_tab(sheets_app, monkeypatch
         cp_tabs_synced = {tab for tab, _cols in fake.batch_update_columns_calls}
         assert "CP-0" in cp_tabs_synced and "CP-1" in cp_tabs_synced, fake.batch_update_columns_calls
 
-        # New behaviour: the Ekipe tab was also rebuilt. We don't pin the
-        # tab name (it comes from sheets_lang.json which can legitimately
-        # be "Ekipe" or "Teams" depending on environment) — what matters
-        # is that build_teams_tab wrote an A1 grid on *some* worksheet
-        # that isn't one of the per-CP tabs.
+        # New behaviour: all three summary tabs were rebuilt — Ekipe
+        # (Teams), Prihodi (Arrivals), and Skupni seštevek (Score). We
+        # don't pin the exact tab names because they come from
+        # sheets_lang.json (Ekipe/Teams, Prihodi/Arrivals, etc.), but we
+        # do expect three non-CP worksheets, each with an A1 grid write.
         cp_tab_names = {f"CP-{i}" for i in range(2)}
-        teams_like = [
+        summary_tabs = [
             (name, ws) for name, ws in fake.spreadsheet._ws.items() if name not in cp_tab_names
         ]
-        assert teams_like, f"No Ekipe/Teams tab was created; got {list(fake.spreadsheet._ws)}"
-        # And the new tab actually received an A1 grid write from
-        # build_teams_tab (not just an autocreate from `ss.worksheet(...)`).
-        a1_writes = [
-            u for _name, ws in teams_like for u in ws.updates if u.get("range_name") == "A1"
-        ]
-        assert a1_writes, f"Expected A1 grid write on the teams tab; got {[ws.updates for _, ws in teams_like]}"
+        assert len(summary_tabs) == 3, (
+            f"Expected 3 summary tabs (Ekipe / Prihodi / Skupni seštevek); "
+            f"got {[n for n, _ in summary_tabs]}"
+        )
+        for name, ws in summary_tabs:
+            a1_writes = [u for u in ws.updates if u.get("range_name") == "A1"]
+            assert a1_writes, f"summary tab {name!r} created but no A1 write recorded: {ws.updates}"
 
 
 def test_sync_uses_one_batch_call_per_cp_not_one_per_group(sheets_app, monkeypatch):
