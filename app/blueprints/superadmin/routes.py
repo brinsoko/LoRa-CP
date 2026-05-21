@@ -15,6 +15,10 @@ Views:
                                       blocked: the only superadmin
                                       cannot be deleted by themselves)
 
+Competition deletion lives on the per-competition settings page's
+Danger Zone (main.delete_competition) — the destructive action stays
+co-located with the thing being destroyed.
+
 Future views can hang off this blueprint without re-doing the role-check
 plumbing.
 """

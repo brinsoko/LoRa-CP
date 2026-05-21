@@ -53,10 +53,30 @@ def list_users():
         .all()
     )
     users = []
+    member_ids = set()
     for user, membership in rows:
         user.membership_role = membership.role
         users.append(user)
-    return render_template("users_list.html", users=users)
+        member_ids.add(user.id)
+
+    # Superadmin-only: list every user not already an active member of
+    # this competition, so the attach form can render a pick-from-list
+    # dropdown instead of forcing the operator to remember usernames.
+    # Per-competition admins still get the free-text field — exposing the
+    # global user list to anyone with admin-in-one-comp would leak names
+    # across competitions.
+    available_users: list[User] = []
+    if getattr(current_user, "role", None) == "superadmin":
+        q = User.query.order_by(User.username.asc())
+        if member_ids:
+            q = q.filter(~User.id.in_(member_ids))
+        available_users = q.all()
+
+    return render_template(
+        "users_list.html",
+        users=users,
+        available_users=available_users,
+    )
 
 
 @users_bp.route("/attach", methods=["POST"])

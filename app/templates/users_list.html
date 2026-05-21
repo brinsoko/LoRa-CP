@@ -16,14 +16,28 @@
       {{ csrf_input() }}
       <div class="col-md-6">
         <label class="form-label">{{ _('Username or Email') }}</label>
-        <input class="form-control"
-               type="text"
-               name="identifier"
-               maxlength="255"
-               autocomplete="off"
-               pattern="[A-Za-z0-9@._+\-]+"
-               required>
-        <div class="form-text">{{ _('Use an existing global username or email address.') }}</div>
+        {% if has_role('superadmin') %}
+          <select class="form-select" name="identifier" required>
+            <option value="" disabled selected>{{ _('Select an existing user...') }}</option>
+            {% for u in available_users %}
+              <option value="{{ u.username }}">
+                {{ u.username }}{% if u.email %} — {{ u.email }}{% endif %}{% if u.role == 'superadmin' %} [superadmin]{% endif %}
+              </option>
+            {% else %}
+              <option value="" disabled>{{ _('No users available to attach.') }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">{{ _('Superadmin view: every existing user not already in this competition.') }}</div>
+        {% else %}
+          <input class="form-control"
+                 type="text"
+                 name="identifier"
+                 maxlength="255"
+                 autocomplete="off"
+                 pattern="[A-Za-z0-9@._+\-]+"
+                 required>
+          <div class="form-text">{{ _('Use an existing global username or email address.') }}</div>
+        {% endif %}
       </div>
       <div class="col-md-3">
         <label class="form-label">{{ _('Role') }}</label>

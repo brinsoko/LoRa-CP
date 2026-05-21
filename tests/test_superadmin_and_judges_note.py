@@ -234,6 +234,64 @@ def test_delete_user_requires_superadmin(client, app):
         assert db.session.get(User, target.id) is not None
 
 
+def test_users_list_renders_pick_list_for_superadmin(client, app):
+    """Superadmin viewing /users/ sees a <select> with every user not
+    already in this competition. Regular per-comp admins see only the
+    free-text input."""
+    with app.app_context():
+        sa_user = create_user(username="super-pick", role="superadmin")
+        comp = create_competition(name="Pick List")
+        add_membership(sa_user, comp, role="admin")
+        # Three other users: two attached, one available.
+        attached = create_user(username="already-attached", role="public")
+        add_membership(attached, comp, role="judge")
+        also_attached = create_user(username="other-attached", role="public")
+        add_membership(also_attached, comp, role="judge")
+        available = create_user(username="free-to-attach", role="public")
+
+        login_as(client, sa_user, comp)
+        resp = client.get("/users/")
+        assert resp.status_code == 200, resp.data[:200]
+        body = resp.data.decode("utf-8")
+
+        # Superadmin sees the dropdown, not the text input.
+        assert 'name="identifier"' in body
+        assert "<select" in body
+        # Available user appears in the picker.
+        assert "free-to-attach" in body
+        # Already-attached users do NOT appear in the picker options.
+        # (They still show up in the membership table below — search the
+        # form region specifically.)
+        select_start = body.index("<select")
+        select_end = body.index("</select>", select_start)
+        select_html = body[select_start:select_end]
+        assert "free-to-attach" in select_html
+        assert "already-attached" not in select_html
+        assert "other-attached" not in select_html
+
+
+def test_users_list_hides_pick_list_for_non_superadmin(client, app):
+    """A per-competition admin should NOT see other users' usernames in
+    a global picker — that would leak names across competitions."""
+    with app.app_context():
+        admin = create_user(username="plain-admin", role="admin")
+        comp = create_competition(name="No Picker")
+        add_membership(admin, comp, role="admin")
+        # A user in a different competition that admin shouldn't see.
+        other_comp = create_competition(name="Some Other Race")
+        other_user = create_user(username="from-other-comp", role="public")
+        add_membership(other_user, other_comp, role="judge")
+
+        login_as(client, admin, comp)
+        resp = client.get("/users/")
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        # The free-text input is rendered, not a <select name="identifier">.
+        assert '<input class="form-control"' in body
+        # The other comp's user must NOT be exposed anywhere on this page.
+        assert "from-other-comp" not in body
+
+
 def test_judges_note_round_trips_through_checkpoint_api(client, app):
     with app.app_context():
         admin = create_user(username="judges-note-admin", role="admin")
