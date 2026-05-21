@@ -591,17 +591,30 @@ def score_resolve():
     if not fields_info["fields"] and not config.get("dead_time_enabled") and not config.get("time_enabled"):
         # Points-only is allowed; require at least the checkpoint config to exist.
         pass
+
+    # Pull the per-CP/per-group rule once so we can enrich each field_def
+    # with display_label, hint, and widget metadata for the judge form.
+    rule = _get_score_rule(comp_id, checkpoint_id, group_id) if group_id else None
+    per_field_rules = (rule or {}).get("field_rules") or {}
+
+    from app.utils.judge_labels import enrich_field_def
+
     field_defs = []
     if config.get("dead_time_enabled"):
         field_defs.append(
-            {"key": "dead_time", "label": fields_info["headers"].get("dead_time") or "Dead Time", "type": "number"}
+            enrich_field_def(
+                {"key": "dead_time", "label": fields_info["headers"].get("dead_time") or "Dead Time", "type": "number"},
+                None,
+            )
         )
     for field in fields_info["fields"]:
-        field_defs.append({"key": field, "label": field, "type": "number"})
+        field_defs.append(
+            enrich_field_def({"key": field, "label": field, "type": "number"}, per_field_rules.get(field))
+        )
     has_score_input = any(fd.get("key") in ("score", "points") for fd in field_defs)
     has_scored_fields = any(fd.get("key") not in ("dead_time",) for fd in field_defs)
     if not has_score_input and not has_scored_fields:
-        field_defs.append({"key": "points", "label": "Score", "type": "number"})
+        field_defs.append(enrich_field_def({"key": "points", "label": "Score", "type": "number"}, None))
 
     existing = (
         ScoreEntry.query.filter(
@@ -618,13 +631,15 @@ def score_resolve():
         is not None
     )
 
-    rule = _get_score_rule(comp_id, checkpoint_id, group_id) if group_id else None
-
     return {
         "ok": True,
         "uid": uid or None,
         "team": {"id": team.id, "name": team.name, "number": team.number},
-        "checkpoint": {"id": checkpoint.id, "name": checkpoint.name},
+        "checkpoint": {
+            "id": checkpoint.id,
+            "name": checkpoint.name,
+            "description": checkpoint.description or "",
+        },
         "group": {"name": group_name},
         "fields": field_defs,
         "latest_score": existing.raw_fields if existing else None,

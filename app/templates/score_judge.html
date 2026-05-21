@@ -71,6 +71,7 @@
       <div class="card-body">
         <h6 class="card-title mb-3">{{ _('Score Input') }}</h6>
         <div id="teamInfo" class="text-body-secondary small mb-2">{{ _('Waiting for scan…') }}</div>
+        <div id="cpDescription" class="alert alert-secondary d-none mb-2"></div>
         <div id="checkinNotice" class="alert alert-info d-none"></div>
         <div id="writebackNotice" class="alert d-none"></div>
 
@@ -100,6 +101,7 @@
   const cardUid = document.getElementById("cardUid");
   const teamSelect = document.getElementById("teamSelect");
   const teamInfo = document.getElementById("teamInfo");
+  const cpDescription = document.getElementById("cpDescription");
   const fieldsContainer = document.getElementById("fieldsContainer");
   const fieldsForm = document.getElementById("fieldsForm");
   const teamId = document.getElementById("teamId");
@@ -157,26 +159,80 @@
     fields.forEach((field) => {
       const col = document.createElement("div");
       col.className = "col-md-6";
+
       const label = document.createElement("label");
-      label.className = "form-label";
+      label.className = "form-label fw-semibold";
       if (field.key === "points" || field.key === "score") {
         label.textContent = I18N.scoreLabel;
       } else {
-        label.textContent = field.label;
-      }
-      const input = document.createElement("input");
-      input.className = "form-control";
-      input.dataset.key = field.key;
-      input.type = field.type === "text" ? "text" : "number";
-      input.step = field.type === "text" ? "1" : "any";
-      if (field.type !== "text" && field.key !== "dead_time") {
-        input.min = "0";
-      }
-      if (latestValues && latestValues[field.key] !== undefined) {
-        input.value = latestValues[field.key];
+        label.textContent = field.display_label || field.label || field.key;
       }
       col.appendChild(label);
-      col.appendChild(input);
+
+      // Hidden input is the source of truth for form submission. The widget
+      // (buttons or number input) writes into it via the 'value' attribute.
+      const hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.dataset.key = field.key;
+      const existingValue =
+        latestValues && latestValues[field.key] !== undefined && latestValues[field.key] !== null
+          ? String(latestValues[field.key])
+          : "";
+      hidden.value = existingValue;
+      col.appendChild(hidden);
+
+      if (field.widget === "buttons" && Array.isArray(field.widget_choices) && field.widget_choices.length) {
+        const group = document.createElement("div");
+        group.className = "btn-group d-flex flex-wrap";
+        group.setAttribute("role", "group");
+        field.widget_choices.forEach((choice) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "btn btn-outline-primary flex-grow-1";
+          btn.textContent = choice.label;
+          btn.dataset.value = String(choice.value);
+          if (existingValue !== "" && String(existingValue) === String(choice.value)) {
+            btn.classList.remove("btn-outline-primary");
+            btn.classList.add("btn-primary", "active");
+          }
+          btn.addEventListener("click", () => {
+            hidden.value = btn.dataset.value;
+            group.querySelectorAll("button").forEach((b) => {
+              b.classList.remove("btn-primary", "active");
+              b.classList.add("btn-outline-primary");
+            });
+            btn.classList.remove("btn-outline-primary");
+            btn.classList.add("btn-primary", "active");
+          });
+          group.appendChild(btn);
+        });
+        col.appendChild(group);
+      } else {
+        const input = document.createElement("input");
+        input.className = "form-control";
+        input.type = field.type === "text" ? "text" : "number";
+        input.step = field.type === "text" ? "1" : "any";
+        if (field.type !== "text" && field.key !== "dead_time") {
+          input.min = "0";
+        }
+        if (existingValue !== "") {
+          input.value = existingValue;
+        }
+        // Mirror typed value into the hidden input so submission code stays
+        // uniform across widget types.
+        input.addEventListener("input", () => {
+          hidden.value = input.value;
+        });
+        col.appendChild(input);
+      }
+
+      if (field.hint) {
+        const hint = document.createElement("div");
+        hint.className = "form-text small";
+        hint.textContent = field.hint;
+        col.appendChild(hint);
+      }
+
       fieldsContainer.appendChild(col);
     });
   }
@@ -256,6 +312,17 @@
     return parts.join(" · ");
   }
 
+  function updateCpDescription(data) {
+    const desc = data && data.checkpoint && data.checkpoint.description;
+    if (desc) {
+      cpDescription.textContent = desc;
+      cpDescription.classList.remove("d-none");
+    } else {
+      cpDescription.textContent = "";
+      cpDescription.classList.add("d-none");
+    }
+  }
+
   async function resolveScore(payload) {
     const resp = await fetch("/api/scores/resolve", {
       method: "POST",
@@ -305,6 +372,7 @@
         checkpointId.value = data.checkpoint.id;
         teamSelect.value = String(data.team.id);
         teamInfo.textContent = formatSummaryLine(data);
+        updateCpDescription(data);
         renderFields(data.fields, data.latest_score || {});
         submitBtn.disabled = false;
         setNotice(data.checkin_created ? I18N.checkinCreated : "");
@@ -334,6 +402,7 @@
       teamId.value = data.team.id;
       checkpointId.value = data.checkpoint.id;
       teamInfo.textContent = formatSummaryLine(data);
+      updateCpDescription(data);
       renderFields(data.fields, data.latest_score || {});
       submitBtn.disabled = false;
       setNotice(data.checkin_created ? I18N.checkinCreated : "");
@@ -348,7 +417,11 @@
   fieldsForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const fields = {};
-    fieldsContainer.querySelectorAll("input").forEach((input) => {
+    // Only the hidden inputs carry data-key. Visible number inputs mirror
+    // their value into the hidden input on every keystroke; button widgets
+    // write to it on click. Iterating [data-key] keeps the collection
+    // uniform regardless of widget type.
+    fieldsContainer.querySelectorAll("[data-key]").forEach((input) => {
       fields[input.dataset.key] = input.value;
     });
     // Warn if overwriting existing values
