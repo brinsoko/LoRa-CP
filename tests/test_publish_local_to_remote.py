@@ -422,32 +422,36 @@ def test_publish_repoints_configs_already_on_a_different_remote(sheets_app, monk
         )
 
 
-def test_publish_dedupes_duplicate_tab_name_rows(sheets_app, monkeypatch):
-    """If two SheetConfig rows share the same tab_name (e.g. the wizard
-    ran twice and left both `local:5` and `local:12` placeholders for the
-    same checkpoint), publish must drop one before committing instead of
-    blowing up on UNIQUE(spreadsheet_id, tab_name).
+def test_publish_replaces_stale_slot_holder_with_fresh_config(sheets_app, monkeypatch):
+    """Real-world case: an older publish left a SheetConfig pointing at the
+    target spreadsheet for tab 'CP-One'. The operator then re-ran the
+    wizard, producing a fresh `local:N` row for the same tab_name. The
+    fresh row is what they want published — the publish loop must drop
+    the older slot-holder and rebuild the remote tab from the fresh row,
+    not skip the fresh row to preserve the old one.
 
-    Regression: previously this raised sqlite3.IntegrityError per duplicate
-    row, ate Sheets API quota until the throttle kicked in, and eventually
-    killed the gunicorn worker."""
+    Regression: previously this raised sqlite3.IntegrityError per
+    duplicate, eventually exhausting the 40-call/60s Sheets quota and
+    killing the gunicorn worker via the /superadmin/sheets-status.json
+    poll's lock contention."""
     with sheets_app.app_context():
         s = _seed_imported_competition()
-        _install_fake_client(monkeypatch)
+        fake = _install_fake_client(monkeypatch)
 
-        # Add a second, stale local config that shares CP-One's tab_name.
-        # Different spreadsheet_id keeps it within the UNIQUE(spreadsheet_id,
-        # tab_name) constraint at insert time, but it WILL collide once we
-        # try to re-point it at the target.
+        # Simulate "older publish ran on a previous wizard pass": insert a
+        # stale row that already owns (target_spreadsheet_id, CP-One) with
+        # outdated content. The fresh cfg from _seed_imported_competition
+        # is still on local: and must beat this row.
+        stale_id_marker = "STALE-MARKER"
         db.session.add(
             SheetConfig(
                 competition_id=s["comp"].id,
-                spreadsheet_id="local:stale",
-                spreadsheet_name="Stale",
-                tab_name=s["cp1"].name,  # same tab_name as the live cfg1
+                spreadsheet_id="REAL-SHEET-ID",
+                spreadsheet_name=stale_id_marker,
+                tab_name=s["cp1"].name,
                 tab_type="checkpoint",
                 checkpoint_id=s["cp1"].id,
-                config={"groups": []},
+                config={"groups": [], "note": "stale"},
             )
         )
         db.session.commit()
@@ -458,23 +462,32 @@ def test_publish_dedupes_duplicate_tab_name_rows(sheets_app, monkeypatch):
         )
 
         assert result["errors"] == [], result
-        # Two distinct tab_names land on the remote (CP-One + CP-Two). The
-        # stale duplicate is dropped, counted as skipped rather than
-        # published.
+        # Both fresh configs publish (CP-One overwrites the stale slot,
+        # CP-Two lands cleanly).
         assert result["published"] == 2, result
-        assert result["skipped"] >= 1, result
 
         remaining = SheetConfig.query.filter_by(competition_id=s["comp"].id).all()
-        # No duplicates: every (spreadsheet_id, tab_name) pair appears once.
-        seen = set()
+        # No duplicate slots after the run.
+        seen: set[tuple[str, str]] = set()
         for c in remaining:
             key = (c.spreadsheet_id, c.tab_name)
             assert key not in seen, f"duplicate slot after publish: {key}"
             seen.add(key)
-        # And no orphan local: rows are left behind.
+        # No local: orphans left.
         assert all(not c.spreadsheet_id.startswith("local:") for c in remaining), (
             [c.spreadsheet_id for c in remaining]
         )
+        # The stale row was the one deleted — the survivor for CP-One is
+        # the fresh config (it kept the real spreadsheet_name from the
+        # seed, not STALE-MARKER).
+        cp1_survivor = next(c for c in remaining if c.tab_name == s["cp1"].name)
+        assert cp1_survivor.spreadsheet_name != stale_id_marker, (
+            "the older slot-holder was kept, not replaced"
+        )
+        # And the remote tab was actually (re)built — the fake client
+        # records the A1 grid write.
+        ws = fake.spreadsheet.worksheet(s["cp1"].name)
+        assert any(u["range_name"] == "A1" for u in ws.updates), ws.updates
 
 
 def test_publish_is_noop_when_sheets_sync_disabled(app_factory, monkeypatch):

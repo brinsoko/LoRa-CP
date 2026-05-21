@@ -1801,31 +1801,29 @@ def publish_local_configs_to_spreadsheet(
 
     for cfg in configs:
         try:
-            # Dedupe: when the wizard runs multiple times the same tab_name
-            # can land in several rows with distinct "local:N" placeholders.
-            # The publish loop would otherwise try to re-point each to the
-            # same (target_spreadsheet_id, tab_name) slot and the second
-            # commit blows up on UNIQUE(spreadsheet_id, tab_name). Drop the
-            # duplicate before doing any Sheets API work — the row that
-            # already owns the slot has the published state.
-            duplicate = (
+            # When the wizard runs a second time it leaves fresh "local:N"
+            # rows alongside an older row that already points at the target
+            # for the same tab_name. The UNIQUE(spreadsheet_id, tab_name)
+            # constraint means we can't have both pointing at the target;
+            # the *fresh* row is the one the operator just generated and
+            # wants published, so delete the older slot-holder and let the
+            # rebuild below overwrite the remote tab with the new content.
+            slot_holder = (
                 SheetConfig.query.filter(SheetConfig.spreadsheet_id == spreadsheet_id)
                 .filter(SheetConfig.tab_name == cfg.tab_name)
                 .filter(SheetConfig.id != cfg.id)
                 .first()
             )
-            if duplicate is not None:
+            if slot_holder is not None:
                 current_app.logger.info(
-                    "publish: dropping duplicate SheetConfig id=%s tab=%r "
-                    "(slot already owned by id=%s)",
-                    cfg.id,
+                    "publish: replacing stale SheetConfig id=%s tab=%r "
+                    "with fresh source id=%s",
+                    slot_holder.id,
                     cfg.tab_name,
-                    duplicate.id,
+                    cfg.id,
                 )
-                db.session.delete(cfg)
-                db.session.commit()
-                result["skipped"] += 1
-                continue
+                db.session.delete(slot_holder)
+                db.session.flush()
 
             grid, group_has_formula = _build_local_cp_grid(cfg, competition_id)
             if not grid or not grid[0]:

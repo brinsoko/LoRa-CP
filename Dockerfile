@@ -21,5 +21,10 @@ ENV FLASK_ENV=production \
 
 EXPOSE 5000
 
-# Gunicorn entrypoint (expects wsgi.py with app=create_app())
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "wsgi:app"]
+# Gunicorn entrypoint (expects wsgi.py with app=create_app()).
+# --timeout 120: the default 30s is too tight for Sheets-sync paths that
+# can legitimately stall on the SheetsClient's rolling 60s quota throttle.
+# Without this, a throttled call held the worker lock long enough that
+# the unrelated /superadmin/sheets-status.json poll blocked, gunicorn
+# SIGKILLed the worker, and the in-flight publish was lost.
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "--timeout", "120", "wsgi:app"]
