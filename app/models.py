@@ -59,6 +59,7 @@ class Competition(db.Model):
     created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
     public_results = db.Column(db.Boolean, nullable=False, default=False)
     hide_gps_map = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    hide_dev_map = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     ingest_password_hash = db.Column(db.String(255), nullable=True)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 

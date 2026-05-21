@@ -46,7 +46,14 @@
         <input class="form-check-input" type="checkbox" id="hideGpsMap" name="hide_gps_map" value="1"
                {% if competition.hide_gps_map %}checked{% endif %}>
         <label class="form-check-label" for="hideGpsMap">{{ _('Hide GPS map') }}</label>
-        <div class="form-text">{{ _('Hide the GPS map buttons from the navigation bar.') }}</div>
+        <div class="form-text">{{ _('Hide the public GPS map button from the navigation bar.') }}</div>
+      </div>
+
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="hideDevMap" name="hide_dev_map" value="1"
+               {% if competition.hide_dev_map %}checked{% endif %}>
+        <label class="form-check-label" for="hideDevMap">{{ _('Hide device map') }}</label>
+        <div class="form-text">{{ _('Hide the LoRa device map button from the navigation bar.') }}</div>
       </div>
 
       <div>

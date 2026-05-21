@@ -316,6 +316,7 @@ def competition_settings():
             "name": competition.name,
             "public_results": competition.public_results,
             "hide_gps_map": competition.hide_gps_map,
+            "hide_dev_map": competition.hide_dev_map,
             "has_ingest_password": bool(competition.ingest_password_hash),
         }
         new_name, name_error = validate_text(
@@ -334,6 +335,7 @@ def competition_settings():
         competition.name = new_name
         competition.public_results = bool(request.form.get("public_results"))
         competition.hide_gps_map = bool(request.form.get("hide_gps_map"))
+        competition.hide_dev_map = bool(request.form.get("hide_dev_map"))
         if request.form.get("clear_ingest_password"):
             competition.set_ingest_password(None)
         else:
@@ -354,6 +356,7 @@ def competition_settings():
                     "name": competition.name,
                     "public_results": competition.public_results,
                     "hide_gps_map": competition.hide_gps_map,
+                    "hide_dev_map": competition.hide_dev_map,
                     "has_ingest_password": bool(competition.ingest_password_hash),
                 },
             },

@@ -43,13 +43,19 @@
           </div>
 
           <div class="col-12">
-            <label class="form-label">{{ _('Or select team') }}</label>
-            <select class="form-select" id="teamSelect">
-              <option value="">{{ _('Choose...') }}</option>
+            <label class="form-label" for="teamSearch">{{ _('Or select team') }}</label>
+            <input type="text"
+                   class="form-control"
+                   id="teamSearch"
+                   list="teamSearchList"
+                   autocomplete="off"
+                   placeholder="{{ _('Type number or name') }}">
+            <datalist id="teamSearchList">
               {% for t in teams %}
-                <option value="{{ t.id }}">{{ t.name }}{% if t.number is not none %} ({{ t.number }}){% endif %}</option>
+                <option value="{% if t.number is not none %}{{ t.number }} - {% endif %}{{ t.name }}" data-team-id="{{ t.id }}"></option>
               {% endfor %}
-            </select>
+            </datalist>
+            <input type="hidden" id="teamSelect" value="">
             <div class="form-text">{{ _('Use this when the team has no RFID card.') }}</div>
           </div>
 
@@ -102,7 +108,30 @@
   const teamSelect = document.getElementById("teamSelect");
   const teamInfo = document.getElementById("teamInfo");
   const cpDescription = document.getElementById("cpDescription");
+  const teamSearch = document.getElementById("teamSearch");
   const fieldsContainer = document.getElementById("fieldsContainer");
+
+  // datalist option.value -> team_id, built from the server-rendered options
+  // so judges can search by number or name and we still know which team was
+  // picked. Inverse map (id -> display string) keeps the search box in sync
+  // when the scan flow sets teamSelect from elsewhere.
+  const TEAM_BY_LABEL = {};
+  const TEAM_LABEL_BY_ID = {};
+  document.querySelectorAll('#teamSearchList option').forEach((opt) => {
+    const id = parseInt(opt.dataset.teamId || "0", 10);
+    if (!id) return;
+    TEAM_BY_LABEL[opt.value] = id;
+    TEAM_LABEL_BY_ID[id] = opt.value;
+  });
+
+  function syncTeamSearchFromId(id) {
+    teamSearch.value = id ? (TEAM_LABEL_BY_ID[id] || "") : "";
+  }
+
+  teamSearch.addEventListener("input", () => {
+    const match = TEAM_BY_LABEL[teamSearch.value];
+    teamSelect.value = match ? String(match) : "";
+  });
   const fieldsForm = document.getElementById("fieldsForm");
   const teamId = document.getElementById("teamId");
   const checkpointId = document.getElementById("checkpointId");
@@ -371,6 +400,7 @@
         teamId.value = data.team.id;
         checkpointId.value = data.checkpoint.id;
         teamSelect.value = String(data.team.id);
+        syncTeamSearchFromId(data.team.id);
         teamInfo.textContent = formatSummaryLine(data);
         updateCpDescription(data);
         renderFields(data.fields, data.latest_score || {});

@@ -57,7 +57,11 @@ def judge_score():
             checkpoints = [jc.checkpoint for jc in assigned if jc.checkpoint]
             default_row = next((jc for jc in assigned if jc.is_default), None)
             default_checkpoint_id = default_row.checkpoint_id if default_row else None
-        teams = Team.query.filter(Team.competition_id == comp_id).order_by(Team.name.asc()).all()
+        teams = (
+            Team.query.filter(Team.competition_id == comp_id)
+            .order_by(Team.number.asc().nulls_last(), Team.name.asc())
+            .all()
+        )
 
     return render_template(
         "score_judge.html",

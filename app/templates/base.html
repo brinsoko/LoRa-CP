@@ -165,6 +165,8 @@
       {% endif %}
       {% if not current_competition.hide_gps_map %}
       <a href="{{ url_for('maps.index') }}" class="btn btn-outline-primary">{{ _('Map') }}</a>
+      {% endif %}
+      {% if not current_competition.hide_dev_map %}
       <a href="{{ url_for('maps.lora_map') }}" class="btn btn-outline-primary">{{ _('Device Map') }}</a>
       {% endif %}
       {% if current_user.is_authenticated and current_competition_role == 'admin' %}

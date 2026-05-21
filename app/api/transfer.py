@@ -67,6 +67,7 @@ def _export_competition(comp: Competition) -> dict:
             "settings": {
                 "public_results": comp.public_results,
                 "hide_gps_map": comp.hide_gps_map,
+                "hide_dev_map": comp.hide_dev_map,
             },
         },
         "teams": [
@@ -341,6 +342,7 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
         name=comp_name,
         public_results=settings.get("public_results", False),
         hide_gps_map=settings.get("hide_gps_map", False),
+        hide_dev_map=settings.get("hide_dev_map", False),
         created_by_user_id=current_user.id if current_user.is_authenticated else None,
     )
     db.session.add(comp)
