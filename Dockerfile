@@ -27,4 +27,9 @@ EXPOSE 5000
 # Without this, a throttled call held the worker lock long enough that
 # the unrelated /superadmin/sheets-status.json poll blocked, gunicorn
 # SIGKILLed the worker, and the in-flight publish was lost.
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "--timeout", "120", "wsgi:app"]
+# --workers 2: a single worker meant the entire app stalled behind a
+# Sheets throttle (auth pages, judge UI, score writes — anything the
+# worker was serving had to wait for the up-to-60s sleep). Two workers
+# let unrelated requests proceed in parallel; small memory cost on a
+# low-traffic admin tool.
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "--timeout", "120", "--workers", "2", "wsgi:app"]

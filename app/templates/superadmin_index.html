@@ -67,6 +67,24 @@
                     {% else %}
                       <span class="badge text-bg-light text-dark">{{ u.role or '-' }}</span>
                     {% endif %}
+                    {% if u.memberships_summary %}
+                      <div class="d-flex flex-wrap gap-1 mt-1">
+                        {% for m in u.memberships_summary %}
+                          {% if m.role == 'admin' %}
+                            {% set role_cls = 'text-bg-primary' %}
+                          {% elif m.role == 'judge' %}
+                            {% set role_cls = 'text-bg-info' %}
+                          {% elif m.role == 'viewer' %}
+                            {% set role_cls = 'text-bg-secondary' %}
+                          {% else %}
+                            {% set role_cls = 'text-bg-light text-dark' %}
+                          {% endif %}
+                          <span class="badge {{ role_cls }}" title="{{ m.competition_name }}">
+                            {{ m.role }} · {{ m.competition_name }}
+                          </span>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
                   </td>
                   <td class="small">{{ u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else '-' }}</td>
                   <td class="text-end">
@@ -126,9 +144,17 @@
       }
       text.textContent = `${used}/${limit}`;
       const remaining = (data.remaining_seconds != null) ? data.remaining_seconds : "-";
-      const initStr = data.client_initialized
-        ? `{{ _('window resets in') }} ${remaining}s`
-        : "{{ _('client not initialised yet') }}";
+      let initStr;
+      if (!data.client_initialized) {
+        initStr = "{{ _('client not initialised yet') }}";
+      } else if (data.throttling) {
+        // _throttle() is mid-sleep holding the client lock — surface
+        // that explicitly so the gauge doesn't look frozen.
+        initStr = "{{ _('throttling — waiting for window reset') }}";
+        arc.setAttribute("stroke", "#dc3545");
+      } else {
+        initStr = `{{ _('window resets in') }} ${remaining}s`;
+      }
       meta.textContent = initStr;
     } catch (err) {
       meta.textContent = "{{ _('Status fetch failed.') }}";

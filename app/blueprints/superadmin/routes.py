@@ -91,6 +91,28 @@ def _generate_password() -> str:
 @_superadmin_only
 def index():
     users = User.query.order_by(User.role.desc(), User.username.asc()).all()
+
+    # Per-comp roles live on CompetitionMember, NOT on User.role (which
+    # stays 'public' for everyone except superadmins). The console table
+    # used to show only User.role, so bulk-created judges appeared as
+    # "public" even though they're judges in one or more competitions.
+    # Aggregate memberships per user so the template can render the
+    # real per-comp roles next to the global one.
+    rows = (
+        db.session.query(CompetitionMember, Competition)
+        .join(Competition, Competition.id == CompetitionMember.competition_id)
+        .filter(CompetitionMember.active.is_(True))
+        .order_by(Competition.name.asc())
+        .all()
+    )
+    memberships_by_user: dict[int, list[dict]] = {}
+    for member, comp in rows:
+        memberships_by_user.setdefault(member.user_id, []).append(
+            {"role": member.role, "competition_name": comp.name}
+        )
+    for u in users:
+        u.memberships_summary = memberships_by_user.get(u.id, [])
+
     return render_template("superadmin_index.html", users=users)
 
 

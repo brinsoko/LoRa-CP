@@ -58,6 +58,31 @@ def test_superadmin_index_renders_for_superadmin(client, app):
         assert b"super-test" in resp.data
 
 
+def test_superadmin_index_surfaces_per_comp_membership_roles(client, app):
+    """A user bulk-added as a judge has User.role='public' but a
+    CompetitionMember row with role='judge'. The console must show the
+    judge badge alongside the public global role, otherwise it looks
+    like every bulk-added user is just 'public'."""
+    with app.app_context():
+        sa_user = create_user(username="super-roles", role="superadmin")
+        judge = create_user(username="judge-roles", role="public")
+        comp = create_competition(name="Roles Race")
+        add_membership(judge, comp, role="judge")
+        login_as(client, sa_user, None)
+
+        resp = client.get("/superadmin/")
+        assert resp.status_code == 200, resp.data[:200]
+        body = resp.data.decode("utf-8")
+        # Locate the judge user's row by username and look at its
+        # surrounding markup for the per-comp role badge text.
+        idx = body.find("judge-roles")
+        assert idx != -1, "judge user missing from superadmin table"
+        nearby = body[idx : idx + 800]
+        assert "judge" in nearby and comp.name in nearby, (
+            f"per-comp role badge missing; nearby markup: {nearby[:400]}"
+        )
+
+
 def test_sheets_status_endpoint_when_client_uninitialised(client, app):
     """Before any Sheets call, the singleton client may not exist yet.
     The status endpoint must report a zeroed snapshot, not 500."""

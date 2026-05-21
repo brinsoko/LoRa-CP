@@ -59,6 +59,54 @@ def test_score_submissions_renders_emoji_in_team_name_and_fields(client, app):
     assert "stage \U0001f3c1 finished" in body
 
 
+def test_score_submissions_prefixes_team_with_number(client, app):
+    """Operators scanning the submissions log want to see the team
+    number next to the team name (e.g. '101 - Pitoni'), not just the
+    name. Teams without a number assigned fall back to the bare name."""
+    admin = create_user(username="num-admin", role="admin")
+    comp = create_competition(name="Numbered Race")
+    add_membership(admin, comp, role="admin")
+    group = create_group(comp, name="Alpha", prefix="1xx")
+    cp = create_checkpoint(comp, name="CP-Num")
+    numbered = create_team(comp, name="Pitoni", number=101)
+    unnumbered = create_team(comp, name="No Number")
+    assign_team_group(numbered, group)
+    assign_team_group(unnumbered, group)
+    db.session.add_all(
+        [
+            ScoreEntry(
+                competition_id=comp.id,
+                team_id=numbered.id,
+                checkpoint_id=cp.id,
+                judge_user_id=admin.id,
+                raw_fields={"points": 10},
+                total=10.0,
+                created_at=datetime(2026, 5, 20, 12, 0, 0),
+            ),
+            ScoreEntry(
+                competition_id=comp.id,
+                team_id=unnumbered.id,
+                checkpoint_id=cp.id,
+                judge_user_id=admin.id,
+                raw_fields={"points": 5},
+                total=5.0,
+                created_at=datetime(2026, 5, 20, 12, 1, 0),
+            ),
+        ]
+    )
+    db.session.commit()
+    login_as(client, admin, comp)
+
+    resp = client.get("/scores/submissions")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    # Numbered team renders as "101 - Pitoni" (note: dash with spaces).
+    assert "101 - Pitoni" in body, body[body.find("Pitoni") - 30 : body.find("Pitoni") + 30]
+    # Unnumbered team renders as bare name (no leading separator/dash).
+    assert "No Number" in body
+    assert "- No Number" not in body, "team without a number should not have a dash prefix"
+
+
 def test_audit_details_render_unicode_payload(client, app):
     admin = create_user(username="audit-admin", role="admin")
     comp = create_competition(name="Audit UTF8 Race")

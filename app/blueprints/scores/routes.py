@@ -899,10 +899,19 @@ def score_submissions():
             dead_num = float(dead_val)
         except Exception:
             dead_num = None
+        # Display team as "<number> - <name>" when a number is assigned,
+        # otherwise fall back to the bare name. Lets operators scan
+        # submissions by team number without flipping to the roster.
+        team_label = ""
+        if entry.team:
+            if entry.team.number is not None:
+                team_label = f"{entry.team.number} - {entry.team.name}"
+            else:
+                team_label = entry.team.name
         rows.append(
             {
                 "id": entry.id,
-                "team": entry.team.name if entry.team else "",
+                "team": team_label,
                 "team_id": entry.team_id,
                 "checkpoint": entry.checkpoint.name if entry.checkpoint else "",
                 "checkpoint_id": entry.checkpoint_id,

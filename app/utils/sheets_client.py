@@ -59,19 +59,29 @@ class SheetsClient:
     def get_window_status(self) -> dict:
         """Snapshot of the current 40/60s throttle window.
 
-        Used by the superadmin console quota indicator. Returns a fresh
-        snapshot under the lock so the read can't race with a concurrent
-        _throttle() update.
+        Used by the superadmin console quota indicator. MUST stay
+        non-blocking: _throttle() holds self._lock for up to 60s during
+        a quota-induced sleep, and the gauge JS polls every 2s — a
+        blocking read would freeze the gauge (and the whole request
+        worker) during throttling, surfacing as "Status fetch failed."
 
-        The window only resets inside _throttle() on the next API call. If
-        the app stays idle past 60s, the counter and start-time stay
-        frozen, which would otherwise show as "24/40, resets in 0s" forever.
-        Detect that here and report a clean 0/40 with a full 60s window —
-        the next call will reset the underlying state to match.
+        Strategy: try to grab the lock with a tiny timeout; if held
+        (i.e. a throttle sleep is in progress), do an unlocked
+        best-effort read. The values we read (_call_count, _call_window_start)
+        are simple Python ints/floats — under the GIL each individual
+        read is atomic, so the worst we get is a snapshot that's
+        microseconds stale, never a torn value.
+
+        If we can see we're past the rolling window (elapsed >= 60),
+        report a clean 0/40 + 60s because the next API call will
+        reset the underlying state to match.
         """
-        with self._lock:
+        acquired = self._lock.acquire(timeout=0.05)
+        try:
             now = time.monotonic()
-            elapsed = max(0.0, now - self._call_window_start)
+            window_start = self._call_window_start
+            call_count = self._call_count
+            elapsed = max(0.0, now - window_start)
             if elapsed >= 60:
                 return {
                     "used": 0,
@@ -79,14 +89,22 @@ class SheetsClient:
                     "window_seconds": 60,
                     "elapsed_seconds": 0.0,
                     "remaining_seconds": 60.0,
+                    "throttling": False,
                 }
             return {
-                "used": int(self._call_count),
+                "used": int(call_count),
                 "limit": 40,
                 "window_seconds": 60,
                 "elapsed_seconds": round(elapsed, 1),
                 "remaining_seconds": max(0.0, round(60 - elapsed, 1)),
+                # If we couldn't get the lock quickly, a _throttle() sleep
+                # is in flight — surface that to the UI so the gauge can
+                # show "throttling" rather than looking dead.
+                "throttling": not acquired,
             }
+        finally:
+            if acquired:
+                self._lock.release()
 
     def _throttle(self) -> None:
         """Throttle after ~40 calls per minute to dodge Sheets read quotas.
