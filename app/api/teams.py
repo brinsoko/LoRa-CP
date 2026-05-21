@@ -13,7 +13,7 @@ from sqlalchemy.orm import joinedload
 
 from app.api.helpers import json_ok
 from app.extensions import db
-from app.models import CheckpointGroup, Team, TeamGroup
+from app.models import CheckpointGroup, Team, TeamGroup, TeamMember
 from app.utils.audit import record_audit_event
 from app.utils.competition import get_current_competition_role, require_current_competition_id
 from app.utils.rest_auth import json_login_required, json_roles_required
@@ -42,6 +42,45 @@ def _dispatch_sync_all(comp_id: int) -> None:
 teams_api_bp = Blueprint("api_teams", __name__)
 
 
+def _apply_members(team: Team, members_payload) -> None:
+    """Replace team.members with the given list.
+
+    Each item may be a plain string (treated as the member's name) or a
+    dict {"name": str, "role": str?}. Items with an empty name are
+    dropped. Position is assigned by submission order so the UI list
+    stays stable.
+
+    The uq_team_member_position constraint blocks two members from
+    claiming the same slot. To avoid a transient duplicate when the
+    payload reorders members, we delete the existing rows and flush
+    before attaching the new collection.
+    """
+    if members_payload is None:
+        return
+    if not isinstance(members_payload, list):
+        return
+    parsed: list[tuple[str, str | None]] = []
+    for item in members_payload:
+        if isinstance(item, str):
+            name, role = item.strip(), None
+        elif isinstance(item, dict):
+            name = (item.get("name") or "").strip()
+            raw_role = item.get("role")
+            role = (raw_role.strip() if isinstance(raw_role, str) else None) or None
+        else:
+            continue
+        if not name:
+            continue
+        parsed.append((name[:160], role[:80] if role else None))
+    for existing in list(team.members):
+        db.session.delete(existing)
+    db.session.flush()
+    team.members = [
+        TeamMember(name=n, role=r, position=idx)
+        for idx, (n, r) in enumerate(parsed)
+    ]
+
+
 def _serialize_team(team: Team) -> dict:
     return {
         "id": team.id,
@@ -60,6 +99,10 @@ def _serialize_team(team: Team) -> dict:
                 team.group_assignments,
                 key=lambda tg: (0 if tg.active else 1, tg.group.name if tg.group else ""),
             )
+        ],
+        "members": [
+            {"id": m.id, "name": m.name, "role": m.role, "position": m.position}
+            for m in sorted(team.members or [], key=lambda m: m.position)
         ],
     }
 
@@ -232,6 +275,8 @@ def team_create():
             db.session.rollback()
             return jsonify({"error": "validation_error", "detail": err}), 400
 
+    _apply_members(team, payload.get("members"))
+
     try:
         db.session.flush()
         record_audit_event(
@@ -353,6 +398,9 @@ def _update_team(team_id: int, partial: bool):
         if not ok:
             db.session.rollback()
             return jsonify({"error": "validation_error", "detail": err}), 400
+
+    if "members" in payload:
+        _apply_members(team, payload.get("members"))
 
     try:
         db.session.flush()

@@ -26,6 +26,7 @@ from app.models import (
     SheetConfig,
     Team,
     TeamGroup,
+    TeamMember,
     User,
 )
 from app.utils.rest_auth import json_roles_required
@@ -68,6 +69,8 @@ def _export_competition(comp: Competition) -> dict:
                 "public_results": comp.public_results,
                 "hide_gps_map": comp.hide_gps_map,
                 "hide_dev_map": comp.hide_dev_map,
+                "hide_audit_messages": comp.hide_audit_messages,
+                "hide_score_submissions": comp.hide_score_submissions,
             },
         },
         "teams": [
@@ -76,6 +79,10 @@ def _export_competition(comp: Competition) -> dict:
                 "number": t.number,
                 "organization": t.organization,
                 "dnf": bool(t.dnf),
+                "members": [
+                    {"name": m.name, "role": m.role, "position": m.position}
+                    for m in sorted(t.members or [], key=lambda m: m.position)
+                ],
             }
             for t in teams
         ],
@@ -93,6 +100,7 @@ def _export_competition(comp: Competition) -> dict:
                 "name": cp.name,
                 "location": cp.location,
                 "description": cp.description,
+                "scoring_text": cp.scoring_text,
                 "easting": cp.easting,
                 "northing": cp.northing,
                 "is_virtual": bool(cp.is_virtual),
@@ -343,6 +351,8 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
         public_results=settings.get("public_results", False),
         hide_gps_map=settings.get("hide_gps_map", False),
         hide_dev_map=settings.get("hide_dev_map", False),
+        hide_audit_messages=settings.get("hide_audit_messages", False),
+        hide_score_submissions=settings.get("hide_score_submissions", False),
         created_by_user_id=current_user.id if current_user.is_authenticated else None,
     )
     db.session.add(comp)
@@ -401,6 +411,25 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
         )
         db.session.add(t)
         db.session.flush()
+        for idx, m_data in enumerate(t_data.get("members") or []):
+            if not isinstance(m_data, dict):
+                continue
+            name_val = (m_data.get("name") or "").strip()
+            if not name_val:
+                continue
+            role_val = m_data.get("role")
+            if isinstance(role_val, str):
+                role_val = role_val.strip() or None
+            else:
+                role_val = None
+            db.session.add(
+                TeamMember(
+                    team_id=t.id,
+                    name=name_val[:160],
+                    role=role_val[:80] if role_val else None,
+                    position=m_data.get("position", idx),
+                )
+            )
         team_map[t.name] = t
 
     # Devices
@@ -741,6 +770,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                 cp.northing = cp_data.get("northing")
                 cp.location = cp_data.get("location")
                 cp.description = cp_data.get("description")
+                cp.scoring_text = cp_data.get("scoring_text")
                 updated["checkpoints"] += 1
             elif action == "skip":
                 skipped += 1
@@ -750,6 +780,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                 name=name,
                 location=cp_data.get("location"),
                 description=cp_data.get("description"),
+                scoring_text=cp_data.get("scoring_text"),
                 easting=cp_data.get("easting"),
                 northing=cp_data.get("northing"),
             )
@@ -783,6 +814,25 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
             )
             db.session.add(t)
             db.session.flush()
+            for idx, m_data in enumerate(t_data.get("members") or []):
+                if not isinstance(m_data, dict):
+                    continue
+                name_val = (m_data.get("name") or "").strip()
+                if not name_val:
+                    continue
+                role_val = m_data.get("role")
+                if isinstance(role_val, str):
+                    role_val = role_val.strip() or None
+                else:
+                    role_val = None
+                db.session.add(
+                    TeamMember(
+                        team_id=t.id,
+                        name=name_val[:160],
+                        role=role_val[:80] if role_val else None,
+                        position=m_data.get("position", idx),
+                    )
+                )
             team_map[name] = t
             added["teams"] += 1
 

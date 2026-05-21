@@ -78,6 +78,7 @@
         <h6 class="card-title mb-3">{{ _('Score Input') }}</h6>
         <div id="teamInfo" class="text-body-secondary small mb-2">{{ _('Waiting for scan…') }}</div>
         <div id="cpDescription" class="alert alert-secondary d-none mb-2"></div>
+        <div id="cpScoringText" class="alert alert-info d-none mb-2" style="white-space: pre-line;"></div>
         <div id="checkinNotice" class="alert alert-info d-none"></div>
         <div id="writebackNotice" class="alert d-none"></div>
 
@@ -108,6 +109,7 @@
   const teamSelect = document.getElementById("teamSelect");
   const teamInfo = document.getElementById("teamInfo");
   const cpDescription = document.getElementById("cpDescription");
+  const cpScoringText = document.getElementById("cpScoringText");
   const teamSearch = document.getElementById("teamSearch");
   const fieldsContainer = document.getElementById("fieldsContainer");
 
@@ -349,6 +351,14 @@
     } else {
       cpDescription.textContent = "";
       cpDescription.classList.add("d-none");
+    }
+    const scoringText = data && data.checkpoint && data.checkpoint.scoring_text;
+    if (scoringText) {
+      cpScoringText.textContent = scoringText;
+      cpScoringText.classList.remove("d-none");
+    } else {
+      cpScoringText.textContent = "";
+      cpScoringText.classList.add("d-none");
     }
   }
 

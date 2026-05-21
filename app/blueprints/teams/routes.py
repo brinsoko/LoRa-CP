@@ -34,6 +34,21 @@ def _parse_optional_int(raw_value, field_label: str) -> tuple[int | None, str | 
         return None, f"{field_label} must be an integer."
 
 
+def _parse_members_text(raw_value) -> list[str]:
+    """Split the multi-line members textarea into a list of names.
+
+    Blanks are dropped, lines are stripped, order is preserved so the
+    judge / admin sees the same list back."""
+    if not raw_value:
+        return []
+    names = []
+    for line in str(raw_value).splitlines():
+        cleaned = line.strip()
+        if cleaned:
+            names.append(cleaned)
+    return names
+
+
 def _load_organizations() -> list[str]:
     resp, payload = api_json("GET", "/api/teams")
     if resp.status_code != 200:
@@ -132,6 +147,8 @@ def add_team():
                 organizations=organizations,
             )
 
+        members = _parse_members_text(request.form.get("members_text"))
+
         resp, payload = api_json(
             "POST",
             "/api/teams",
@@ -140,6 +157,7 @@ def add_team():
                 "number": number,
                 "organization": organization,
                 "group_id": selected_group_id,
+                "members": members,
             },
         )
 
@@ -244,6 +262,7 @@ def edit_team(team_id: int):
             "number": number,
             "organization": organization,
             "group_id": selected_group_id,
+            "members": _parse_members_text(request.form.get("members_text")),
         }
         if (get_current_competition_role() or "") == "admin":
             update_payload["dnf"] = bool(request.form.get("dnf"))

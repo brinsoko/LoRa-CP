@@ -742,7 +742,23 @@ def build_teams_tab(
         )
         rows = []
         for t in teams:
-            rows.append([t.number or "", t.name, t.organization or "", ""])  # last col reserved for points
+            # Members joined comma-separated in one cell so the sheet row
+            # still reads as one team. Count column gives at-a-glance
+            # roster verification. This data lives only on the Teams tab;
+            # per-CP and Score tabs are untouched.
+            ordered_members = sorted(t.members or [], key=lambda m: m.position)
+            member_names = ", ".join(m.name for m in ordered_members)
+            member_count = len(ordered_members)
+            rows.append(
+                [
+                    t.number or "",
+                    t.name,
+                    t.organization or "",
+                    member_names,
+                    member_count,
+                    "",  # last col reserved for points
+                ]
+            )
         max_rows = max(max_rows, len(rows))
         group_blocks.append({"name": g.name, "rows": rows})
 
@@ -752,6 +768,8 @@ def build_teams_tab(
             lang.get("teams_number_header", "Številka"),
             lang.get("teams_name_header", "Ime ekipe"),
             lang.get("teams_org_header", "Rod/Org"),
+            lang.get("teams_members_header", "Člani"),
+            lang.get("teams_members_count_header", "Št. članov"),
             lang.get("teams_points_header", "Skupne točke"),
         ]
     col_count = len(headers)

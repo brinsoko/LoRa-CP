@@ -47,6 +47,14 @@
       {% endif %}
 
       <div class="mb-3">
+        <label class="form-label">{{ _('Team members') }}</label>
+        <textarea name="members_text" rows="4" class="form-control"
+                  placeholder="{{ _('One name per line') }}">{% for m in team.members or [] %}{{ m.name }}
+{% endfor %}</textarea>
+        <div class="form-text">{{ _('One scout per line. Order is preserved.') }}</div>
+      </div>
+
+      <div class="mb-3">
         <label class="form-label">{{ _('RFID UID') }}</label>
         <input name="rfid_uid" class="form-control" value="{{ rfid_card.uid if rfid_card else '' }}" placeholder="{{ _('Tap tag or paste UID') }}">
         <div class="form-text">

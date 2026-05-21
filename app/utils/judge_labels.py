@@ -206,6 +206,44 @@ def derive_widget(rule: dict | None, max_button_choices: int = 6) -> dict:
     return {"widget": "buttons", "widget_choices": choices}
 
 
+def auto_scoring_text(rule: dict | None, field_keys: list[str] | None = None) -> str:
+    """Build a short Slovene scoring summary for a CP from its score rule.
+
+    Used as the default body when Checkpoint.scoring_text is NULL - judges
+    see a one-line-per-field description like
+
+        Dolzina plavuti: Max 10 tock
+        Sirina plavuti: Max 10 tock
+        Izgled: 0-20 tock
+
+    Admins can override with a curated string in scoring_text; the route
+    chooses curated > auto > empty. field_keys lets the caller hold the
+    field ordering (matches the SheetConfig groups[].fields order), since
+    rule["total_fields"] may differ slightly.
+    """
+    if not rule or not isinstance(rule, dict):
+        return ""
+    field_rules = rule.get("field_rules") or {}
+    ordering = field_keys or rule.get("total_fields") or list(field_rules.keys())
+    lines = []
+    for key in ordering:
+        sub = field_rules.get(key, {})
+        label = display_label(key)
+        hint = derive_hint(sub) or soft_cap_hint(key)
+        if hint:
+            lines.append(f"{label}: {hint}")
+        else:
+            lines.append(label)
+    if "time_race" in rule:
+        tr = rule["time_race"]
+        mp = tr.get("max_points") or 0
+        s_cp = tr.get("start_checkpoint_name") or ""
+        e_cp = tr.get("end_checkpoint_name") or ""
+        if s_cp and e_cp:
+            lines.append(f"Hitrostna {s_cp} -> {e_cp}: max {_fmt_num(mp)} tock")
+    return "\n".join(lines)
+
+
 def enrich_field_def(field_def: dict, rule: dict | None) -> dict:
     """Add display_label/hint/widget keys to a field_def in place and return it.
 

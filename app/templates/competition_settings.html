@@ -42,18 +42,45 @@
         <div class="form-text">{{ _('Allow anyone with the link to view results.') }}</div>
       </div>
 
-      <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="hideGpsMap" name="hide_gps_map" value="1"
-               {% if competition.hide_gps_map %}checked{% endif %}>
-        <label class="form-check-label" for="hideGpsMap">{{ _('Hide GPS map') }}</label>
-        <div class="form-text">{{ _('Hide the public GPS map button from the navigation bar.') }}</div>
-      </div>
-
-      <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" id="hideDevMap" name="hide_dev_map" value="1"
-               {% if competition.hide_dev_map %}checked{% endif %}>
-        <label class="form-check-label" for="hideDevMap">{{ _('Hide device map') }}</label>
-        <div class="form-text">{{ _('Hide the LoRa device map button from the navigation bar.') }}</div>
+      <div>
+        <label class="form-label">{{ _('Visible features') }}</label>
+        <div class="dropdown">
+          <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="visibilityDropdown"
+                  data-bs-toggle="dropdown" aria-expanded="false">
+            {{ _('Hide from navigation') }}
+          </button>
+          <ul class="dropdown-menu p-3" aria-labelledby="visibilityDropdown" style="min-width: 320px;">
+            <li>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="hideGpsMap" name="hide_gps_map" value="1"
+                       {% if competition.hide_gps_map %}checked{% endif %}>
+                <label class="form-check-label" for="hideGpsMap">{{ _('Hide GPS map') }}</label>
+              </div>
+            </li>
+            <li>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="hideDevMap" name="hide_dev_map" value="1"
+                       {% if competition.hide_dev_map %}checked{% endif %}>
+                <label class="form-check-label" for="hideDevMap">{{ _('Hide device map') }}</label>
+              </div>
+            </li>
+            <li>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="hideAuditMessages" name="hide_audit_messages" value="1"
+                       {% if competition.hide_audit_messages %}checked{% endif %}>
+                <label class="form-check-label" for="hideAuditMessages">{{ _('Hide audit + messages') }}</label>
+              </div>
+            </li>
+            <li>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="hideScoreSubmissions" name="hide_score_submissions" value="1"
+                       {% if competition.hide_score_submissions %}checked{% endif %}>
+                <label class="form-check-label" for="hideScoreSubmissions">{{ _('Hide score submissions log') }}</label>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div class="form-text">{{ _('Pick which navigation links are hidden to reduce clutter on race day.') }}</div>
       </div>
 
       <div>

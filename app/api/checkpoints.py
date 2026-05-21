@@ -23,6 +23,7 @@ def _serialize_checkpoint(cp: Checkpoint) -> dict:
         "name": cp.name,
         "location": cp.location,
         "description": cp.description,
+        "scoring_text": cp.scoring_text,
         "easting": cp.easting,
         "northing": cp.northing,
         "is_virtual": cp.is_virtual,
@@ -290,6 +291,17 @@ def _update_checkpoint(checkpoint_id: int, partial: bool):
             return jsonify({"error": "validation_error", "detail": description_error}), 400
         cp.description = description or None
 
+    if "scoring_text" in payload or not partial:
+        scoring_text, scoring_text_error = validate_text(
+            payload.get("scoring_text"),
+            field_name="scoring_text",
+            max_length=4000,
+            multiline=True,
+        )
+        if scoring_text_error:
+            return jsonify({"error": "validation_error", "detail": scoring_text_error}), 400
+        cp.scoring_text = scoring_text or None
+
     if "easting" in payload or not partial:
         easting, easting_err = validate_finite_float(payload.get("easting"), field_name="easting")
         if easting_err:
@@ -415,6 +427,16 @@ def checkpoint_import():
             skipped += 1
             errors.append({"index": idx, "detail": description_error})
             continue
+        scoring_text, scoring_text_error = validate_text(
+            item.get("scoring_text"),
+            field_name="scoring_text",
+            max_length=4000,
+            multiline=True,
+        )
+        if scoring_text_error:
+            skipped += 1
+            errors.append({"index": idx, "detail": scoring_text_error})
+            continue
 
         action = (item.get("action") or "upsert").lower()
         cp = _checkpoint_query(comp_id).filter(Checkpoint.name == name).first()
@@ -442,6 +464,8 @@ def checkpoint_import():
             cp.location = location
         if description is not None:
             cp.description = description
+        if scoring_text is not None:
+            cp.scoring_text = scoring_text
 
         if "easting" in item and item["easting"] not in (None, ""):
             easting, _err = validate_finite_float(item["easting"], field_name="easting")

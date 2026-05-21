@@ -60,6 +60,8 @@ class Competition(db.Model):
     public_results = db.Column(db.Boolean, nullable=False, default=False)
     hide_gps_map = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     hide_dev_map = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    hide_audit_messages = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    hide_score_submissions = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
     ingest_password_hash = db.Column(db.String(255), nullable=True)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
@@ -260,10 +262,51 @@ class Team(db.Model):
         passive_deletes=True,
     )
 
+    members = db.relationship(
+        "TeamMember",
+        back_populates="team",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="TeamMember.position",
+    )
+
     __table_args__ = (CheckConstraint("number IS NULL OR number > 0", name="ck_team_number_positive"),)
 
     def __repr__(self) -> str:
         return f"<Team id={self.id} comp={self.competition_id} number={self.number} name={self.name!r}>"
+
+
+# ==============
+# TeamMember
+# ==============
+class TeamMember(db.Model):
+    """One scout in a team. Free-text name + optional role (e.g. 'kapetan').
+
+    position pins the display order so reorderings persist across reloads;
+    the uq_team_member_position constraint blocks two rows colliding on
+    the same slot.
+    """
+    __tablename__ = "team_members"
+
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(
+        db.Integer,
+        db.ForeignKey("teams.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name = db.Column(db.String(160), nullable=False)
+    role = db.Column(db.String(80), nullable=True)
+    position = db.Column(db.Integer, nullable=False, default=0)
+
+    team = db.relationship("Team", back_populates="members")
+
+    __table_args__ = (
+        UniqueConstraint("team_id", "position", name="uq_team_member_position"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<TeamMember id={self.id} team={self.team_id} name={self.name!r}>"
 
 
 # ==============
@@ -357,6 +400,7 @@ class Checkpoint(db.Model):
     name = db.Column(db.String(120), nullable=False)
     location = db.Column(db.String(255))
     description = db.Column(db.Text)
+    scoring_text = db.Column(db.Text)
     easting = db.Column(db.Float)
     northing = db.Column(db.Float)
     is_virtual = db.Column(db.Boolean, nullable=False, default=False, server_default="0")

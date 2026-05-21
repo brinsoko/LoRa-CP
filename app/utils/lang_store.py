@@ -14,6 +14,8 @@ DEFAULT_LANG = {
     "teams_number_header": "Številka",
     "teams_name_header": "Ime ekipe",
     "teams_org_header": "Rod/Org",
+    "teams_members_header": "Člani",
+    "teams_members_count_header": "Št. članov",
     "teams_points_header": "Skupne točke",
     "score_group_header": "Skupina",
     "score_number_header": "Številka",

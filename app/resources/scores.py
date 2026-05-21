@@ -597,7 +597,7 @@ def score_resolve():
     rule = _get_score_rule(comp_id, checkpoint_id, group_id) if group_id else None
     per_field_rules = (rule or {}).get("field_rules") or {}
 
-    from app.utils.judge_labels import enrich_field_def
+    from app.utils.judge_labels import auto_scoring_text, enrich_field_def
 
     field_defs = []
     if config.get("dead_time_enabled"):
@@ -631,6 +631,13 @@ def score_resolve():
         is not None
     )
 
+    # Checkpoint scoring_text: curated admin override wins; otherwise
+    # auto-generate from the rule so the judge always sees something
+    # actionable instead of a bare description.
+    scoring_text = (checkpoint.scoring_text or "").strip()
+    if not scoring_text and rule:
+        scoring_text = auto_scoring_text(rule, field_keys=fields_info.get("fields"))
+
     return {
         "ok": True,
         "uid": uid or None,
@@ -639,6 +646,7 @@ def score_resolve():
             "id": checkpoint.id,
             "name": checkpoint.name,
             "description": checkpoint.description or "",
+            "scoring_text": scoring_text,
         },
         "group": {"name": group_name},
         "fields": field_defs,
