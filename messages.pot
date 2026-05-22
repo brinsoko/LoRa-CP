@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-05-21 13:05+0200\n"
+"POT-Creation-Date: 2026-05-22 14:28+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -169,7 +169,7 @@ msgstr ""
 #: app/blueprints/main/routes.py:475 app/blueprints/scores/routes.py:79
 #: app/blueprints/scores/routes.py:228 app/blueprints/scores/routes.py:246
 #: app/blueprints/scores/routes.py:321 app/blueprints/scores/routes.py:584
-#: app/blueprints/scores/routes.py:646 app/blueprints/scores/routes.py:857
+#: app/blueprints/scores/routes.py:646 app/blueprints/scores/routes.py:924
 #: app/blueprints/sheets/routes.py:55 app/blueprints/users/routes.py:43
 #: app/blueprints/users/routes.py:67 app/blueprints/users/routes.py:134
 #: app/blueprints/users/routes.py:197 app/blueprints/users/routes.py:284
@@ -704,11 +704,11 @@ msgstr ""
 msgid "Global rule deleted."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:597 app/blueprints/scores/routes.py:845
+#: app/blueprints/scores/routes.py:597 app/blueprints/scores/routes.py:912
 msgid "Public results are not enabled for this competition."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:910
+#: app/blueprints/scores/routes.py:977
 msgid "Legacy or unknown"
 msgstr ""
 
@@ -1210,7 +1210,8 @@ msgstr ""
 #: app/templates/add_checkpoint.html:59 app/templates/base.html:161
 #: app/templates/checkpoint_edit.html:88 app/templates/checkpoints_list.html:25
 #: app/templates/groups_list.html:3 app/templates/groups_list.html:9
-#: app/templates/sheets_admin.html:141 app/templates/teams_list.html:70
+#: app/templates/scores_stats.html:29 app/templates/sheets_admin.html:141
+#: app/templates/teams_list.html:70
 msgid "Groups"
 msgstr ""
 
@@ -1372,12 +1373,12 @@ msgstr ""
 msgid "Actor"
 msgstr ""
 
-#: app/templates/audit_list.html:31 app/templates/scores_stats.html:88
+#: app/templates/audit_list.html:31 app/templates/scores_stats.html:142
 #: app/templates/view_checkins.html:36
 msgid "From"
 msgstr ""
 
-#: app/templates/audit_list.html:35 app/templates/scores_stats.html:89
+#: app/templates/audit_list.html:35 app/templates/scores_stats.html:143
 #: app/templates/view_checkins.html:42
 msgid "To"
 msgstr ""
@@ -1509,7 +1510,8 @@ msgid "Dark mode"
 msgstr ""
 
 #: app/templates/base.html:139 app/templates/live_arrivals.html:76
-#: app/templates/scores_stats.html:31 app/templates/teams_list.html:3
+#: app/templates/scores_stats.html:31 app/templates/scores_stats.html:85
+#: app/templates/teams_list.html:3
 msgid "Teams"
 msgstr ""
 
@@ -2487,8 +2489,8 @@ msgstr ""
 
 #: app/templates/live_arrivals.html:6 app/templates/live_arrivals.html:92
 #: app/templates/live_arrivals.html:190 app/templates/live_arrivals.html:234
-#: app/templates/scores_stats.html:33 app/templates/scores_view.html:59
-#: app/templates/scores_view.html:159
+#: app/templates/scores_stats.html:33 app/templates/scores_stats.html:87
+#: app/templates/scores_view.html:59 app/templates/scores_view.html:159
 msgid "Finished"
 msgstr ""
 
@@ -3411,51 +3413,57 @@ msgstr ""
 msgid "Group statistics"
 msgstr ""
 
-#: app/templates/scores_stats.html:35
+#: app/templates/scores_stats.html:27
+msgid "Overall (all groups)"
+msgstr ""
+
+#: app/templates/scores_stats.html:35 app/templates/scores_stats.html:89
 msgid "Completion rate"
 msgstr ""
 
-#: app/templates/scores_stats.html:37 app/templates/scores_stats.html:139
+#: app/templates/scores_stats.html:37 app/templates/scores_stats.html:91
+#: app/templates/scores_stats.html:193
 msgid "Average points"
 msgstr ""
 
-#: app/templates/scores_stats.html:39 app/templates/scores_stats.html:162
+#: app/templates/scores_stats.html:39 app/templates/scores_stats.html:93
+#: app/templates/scores_stats.html:216
 msgid "Average overall time (min)"
 msgstr ""
 
-#: app/templates/scores_stats.html:47
+#: app/templates/scores_stats.html:47 app/templates/scores_stats.html:101
 msgid "Median overall time (min)"
 msgstr ""
 
-#: app/templates/scores_stats.html:55
+#: app/templates/scores_stats.html:55 app/templates/scores_stats.html:109
 msgid "Average checkpoints visited"
 msgstr ""
 
-#: app/templates/scores_stats.html:63
+#: app/templates/scores_stats.html:63 app/templates/scores_stats.html:117
 msgid "Fastest team"
 msgstr ""
 
-#: app/templates/scores_stats.html:66
+#: app/templates/scores_stats.html:68 app/templates/scores_stats.html:120
 msgid "min"
 msgstr ""
 
-#: app/templates/scores_stats.html:71
+#: app/templates/scores_stats.html:125
 msgid "Highest drop-off checkpoint"
 msgstr ""
 
-#: app/templates/scores_stats.html:82
+#: app/templates/scores_stats.html:136
 msgid "Average segment times (min)"
 msgstr ""
 
-#: app/templates/scores_stats.html:90
+#: app/templates/scores_stats.html:144
 msgid "Average time"
 msgstr ""
 
-#: app/templates/scores_stats.html:91
+#: app/templates/scores_stats.html:145
 msgid "Samples"
 msgstr ""
 
-#: app/templates/scores_stats.html:113
+#: app/templates/scores_stats.html:167
 msgid "No segment data yet."
 msgstr ""
 

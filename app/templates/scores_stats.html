@@ -21,6 +21,60 @@
   </div>
 </div>
 
+{% if overall and overall.team_count %}
+<div class="card shadow-sm mb-3 border-primary">
+  <div class="card-body">
+    <h6 class="card-title mb-2">{{ _('Overall (all groups)') }}</h6>
+    <dl class="row mb-0">
+      <dt class="col-sm-4 col-md-3">{{ _('Groups') }}</dt>
+      <dd class="col-sm-2 col-md-3">{{ overall.group_count }}</dd>
+      <dt class="col-sm-4 col-md-3">{{ _('Teams') }}</dt>
+      <dd class="col-sm-2 col-md-3">{{ overall.team_count }}</dd>
+      <dt class="col-sm-4 col-md-3">{{ _('Finished') }}</dt>
+      <dd class="col-sm-2 col-md-3">{{ overall.finished_count }}</dd>
+      <dt class="col-sm-4 col-md-3">{{ _('Completion rate') }}</dt>
+      <dd class="col-sm-2 col-md-3">{{ ((overall.completion_rate|default(0, true)) * 100)|round(0)|int }}%</dd>
+      <dt class="col-sm-4 col-md-3">{{ _('Average points') }}</dt>
+      <dd class="col-sm-2 col-md-3">{{ (overall.avg_points|default(0, true))|round(0)|int }}</dd>
+      <dt class="col-sm-4 col-md-3">{{ _('Average overall time (min)') }}</dt>
+      <dd class="col-sm-2 col-md-3">
+        {% if overall.avg_time_minutes is not none %}
+          {{ (overall.avg_time_minutes)|round(0)|int }}
+        {% else %}
+          -
+        {% endif %}
+      </dd>
+      <dt class="col-sm-4 col-md-3">{{ _('Median overall time (min)') }}</dt>
+      <dd class="col-sm-2 col-md-3">
+        {% if overall.median_time_minutes is not none %}
+          {{ (overall.median_time_minutes)|round(0)|int }}
+        {% else %}
+          -
+        {% endif %}
+      </dd>
+      <dt class="col-sm-4 col-md-3">{{ _('Average checkpoints visited') }}</dt>
+      <dd class="col-sm-2 col-md-3">
+        {% if overall.avg_checkpoint_count is not none %}
+          {{ (overall.avg_checkpoint_count)|round(0)|int }}
+        {% else %}
+          -
+        {% endif %}
+      </dd>
+      <dt class="col-sm-4 col-md-3">{{ _('Fastest team') }}</dt>
+      <dd class="col-sm-8 col-md-9">
+        {% if overall.fastest_team %}
+          {{ overall.fastest_team }}
+          {% if overall.fastest_group %}<span class="text-muted">({{ overall.fastest_group }})</span>{% endif %}
+          - {{ (overall.fastest_minutes|default(0, true))|round(0)|int }} {{ _('min') }}
+        {% else %}
+          -
+        {% endif %}
+      </dd>
+    </dl>
+  </div>
+</div>
+{% endif %}
+
 {% for g in groups %}
   <div class="card shadow-sm mb-3">
     <div class="card-body">

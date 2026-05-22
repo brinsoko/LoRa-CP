@@ -676,6 +676,16 @@ def _build_stats_context(comp_id: int) -> dict:
     for link in team_groups:
         teams_by_group_id.setdefault(link.group_id, set()).add(link.team_id)
 
+    # Virtual checkpoints award points but have no check-in timestamps,
+    # so they must be excluded from any arrival-time based stat
+    # (overall/segment durations, fastest team, drop-off, checkpoint count).
+    virtual_cp_ids = {
+        cp_id
+        for (cp_id,) in db.session.query(Checkpoint.id)
+        .filter(Checkpoint.competition_id == comp_id, Checkpoint.is_virtual.is_(True))
+        .all()
+    }
+
     links = (
         CheckpointGroupLink.query.filter(CheckpointGroupLink.group_id.in_([g.id for g in groups]))
         .order_by(CheckpointGroupLink.group_id.asc(), CheckpointGroupLink.position.asc().nulls_last())
@@ -684,6 +694,9 @@ def _build_stats_context(comp_id: int) -> dict:
     checkpoint_order_by_group = {}
     for link in links:
         checkpoint_order_by_group.setdefault(link.group_id, []).append(link.checkpoint_id)
+
+    overall_durations: list[tuple[int, str, str | None, float]] = []
+    overall_checkpoint_counts: list[int] = []
 
     stats = []
     for group in groups:
@@ -719,12 +732,13 @@ def _build_stats_context(comp_id: int) -> dict:
         completion_rate = (finished_count / len(group_rows)) if group_rows else 0
 
         cp_ids = checkpoint_order_by_group.get(group.id, [])
+        physical_cp_ids = [cid for cid in cp_ids if cid not in virtual_cp_ids]
         checkins = []
-        if cp_ids:
+        if physical_cp_ids:
             checkins = (
                 Checkin.query.filter(Checkin.competition_id == comp_id)
                 .filter(Checkin.team_id.in_(team_ids))
-                .filter(Checkin.checkpoint_id.in_(cp_ids))
+                .filter(Checkin.checkpoint_id.in_(physical_cp_ids))
                 .order_by(Checkin.timestamp.asc())
                 .all()
             )
@@ -735,11 +749,12 @@ def _build_stats_context(comp_id: int) -> dict:
                 team_cp_times.setdefault(c.team_id, {})[c.checkpoint_id] = c.timestamp
 
         avg_checkpoint_count = None
-        if cp_ids:
+        if physical_cp_ids:
             counts = []
             for tid in team_ids:
                 counts.append(len(team_cp_times.get(tid, {})))
             avg_checkpoint_count = sum(counts) / len(counts) if counts else None
+            overall_checkpoint_counts.extend(counts)
 
         avg_time_minutes = None
         median_time_minutes = None
@@ -747,9 +762,9 @@ def _build_stats_context(comp_id: int) -> dict:
         fastest_minutes = None
         dropoff_checkpoint = None
         dropoff_rate = None
-        if len(cp_ids) >= 2:
-            start_id = cp_ids[0]
-            end_id = cp_ids[-1]
+        if len(physical_cp_ids) >= 2:
+            start_id = physical_cp_ids[0]
+            end_id = physical_cp_ids[-1]
             durations = []
             for tid in team_ids:
                 start_ts = team_cp_times.get(tid, {}).get(start_id)
@@ -768,12 +783,16 @@ def _build_stats_context(comp_id: int) -> dict:
                 fastest_tid, fastest_minutes = min(durations, key=lambda d: d[1])
                 fastest_row = next((r for r in group_rows if r.get("id") == fastest_tid), None)
                 fastest_team = fastest_row.get("name") if fastest_row else None
+                for tid, minutes in durations:
+                    team_row = next((r for r in group_rows if r.get("id") == tid), None)
+                    team_name = team_row.get("name") if team_row else None
+                    overall_durations.append((tid, group.name, team_name, minutes))
 
         segments = []
-        if len(cp_ids) >= 2:
-            for idx in range(len(cp_ids) - 1):
-                from_id = cp_ids[idx]
-                to_id = cp_ids[idx + 1]
+        if len(physical_cp_ids) >= 2:
+            for idx in range(len(physical_cp_ids) - 1):
+                from_id = physical_cp_ids[idx]
+                to_id = physical_cp_ids[idx + 1]
                 from_count = 0
                 to_count = 0
                 segment_durations = []
@@ -826,12 +845,60 @@ def _build_stats_context(comp_id: int) -> dict:
             }
         )
 
+    overall_team_count = len(rows)
+    overall_finished = sum(1 for r in rows if r.get("finished"))
+    overall_completion_rate = (overall_finished / overall_team_count) if overall_team_count else 0
+    scored_rows_all = [r for r in rows if not r.get("dnf")]
+    overall_avg_points = (
+        sum(float(r.get("total") or 0.0) for r in scored_rows_all) / len(scored_rows_all)
+        if scored_rows_all
+        else None
+    )
+    overall_avg_time = None
+    overall_median_time = None
+    overall_fastest_team = None
+    overall_fastest_group = None
+    overall_fastest_minutes = None
+    if overall_durations:
+        minutes_list = [d[3] for d in overall_durations]
+        overall_avg_time = sum(minutes_list) / len(minutes_list)
+        sorted_minutes = sorted(minutes_list)
+        mid = len(sorted_minutes) // 2
+        if len(sorted_minutes) % 2 == 1:
+            overall_median_time = sorted_minutes[mid]
+        else:
+            overall_median_time = (sorted_minutes[mid - 1] + sorted_minutes[mid]) / 2.0
+        fastest = min(overall_durations, key=lambda d: d[3])
+        overall_fastest_team = fastest[2]
+        overall_fastest_group = fastest[1]
+        overall_fastest_minutes = fastest[3]
+    overall_avg_checkpoint_count = (
+        sum(overall_checkpoint_counts) / len(overall_checkpoint_counts)
+        if overall_checkpoint_counts
+        else None
+    )
+
+    overall = {
+        "team_count": overall_team_count,
+        "finished_count": overall_finished,
+        "completion_rate": overall_completion_rate,
+        "avg_points": overall_avg_points,
+        "avg_time_minutes": overall_avg_time,
+        "median_time_minutes": overall_median_time,
+        "fastest_team": overall_fastest_team,
+        "fastest_group": overall_fastest_group,
+        "fastest_minutes": overall_fastest_minutes,
+        "avg_checkpoint_count": overall_avg_checkpoint_count,
+        "group_count": sum(1 for g in stats if g["team_count"]),
+    }
+
     chart_groups = [g["name"] for g in stats if g["team_count"]]
     chart_points = [g["avg_points"] or 0 for g in stats if g["team_count"]]
     chart_times = [g["avg_time_minutes"] or 0 for g in stats if g["team_count"]]
 
     return {
         "groups": stats,
+        "overall": overall,
         "chart_groups": chart_groups,
         "chart_points": chart_points,
         "chart_times": chart_times,
