@@ -25,7 +25,11 @@ from app.models import (
     Team,
     TeamGroup,
 )
-from app.resources.scores import _compute_global_contrib, recompute_scores_for_rule
+from app.resources.scores import (
+    _compute_global_contrib,
+    _compute_time_race_scores_from_checkins,
+    recompute_scores_for_rule,
+)
 from app.utils.competition import get_current_competition_id, get_current_competition_role
 from app.utils.perms import roles_required
 
@@ -443,6 +447,43 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         group_id_for_team = team_group_ids.get(team_id)
         if group_id_for_team:
             allowed_checkpoint_ids[team_id] = group_checkpoint_ids.get(group_id_for_team, set())
+
+    # Live time_race scoring: rank-based ScoreRule.time_race rules compute
+    # points from the spread between fastest and slowest finished team. The
+    # original code path only ran via recompute_scores_for_rule (triggered by
+    # judge form submit or rule edit), so LoRa auto-arrivals never made the
+    # points appear. Recomputing on every render keeps the leaderboard live
+    # as teams finish — same authoritative source the offline recompute uses.
+    time_race_rules = ScoreRule.query.filter(ScoreRule.competition_id == comp_id).all()
+    for rule in time_race_rules:
+        tr = (rule.rules or {}).get("time_race") or {}
+        start_cp = tr.get("start_checkpoint_id")
+        end_cp = tr.get("end_checkpoint_id")
+        if not start_cp or not end_cp:
+            continue
+        try:
+            start_cp_i = int(start_cp)
+            end_cp_i = int(end_cp)
+        except (TypeError, ValueError):
+            continue
+        max_points = float(tr.get("max_points") or 0)
+        min_points = float(tr.get("min_points") or 0)
+        group_team_ids = [tid for tid in team_ids if team_group_ids.get(tid) == rule.group_id]
+        if not group_team_ids:
+            continue
+        live_scores = _compute_time_race_scores_from_checkins(
+            group_team_ids, comp_id, start_cp_i, end_cp_i, min_points, max_points,
+        )
+        cp_id = rule.checkpoint_id
+        for team_id, new_total in live_scores.items():
+            # Live rank-based value supersedes any ScoreEntry total from the
+            # offline recompute — subtract the stale contribution from totals
+            # before writing the fresh one so we never double-count.
+            old = per_team_points.get(team_id, {}).get(cp_id)
+            if old is not None:
+                totals[team_id] = totals.get(team_id, 0.0) - float(old)
+            per_team_points.setdefault(team_id, {})[cp_id] = new_total
+            totals[team_id] = totals.get(team_id, 0.0) + float(new_total)
 
     team_time_minutes: dict[int, float | None] = {team_id: None for team_id in team_ids}
     if team_ids and group_start_checkpoint and group_final_checkpoint:
