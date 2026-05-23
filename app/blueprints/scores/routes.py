@@ -1,10 +1,12 @@
 # app/blueprints/scores/routes.py
 from __future__ import annotations
 
+import csv
+import io
 import json
 from datetime import datetime
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
 from flask_babel import gettext as _
 from flask_login import current_user
 from sqlalchemy.orm import joinedload
@@ -396,6 +398,25 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
                 if link.group_id not in group_start_checkpoint:
                     group_start_checkpoint[link.group_id] = link.checkpoint_id
 
+    # Load global rules early so the per-group start/end CP overrides apply
+    # to time_minutes too — mirroring live_arrivals.py:78-85. Without this
+    # the scores view computes elapsed time against the link-order first/last
+    # checkpoint, which is wrong whenever operators configure a different
+    # start/finish CP via the global time rule form.
+    global_rules = GlobalScoreRule.query.filter(GlobalScoreRule.competition_id == comp_id).all()
+    global_rules_map = {rule.group_id: rule.rules for rule in global_rules}
+    for rule in global_rules:
+        time_rule = (rule.rules or {}).get("time") or {}
+        try:
+            start_override = int(time_rule.get("start_checkpoint_id")) if time_rule.get("start_checkpoint_id") else None
+            end_override = int(time_rule.get("end_checkpoint_id")) if time_rule.get("end_checkpoint_id") else None
+        except (TypeError, ValueError):
+            start_override = end_override = None
+        if start_override:
+            group_start_checkpoint[rule.group_id] = start_override
+        if end_override:
+            group_final_checkpoint[rule.group_id] = end_override
+
     totals = {team_id: 0.0 for team_id in team_ids}
     dead_times = {team_id: 0.0 for team_id in team_ids}
     per_team_points: dict[int, dict[int, float | None]] = {team_id: {} for team_id in team_ids}
@@ -451,8 +472,6 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             if start_ts and end_ts and end_ts >= start_ts:
                 team_time_minutes[team_id] = (end_ts - start_ts).total_seconds() / 60.0
 
-    global_rules = GlobalScoreRule.query.filter(GlobalScoreRule.competition_id == comp_id).all()
-    global_rules_map = {rule.group_id: rule.rules for rule in global_rules}
     global_totals = {}
     global_time_points = {}
     global_found_points = {}
@@ -588,6 +607,82 @@ def view_scores():
     context = _build_scores_context(comp_id, group_id)
     context["show_actions"] = True
     return render_template("scores_view.html", **context)
+
+
+@scores_bp.route("/view/export.csv", methods=["GET"])
+@roles_required("judge", "admin")
+def view_scores_export_csv():
+    """Same data as /scores/view's extended (per-CP) table, flattened
+    to CSV. Honors ?group_id=. Columns mirror the on-screen extended
+    table: rank/group/number/team/finished/time_minutes, one column per
+    checkpoint, then time_points/found_points/dead_time/total. Use this
+    as the canonical export to recreate the leaderboard in Sheets when
+    sheets sync is unavailable."""
+    comp_id = get_current_competition_id()
+    if not comp_id:
+        flash(_("Select a competition first."), "warning")
+        return redirect(url_for("main.select_competition"))
+
+    group_id = request.args.get("group_id", type=int)
+    context = _build_scores_context(comp_id, group_id)
+    rows = context.get("rows") or []
+    checkpoints = context.get("checkpoints") or []
+    per_team_points = context.get("per_team_points") or {}
+
+    def fmt(val, spec):
+        return format(val, spec) if val is not None else ""
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    header = ["rank", "group", "number", "team", "organization",
+              "finished", "dnf", "time_minutes"]
+    header += [f"cp.{cp.name}" for cp in checkpoints]
+    header += ["time_points", "found_points", "dead_time", "total"]
+    w.writerow(header)
+
+    for i, r in enumerate(rows, 1):
+        team_id = r.get("id")
+        team_cp_points = per_team_points.get(team_id, {}) if team_id else {}
+        allowed = r.get("allowed_checkpoints") or set()
+        excluded = r.get("excluded_checkpoints") or set()
+        per_cp_cells = []
+        for cp in checkpoints:
+            val = team_cp_points.get(cp.id)
+            if r.get("dnf"):
+                per_cp_cells.append("DNF")
+            elif cp.id in excluded:
+                per_cp_cells.append("")
+            elif val is not None:
+                per_cp_cells.append(fmt(val, ".2f"))
+            elif cp.id in allowed:
+                per_cp_cells.append("0")
+            else:
+                per_cp_cells.append("")
+        w.writerow([
+            i,
+            r.get("group", ""),
+            r.get("number", "") if r.get("number") is not None else "",
+            r.get("name", ""),
+            r.get("organization", ""),
+            "YES" if r.get("finished") else "",
+            "YES" if r.get("dnf") else "",
+            fmt(r.get("time_minutes"), ".2f"),
+            *per_cp_cells,
+            fmt(r.get("global_time"), ".2f"),
+            fmt(r.get("global_found"), ".2f"),
+            fmt(r.get("dead_time"), ".0f"),
+            fmt(r.get("total"), ".2f"),
+        ])
+
+    filename = f"scores_comp{comp_id}"
+    if group_id:
+        filename += f"_group{group_id}"
+    filename += ".csv"
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @scores_bp.route("/public/<int:competition_id>", methods=["GET"])

@@ -37,6 +37,12 @@
         <button class="btn btn-outline-secondary" type="button" id="toggleExtended">
           {{ _('Show per-checkpoint') }}
         </button>
+        {% if show_actions %}
+        <a class="btn btn-outline-secondary"
+           href="{{ url_for('scores.view_scores_export_csv', group_id=request.args.get('group_id') or None) }}">
+          {{ _('Export CSV') }}
+        </a>
+        {% endif %}
         <form method="get" class="d-flex gap-2">
           <select class="form-select" name="group_id">
             <option value="">{{ _('All groups') }}</option>
@@ -97,7 +103,7 @@
                 {% if row.dnf %}
                   {{ _('DNF') }}
                 {% else %}
-                  {{ (row.total or 0)|round(0)|int }}
+                  {{ '%.2f'|format(row.total or 0) }}
                 {% endif %}
                 {% if row.organization %}
                   <span class="text-muted small ms-1">({{ row.organization }})</span>
@@ -212,14 +218,14 @@
                 {% if row.dnf %}
                   {{ _('DNF') }}
                 {% else %}
-                  {{ (row.global_time or 0)|round(0)|int }}
+                  {{ '%.2f'|format(row.global_time or 0) }}
                 {% endif %}
               </td>
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}
                 {% else %}
-                  {{ (row.global_found or 0)|round(0)|int }}
+                  {{ '%.2f'|format(row.global_found or 0) }}
                 {% endif %}
               </td>
               <td class="text-end">{{ (row.dead_time or 0)|round(0)|int }}</td>
@@ -227,7 +233,7 @@
                 {% if row.dnf %}
                   {{ _('DNF') }}
                 {% else %}
-                  {{ (row.total or 0)|round(0)|int }}
+                  {{ '%.2f'|format(row.total or 0) }}
                 {% endif %}
                 {% if row.organization %}
                   <span class="text-muted small ms-1">({{ row.organization }})</span>
