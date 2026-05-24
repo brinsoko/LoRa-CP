@@ -54,7 +54,24 @@
   </div>
 {% endif %}
 
-<div class="text-muted mb-2">{{ _('Total: %(count)s', count=teams|length) }}</div>
+<div class="d-flex justify-content-between align-items-end mb-2 gap-2 flex-wrap">
+  <div class="text-muted">{{ _('Total: %(count)s', count=teams|length) }}</div>
+  {% if teams|length > 0 %}
+    <div style="min-width: 240px;">
+      <input type="text"
+             class="form-control form-control-sm"
+             id="teamRowSearch"
+             list="teamRowSearchList"
+             autocomplete="off"
+             placeholder="{{ _('Search teams (number or name)') }}">
+      <datalist id="teamRowSearchList">
+        {% for t in teams %}
+          <option value="{% if t.number is not none %}{{ t.number }} - {% endif %}{{ t.name }}" data-team-id="{{ t.id }}"></option>
+        {% endfor %}
+      </datalist>
+    </div>
+  {% endif %}
+</div>
 
 {% if teams|length == 0 %}
   <div class="alert alert-info">{{ _('No teams found.') }}</div>
@@ -73,11 +90,24 @@
           {% endif %}
         </tr>
       </thead>
-      <tbody>
+      <tbody id="teamRowsBody">
         {% for team in teams %}
-          <tr>
+          <tr data-team-id="{{ team.id }}"
+              data-team-name="{{ team.name|lower }}"
+              data-team-number="{{ team.number if team.number is not none else '' }}">
             <td>{{ loop.index }}</td>
-            <td>{{ team.name }}</td>
+            <td>
+              {{ team.name }}
+              {% if team.notes %}
+                <i class="bi bi-sticky-fill text-warning ms-1"
+                   role="img"
+                   tabindex="0"
+                   data-bs-toggle="tooltip"
+                   data-bs-placement="top"
+                   title="{{ team.notes }}"
+                   aria-label="{{ _('Team has notes') }}: {{ team.notes }}"></i>
+              {% endif %}
+            </td>
             <td>{{ team.organization or "—" }}</td>
             <td>{{ team.number or "—" }}</td>
 
@@ -113,6 +143,57 @@
     </table>
   </div>
 {% endif %}
+
+<script>
+  // Activate Bootstrap tooltips on this page (notes indicator on team rows).
+  (function () {
+    if (typeof bootstrap === "undefined" || !bootstrap.Tooltip) return;
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+      bootstrap.Tooltip.getOrCreateInstance(el);
+    });
+  })();
+</script>
+
+<script>
+  // Client-side row filter: there is no server-side team filter on this page
+  // (group filter is server-driven), so we hide non-matching rows in place
+  // when the user types into the datalist input. Picking an exact datalist
+  // entry narrows to a single row; partial text still works for fuzzy scans.
+  (function () {
+    const input = document.getElementById("teamRowSearch");
+    const body = document.getElementById("teamRowsBody");
+    if (!input || !body) return;
+
+    const ID_BY_LABEL = {};
+    document.querySelectorAll('#teamRowSearchList option').forEach((opt) => {
+      const id = parseInt(opt.dataset.teamId || "0", 10);
+      if (!id) return;
+      ID_BY_LABEL[opt.value] = id;
+    });
+
+    function applyFilter() {
+      const raw = input.value.trim().toLowerCase();
+      const exactId = ID_BY_LABEL[input.value];
+      body.querySelectorAll("tr[data-team-id]").forEach((row) => {
+        if (!raw) {
+          row.hidden = false;
+          return;
+        }
+        if (exactId) {
+          row.hidden = String(row.dataset.teamId) !== String(exactId);
+          return;
+        }
+        const name = row.dataset.teamName || "";
+        const number = row.dataset.teamNumber || "";
+        const match = name.includes(raw) || number.includes(raw);
+        row.hidden = !match;
+      });
+    }
+
+    input.addEventListener("input", applyFilter);
+    input.addEventListener("change", applyFilter);
+  })();
+</script>
 
 {% if has_role('judge','admin') %}
 <script>

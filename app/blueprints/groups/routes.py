@@ -76,13 +76,14 @@ def add_group():
         name = (request.form.get("name") or "").strip()
         prefix = (request.form.get("prefix") or "").strip() or None
         desc = (request.form.get("description") or "").strip() or None
+        reverse = request.form.get("reverse") in ("on", "1", "true", "True")
 
         if not name:
             flash(_("Group name is required."), "warning")
             return render_template(
                 "group_edit.html",
                 mode="add",
-                g=None,
+                g={"reverse": reverse},
                 selected_ids=selected_ids,
                 selected_checkpoints=selected_items,
                 available_checkpoints=available_items,
@@ -96,6 +97,7 @@ def add_group():
                 "prefix": prefix,
                 "description": desc,
                 "checkpoint_ids": selected_ids,
+                "reverse": reverse,
             },
         )
 
@@ -136,11 +138,13 @@ def edit_group(group_id: int):
         name = (request.form.get("name") or "").strip()
         prefix = (request.form.get("prefix") or "").strip() or None
         desc = (request.form.get("description") or "").strip() or None
+        reverse = request.form.get("reverse") in ("on", "1", "true", "True")
 
         if not name:
             flash(_("Group name is required."), "warning")
             group["name"] = name
             group["description"] = desc
+            group["reverse"] = reverse
             group["checkpoints"] = [
                 {"id": cp.get("id"), "name": cp.get("name"), "position": idx} for idx, cp in enumerate(selected_items)
             ]
@@ -161,6 +165,7 @@ def edit_group(group_id: int):
                 "prefix": prefix,
                 "description": desc,
                 "checkpoint_ids": selected_ids,
+                "reverse": reverse,
             },
         )
 
@@ -172,6 +177,7 @@ def edit_group(group_id: int):
         group["name"] = name
         group["prefix"] = prefix
         group["description"] = desc
+        group["reverse"] = reverse
         group["checkpoints"] = [
             {"id": cp.get("id"), "name": cp.get("name"), "position": idx} for idx, cp in enumerate(selected_items)
         ]

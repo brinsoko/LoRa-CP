@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import joinedload
 
+from app.extensions import db
 from app.models import (
     Checkin,
     Checkpoint,
@@ -66,6 +67,19 @@ def _build_group_routes(comp_id: int) -> tuple[dict[int, list[int]], dict[int, i
     group_checkpoint_order: dict[int, list[int]] = {}
     for link in links:
         group_checkpoint_order.setdefault(link.group_id, []).append(link.checkpoint_id)
+
+    # Some groups walk the same set of checkpoints in the opposite direction.
+    # Reverse their order list here so downstream consumers (group_start /
+    # group_finish derivation, missed-CP detection, template rendering) all
+    # see the route in the direction the group actually traverses it.
+    reverse_flags = dict(
+        db.session.query(CheckpointGroup.id, CheckpointGroup.reverse)
+        .filter(CheckpointGroup.competition_id == comp_id)
+        .all()
+    )
+    for group_id, checkpoint_ids in list(group_checkpoint_order.items()):
+        if reverse_flags.get(group_id) and checkpoint_ids:
+            group_checkpoint_order[group_id] = list(reversed(checkpoint_ids))
 
     group_start: dict[int, int] = {}
     group_finish: dict[int, int] = {}
@@ -174,11 +188,27 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
     else:
         checkpoints = (
             Checkpoint.query.filter(Checkpoint.competition_id == comp_id, Checkpoint.is_virtual.is_(False))
-            .order_by(Checkpoint.name.asc())
+            .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
             .all()
         )
 
     checkpoint_ids_for_view = {checkpoint.id for checkpoint in checkpoints}
+
+    # Name lookup used for the per-team "missed" badge list. Covers every
+    # non-virtual checkpoint in the competition so we can label missed CPs
+    # even when the page is filtered to a single group's subset.
+    checkpoint_name_lookup: dict[int, str] = {checkpoint.id: checkpoint.name for checkpoint in checkpoints}
+    all_route_checkpoint_ids: set[int] = set()
+    for ordered_ids in group_checkpoint_order.values():
+        all_route_checkpoint_ids.update(ordered_ids)
+    missing_name_ids = all_route_checkpoint_ids - set(checkpoint_name_lookup.keys())
+    if missing_name_ids:
+        extra_cps = Checkpoint.query.filter(
+            Checkpoint.competition_id == comp_id,
+            Checkpoint.id.in_(missing_name_ids),
+        ).all()
+        for cp in extra_cps:
+            checkpoint_name_lookup[cp.id] = cp.name
 
     team_group_ids: dict[int, list[int]] = {}
     group_team_ids: dict[int, set[int]] = {}
@@ -302,6 +332,22 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
 
         elapsed_minutes = _minutes_between(started_at, elapsed_end)
         latest_at = latest.timestamp if latest else None
+
+        # Skipped-CP detection: expected route (already direction-flipped by
+        # _build_group_routes) minus actual arrivals, preserving route order
+        # so operators see the visit sequence rather than an id-sorted set.
+        missed_checkpoints: list[dict] = []
+        if route_group_id:
+            expected_route = group_checkpoint_order.get(route_group_id, [])
+            arrived_ids = set(cp_times.keys())
+            for cp_id in expected_route:
+                if cp_id in arrived_ids:
+                    continue
+                name = checkpoint_name_lookup.get(cp_id)
+                if not name:
+                    continue
+                missed_checkpoints.append({"id": cp_id, "name": name})
+
         team_rows.append(
             {
                 "id": team.id,
@@ -318,6 +364,7 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
                 "latest_at_label": _display_dt(latest_at),
                 "elapsed_minutes": elapsed_minutes,
                 "elapsed_label": _minutes_label(elapsed_minutes),
+                "missed_checkpoints": missed_checkpoints,
                 "_latest_sort": latest_at,
             }
         )

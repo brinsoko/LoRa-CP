@@ -103,11 +103,123 @@ def _normalize_checkpoint_form(form):
     }, lora_device_error or group_ids_error
 
 
+def _fetch_competition_members() -> list[dict]:
+    """Active members of the current competition, for the judges-edit modal.
+
+    Returns a minimal dict per user so the template can render checkboxes
+    without touching the ORM directly.
+    """
+    from app.extensions import db as _db
+    from app.models import CompetitionMember, User
+    from app.utils.competition import get_current_competition_id
+
+    comp_id = get_current_competition_id()
+    if not comp_id:
+        return []
+    rows = (
+        _db.session.query(User.id, User.username, CompetitionMember.role)
+        .join(CompetitionMember, CompetitionMember.user_id == User.id)
+        .filter(
+            CompetitionMember.competition_id == comp_id,
+            CompetitionMember.active.is_(True),
+        )
+        .order_by(User.username.asc())
+        .all()
+    )
+    return [{"id": uid, "username": uname, "role": role} for (uid, uname, role) in rows]
+
+
 @checkpoints_bp.route("/", methods=["GET"])
 @roles_required("judge", "admin")
 def list_checkpoints():
     checkpoints = _fetch_checkpoints()
-    return render_template("checkpoints_list.html", checkpoints=checkpoints)
+    eligible_users = _fetch_competition_members()
+    return render_template(
+        "checkpoints_list.html",
+        checkpoints=checkpoints,
+        eligible_users=eligible_users,
+    )
+
+
+@checkpoints_bp.route("/<int:cp_id>/judges", methods=["POST"])
+@roles_required("admin")
+def update_checkpoint_judges(cp_id: int):
+    """Replace the set of judges assigned to a checkpoint.
+
+    Scope every read/write by competition_id so editing one competition's
+    judge assignments can never wipe a user's assignments in another. The
+    JudgeCheckpoint.competition_id column (added in c6d7e8f9a0b1) makes
+    this enforceable.
+    """
+    from flask_login import current_user
+
+    from app.extensions import db as _db
+    from app.models import Checkpoint as _Checkpoint
+    from app.models import CompetitionMember, JudgeCheckpoint
+    from app.utils.audit import record_audit_event
+    from app.utils.competition import get_current_competition_id
+
+    comp_id = get_current_competition_id()
+    if not comp_id:
+        flash(_("Select a competition first."), "warning")
+        return redirect(url_for("main.select_competition"))
+
+    cp = _Checkpoint.query.filter(_Checkpoint.competition_id == comp_id, _Checkpoint.id == cp_id).first()
+    if not cp:
+        flash(_("Checkpoint not found."), "warning")
+        return redirect(url_for("checkpoints.list_checkpoints"))
+
+    raw_ids = request.form.getlist("user_ids")
+    parsed_ids: list[int] = []
+    for raw in raw_ids:
+        try:
+            parsed_ids.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+
+    # Only allow assigning users who are active members of THIS competition.
+    eligible_ids = {
+        uid
+        for (uid,) in _db.session.query(CompetitionMember.user_id)
+        .filter(
+            CompetitionMember.competition_id == comp_id,
+            CompetitionMember.active.is_(True),
+        )
+        .all()
+    }
+    desired_ids = {uid for uid in parsed_ids if uid in eligible_ids}
+
+    existing = JudgeCheckpoint.query.filter(
+        JudgeCheckpoint.checkpoint_id == cp.id,
+        JudgeCheckpoint.competition_id == comp_id,
+    ).all()
+    existing_ids = {row.user_id for row in existing}
+
+    to_delete = [row for row in existing if row.user_id not in desired_ids]
+    to_add = desired_ids - existing_ids
+
+    for row in to_delete:
+        _db.session.delete(row)
+    for uid in to_add:
+        _db.session.add(JudgeCheckpoint(user_id=uid, checkpoint_id=cp.id, competition_id=comp_id, is_default=False))
+
+    record_audit_event(
+        competition_id=comp_id,
+        event_type="checkpoint_judges_updated",
+        entity_type="checkpoint",
+        entity_id=cp.id,
+        actor_user=current_user if current_user.is_authenticated else None,
+        summary=f"Checkpoint {cp.name} judges updated.",
+        details={
+            "before": sorted(existing_ids),
+            "after": sorted(desired_ids),
+            "added": sorted(to_add),
+            "removed": sorted(uid for uid in existing_ids if uid not in desired_ids),
+        },
+    )
+    _db.session.commit()
+    flash(_("Checkpoint judges updated."), "success")
+    return redirect(url_for("checkpoints.list_checkpoints"))
 
 
 @checkpoints_bp.route("/add", methods=["GET", "POST"])

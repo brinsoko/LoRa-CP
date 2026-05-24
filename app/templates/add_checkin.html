@@ -10,15 +10,29 @@
       {{ csrf_input() }}
       <div class="row g-3">
         <div class="col-md-4">
-          <label class="form-label">{{ _('Team') }}</label>
-          <input type="text" class="form-control mb-2" id="teamSearch" placeholder="{{ _('Search teams...') }}">
-          <select name="team_id" class="form-select" required>
+          <label class="form-label" for="teamSearch">{{ _('Team') }}</label>
+          {% set preselected_label = '' %}
+          {% if dup_team_id %}
             {% for t in teams %}
-              <option value="{{ t.id }}" {% if dup_team_id and dup_team_id==t.id %}selected{% endif %}>
-                {{ t.name }}{% if t.number is not none %} ({{ t.number }}){% endif %}
-              </option>
+              {% if t.id == dup_team_id %}
+                {% set preselected_label = ((t.number ~ ' - ') if t.number is not none else '') ~ t.name %}
+              {% endif %}
             {% endfor %}
-          </select>
+          {% endif %}
+          <input type="text"
+                 class="form-control"
+                 id="teamSearch"
+                 list="teamSearchList"
+                 autocomplete="off"
+                 placeholder="{{ _('Type number or name') }}"
+                 value="{{ preselected_label }}"
+                 required>
+          <datalist id="teamSearchList">
+            {% for t in teams %}
+              <option value="{% if t.number is not none %}{{ t.number }} - {% endif %}{{ t.name }}" data-team-id="{{ t.id }}"></option>
+            {% endfor %}
+          </datalist>
+          <input type="hidden" name="team_id" id="teamId" value="{{ dup_team_id or '' }}">
         </div>
 
         <div class="col-md-4">
@@ -70,16 +84,38 @@
 </div>
 
 <script>
-  const teamSearch = document.getElementById("teamSearch");
-  const teamSelect = document.querySelector('select[name="team_id"]');
-  if (teamSearch && teamSelect) {
-    teamSearch.addEventListener("input", () => {
-      const term = teamSearch.value.toLowerCase().trim();
-      Array.from(teamSelect.options).forEach((opt) => {
-        const text = (opt.textContent || "").toLowerCase();
-        opt.hidden = term && !text.includes(term);
-      });
+  // Mirror of the score_judge datalist pattern: the visible text input is
+  // backed by a hidden team_id input that the form actually submits. We
+  // resolve the label-to-id via the datalist options so judges can search
+  // by either number or name. An empty/invalid label clears team_id so
+  // the required attribute on the hidden input would catch typos at submit.
+  (function () {
+    const teamSearch = document.getElementById("teamSearch");
+    const teamIdInput = document.getElementById("teamId");
+    if (!teamSearch || !teamIdInput) return;
+
+    const TEAM_BY_LABEL = {};
+    document.querySelectorAll('#teamSearchList option').forEach((opt) => {
+      const id = parseInt(opt.dataset.teamId || "0", 10);
+      if (!id) return;
+      TEAM_BY_LABEL[opt.value] = id;
     });
-  }
+
+    function syncTeamId() {
+      const match = TEAM_BY_LABEL[teamSearch.value];
+      teamIdInput.value = match ? String(match) : "";
+    }
+
+    teamSearch.addEventListener("input", syncTeamId);
+    teamSearch.addEventListener("change", syncTeamId);
+    teamSearch.form?.addEventListener("submit", (event) => {
+      syncTeamId();
+      if (!teamIdInput.value) {
+        event.preventDefault();
+        teamSearch.focus();
+        teamSearch.reportValidity?.();
+      }
+    });
+  })();
 </script>
 {% endblock %}

@@ -7,16 +7,28 @@
     <form method="get" class="row g-2 align-items-end">
       <input type="hidden" name="per_page" value="{{ pagination.per_page if pagination else 100 }}">
       <div class="col-12 col-md-4">
-        <label class="form-label">{{ _('Team') }}</label>
-        <select name="team_id" class="form-select">
-          <option value="">— {{ _('All teams') }} —</option>
+        <label class="form-label" for="teamSearchInput">{{ _('Team') }}</label>
+        {% set selected_team_label = '' %}
+        {% if selected_team_id %}
           {% for t in teams %}
-            <option value="{{ t.id }}"
-              {% if selected_team_id == t.id %}selected{% endif %}>
-              {{ t.name }}{% if t.number is not none %} ({{ t.number }}){% endif %}
-            </option>
+            {% if t.id == selected_team_id %}
+              {% set selected_team_label = ((t.number ~ ' - ') if t.number is not none else '') ~ t.name %}
+            {% endif %}
           {% endfor %}
-        </select>
+        {% endif %}
+        <input type="text"
+               class="form-control"
+               id="teamSearchInput"
+               list="teamFilterList"
+               autocomplete="off"
+               placeholder="{{ _('All teams (type to filter)') }}"
+               value="{{ selected_team_label }}">
+        <datalist id="teamFilterList">
+          {% for t in teams %}
+            <option value="{% if t.number is not none %}{{ t.number }} - {% endif %}{{ t.name }}" data-team-id="{{ t.id }}"></option>
+          {% endfor %}
+        </datalist>
+        <input type="hidden" name="team_id" id="teamIdHidden" value="{{ selected_team_id or '' }}">
       </div>
 
       <div class="col-12 col-md-4">
@@ -146,5 +158,38 @@
 {% else %}
   <p class="text-muted">{{ _('No check-ins match your filters.') }}</p>
 {% endif %}
+
+<script>
+  // datalist-backed team filter: resolves the typed label to a team id and
+  // mirrors it into the hidden team_id field so the GET query string ends
+  // up with team_id=<int>, matching the rest of the filter contract. Empty
+  // input means "all teams" — clearing the hidden value removes the param.
+  (function () {
+    const search = document.getElementById("teamSearchInput");
+    const hidden = document.getElementById("teamIdHidden");
+    if (!search || !hidden) return;
+
+    const TEAM_BY_LABEL = {};
+    document.querySelectorAll('#teamFilterList option').forEach((opt) => {
+      const id = parseInt(opt.dataset.teamId || "0", 10);
+      if (!id) return;
+      TEAM_BY_LABEL[opt.value] = id;
+    });
+
+    function syncTeamId() {
+      const value = search.value.trim();
+      if (!value) {
+        hidden.value = "";
+        return;
+      }
+      const match = TEAM_BY_LABEL[value];
+      hidden.value = match ? String(match) : "";
+    }
+
+    search.addEventListener("input", syncTeamId);
+    search.addEventListener("change", syncTeamId);
+    search.form?.addEventListener("submit", syncTeamId);
+  })();
+</script>
 
 {% endblock %}
