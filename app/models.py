@@ -209,10 +209,20 @@ class JudgeCheckpoint(db.Model):
         nullable=False,
         index=True,
     )
+    # competition_id scopes the assignment so editing a judge's assignments
+    # in one competition can't wipe their assignments in another. Always
+    # equal to checkpoint.competition_id for valid rows.
+    competition_id = db.Column(
+        db.Integer,
+        db.ForeignKey("competitions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     is_default = db.Column(db.Boolean, nullable=False, default=False)
 
     user = db.relationship("User")
     checkpoint = db.relationship("Checkpoint")
+    competition = db.relationship("Competition")
 
     __table_args__ = (UniqueConstraint("user_id", "checkpoint_id", name="uq_judge_checkpoint"),)
 
@@ -237,6 +247,13 @@ class Team(db.Model):
     number = db.Column(db.Integer, nullable=True)
     organization = db.Column(db.String(120), nullable=True, index=True)
     dnf = db.Column(db.Boolean, nullable=False, default=False)
+    # Free-text notes for judges to record special events (lost child,
+    # bike trouble, etc.). Display-only; does not affect scoring.
+    notes = db.Column(db.Text, nullable=True)
+    # Team-level dead-time minutes not bound to any single checkpoint
+    # (e.g. organizer-caused delay at the start). _get_team_dead_time_total
+    # adds this to the per-CP sum before the time-trial penalty applies.
+    bonus_dead_time = db.Column(db.Float, nullable=False, default=0.0, server_default="0.0")
 
     # relationships
     competition = db.relationship("Competition", back_populates="teams")
@@ -286,6 +303,7 @@ class TeamMember(db.Model):
     the uq_team_member_position constraint blocks two rows colliding on
     the same slot.
     """
+
     __tablename__ = "team_members"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -301,9 +319,7 @@ class TeamMember(db.Model):
 
     team = db.relationship("Team", back_populates="members")
 
-    __table_args__ = (
-        UniqueConstraint("team_id", "position", name="uq_team_member_position"),
-    )
+    __table_args__ = (UniqueConstraint("team_id", "position", name="uq_team_member_position"),)
 
     def __repr__(self) -> str:
         return f"<TeamMember id={self.id} team={self.team_id} name={self.name!r}>"
@@ -361,6 +377,10 @@ class CheckpointGroup(db.Model):
     prefix = db.Column(db.String(20), nullable=True)
     description = db.Column(db.Text)
     position = db.Column(db.Integer, nullable=False, default=0)
+    # Per-group direction flag. When True, _build_group_routes flips the
+    # checkpoint order so the live arrivals view shows the route in the
+    # direction this group actually traverses it.
+    reverse = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
 
     competition = db.relationship("Competition", back_populates="checkpoint_groups")
     checkpoint_links = db.relationship(
@@ -405,6 +425,10 @@ class Checkpoint(db.Model):
     easting = db.Column(db.Float)
     northing = db.Column(db.Float)
     is_virtual = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    # Manual display order. Nullable so newly imported checkpoints sort
+    # after positioned ones; existing rows were backfilled by migration
+    # c6d7e8f9a0b1 with row-number-by-name to preserve current ordering.
+    position = db.Column(db.Integer, nullable=True)
 
     # Device mapping (one device ↔ one checkpoint)
     lora_device_id = db.Column(
@@ -807,9 +831,7 @@ def _assign_checkpoint_link_position(link: CheckpointGroupLink) -> None:
     if not group:
         return
 
-    existing_positions = [
-        cl.position for cl in group.checkpoint_links if cl is not link and cl.position is not None
-    ]
+    existing_positions = [cl.position for cl in group.checkpoint_links if cl is not link and cl.position is not None]
     link.position = (max(existing_positions) + 1) if existing_positions else 0
 
 

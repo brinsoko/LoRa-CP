@@ -39,7 +39,11 @@ def assign_checkpoints():
         .all()
     )
     judges = [{"id": u.id, "username": u.username, "role": m.role} for u, m in members]
-    checkpoints = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
+    checkpoints = (
+        Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
+        .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
+        .all()
+    )
 
     if request.method == "POST":
         judge_id = request.form.get("judge_id", type=int)
@@ -70,7 +74,14 @@ def assign_checkpoints():
         if default_id and default_id not in selected_ids:
             default_id = None
 
-        existing = JudgeCheckpoint.query.filter(JudgeCheckpoint.user_id == judge_id).all()
+        # Scope all reads/writes to the current competition so editing a
+        # judge's assignments here can't wipe their assignments in another
+        # competition. Previously the query was unscoped and the delete
+        # loop nuked unrelated rows.
+        existing = JudgeCheckpoint.query.filter(
+            JudgeCheckpoint.user_id == judge_id,
+            JudgeCheckpoint.competition_id == comp_id,
+        ).all()
         existing_ids = {jc.checkpoint_id for jc in existing}
         selected_set = set(selected_ids)
 
@@ -80,19 +91,21 @@ def assign_checkpoints():
 
         for cid in selected_ids:
             if cid not in existing_ids:
-                db.session.add(JudgeCheckpoint(user_id=judge_id, checkpoint_id=cid))
+                db.session.add(JudgeCheckpoint(user_id=judge_id, checkpoint_id=cid, competition_id=comp_id))
 
         if selected_ids and not default_id:
             default_id = selected_ids[0]
 
         if selected_ids:
             (
-                JudgeCheckpoint.query.filter(JudgeCheckpoint.user_id == judge_id).update(
-                    {JudgeCheckpoint.is_default: False}, synchronize_session=False
-                )
+                JudgeCheckpoint.query.filter(
+                    JudgeCheckpoint.user_id == judge_id,
+                    JudgeCheckpoint.competition_id == comp_id,
+                ).update({JudgeCheckpoint.is_default: False}, synchronize_session=False)
             )
             JudgeCheckpoint.query.filter(
                 JudgeCheckpoint.user_id == judge_id,
+                JudgeCheckpoint.competition_id == comp_id,
                 JudgeCheckpoint.checkpoint_id == default_id,
             ).update({JudgeCheckpoint.is_default: True}, synchronize_session=False)
 
@@ -104,7 +117,10 @@ def assign_checkpoints():
     assigned = []
     default_checkpoint_id = None
     if selected_judge_id:
-        assigned = JudgeCheckpoint.query.filter(JudgeCheckpoint.user_id == selected_judge_id).all()
+        assigned = JudgeCheckpoint.query.filter(
+            JudgeCheckpoint.user_id == selected_judge_id,
+            JudgeCheckpoint.competition_id == comp_id,
+        ).all()
         default_row = next((jc for jc in assigned if jc.is_default), None)
         default_checkpoint_id = default_row.checkpoint_id if default_row else None
 

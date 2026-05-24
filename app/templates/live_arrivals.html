@@ -191,6 +191,7 @@
               <th>{{ _('Elapsed') }}</th>
               <th>{{ _('Latest checkpoint') }}</th>
               <th>{{ _('Latest time') }}</th>
+              <th>{{ _('Missed') }}</th>
             </tr>
           </thead>
           <tbody id="teamTimingRows">
@@ -204,10 +205,19 @@
                 <td>{{ team.elapsed_label or '-' }}</td>
                 <td>{{ team.latest_checkpoint or '-' }}</td>
                 <td>{{ team.latest_at_label or '-' }}</td>
+                <td>
+                  {% if team.missed_checkpoints %}
+                    {% for cp in team.missed_checkpoints %}
+                      <span class="badge text-bg-light border text-muted me-1">{{ cp.name }}</span>
+                    {% endfor %}
+                  {% else %}
+                    <span class="text-success" title="{{ _('No missed checkpoints') }}">✓</span>
+                  {% endif %}
+                </td>
               </tr>
             {% else %}
               <tr>
-                <td colspan="8" class="text-muted">{{ _('No teams to show.') }}</td>
+                <td colspan="9" class="text-muted">{{ _('No teams to show.') }}</td>
               </tr>
             {% endfor %}
           </tbody>
@@ -237,6 +247,7 @@
       started: "{{ _('Started') }}",
       not_started: "{{ _('Not started') }}",
       not_routed: "{{ _('Not routed') }}",
+      noMissed: "{{ _('No missed checkpoints') }}",
     };
     const statusClasses = {
       finished: "text-bg-success",
@@ -305,11 +316,15 @@
       const body = document.getElementById("teamTimingRows");
       if (!body) return;
       if (!rows || rows.length === 0) {
-        body.innerHTML = `<tr><td colspan="8" class="text-muted">${escapeHtml(labels.noTeams)}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="9" class="text-muted">${escapeHtml(labels.noTeams)}</td></tr>`;
         return;
       }
       body.innerHTML = rows.map((row) => {
         const teamNumber = row.number === null || row.number === undefined ? "" : ` (${escapeHtml(row.number)})`;
+        const missed = Array.isArray(row.missed_checkpoints) ? row.missed_checkpoints : [];
+        const missedCell = missed.length
+          ? missed.map((cp) => `<span class="badge text-bg-light border text-muted me-1">${escapeHtml(cp.name)}</span>`).join("")
+          : `<span class="text-success" title="${escapeHtml(labels.noMissed)}">✓</span>`;
         return `
           <tr>
             <td>${escapeHtml(row.name)}${teamNumber}</td>
@@ -320,6 +335,7 @@
             <td>${escapeHtml(row.elapsed_label || "-")}</td>
             <td>${escapeHtml(row.latest_checkpoint || "-")}</td>
             <td>${escapeHtml(row.latest_at_label || "-")}</td>
+            <td>${missedCell}</td>
           </tr>
         `;
       }).join("");

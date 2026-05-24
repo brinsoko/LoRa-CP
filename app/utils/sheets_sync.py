@@ -202,9 +202,7 @@ def _build_global_rule_formulas(
                 start_lookup = (
                     f"INDEX('{start_cp_name}'!{s_t}:{s_t}; MATCH(B{row_idx}; '{start_cp_name}'!{s_a}:{s_a}; 0))"
                 )
-                end_lookup = (
-                    f"INDEX('{end_cp_name}'!{e_t}:{e_t}; MATCH(B{row_idx}; '{end_cp_name}'!{e_a}:{e_a}; 0))"
-                )
+                end_lookup = f"INDEX('{end_cp_name}'!{e_t}:{e_t}; MATCH(B{row_idx}; '{end_cp_name}'!{e_a}:{e_a}; 0))"
                 max_p = _fmt_num(time_rule.get("max_points") or 0)
                 threshold = _fmt_num(time_rule.get("threshold_minutes") or 0)
                 penalty_p = _fmt_num(time_rule.get("penalty_points") or 0)
@@ -217,7 +215,7 @@ def _build_global_rule_formulas(
                 penalty_m = _fmt_num(pm) if pm > 0 else "1"
                 min_p = _fmt_num(time_rule.get("min_points") or 0)
                 cas_formula = (
-                    f"=IFERROR(IF({end_lookup}=\"\"; 0; "
+                    f'=IFERROR(IF({end_lookup}=""; 0; '
                     f"MAX({max_p}-MAX(0; ({end_lookup}-{start_lookup})*1440-({dead_time_sum_expr})-{threshold})"
                     f"/{penalty_m}*{penalty_p}; {min_p})); 0)"
                 )
@@ -249,10 +247,8 @@ def _build_global_rule_formulas(
                 continue
             tcl = _col_letter(t_col)
             acl = _col_letter(a_col)
-            lookup = (
-                f"INDEX('{cfg.tab_name}'!{tcl}:{tcl}; MATCH(B{row_idx}; '{cfg.tab_name}'!{acl}:{acl}; 0))"
-            )
-            per_cp_terms.append(f"IFERROR(IF({lookup}<>\"\"; 1; 0); 0)")
+            lookup = f"INDEX('{cfg.tab_name}'!{tcl}:{tcl}; MATCH(B{row_idx}; '{cfg.tab_name}'!{acl}:{acl}; 0))"
+            per_cp_terms.append(f'IFERROR(IF({lookup}<>""; 1; 0); 0)')
         if per_cp_terms:
             found_formula = f"={_fmt_num(points_per)}*({'+'.join(per_cp_terms)})"
 
@@ -308,9 +304,7 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
             )
             values = [n[1] if n[1] is not None else (n[2] or "") for n in nums]
             if values:
-                columns_for_this_cp.append(
-                    {"col": start_col, "start_row": 2, "values": values}
-                )
+                columns_for_this_cp.append({"col": start_col, "start_row": 2, "values": values})
 
         if columns_for_this_cp:
             try:
@@ -344,9 +338,7 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
                 # Non-404 failures: log + skip as before. A single bad tab
                 # shouldn't abort the whole sync.
                 try:
-                    current_app.logger.warning(
-                        "sync_all_checkpoint_tabs: %s failed: %s", cfg.tab_name, exc
-                    )
+                    current_app.logger.warning("sync_all_checkpoint_tabs: %s failed: %s", cfg.tab_name, exc)
                 except Exception:
                     pass
 
@@ -459,7 +451,24 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime
 
 
 def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: datetime | None = None):
-    """Set arrived checkbox TRUE for the given team/checkpoint in any linked checkpoint tab."""
+    """Write the arrival timestamp into every linked CP tab in one batch per config.
+
+    Batching strategy
+    -----------------
+    A team can belong to multiple groups, and a single SheetConfig can carry
+    several group blocks. Pre-batching we issued one ``client.update_cell``
+    per (cfg, group) — up to N calls per arrival on a multi-group CP tab.
+
+    We now accumulate every (column, row, timestamp) write per config into a
+    list of single-cell column specs and fire ONE ``batch_update_columns``
+    call per cfg. On a 100-team × 15-CP race with ~2 groups per CP this
+    drops mark-arrival traffic from ~30 to ~15 calls per arrival burst,
+    staying comfortably under the 40-calls/60s Sheets throttle.
+
+    Public signature unchanged so worker dispatch in
+    ``app/utils/sheets_sync_worker.py:enqueue_mark_arrival`` benefits
+    automatically.
+    """
     if not sheets_sync_enabled():
         return
     team = db.session.get(Team, team_id)
@@ -482,12 +491,21 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
         current_app.logger.warning("Sheets arrival sync skipped: %s", exc)
         return
 
+    ts = arrived_at or datetime.now()
+    ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
+
     # Team may belong to multiple groups; mark in each matching block.
     group_cache: dict[int, list[CheckpointGroup]] = {}
     for cfg in configs:
         group_defs = (cfg.config or {}).get("groups", [])
         group_cols = _group_start_cols_from_config(cfg.config or {})
         time_enabled = bool((cfg.config or {}).get("time_enabled"))
+        if not time_enabled:
+            # Nothing to write on this cfg — arrivals are recorded as a
+            # timestamp in the time column. Skip without queueing a batch.
+            continue
+        dead_time_enabled = bool((cfg.config or {}).get("dead_time_enabled"))
+        column_writes: list[dict] = []
         for grp_def, start_col in zip(group_defs, group_cols, strict=False):
             db_group = _resolve_group_from_cfg(cfg.competition_id, grp_def, group_cache)
             if not db_group:
@@ -510,19 +528,15 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
             except ValueError:
                 continue
             row = 2 + idx  # header at row 1
-            time_col = None
-            if time_enabled:
-                dead_time_enabled = bool((cfg.config or {}).get("dead_time_enabled"))
-                time_col = start_col + 1
-                if dead_time_enabled:
-                    time_col += 1  # shift if dead time sits before time
-            try:
-                if time_col:
-                    ts = arrived_at or datetime.now()
-                    ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
-                    client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, time_col, ts_str)
-            except Exception as exc:
-                current_app.logger.warning("Could not update arrival checkbox: %s", exc)
+            time_col = start_col + 1 + (1 if dead_time_enabled else 0)
+            column_writes.append({"col": time_col, "start_row": row, "values": [ts_str]})
+
+        if not column_writes:
+            continue
+        try:
+            client.batch_update_columns(cfg.spreadsheet_id, cfg.tab_name, column_writes)
+        except Exception as exc:
+            current_app.logger.warning("Could not update arrival checkbox: %s", exc)
 
 
 def update_checkpoint_scores(
@@ -543,7 +557,33 @@ def update_checkpoint_scores(
 def update_checkpoint_scores_sync(
     team_id: int, checkpoint_id: int, group_name: str, values: dict, scored_at: datetime | None = None
 ):
-    """Update score-related fields for a team in a checkpoint tab based on config layout."""
+    """Update score-related fields for a team in a checkpoint tab based on config layout.
+
+    Batching strategy
+    -----------------
+    Pre-batching, each (cfg, group) match issued one ``update_cell`` per
+    enabled field — dead_time, time, each per-group ``fields`` entry, and
+    points. On a 100-team × 15-CP × 2-group race this added up to ~6000
+    Sheets API calls and tripped the 40/60s throttle (the worker queue
+    grew to ~9 minutes of backlog).
+
+    The new shape walks the cfg in the same order but accumulates every
+    write into a list of single-cell column specs, then fires ONE
+    ``batch_update_columns`` call per cfg. On the same race the count
+    drops to ~1500 calls (4× reduction), well inside the throttle window.
+
+    All semantics preserved:
+      * ``dead_time_enabled`` / ``time_enabled`` flags still gate the
+        respective writes and the column-shift bookkeeping.
+      * Per-group ``points_formula=True`` still skips the Points cell so
+        a published formula is never clobbered by a raw value.
+      * The ``scored_at`` fallback for the time cell still applies when
+        no explicit time value is in ``values``.
+
+    Public signature unchanged so worker dispatch in
+    ``app/utils/sheets_sync_worker.py:enqueue_update_scores`` benefits
+    automatically (it just calls into this _sync variant).
+    """
     if not sheets_sync_enabled():
         return
     team = db.session.get(Team, team_id)
@@ -576,6 +616,8 @@ def update_checkpoint_scores_sync(
         time_header = (cfg.config or {}).get("time_header") or "Time"
         points_header = (cfg.config or {}).get("points_header") or "Points"
 
+        column_writes: list[dict] = []
+
         for grp_def, start_col in zip(group_defs, group_cols, strict=False):
             grp_name = (grp_def.get("name") or "").strip()
             if _norm_name(grp_name) != _norm_name(group_name):
@@ -602,28 +644,36 @@ def update_checkpoint_scores_sync(
             col = start_col + 1
             if dead_time_enabled:
                 if dead_time_header in values or "dead_time" in values:
-                    client.update_cell(
-                        cfg.spreadsheet_id,
-                        cfg.tab_name,
-                        row,
-                        col,
-                        values.get(dead_time_header, values.get("dead_time")),
+                    column_writes.append(
+                        {
+                            "col": col,
+                            "start_row": row,
+                            "values": [values.get(dead_time_header, values.get("dead_time"))],
+                        }
                     )
                 col += 1
             if time_enabled:
                 if time_header in values or "time" in values:
-                    client.update_cell(
-                        cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(time_header, values.get("time"))
+                    column_writes.append(
+                        {
+                            "col": col,
+                            "start_row": row,
+                            "values": [values.get(time_header, values.get("time"))],
+                        }
                     )
                 elif scored_at:
-                    client.update_cell(
-                        cfg.spreadsheet_id, cfg.tab_name, row, col, scored_at.strftime("%Y-%m-%d %H:%M:%S")
+                    column_writes.append(
+                        {
+                            "col": col,
+                            "start_row": row,
+                            "values": [scored_at.strftime("%Y-%m-%d %H:%M:%S")],
+                        }
                     )
                 col += 1
 
             for field_name in grp_def.get("fields") or []:
                 if field_name in values:
-                    client.update_cell(cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(field_name))
+                    column_writes.append({"col": col, "start_row": row, "values": [values.get(field_name)]})
                 col += 1
 
             # Points cell: when this group's config flags points_formula
@@ -633,9 +683,20 @@ def update_checkpoint_scores_sync(
             # Points from the raw field cells we just wrote.
             if not grp_def.get("points_formula"):
                 if points_header in values or "points" in values:
-                    client.update_cell(
-                        cfg.spreadsheet_id, cfg.tab_name, row, col, values.get(points_header, values.get("points"))
+                    column_writes.append(
+                        {
+                            "col": col,
+                            "start_row": row,
+                            "values": [values.get(points_header, values.get("points"))],
+                        }
                     )
+
+        if not column_writes:
+            continue
+        try:
+            client.batch_update_columns(cfg.spreadsheet_id, cfg.tab_name, column_writes)
+        except Exception as exc:
+            current_app.logger.warning("Could not update checkpoint scores: %s", exc)
 
 
 def build_arrivals_tab(
@@ -910,10 +971,7 @@ def build_teams_tab(
     # content is empty header/subheader rows. Return a warning so the
     # caller doesn't flash a misleading success.
     if not group_blocks or not any(values):
-        return (
-            "No team data to write. Check that the competition has groups "
-            "with teams assigned."
-        )
+        return "No team data to write. Check that the competition has groups with teams assigned."
 
     client = get_sheets_client(current_app)
     ss = client._call(client.gc.open_by_key, spreadsheet_id)
@@ -970,18 +1028,20 @@ def build_score_tab(
     if competition_id is not None:
         for gr in GlobalScoreRule.query.filter_by(competition_id=competition_id).all():
             global_rules_by_group[gr.group_id] = gr.rules or {}
-    cp_id_to_name = {
-        c.id: c.name
-        for c in _CP.query.filter(_CP.competition_id == competition_id).all()
-    } if competition_id is not None else {}
+    cp_id_to_name = (
+        {c.id: c.name for c in _CP.query.filter(_CP.competition_id == competition_id).all()}
+        if competition_id is not None
+        else {}
+    )
     # Virtual CPs are excluded from the spreadsheet's Found-points sum
     # so it matches the in-app calculation (no physical arrival = no
     # +100 per Article 38). Compute once; the helper consults this set
     # per row.
-    virtual_cp_names = {
-        c.name
-        for c in _CP.query.filter(_CP.competition_id == competition_id, _CP.is_virtual.is_(True)).all()
-    } if competition_id is not None else set()
+    virtual_cp_names = (
+        {c.name for c in _CP.query.filter(_CP.competition_id == competition_id, _CP.is_virtual.is_(True)).all()}
+        if competition_id is not None
+        else set()
+    )
 
     values = []
     blocks = []  # track ranges for org summary
@@ -1122,9 +1182,7 @@ def build_score_tab(
             if include_dead_time_sum:
                 if dead_time_formulas and any(f not in ("=0", "0") for f in dead_time_formulas):
                     dt_total_formula = f"=SUM({';'.join(_strip_eq(f) for f in dead_time_formulas)})"
-                    dead_time_sum_expr = (
-                        f"SUM({';'.join(_strip_eq(f) for f in dead_time_formulas)})"
-                    )
+                    dead_time_sum_expr = f"SUM({';'.join(_strip_eq(f) for f in dead_time_formulas)})"
                 else:
                     dt_total_formula = "=0"
                 row.append(dt_total_formula)
@@ -1262,6 +1320,101 @@ def build_score_tab(
     )
 
 
+def build_public_summary_tab(
+    spreadsheet_id: str,
+    tab_name: str,
+    *,
+    competition_id: int | None = None,
+):
+    """Build a public-facing summary tab on the spreadsheet.
+
+    Columns: Group, Number, Team, Organization, Total points. No per-CP
+    breakdown, no dead time, no time-trial split, no formulas. This is
+    the version we share with the public during a race so spectators
+    can see ranks without exposing scoring internals.
+
+    Data path mirrors the on-screen /scores/view: we call
+    ``_build_scores_context(competition_id, None)`` so the rows include
+    the live time_race recomputations + global rule contributions, then
+    sort by group order (already established in the context) and then
+    by total points descending. Final values only — no formulas — so
+    spectators see exactly what we see and we don't leak intermediate
+    columns by accident.
+
+    Headers come from ``load_lang()`` for the standard score-column
+    keys; Slovenian defaults match the rest of the spreadsheet.
+
+    Returns None on success, or a short error string for the caller to
+    surface as a flash message. Sheets API errors propagate (the
+    publisher wraps the call in a try/except so a failure here is
+    non-fatal for the rest of the publish).
+    """
+    if not sheets_sync_enabled():
+        return "Sheets sync is disabled."
+    if competition_id is None:
+        return "Public summary tab requires a competition_id."
+
+    # Import here so module import time stays free of the routes layer
+    # (and so we don't risk a circular import when the blueprint
+    # eventually imports sheets utilities).
+    from app.blueprints.scores.routes import _build_scores_context
+
+    context = _build_scores_context(competition_id, None)
+    rows = context.get("rows") or []
+
+    lang = load_lang()
+    header = [
+        lang.get("score_group_header", "Skupina"),
+        lang.get("score_number_header", "Številka"),
+        lang.get("score_team_header", "Ekipa"),
+        lang.get("score_org_header", "Organizacija"),
+        lang.get("score_total_header", "Skupaj točk"),
+    ]
+
+    # _build_scores_context already sorts by (group_idx, group_name,
+    # dnf-last, -total, name). That gives us "group order, ranks within
+    # group" which is exactly what spectators want. We re-sort here
+    # only to guarantee the ordering even if upstream changes the
+    # default, and to keep the contract self-documenting.
+    def _sort_key(r):
+        group_name = (r.get("group") or "").strip()
+        total = float(r.get("total") or 0.0)
+        return (group_name, 1 if r.get("dnf") else 0, -total, (r.get("name") or "").lower())
+
+    sorted_rows = sorted(rows, key=_sort_key)
+
+    values: list[list] = [header]
+    for r in sorted_rows:
+        values.append(
+            [
+                escape_formula_cell(r.get("group") or ""),
+                r.get("number") if r.get("number") is not None else "",
+                escape_formula_cell(r.get("name") or ""),
+                escape_formula_cell(r.get("organization") or ""),
+                round(float(r.get("total") or 0.0), 2),
+            ]
+        )
+
+    # Same guard as the other summary builders: header-only means the
+    # competition has no teams yet, so a write would be misleading.
+    if len(values) <= 1:
+        return "No team data to write to public summary tab."
+
+    client = get_sheets_client(current_app)
+    ss = client._call(client.gc.open_by_key, spreadsheet_id)
+    try:
+        ws = client._call(ss.worksheet, tab_name)
+        client._call(ws.clear)
+    except Exception:
+        ws = client._call(ss.add_worksheet, title=tab_name, rows=max(len(values) + 20, 100), cols=10)
+    client._call(
+        ws.update,
+        range_name="A1",
+        values=values,
+        value_input_option="USER_ENTERED",
+    )
+
+
 def wizard_build_checkpoint_tabs(
     spreadsheet_id: str,
     arrived_header: str,
@@ -1287,7 +1440,7 @@ def wizard_build_checkpoint_tabs(
     checkpoints_query = Checkpoint.query
     if competition_id is not None:
         checkpoints_query = checkpoints_query.filter(Checkpoint.competition_id == competition_id)
-    checkpoints = checkpoints_query.order_by(Checkpoint.name.asc()).all()
+    checkpoints = checkpoints_query.order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc()).all()
     if not checkpoints:
         return 0, 0
 
@@ -1425,7 +1578,7 @@ def wizard_create_checkpoint_configs(
     checkpoints_query = Checkpoint.query
     if competition_id is not None:
         checkpoints_query = checkpoints_query.filter(Checkpoint.competition_id == competition_id)
-    checkpoints = checkpoints_query.order_by(Checkpoint.name.asc()).all()
+    checkpoints = checkpoints_query.order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc()).all()
     if not checkpoints:
         return 0, 0
 
@@ -1575,9 +1728,7 @@ def _field_rule_to_formula(rule, cell_ref: str) -> str | None:
         min_p = _fmt_num(rule.get("min_points") or 0)
         # Empty cell -> deviation would compute |0-target| which is
         # spurious; explicitly return 0 for empty inputs.
-        deviation_expr = (
-            f"MAX({max_p}-ABS({cell_ref}-{target})/{penalty_d}*{penalty_p}; {min_p})"
-        )
+        deviation_expr = f"MAX({max_p}-ABS({cell_ref}-{target})/{penalty_d}*{penalty_p}; {min_p})"
         return f'IF({cell_ref}=""; 0; {deviation_expr})'
 
     # Unknown / unsupported rule type (interpolate, found, time_race
@@ -1636,9 +1787,7 @@ def _points_formula_from_rule(
     return "=" + "+".join(pieces)
 
 
-def _build_local_cp_grid(
-    cfg: SheetConfig, competition_id: int
-) -> tuple[list[list], dict[int, bool]]:
+def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> tuple[list[list], dict[int, bool]]:
     """Build the full per-checkpoint grid (headers + all team rows) from a
     SheetConfig, including any existing ScoreEntry data and check-in
     timestamps. Returned as a 2D list suitable for a single
@@ -1713,15 +1862,11 @@ def _build_local_cp_grid(
             checkin_ts = None
             if cp_id is not None:
                 score = (
-                    ScoreEntry.query.filter_by(
-                        competition_id=competition_id, team_id=t_id, checkpoint_id=cp_id
-                    )
+                    ScoreEntry.query.filter_by(competition_id=competition_id, team_id=t_id, checkpoint_id=cp_id)
                     .order_by(ScoreEntry.created_at.desc())
                     .first()
                 )
-                ci = Checkin.query.filter_by(
-                    competition_id=competition_id, team_id=t_id, checkpoint_id=cp_id
-                ).first()
+                ci = Checkin.query.filter_by(competition_id=competition_id, team_id=t_id, checkpoint_id=cp_id).first()
                 if ci and ci.timestamp:
                     checkin_ts = ci.timestamp
             rows.append(
@@ -1762,9 +1907,7 @@ def _build_local_cp_grid(
             points_col_by_group[gid] = col_cursor  # 1-based column of Points
             field_cols_by_group[gid] = field_cols
             rule = (
-                ScoreRule.query.filter_by(
-                    competition_id=competition_id, checkpoint_id=cp_id, group_id=gid
-                )
+                ScoreRule.query.filter_by(competition_id=competition_id, checkpoint_id=cp_id, group_id=gid)
                 .order_by(ScoreRule.created_at.desc())
                 .first()
             )
@@ -1895,9 +2038,7 @@ def publish_local_configs_to_spreadsheet(
         .all()
     )
     if not configs:
-        result["errors"].append(
-            "No SheetConfigs need publishing (all already point at the target)."
-        )
+        result["errors"].append("No SheetConfigs need publishing (all already point at the target).")
         return result
 
     try:
@@ -1931,8 +2072,7 @@ def publish_local_configs_to_spreadsheet(
             )
             if slot_holder is not None:
                 current_app.logger.info(
-                    "publish: replacing stale SheetConfig id=%s tab=%r "
-                    "with fresh source id=%s",
+                    "publish: replacing stale SheetConfig id=%s tab=%r with fresh source id=%s",
                     slot_holder.id,
                     cfg.tab_name,
                     cfg.id,
@@ -2009,10 +2149,15 @@ def publish_local_configs_to_spreadsheet(
 
     if build_summary_tabs and result["published"] > 0:
         lang = load_lang()
+        # "Javno" (public) is the spectator-facing tab: group, number,
+        # team, organization, total. Same try/except shape as the other
+        # summary tabs so a failure here is logged but doesn't prevent
+        # the rest of the publish from succeeding.
         for label, fn, tab_label in [
             ("teams", build_teams_tab, lang.get("teams_tab") or "Teams"),
             ("arrivals", build_arrivals_tab, lang.get("arrivals_tab") or "Arrivals"),
             ("score", build_score_tab, lang.get("score_tab") or "Score"),
+            ("public", build_public_summary_tab, lang.get("public_tab") or "Javno"),
         ]:
             try:
                 err = fn(

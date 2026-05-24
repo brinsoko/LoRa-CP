@@ -63,7 +63,7 @@
             <th>{{ _('Number') }}</th>
             <th>{{ _('Team') }}</th>
             <th>{{ _('Finished') }}</th>
-            <th class="text-end">{{ _('Time (min)') }}</th>
+            <th class="text-end">{{ _('Time-trial') }}</th>
             <th class="text-end">{{ _('Dead time (sum)') }}</th>
             <th class="text-end">{{ _('Total points') }}</th>
             {% if show_actions %}
@@ -89,11 +89,16 @@
                   <span class="badge text-bg-secondary">{{ _('No') }}</span>
                 {% endif %}
               </td>
+              {# Unified time-trial cell: score (effective minutes). Shows
+                 the points the team gets from the GlobalScoreRule.time
+                 (either absolute or rank mode) followed by their effective
+                 elapsed time (raw - dead time) in parens. #}
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}
-                {% elif row.time_minutes is not none %}
-                  {{ '%.1f'|format(row.time_minutes) }}
+                {% elif row.effective_time_minutes is not none %}
+                  {{ '%.2f'|format(row.global_time or 0) }}
+                  <span class="text-muted small">({{ '%.1f'|format(row.effective_time_minutes) }} min)</span>
                 {% else %}
                   —
                 {% endif %}

@@ -40,9 +40,7 @@ def _serialize_checkpoint(cp: Checkpoint) -> dict:
         "description": cp.description,
         "scoring_text": cp.scoring_text,
         "judges_note": cp.judges_note,
-        "assigned_judges": [
-            {"id": uid, "username": uname} for (uid, uname) in assigned_users
-        ],
+        "assigned_judges": [{"id": uid, "username": uname} for (uid, uname) in assigned_users],
         "easting": cp.easting,
         "northing": cp.northing,
         "is_virtual": cp.is_virtual,
@@ -171,7 +169,7 @@ def checkpoint_list():
             joinedload(Checkpoint.group_links).joinedload(CheckpointGroupLink.group),
             joinedload(Checkpoint.lora_device),
         )
-        .order_by(Checkpoint.name.asc())
+        .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
         .all()
     )
     return json_ok({"checkpoints": [_serialize_checkpoint(cp) for cp in cps]})

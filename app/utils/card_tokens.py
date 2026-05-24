@@ -17,6 +17,27 @@ def _settings() -> tuple[str, int]:
     return secret, hmac_len
 
 
+# Real RFID/NFC card UIDs are 4, 5, 7, 8, or 10 bytes — i.e. 8, 10, 14, 16,
+# or 20 hex characters after normalize_uid stripped colons/dashes. Anything
+# else is almost certainly a manual judge entry (free-text in a UID field
+# that they typed) and should NOT trigger a card_writeback attempt — the
+# previous behaviour returned a writeback dict for those, which made the
+# UI flash "Card write-back failed" against teams that were never scanned.
+_VALID_UID_LENGTHS = frozenset({8, 10, 14, 16, 20})
+_HEX_CHARS = frozenset("0123456789ABCDEF")
+
+
+def looks_like_card_uid(uid: str | None) -> bool:
+    """Cheap shape check — used to suppress writeback attempts for manual
+    judge entries that happen to leave the UID field non-empty."""
+    if not uid:
+        return False
+    s = uid.strip().upper()
+    if len(s) not in _VALID_UID_LENGTHS:
+        return False
+    return all(c in _HEX_CHARS for c in s)
+
+
 def compute_card_digest(uid: str, dev_id: int) -> str | None:
     """
     Compute the truncated hex HMAC for the pair (device, card).

@@ -25,6 +25,15 @@
         <textarea class="form-control" name="description" rows="2">{{ group_obj.description if group_obj else request.form.get('description', '') }}</textarea>
       </div>
 
+      <div class="mb-4 form-check">
+        {% set reverse_checked = (group_obj.reverse if group_obj and group_obj.get('reverse') is not none else (request.form.get('reverse') in ('on', '1', 'true', 'True'))) %}
+        <input class="form-check-input" type="checkbox" name="reverse" id="groupReverse" value="on" {% if reverse_checked %}checked{% endif %}>
+        <label class="form-check-label" for="groupReverse">
+          {{ _('Group traverses route in reverse direction') }}
+        </label>
+        <div class="form-text">{{ _('Flips the checkpoint order shown in live arrivals and used for start/finish detection. Useful when this group starts at the opposite end of the route.') }}</div>
+      </div>
+
       <div class="mb-4">
         <label class="form-label">{{ _('Checkpoints') }}</label>
         <div class="row g-3">

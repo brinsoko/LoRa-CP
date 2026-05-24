@@ -22,7 +22,7 @@ from app.models import (
     Team,
 )
 from app.utils.audit import format_device_label, record_audit_event
-from app.utils.card_tokens import compute_card_digest
+from app.utils.card_tokens import compute_card_digest, looks_like_card_uid
 from app.utils.payloads import parse_gps_payload
 from app.utils.serial_helpers import normalize_uid
 from app.utils.sheets_sync import mark_arrival_checkbox
@@ -437,7 +437,40 @@ def ingest_post():
                     # do not fail ingest if Sheets update fails
                     pass
 
-        looks_like_uid = gps_lat is None and gps_lon is None and (payload is not None) and ("," not in str(payload))
+                # If this check-in lands at the END checkpoint of a rank-mode
+                # GlobalScoreRule.time, the team's time-trial points just
+                # crystallized (and every other finished team's score may
+                # have shifted because the spread changed). Trigger an
+                # async recompute + sheet push so the leaderboard + sheet
+                # both update without a manual judge form submission.
+                # No-op if the team isn't in a rank-mode group, or sheets
+                # sync is disabled.
+                try:
+                    from app.models import GlobalScoreRule as _GSR
+                    from app.utils.sheets_sync_worker import enqueue_recompute_rank_time_push as _enqueue
+
+                    rules_at_end = _GSR.query.filter(_GSR.competition_id == competition_id).all()
+                    for _r in rules_at_end:
+                        tr = (_r.rules or {}).get("time") or {}
+                        if (tr.get("mode") or "").lower() != "rank":
+                            continue
+                        if str(tr.get("end_checkpoint_id") or "") != str(cp.id):
+                            continue
+                        _enqueue(current_app._get_current_object(), competition_id, _r.group_id)
+                except Exception:
+                    pass
+
+        # Skip writeback for non-UID payloads (GPS frames, comma-list data)
+        # AND for inputs whose shape doesn't match a real card UID. The old
+        # check only excluded GPS frames; manual judge entries through this
+        # endpoint would still flash a "writeback failed" UI message.
+        looks_like_uid = (
+            gps_lat is None
+            and gps_lon is None
+            and (payload is not None)
+            and ("," not in str(payload))
+            and looks_like_card_uid(uid)
+        )
         if looks_like_uid:
             digest_id = int(dev_id) if dev_id is not None else int(checkpoint_id or 0)
             card_writeback = _card_writeback(uid, digest_id, cp, team_obj, received_at)

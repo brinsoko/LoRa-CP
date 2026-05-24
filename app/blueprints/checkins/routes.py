@@ -46,7 +46,7 @@ def _fetch_assigned_checkpoints():
             JudgeCheckpoint.user_id == current_user.id,
             Checkpoint.competition_id == comp_id,
         )
-        .order_by(Checkpoint.name.asc())
+        .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
         .all()
     )
     return [jc.checkpoint for jc in assigned if jc.checkpoint]

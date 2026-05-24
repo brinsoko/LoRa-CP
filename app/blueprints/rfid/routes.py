@@ -48,14 +48,18 @@ def _fetch_checkpoints_for_user():
         return []
     role = get_current_competition_role()
     if role == "admin":
-        return Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
+        return (
+            Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
+            .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
+            .all()
+        )
     assigned = (
         JudgeCheckpoint.query.join(Checkpoint, JudgeCheckpoint.checkpoint_id == Checkpoint.id)
         .filter(
             JudgeCheckpoint.user_id == current_user.id,
             Checkpoint.competition_id == comp_id,
         )
-        .order_by(Checkpoint.name.asc())
+        .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
         .all()
     )
     return [jc.checkpoint for jc in assigned if jc.checkpoint]
@@ -156,7 +160,9 @@ def judge_console():
         role = get_current_competition_role()
         if role == "admin":
             checkpoints = (
-                Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
+                Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
+                .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
+                .all()
             )
             default_checkpoint_id = checkpoints[0].id if checkpoints else None
         else:
@@ -166,7 +172,7 @@ def judge_console():
                     JudgeCheckpoint.user_id == current_user.id,
                     Checkpoint.competition_id == comp_id,
                 )
-                .order_by(Checkpoint.name.asc())
+                .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
                 .all()
             )
             default_row = next((jc for jc in assigned if jc.is_default), None)

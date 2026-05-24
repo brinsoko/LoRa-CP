@@ -76,6 +76,7 @@ def _serialize_group(group: CheckpointGroup, include_checkpoints: bool = True) -
         "prefix": group.prefix,
         "description": group.description,
         "position": group.position,
+        "reverse": bool(group.reverse),
     }
     if include_checkpoints:
         data["checkpoints"] = [
@@ -190,6 +191,7 @@ def group_create():
         description=description,
         competition_id=comp_id,
         position=next_position,
+        reverse=bool(payload.get("reverse")),
     )
     db.session.add(group)
     db.session.flush()
@@ -276,6 +278,9 @@ def _update_group(group_id: int, partial: bool):
     if "checkpoint_ids" in payload:
         checkpoint_ids = _parse_checkpoint_ids(payload.get("checkpoint_ids"))
         _sync_group_checkpoints(group, checkpoint_ids)
+
+    if "reverse" in payload or not partial:
+        group.reverse = bool(payload.get("reverse"))
 
     db.session.flush()
     record_audit_event(

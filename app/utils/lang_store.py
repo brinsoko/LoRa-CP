@@ -11,6 +11,7 @@ DEFAULT_LANG = {
     "teams_tab": "Ekipe",
     "arrivals_tab": "Prihodi",
     "score_tab": "Skupni seštevek",
+    "public_tab": "Javno",
     "teams_number_header": "Številka",
     "teams_name_header": "Ime ekipe",
     "teams_org_header": "Rod/Org",

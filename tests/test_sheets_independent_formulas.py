@@ -417,8 +417,12 @@ def test_update_checkpoint_scores_sync_skips_points_when_flag_set(sheets_app, mo
         )
         db.session.commit()
 
-        # Track every update_cell call to verify we wrote task1 but
-        # not the Points column.
+        # Track every cell write to verify we wrote task1 but not the
+        # Points column. update_checkpoint_scores_sync now batches per
+        # cfg via batch_update_columns, so the mock unpacks the column
+        # spec list into the same (row, col, value) tuples the original
+        # update_cell path emitted — keeps the assertions API-shape
+        # agnostic.
         written_cells: list[tuple[int, int, object]] = []
 
         class _RecordingClient:
@@ -436,6 +440,13 @@ def test_update_checkpoint_scores_sync_skips_points_when_flag_set(sheets_app, mo
 
             def update_cell(self, _sid, _tab, row, col, value):
                 written_cells.append((row, col, value))
+
+            def batch_update_columns(self, _sid, _tab, columns):
+                for spec in columns:
+                    col = spec["col"]
+                    start_row = spec["start_row"]
+                    for offset, v in enumerate(spec["values"]):
+                        written_cells.append((start_row + offset, col, v))
 
             def update_column(self, *args, **kwargs):
                 pass
@@ -506,6 +517,16 @@ def test_update_checkpoint_scores_sync_still_writes_points_without_flag(sheets_a
 
             def update_cell(self, _sid, _tab, row, col, value):
                 written.append((row, col, value))
+
+            def batch_update_columns(self, _sid, _tab, columns):
+                # Match the batched API path the sync now uses; unpack
+                # each column spec into (row, col, value) so existing
+                # assertions on `written` remain meaningful.
+                for spec in columns:
+                    col = spec["col"]
+                    start_row = spec["start_row"]
+                    for offset, v in enumerate(spec["values"]):
+                        written.append((start_row + offset, col, v))
 
         monkeypatch.setattr(sheets_sync, "get_sheets_client", lambda _app: _Rec())
         sheets_sync.update_checkpoint_scores_sync(

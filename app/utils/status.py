@@ -106,7 +106,7 @@ def all_checkpoints_for_map(competition_id: int) -> list[dict]:
             Checkpoint.competition_id == competition_id,
             Checkpoint.is_virtual.is_(False),
         )
-        .order_by(Checkpoint.name.asc())
+        .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
         .all()
     )
     return [

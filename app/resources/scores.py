@@ -18,7 +18,7 @@ from app.models import (
     TeamGroup,
 )
 from app.utils.audit import record_audit_event
-from app.utils.card_tokens import compute_card_digest
+from app.utils.card_tokens import compute_card_digest, looks_like_card_uid
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_roles_required
 from app.utils.serial_helpers import normalize_uid
@@ -206,7 +206,13 @@ def _apply_field_rule(value, rule, context: dict) -> float | None:
 
 
 def _get_team_dead_time_total(competition_id: int, team_id: int) -> float:
-    """Sum all dead_time values from the latest ScoreEntry per checkpoint for a team."""
+    """Sum all dead_time values for a team — CP-bound entries plus the
+    team-level ``Team.bonus_dead_time`` adjustment (set by admins for
+    organizer-caused delays that don't belong to any single checkpoint).
+
+    Per-CP component: latest ScoreEntry's ``raw_fields.dead_time`` per CP.
+    Team-level component: ``Team.bonus_dead_time`` (in minutes, default 0).
+    """
     entries = (
         ScoreEntry.query.filter(
             ScoreEntry.competition_id == competition_id,
@@ -226,10 +232,47 @@ def _get_team_dead_time_total(competition_id: int, team_id: int) -> float:
         num = _to_number(dead_val)
         if num is not None and num > 0:
             total_dead += num
+
+    # Team-level adjustment. Stored in minutes on the Team row so admins
+    # can flag delays the team had no control over (e.g. checkpoint
+    # offline for 15 min) without inventing fake CP-level dead-time.
+    team = db.session.get(Team, team_id)
+    if team and team.bonus_dead_time:
+        try:
+            total_dead += float(team.bonus_dead_time)
+        except (TypeError, ValueError):
+            pass
+
     return total_dead
 
 
-def _compute_global_contrib(competition_id: int, team_id: int, group_id: int, global_rule: dict | None) -> dict:
+def _compute_global_contrib(
+    competition_id: int,
+    team_id: int,
+    group_id: int,
+    global_rule: dict | None,
+    *,
+    precomputed_rank_score: float | None = None,
+) -> dict:
+    """Per-team contribution from the group's GlobalScoreRule.
+
+    The time rule supports two modes (set via ``rules['time']['mode']``):
+
+    - ``"absolute"`` (default for backward compat): the classic
+      threshold-and-penalty formula. ``max_points`` if you finish under
+      ``threshold_minutes``, then lose ``penalty_points`` per
+      ``penalty_minutes`` over until you hit ``min_points``.
+    - ``"rank"``: fastest finisher in the group gets ``max_points``,
+      slowest gets ``min_points``, everyone else linearly interpolated by
+      effective duration. The caller (``_build_scores_context``) must
+      pre-compute the per-group rank map once and pass this team's score
+      via ``precomputed_rank_score`` so we don't re-rank the whole field
+      for every team.
+
+    Auto-DNF (``dq_multiplier``) still applies in rank mode — a team
+    that's massively over threshold is DNF regardless of where they
+    ranked against an even-slower team.
+    """
     if not global_rule:
         return {"total": None, "found_points": None, "time_points": None, "auto_dnf": False}
 
@@ -275,6 +318,7 @@ def _compute_global_contrib(competition_id: int, team_id: int, group_id: int, gl
             used = True
 
     time_rule = global_rule.get("time") or {}
+    mode = (time_rule.get("mode") or "absolute").strip().lower()
     start_cp = time_rule.get("start_checkpoint_id")
     end_cp = time_rule.get("end_checkpoint_id")
     max_points = _to_number(time_rule.get("max_points"))
@@ -283,14 +327,11 @@ def _compute_global_contrib(competition_id: int, team_id: int, group_id: int, gl
     penalty_points = _to_number(time_rule.get("penalty_points"))
     min_points = _to_number(time_rule.get("min_points")) or 0.0
     dq_multiplier = _to_number(time_rule.get("dq_multiplier"))
-    if (
-        start_cp
-        and end_cp
-        and max_points is not None
-        and threshold_minutes is not None
-        and penalty_minutes
-        and penalty_points is not None
-    ):
+
+    # Auto-DQ check is shared between modes: compute effective duration
+    # if start+end check-ins exist, regardless of mode.
+    effective_duration_minutes = None
+    if start_cp and end_cp:
         start_row = (
             Checkin.query.filter(
                 Checkin.competition_id == competition_id,
@@ -311,20 +352,37 @@ def _compute_global_contrib(competition_id: int, team_id: int, group_id: int, gl
         )
         if start_row and end_row:
             raw_duration = (end_row.timestamp - start_row.timestamp).total_seconds() / 60.0
-            # Subtract dead time from elapsed duration
             dead_time_total = _get_team_dead_time_total(competition_id, team_id)
-            duration_minutes = max(0.0, raw_duration - dead_time_total)
-
-            # Auto-DQ check: if effective time exceeds threshold × dq_multiplier
-            if dq_multiplier is not None and dq_multiplier > 0 and duration_minutes > threshold_minutes * dq_multiplier:
+            effective_duration_minutes = max(0.0, raw_duration - dead_time_total)
+            if (
+                dq_multiplier is not None
+                and dq_multiplier > 0
+                and threshold_minutes is not None
+                and effective_duration_minutes > threshold_minutes * dq_multiplier
+            ):
                 auto_dnf = True
 
-            if duration_minutes <= threshold_minutes:
+    if mode == "rank":
+        # Rank mode: caller supplied the precomputed score (or None for
+        # teams that didn't finish or aren't in any rank group).
+        if precomputed_rank_score is not None and max_points is not None:
+            time_points = _round_score(_clamp_non_negative(precomputed_rank_score))
+            total += time_points
+            used = True
+    else:
+        # Absolute mode (default): threshold + penalty.
+        if (
+            effective_duration_minutes is not None
+            and max_points is not None
+            and threshold_minutes is not None
+            and penalty_minutes
+            and penalty_points is not None
+        ):
+            if effective_duration_minutes <= threshold_minutes:
                 time_points = max_points
             else:
-                over = max(0.0, duration_minutes - threshold_minutes)
+                over = max(0.0, effective_duration_minutes - threshold_minutes)
                 time_points = max_points - (over / penalty_minutes) * penalty_points
-            # Clamp to minimum (never negative), round to 2 decimal places
             time_points = _round_score(_clamp_non_negative(max(time_points, min_points)))
             total += time_points
             used = True
@@ -857,7 +915,12 @@ def score_submit():
 
     card_writeback = None
     writeback_error = None
-    if created_checkin and uid:
+    # Only produce a writeback for inputs that actually look like a scanned
+    # card UID — see looks_like_card_uid for the heuristic. Manual judge
+    # entries (selected via team dropdown) used to trigger a writeback
+    # attempt that always failed and flashed "Card write-back failed" in
+    # the UI, which was confusing.
+    if created_checkin and looks_like_card_uid(uid):
         digest = compute_card_digest(uid, int(checkpoint_id))
         if digest:
             card_writeback = {

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-05-22 14:28+0200\n"
+"POT-Creation-Date: 2026-05-24 19:20+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -28,12 +28,12 @@ msgstr ""
 msgid "Prefix conflicts with existing group '%(group)s' (prefix: %(prefix)s)."
 msgstr ""
 
-#: app/api/groups.py:183
+#: app/api/groups.py:184
 msgid "Group name already exists."
 msgstr ""
 
-#: app/api/teams.py:242 app/api/teams.py:244 app/api/teams.py:294
-#: app/api/teams.py:344 app/api/teams.py:348 app/api/teams.py:419
+#: app/api/teams.py:258 app/api/teams.py:260 app/api/teams.py:310
+#: app/api/teams.py:360 app/api/teams.py:364 app/api/teams.py:458
 msgid "Team number must be a positive integer."
 msgstr ""
 
@@ -80,7 +80,7 @@ msgstr ""
 msgid "Competition %(name)s created."
 msgstr ""
 
-#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:371
+#: app/blueprints/audit/routes.py:72 app/blueprints/main/routes.py:382
 msgid "Competition settings updated."
 msgstr ""
 
@@ -99,7 +99,7 @@ msgstr ""
 msgid "Team %(name)s created."
 msgstr ""
 
-#: app/blueprints/audit/routes.py:80 app/blueprints/teams/routes.py:309
+#: app/blueprints/audit/routes.py:80 app/blueprints/teams/routes.py:331
 msgid "Team updated."
 msgstr ""
 
@@ -121,7 +121,7 @@ msgstr ""
 msgid "Checkpoint %(name)s created."
 msgstr ""
 
-#: app/blueprints/audit/routes.py:90 app/blueprints/checkpoints/routes.py:210
+#: app/blueprints/audit/routes.py:90 app/blueprints/checkpoints/routes.py:322
 msgid "Checkpoint updated."
 msgstr ""
 
@@ -135,7 +135,7 @@ msgstr ""
 msgid "Group %(name)s created."
 msgstr ""
 
-#: app/blueprints/audit/routes.py:96 app/blueprints/groups/routes.py:168
+#: app/blueprints/audit/routes.py:96 app/blueprints/groups/routes.py:173
 msgid "Group updated."
 msgstr ""
 
@@ -163,20 +163,22 @@ msgid "Device %(name)s deleted."
 msgstr ""
 
 #: app/blueprints/audit/routes.py:115 app/blueprints/checkins/routes.py:171
+#: app/blueprints/checkpoints/routes.py:164
 #: app/blueprints/firmware/routes.py:41 app/blueprints/judges/routes.py:18
-#: app/blueprints/main/routes.py:165 app/blueprints/main/routes.py:225
-#: app/blueprints/main/routes.py:410 app/blueprints/main/routes.py:447
-#: app/blueprints/main/routes.py:475 app/blueprints/scores/routes.py:79
-#: app/blueprints/scores/routes.py:228 app/blueprints/scores/routes.py:246
-#: app/blueprints/scores/routes.py:321 app/blueprints/scores/routes.py:584
-#: app/blueprints/scores/routes.py:646 app/blueprints/scores/routes.py:924
-#: app/blueprints/sheets/routes.py:55 app/blueprints/users/routes.py:43
-#: app/blueprints/users/routes.py:67 app/blueprints/users/routes.py:134
-#: app/blueprints/users/routes.py:197 app/blueprints/users/routes.py:284
+#: app/blueprints/main/routes.py:172 app/blueprints/main/routes.py:236
+#: app/blueprints/main/routes.py:421 app/blueprints/main/routes.py:458
+#: app/blueprints/main/routes.py:486 app/blueprints/scores/routes.py:87
+#: app/blueprints/scores/routes.py:240 app/blueprints/scores/routes.py:258
+#: app/blueprints/scores/routes.py:333 app/blueprints/scores/routes.py:715
+#: app/blueprints/scores/routes.py:735 app/blueprints/scores/routes.py:860
+#: app/blueprints/scores/routes.py:1134 app/blueprints/sheets/routes.py:61
+#: app/blueprints/users/routes.py:43 app/blueprints/users/routes.py:87
+#: app/blueprints/users/routes.py:154 app/blueprints/users/routes.py:217
+#: app/blueprints/users/routes.py:304
 msgid "Select a competition first."
 msgstr ""
 
-#: app/blueprints/audit/routes.py:129 app/blueprints/main/routes.py:176
+#: app/blueprints/audit/routes.py:129 app/blueprints/main/routes.py:187
 msgid "Invalid date filter; showing unfiltered results."
 msgstr ""
 
@@ -184,11 +186,11 @@ msgstr ""
 msgid "Please fill in all fields."
 msgstr ""
 
-#: app/blueprints/auth/routes.py:26 app/blueprints/users/routes.py:247
+#: app/blueprints/auth/routes.py:26 app/blueprints/users/routes.py:267
 msgid "New passwords do not match."
 msgstr ""
 
-#: app/blueprints/auth/routes.py:28 app/blueprints/users/routes.py:244
+#: app/blueprints/auth/routes.py:28 app/blueprints/users/routes.py:264
 msgid "New password must be at least 8 characters."
 msgstr ""
 
@@ -249,7 +251,7 @@ msgstr ""
 msgid "Signed out."
 msgstr ""
 
-#: app/blueprints/auth/routes.py:246 app/blueprints/users/routes.py:226
+#: app/blueprints/auth/routes.py:246 app/blueprints/users/routes.py:246
 msgid "Invalid form data."
 msgstr ""
 
@@ -301,7 +303,7 @@ msgstr ""
 msgid "Could not load check-ins."
 msgstr ""
 
-#: app/blueprints/checkins/routes.py:182 app/blueprints/groups/routes.py:123
+#: app/blueprints/checkins/routes.py:182 app/blueprints/groups/routes.py:125
 msgid "Group not found."
 msgstr ""
 
@@ -364,62 +366,67 @@ msgstr ""
 msgid "Could not load devices."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:132
-#: app/blueprints/checkpoints/routes.py:193
+#: app/blueprints/checkpoints/routes.py:169
+#: app/blueprints/checkpoints/routes.py:274
+msgid "Checkpoint not found."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:221
+msgid "Checkpoint judges updated."
+msgstr ""
+
+#: app/blueprints/checkpoints/routes.py:244
+#: app/blueprints/checkpoints/routes.py:305
 #: app/blueprints/firmware/routes.py:101
 msgid "Name is required."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:143
+#: app/blueprints/checkpoints/routes.py:255
 msgid "Checkpoint added."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:162
-msgid "Checkpoint not found."
-msgstr ""
-
-#: app/blueprints/checkpoints/routes.py:244
+#: app/blueprints/checkpoints/routes.py:356
 msgid "Checkpoint deleted."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:246
-#: app/blueprints/checkpoints/routes.py:250
+#: app/blueprints/checkpoints/routes.py:358
+#: app/blueprints/checkpoints/routes.py:362
 msgid "Could not delete checkpoint."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:285
+#: app/blueprints/checkpoints/routes.py:397
 msgid "Paste JSON payload to import."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:291 app/blueprints/scores/routes.py:113
+#: app/blueprints/checkpoints/routes.py:403 app/blueprints/scores/routes.py:125
 #, python-format
 msgid "Invalid JSON: %(error)s"
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:315
+#: app/blueprints/checkpoints/routes.py:427
 msgid ""
 "JSON must be an array of checkpoints, an object with 'items', or an "
 "object with 'cps' list."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:322
+#: app/blueprints/checkpoints/routes.py:434
 #: app/templates/competition_transfer.html:88
 msgid "Import failed."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:323
+#: app/blueprints/checkpoints/routes.py:435
 #, python-format
 msgid "Import failed: %(detail)s"
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:330
+#: app/blueprints/checkpoints/routes.py:442
 #, python-format
 msgid ""
 "Imported checkpoints: created %(created)s, updated %(updated)s, skipped "
 "%(skipped)s."
 msgstr ""
 
-#: app/blueprints/checkpoints/routes.py:338
+#: app/blueprints/checkpoints/routes.py:450
 #, python-format
 msgid "%(count)s row(s) reported errors; see logs."
 msgstr ""
@@ -470,55 +477,55 @@ msgstr ""
 msgid "Firmware '%(name)s' deleted."
 msgstr ""
 
-#: app/blueprints/groups/routes.py:81 app/blueprints/groups/routes.py:141
+#: app/blueprints/groups/routes.py:82 app/blueprints/groups/routes.py:144
 msgid "Group name is required."
 msgstr ""
 
-#: app/blueprints/groups/routes.py:103
+#: app/blueprints/groups/routes.py:105
 msgid "Group created."
 msgstr ""
 
-#: app/blueprints/groups/routes.py:106
+#: app/blueprints/groups/routes.py:108
 msgid "Could not create group."
 msgstr ""
 
-#: app/blueprints/groups/routes.py:171
+#: app/blueprints/groups/routes.py:176
 msgid "Could not update group."
 msgstr ""
 
-#: app/blueprints/groups/routes.py:199
+#: app/blueprints/groups/routes.py:205
 msgid "Group deleted."
 msgstr ""
 
-#: app/blueprints/groups/routes.py:201
+#: app/blueprints/groups/routes.py:207
 msgid "Could not delete group."
 msgstr ""
 
-#: app/blueprints/groups/routes.py:212
+#: app/blueprints/groups/routes.py:218
 msgid "team_id and group_id are required."
 msgstr ""
 
-#: app/blueprints/groups/routes.py:217
+#: app/blueprints/groups/routes.py:223
 msgid "group_id must be an integer."
 msgstr ""
 
-#: app/blueprints/groups/routes.py:227
+#: app/blueprints/groups/routes.py:233
 msgid "Active group updated."
 msgstr ""
 
-#: app/blueprints/groups/routes.py:229
+#: app/blueprints/groups/routes.py:235
 msgid "Could not set active group."
 msgstr ""
 
-#: app/blueprints/judges/routes.py:50
+#: app/blueprints/judges/routes.py:54
 msgid "Select a judge."
 msgstr ""
 
-#: app/blueprints/judges/routes.py:59
+#: app/blueprints/judges/routes.py:63
 msgid "Invalid judge selection."
 msgstr ""
 
-#: app/blueprints/judges/routes.py:100
+#: app/blueprints/judges/routes.py:113
 msgid "Judge checkpoints updated."
 msgstr ""
 
@@ -550,56 +557,56 @@ msgstr ""
 msgid "Could not delete device."
 msgstr ""
 
-#: app/blueprints/main/routes.py:63 app/blueprints/main/routes.py:335
+#: app/blueprints/main/routes.py:64 app/blueprints/main/routes.py:346
 msgid "A competition with that name already exists."
 msgstr ""
 
-#: app/blueprints/main/routes.py:104
+#: app/blueprints/main/routes.py:105
 msgid "Competition created."
 msgstr ""
 
-#: app/blueprints/main/routes.py:112
+#: app/blueprints/main/routes.py:113
 msgid "You don't have access to that competition."
 msgstr ""
 
-#: app/blueprints/main/routes.py:114
+#: app/blueprints/main/routes.py:115
 msgid "Competition selected."
 msgstr ""
 
-#: app/blueprints/main/routes.py:230 app/blueprints/main/routes.py:452
-#: app/blueprints/main/routes.py:480
+#: app/blueprints/main/routes.py:241 app/blueprints/main/routes.py:463
+#: app/blueprints/main/routes.py:491
 msgid "Competition not found."
 msgstr ""
 
-#: app/blueprints/main/routes.py:243
+#: app/blueprints/main/routes.py:254
 msgid "Valid email is required."
 msgstr ""
 
-#: app/blueprints/main/routes.py:246 app/blueprints/users/routes.py:79
+#: app/blueprints/main/routes.py:257 app/blueprints/users/routes.py:99
 msgid "Invalid role selected."
 msgstr ""
 
-#: app/blueprints/main/routes.py:255
+#: app/blueprints/main/routes.py:266
 msgid "An active invite already exists for this email."
 msgstr ""
 
-#: app/blueprints/main/routes.py:312
+#: app/blueprints/main/routes.py:323
 msgid "Invite saved."
 msgstr ""
 
-#: app/blueprints/main/routes.py:418
+#: app/blueprints/main/routes.py:429
 msgid "Invite not found."
 msgstr ""
 
-#: app/blueprints/main/routes.py:438
+#: app/blueprints/main/routes.py:449
 msgid "Invite revoked."
 msgstr ""
 
-#: app/blueprints/main/routes.py:463
+#: app/blueprints/main/routes.py:474
 msgid "Competition deleted."
 msgstr ""
 
-#: app/blueprints/main/routes.py:466
+#: app/blueprints/main/routes.py:477
 msgid "Could not delete competition."
 msgstr ""
 
@@ -611,254 +618,259 @@ msgstr ""
 msgid "Could not load RFID mappings."
 msgstr ""
 
-#: app/blueprints/rfid/routes.py:88
+#: app/blueprints/rfid/routes.py:92
 msgid "RFID mapping created."
 msgstr ""
 
-#: app/blueprints/rfid/routes.py:91
+#: app/blueprints/rfid/routes.py:95
 msgid "Could not create RFID mapping."
 msgstr ""
 
-#: app/blueprints/rfid/routes.py:107
+#: app/blueprints/rfid/routes.py:111
 msgid "RFID card not found."
 msgstr ""
 
-#: app/blueprints/rfid/routes.py:125
+#: app/blueprints/rfid/routes.py:129
 msgid "RFID mapping updated."
 msgstr ""
 
-#: app/blueprints/rfid/routes.py:128
+#: app/blueprints/rfid/routes.py:132
 msgid "Could not update RFID mapping."
 msgstr ""
 
-#: app/blueprints/rfid/routes.py:194
+#: app/blueprints/rfid/routes.py:200
 msgid "RFID mapping deleted."
 msgstr ""
 
-#: app/blueprints/rfid/routes.py:196
+#: app/blueprints/rfid/routes.py:202
 msgid "Could not delete RFID mapping."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:107
+#: app/blueprints/scores/routes.py:119
 msgid "Checkpoint, group, and rules JSON are required."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:117 app/templates/score_rules.html:295
+#: app/blueprints/scores/routes.py:129 app/templates/score_rules.html:295
 msgid "Rules JSON must be an object."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:126 app/templates/score_rules.html:296
+#: app/blueprints/scores/routes.py:138 app/templates/score_rules.html:296
 msgid "Time-based scoring requires start and end checkpoints."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:145
+#: app/blueprints/scores/routes.py:157
 msgid "No groups are linked to this checkpoint, nothing to apply."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:174
+#: app/blueprints/scores/routes.py:186
 #, python-format
 msgid "Applied to %(count)s groups (created %(created)s, updated %(updated)s)."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:195
+#: app/blueprints/scores/routes.py:207
 msgid "Score rule updated."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:204
+#: app/blueprints/scores/routes.py:216
 msgid "Score rule created."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:232
+#: app/blueprints/scores/routes.py:244
 msgid "Score rule not found."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:237
+#: app/blueprints/scores/routes.py:249
 msgid "Score rule deleted."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:265
+#: app/blueprints/scores/routes.py:277
 msgid "Group is required for global rules."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:277
+#: app/blueprints/scores/routes.py:289
 msgid "Global time rule requires start and end checkpoints."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:292
+#: app/blueprints/scores/routes.py:304
 msgid "Select at least one global rule."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:301
+#: app/blueprints/scores/routes.py:313
 msgid "Global rules updated."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:309
+#: app/blueprints/scores/routes.py:321
 msgid "Global rules created."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:328
+#: app/blueprints/scores/routes.py:340
 msgid "Global rule not found."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:333
+#: app/blueprints/scores/routes.py:345
 msgid "Global rule deleted."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:597 app/blueprints/scores/routes.py:912
+#: app/blueprints/scores/routes.py:811 app/blueprints/scores/routes.py:1122
 msgid "Public results are not enabled for this competition."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:977
+#: app/blueprints/scores/routes.py:1200
 msgid "Legacy or unknown"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:62
+#: app/blueprints/sheets/routes.py:68
 msgid "Sheets sync is disabled."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:157
+#: app/blueprints/sheets/routes.py:167
 msgid "Language pack saved."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:166
+#: app/blueprints/sheets/routes.py:176
 msgid "Sheets settings saved."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:198
+#: app/blueprints/sheets/routes.py:208
 msgid "Spreadsheet ID is required to build arrivals."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:216
+#: app/blueprints/sheets/routes.py:226
 #, python-format
 msgid "Failed to build arrivals tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:218
+#: app/blueprints/sheets/routes.py:228
 #, python-format
 msgid "Arrivals tab '%(tab)s' updated."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:235
+#: app/blueprints/sheets/routes.py:245
 #, python-format
 msgid "Arrivals tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:260 app/blueprints/sheets/routes.py:316
-#: app/blueprints/sheets/routes.py:508 app/blueprints/sheets/routes.py:745
+#: app/blueprints/sheets/routes.py:270 app/blueprints/sheets/routes.py:326
+#: app/blueprints/sheets/routes.py:522 app/blueprints/sheets/routes.py:825
 msgid "Spreadsheet ID is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:276
+#: app/blueprints/sheets/routes.py:286
 #, python-format
 msgid "Failed to build teams tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:278
+#: app/blueprints/sheets/routes.py:288
 #, python-format
 msgid "Teams tab '%(tab)s' updated."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:291
+#: app/blueprints/sheets/routes.py:301
 #, python-format
 msgid "Teams tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:342
+#: app/blueprints/sheets/routes.py:352
 #, python-format
 msgid "Failed to build score tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:344
+#: app/blueprints/sheets/routes.py:354
 #, python-format
 msgid "Score tab '%(tab)s' updated."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:359
+#: app/blueprints/sheets/routes.py:369
 #, python-format
 msgid "Score tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:376
+#: app/blueprints/sheets/routes.py:386
 msgid "No configs to prune."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:384
+#: app/blueprints/sheets/routes.py:394
 #, python-format
 msgid "Could not init Sheets client: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:405
+#: app/blueprints/sheets/routes.py:415
 #, python-format
 msgid "Pruned %(count)s stale config(s) (tabs no longer exist)."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:407
+#: app/blueprints/sheets/routes.py:417
 msgid "No stale configs found."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:513
+#: app/blueprints/sheets/routes.py:527
 msgid "Select at least one checkpoint to create."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:558
+#: app/blueprints/sheets/routes.py:572
 #, python-format
 msgid "Wizard failed: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:564
+#: app/blueprints/sheets/routes.py:578
 #, python-format
 msgid ""
 "Wizard completed. Created %(created)s local configs, skipped %(skipped)s "
 "existing."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:573
+#: app/blueprints/sheets/routes.py:587
 #, python-format
 msgid "Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:593 app/blueprints/sheets/routes.py:694
+#: app/blueprints/sheets/routes.py:607 app/blueprints/sheets/routes.py:774
 msgid "Config not found."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:596
+#: app/blueprints/sheets/routes.py:610
 msgid "Config is missing groups; cannot sync."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:604
+#: app/blueprints/sheets/routes.py:658
 #, python-format
 msgid "Failed to sync team numbers: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:606
-msgid "Synced team numbers for checkpoint tabs."
+#: app/blueprints/sheets/routes.py:675
+#, python-format
+msgid "Synced checkpoint tabs but some summary rebuilds reported errors: %(errs)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:614
+#: app/blueprints/sheets/routes.py:682
+msgid "Synced team numbers and rebuilt Ekipe, Prihodi, and Skupni seštevek."
+msgstr ""
+
+#: app/blueprints/sheets/routes.py:696
 msgid "Team-number sync queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:638
+#: app/blueprints/sheets/routes.py:720
 msgid "Target spreadsheet ID is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:642
+#: app/blueprints/sheets/routes.py:724
 msgid "Target spreadsheet must be a real Google Sheets ID, not a local: sentinel."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:652
+#: app/blueprints/sheets/routes.py:734
 #, python-format
 msgid "Publish failed: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:658
+#: app/blueprints/sheets/routes.py:740
 #, python-format
 msgid ""
 "Published %(count)s checkpoint tab(s), skipped %(skip)s. Summary tabs "
 "built: %(s)s."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:675
+#: app/blueprints/sheets/routes.py:755
 #, python-format
 msgid ""
 "Publish to %(sid)s queued. This takes ~30 seconds for a 15-CP "
@@ -866,111 +878,158 @@ msgid ""
 "log."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:708
+#: app/blueprints/sheets/routes.py:788
 #, python-format
 msgid "Remote tab could not be deleted: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:712
+#: app/blueprints/sheets/routes.py:792
 #, python-format
 msgid "Config '%(tab)s' deleted."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:740
+#: app/blueprints/sheets/routes.py:820
 msgid "Tab title is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:750
+#: app/blueprints/sheets/routes.py:830
 msgid "At least one group line is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:803
+#: app/blueprints/sheets/routes.py:883
 #, python-format
 msgid "Could not add tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:806
+#: app/blueprints/sheets/routes.py:886
 msgid ""
 "Check that the spreadsheet ID is correct and that the service account "
 "email has Editor access to it."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:816
+#: app/blueprints/sheets/routes.py:896
 #, python-format
 msgid ""
 "A config for tab '%(tab)s' already exists. Submit again with overwrite "
 "enabled to replace it."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:839
+#: app/blueprints/sheets/routes.py:919
 #, python-format
 msgid "Tab '%(tab)s' overwritten."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:853
+#: app/blueprints/sheets/routes.py:933
 #, python-format
 msgid "Added local tab '%(tab)s'."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:855
+#: app/blueprints/sheets/routes.py:935
 #, python-format
 msgid "Added tab '%(tab)s' to spreadsheet."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:142 app/blueprints/teams/routes.py:247
+#: app/blueprints/superadmin/routes.py:154
+msgid "Invalid role."
+msgstr ""
+
+#: app/blueprints/superadmin/routes.py:163
+msgid "Pick a competition to attach the new users to."
+msgstr ""
+
+#: app/blueprints/superadmin/routes.py:185
+#, python-format
+msgid "Invalid usernames (skipped): %(list)s"
+msgstr ""
+
+#: app/blueprints/superadmin/routes.py:190
+#, python-format
+msgid "Duplicate usernames in input (skipped): %(list)s"
+msgstr ""
+
+#: app/blueprints/superadmin/routes.py:195
+msgid "Provide at least one valid username."
+msgstr ""
+
+#: app/blueprints/superadmin/routes.py:247
+#, python-format
+msgid "Already in %(comp)s (skipped): %(list)s"
+msgstr ""
+
+#: app/blueprints/superadmin/routes.py:256
+#, python-format
+msgid "Existing user(s) attached to %(comp)s as %(role)s: %(list)s"
+msgstr ""
+
+#: app/blueprints/superadmin/routes.py:291
+#: app/templates/superadmin_index.html:100
+msgid "You cannot delete your own account."
+msgstr ""
+
+#: app/blueprints/superadmin/routes.py:296 app/blueprints/users/routes.py:231
+#: app/blueprints/users/routes.py:311
+msgid "User not found."
+msgstr ""
+
+#: app/blueprints/superadmin/routes.py:311
+#, python-format
+msgid "Deleted user '%(user)s'."
+msgstr ""
+
+#: app/blueprints/teams/routes.py:142 app/blueprints/teams/routes.py:259
 msgid "Team name is required."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:181
+#: app/blueprints/teams/routes.py:193
 msgid "Team created."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:184
+#: app/blueprints/teams/routes.py:196
 msgid "Could not create team."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:200
+#: app/blueprints/teams/routes.py:212
 msgid "Team not found."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:312
+#: app/blueprints/teams/routes.py:334
 msgid "Could not update team."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:349
+#: app/blueprints/teams/routes.py:371
 msgid "Team deleted."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:351
+#: app/blueprints/teams/routes.py:373
 msgid "Could not delete team."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:366
+#: app/blueprints/teams/routes.py:388
 msgid "Could not randomize team numbers."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:371
+#: app/blueprints/teams/routes.py:393
 #, python-format
 msgid "Randomized team numbers. Assigned %(count)s."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:373
+#: app/blueprints/teams/routes.py:395
 msgid "No team numbers were assigned."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:377
+#: app/blueprints/teams/routes.py:399
 #, python-format
 msgid "Group %(id)s"
 msgstr ""
 
-#: app/blueprints/teams/routes.py:382
+#: app/blueprints/teams/routes.py:404
 #, python-format
 msgid ""
 "Not enough numbers available in range %(min)s–%(max)s. %(available)s "
 "available, %(needed)s needed."
 msgstr ""
 
-#: app/blueprints/teams/routes.py:391
+#: app/blueprints/teams/routes.py:413
 #, python-format
 msgid "%(group)s: invalid or missing prefix."
 msgstr ""
@@ -989,54 +1048,50 @@ msgid ""
 "hyphens."
 msgstr ""
 
-#: app/blueprints/users/routes.py:89
+#: app/blueprints/users/routes.py:109
 msgid "No existing user matches that username or email."
 msgstr ""
 
-#: app/blueprints/users/routes.py:97
+#: app/blueprints/users/routes.py:117
 msgid "That user is already in this competition."
 msgstr ""
 
-#: app/blueprints/users/routes.py:103
+#: app/blueprints/users/routes.py:123
 #, python-format
 msgid "User '%(user)s' re-added to this competition."
 msgstr ""
 
-#: app/blueprints/users/routes.py:112
+#: app/blueprints/users/routes.py:132
 #, python-format
 msgid "User '%(user)s' added to this competition."
 msgstr ""
 
-#: app/blueprints/users/routes.py:141
+#: app/blueprints/users/routes.py:161
 msgid "Please fill all fields. Role must be viewer/judge/admin."
 msgstr ""
 
-#: app/blueprints/users/routes.py:145
+#: app/blueprints/users/routes.py:165
 msgid "Username already exists."
 msgstr ""
 
-#: app/blueprints/users/routes.py:186
+#: app/blueprints/users/routes.py:206
 #, python-format
 msgid "User '%(user)s' created."
 msgstr ""
 
-#: app/blueprints/users/routes.py:211 app/blueprints/users/routes.py:291
-msgid "User not found."
-msgstr ""
-
-#: app/blueprints/users/routes.py:231
+#: app/blueprints/users/routes.py:251
 msgid "Another user already has that username."
 msgstr ""
 
-#: app/blueprints/users/routes.py:250
+#: app/blueprints/users/routes.py:270
 msgid "Password should not contain the username."
 msgstr ""
 
-#: app/blueprints/users/routes.py:273
+#: app/blueprints/users/routes.py:293
 msgid "User updated."
 msgstr ""
 
-#: app/blueprints/users/routes.py:318
+#: app/blueprints/users/routes.py:338
 msgid "User removed from this competition."
 msgstr ""
 
@@ -1080,13 +1135,13 @@ msgstr ""
 msgid "No UID read (check device, cable, or increase timeout)."
 msgstr ""
 
-#: app/resources/scores.py:680
+#: app/resources/scores.py:738
 msgid "Score cannot be negative."
 msgstr ""
 
 #: app/templates/add_checkin.html:2 app/templates/add_checkin.html:7
-#: app/templates/base.html:149 app/templates/live_arrivals.html:36
-#: app/templates/view_checkins.html:73
+#: app/templates/base.html:157 app/templates/live_arrivals.html:36
+#: app/templates/view_checkins.html:85
 msgid "Add Check-in"
 msgstr ""
 
@@ -1094,68 +1149,68 @@ msgstr ""
 #: app/templates/live_arrivals.html:186 app/templates/map.html:7
 #: app/templates/rfid_finish.html:88 app/templates/rfid_judge.html:92
 #: app/templates/rfid_list.html:24 app/templates/score_judge.html:161
-#: app/templates/scores_submissions.html:39 app/templates/scores_view.html:58
-#: app/templates/scores_view.html:158 app/templates/view_checkins.html:10
-#: app/templates/view_checkins.html:90
+#: app/templates/scores_submissions.html:39 app/templates/scores_view.html:64
+#: app/templates/scores_view.html:169 app/templates/view_checkins.html:10
+#: app/templates/view_checkins.html:102
 msgid "Team"
 msgstr ""
 
-#: app/templates/add_checkin.html:14
-msgid "Search teams..."
+#: app/templates/add_checkin.html:27 app/templates/score_judge.html:52
+msgid "Type number or name"
 msgstr ""
 
-#: app/templates/add_checkin.html:25 app/templates/checkin_edit.html:24
+#: app/templates/add_checkin.html:39 app/templates/checkin_edit.html:24
 #: app/templates/judge_assign.html:49 app/templates/live_arrivals.html:130
 #: app/templates/lora_list.html:13 app/templates/rfid_judge.html:16
 #: app/templates/rfid_judge.html:93 app/templates/score_judge.html:16
 #: app/templates/score_judge.html:162 app/templates/score_rules.html:13
 #: app/templates/score_rules.html:189 app/templates/scores_submissions.html:40
-#: app/templates/sheets_admin.html:137 app/templates/sheets_admin.html:341
-#: app/templates/view_checkins.html:23 app/templates/view_checkins.html:92
+#: app/templates/sheets_admin.html:137 app/templates/sheets_admin.html:358
+#: app/templates/view_checkins.html:35 app/templates/view_checkins.html:104
 msgid "Checkpoint"
 msgstr ""
 
-#: app/templates/add_checkin.html:35 app/templates/checkin_edit.html:33
+#: app/templates/add_checkin.html:49 app/templates/checkin_edit.html:33
 #: app/templates/rfid_judge.html:26 app/templates/score_judge.html:26
 msgid "No checkpoints assigned yet."
 msgstr ""
 
-#: app/templates/add_checkin.html:40
+#: app/templates/add_checkin.html:54
 msgid "Time (optional)"
 msgstr ""
 
-#: app/templates/add_checkin.html:46
+#: app/templates/add_checkin.html:60
 msgid "Leave blank to use the current time."
 msgstr ""
 
-#: app/templates/add_checkin.html:50 app/templates/checkin_edit.html:48
+#: app/templates/add_checkin.html:64 app/templates/checkin_edit.html:48
 msgid "Time zone"
 msgstr ""
 
-#: app/templates/add_checkin.html:53 app/templates/checkin_edit.html:51
+#: app/templates/add_checkin.html:67 app/templates/checkin_edit.html:51
 msgid "Times are entered in local time and stored in UTC."
 msgstr ""
 
-#: app/templates/add_checkin.html:60
+#: app/templates/add_checkin.html:74
 msgid ""
 "This team already checked in at that checkpoint. Submit again to replace "
 "the previous timestamp."
 msgstr ""
 
-#: app/templates/add_checkin.html:65
+#: app/templates/add_checkin.html:79
 msgid "Record Check-in"
 msgstr ""
 
-#: app/templates/add_checkin.html:66 app/templates/add_checkpoint.html:80
-#: app/templates/add_team.html:64 app/templates/change_password.html:22
+#: app/templates/add_checkin.html:80 app/templates/add_checkpoint.html:80
+#: app/templates/add_team.html:83 app/templates/change_password.html:22
 #: app/templates/checkin_edit.html:67 app/templates/checkpoint_edit.html:109
 #: app/templates/checkpoints_import_json.html:32
-#: app/templates/create_admin.html:17 app/templates/firmware_upload.html:59
-#: app/templates/group_edit.html:71 app/templates/login.html:17
-#: app/templates/lora_add.html:22 app/templates/lora_edit.html:26
-#: app/templates/register.html:31 app/templates/rfid_add.html:43
-#: app/templates/rfid_edit.html:38 app/templates/team_edit.html:80
-#: app/templates/user_edit.html:44
+#: app/templates/checkpoints_list.html:128 app/templates/create_admin.html:17
+#: app/templates/firmware_upload.html:59 app/templates/group_edit.html:80
+#: app/templates/login.html:17 app/templates/lora_add.html:22
+#: app/templates/lora_edit.html:26 app/templates/register.html:31
+#: app/templates/rfid_add.html:43 app/templates/rfid_edit.html:38
+#: app/templates/team_edit.html:99 app/templates/user_edit.html:44
 msgid "Cancel"
 msgstr ""
 
@@ -1169,7 +1224,7 @@ msgstr ""
 #: app/templates/firmware_list.html:17 app/templates/firmware_upload.html:16
 #: app/templates/group_edit.html:14 app/templates/groups_list.html:32
 #: app/templates/lora_edit.html:13 app/templates/lora_list.html:13
-#: app/templates/team_edit.html:10 app/templates/teams_list.html:67
+#: app/templates/team_edit.html:10 app/templates/teams_list.html:84
 msgid "Name"
 msgstr ""
 
@@ -1207,11 +1262,11 @@ msgstr ""
 msgid "Virtual checkpoint (no map, no arrivals, no auto check-in)"
 msgstr ""
 
-#: app/templates/add_checkpoint.html:59 app/templates/base.html:161
+#: app/templates/add_checkpoint.html:59 app/templates/base.html:162
 #: app/templates/checkpoint_edit.html:88 app/templates/checkpoints_list.html:25
 #: app/templates/groups_list.html:3 app/templates/groups_list.html:9
 #: app/templates/scores_stats.html:29 app/templates/sheets_admin.html:141
-#: app/templates/teams_list.html:70
+#: app/templates/teams_list.html:87
 msgid "Groups"
 msgstr ""
 
@@ -1219,7 +1274,7 @@ msgstr ""
 msgid "A checkpoint can belong to many groups."
 msgstr ""
 
-#: app/templates/add_checkpoint.html:79 app/templates/add_team.html:63
+#: app/templates/add_checkpoint.html:79 app/templates/add_team.html:82
 #: app/templates/register.html:30 app/templates/sheets_admin.html:136
 #: app/templates/user_edit.html:43
 msgid "Create"
@@ -1233,9 +1288,9 @@ msgstr ""
 msgid "Organizations"
 msgstr ""
 
-#: app/templates/add_team.html:24 app/templates/scores_view.html:57
-#: app/templates/scores_view.html:157 app/templates/team_edit.html:25
-#: app/templates/teams_list.html:69
+#: app/templates/add_team.html:24 app/templates/scores_view.html:63
+#: app/templates/scores_view.html:168 app/templates/team_edit.html:25
+#: app/templates/teams_list.html:86
 msgid "Number"
 msgstr ""
 
@@ -1247,13 +1302,13 @@ msgstr ""
 #: app/templates/live_arrivals.html:187 app/templates/score_judge.html:163
 #: app/templates/score_rules.html:22 app/templates/score_rules.html:101
 #: app/templates/score_rules.html:190 app/templates/score_rules.html:238
-#: app/templates/scores_view.html:56 app/templates/scores_view.html:156
+#: app/templates/scores_view.html:62 app/templates/scores_view.html:167
 #: app/templates/team_edit.html:31 app/templates/teams_list.html:12
 msgid "Group"
 msgstr ""
 
 #: app/templates/add_team.html:32 app/templates/team_edit.html:33
-#: app/templates/teams_list.html:89
+#: app/templates/teams_list.html:119
 msgid "No group"
 msgstr ""
 
@@ -1269,87 +1324,109 @@ msgstr ""
 msgid "One scout per line. Order is preserved."
 msgstr ""
 
-#: app/templates/add_team.html:47 app/templates/rfid_add.html:11
-#: app/templates/rfid_edit.html:10 app/templates/team_edit.html:58
+#: app/templates/add_team.html:47 app/templates/team_edit.html:58
+msgid "Notes"
+msgstr ""
+
+#: app/templates/add_team.html:50 app/templates/team_edit.html:61
+msgid "Special events, organizer adjustments, anything judges should know."
+msgstr ""
+
+#: app/templates/add_team.html:51 app/templates/team_edit.html:62
+msgid "Optional. Visible to judges and admins on the team list."
+msgstr ""
+
+#: app/templates/add_team.html:56 app/templates/team_edit.html:67
+msgid "Team-level dead time (minutes)"
+msgstr ""
+
+#: app/templates/add_team.html:60 app/templates/team_edit.html:71
+msgid ""
+"For delays the team had no control over (organizer-caused, etc.). Added "
+"to the per-CP dead-time sum before time-trial scoring."
+msgstr ""
+
+#: app/templates/add_team.html:66 app/templates/rfid_add.html:11
+#: app/templates/rfid_edit.html:10 app/templates/team_edit.html:77
 msgid "RFID UID"
 msgstr ""
 
-#: app/templates/add_team.html:48 app/templates/team_edit.html:59
+#: app/templates/add_team.html:67 app/templates/team_edit.html:78
 msgid "Tap tag or paste UID"
 msgstr ""
 
-#: app/templates/add_team.html:49
+#: app/templates/add_team.html:68
 msgid "Optional; creates an RFID mapping for this team."
 msgstr ""
 
-#: app/templates/add_team.html:51 app/templates/rfid_edit.html:14
-#: app/templates/team_edit.html:67
+#: app/templates/add_team.html:70 app/templates/rfid_edit.html:14
+#: app/templates/team_edit.html:86
 msgid "Read via Web NFC"
 msgstr ""
 
-#: app/templates/add_team.html:52 app/templates/rfid_edit.html:15
-#: app/templates/team_edit.html:68
+#: app/templates/add_team.html:71 app/templates/rfid_edit.html:15
+#: app/templates/team_edit.html:87
 msgid "Not checked"
 msgstr ""
 
-#: app/templates/add_team.html:58 app/templates/team_edit.html:74
+#: app/templates/add_team.html:77 app/templates/team_edit.html:93
 msgid "RFID Card Number"
 msgstr ""
 
-#: app/templates/add_team.html:59 app/templates/team_edit.html:75
+#: app/templates/add_team.html:78 app/templates/team_edit.html:94
 msgid "Optional friendly number"
 msgstr ""
 
-#: app/templates/add_team.html:77 app/templates/team_edit.html:93
+#: app/templates/add_team.html:96 app/templates/team_edit.html:112
 msgid "Unavailable"
 msgstr ""
 
-#: app/templates/add_team.html:78 app/templates/team_edit.html:94
+#: app/templates/add_team.html:97 app/templates/team_edit.html:113
 msgid "Ready"
 msgstr ""
 
-#: app/templates/add_team.html:79 app/templates/team_edit.html:95
+#: app/templates/add_team.html:98 app/templates/team_edit.html:114
 msgid "Read"
 msgstr ""
 
-#: app/templates/add_team.html:80 app/templates/team_edit.html:96
+#: app/templates/add_team.html:99 app/templates/team_edit.html:115
 msgid "Failed"
 msgstr ""
 
-#: app/templates/add_team.html:81 app/templates/rfid_finish.html:100
-#: app/templates/rfid_judge.html:108 app/templates/team_edit.html:97
+#: app/templates/add_team.html:100 app/templates/rfid_finish.html:100
+#: app/templates/rfid_judge.html:108 app/templates/team_edit.html:116
 msgid "Supported"
 msgstr ""
 
-#: app/templates/add_team.html:82 app/templates/rfid_finish.html:95
+#: app/templates/add_team.html:101 app/templates/rfid_finish.html:95
 #: app/templates/rfid_judge.html:98 app/templates/score_judge.html:148
-#: app/templates/team_edit.html:98
+#: app/templates/team_edit.html:117
 msgid "Web NFC not available in this browser."
 msgstr ""
 
-#: app/templates/add_team.html:83 app/templates/team_edit.html:99
+#: app/templates/add_team.html:102 app/templates/team_edit.html:118
 msgid "Hold the tag near your device to read."
 msgstr ""
 
-#: app/templates/add_team.html:84 app/templates/team_edit.html:100
+#: app/templates/add_team.html:103 app/templates/team_edit.html:119
 msgid "UID read:"
 msgstr ""
 
-#: app/templates/add_team.html:85 app/templates/team_edit.html:101
+#: app/templates/add_team.html:104 app/templates/team_edit.html:120
 msgid "Could not read UID from tag."
 msgstr ""
 
-#: app/templates/add_team.html:86 app/templates/rfid_finish.html:98
-#: app/templates/rfid_judge.html:104 app/templates/team_edit.html:102
+#: app/templates/add_team.html:105 app/templates/rfid_finish.html:98
+#: app/templates/rfid_judge.html:104 app/templates/team_edit.html:121
 msgid "Web NFC read error."
 msgstr ""
 
-#: app/templates/add_team.html:87 app/templates/rfid_finish.html:99
-#: app/templates/rfid_judge.html:105 app/templates/team_edit.html:103
+#: app/templates/add_team.html:106 app/templates/rfid_finish.html:99
+#: app/templates/rfid_judge.html:105 app/templates/team_edit.html:122
 msgid "Web NFC not available."
 msgstr ""
 
-#: app/templates/audit_list.html:2 app/templates/base.html:178
+#: app/templates/audit_list.html:2 app/templates/base.html:198
 msgid "Audit"
 msgstr ""
 
@@ -1374,21 +1451,21 @@ msgid "Actor"
 msgstr ""
 
 #: app/templates/audit_list.html:31 app/templates/scores_stats.html:142
-#: app/templates/view_checkins.html:36
+#: app/templates/view_checkins.html:48
 msgid "From"
 msgstr ""
 
 #: app/templates/audit_list.html:35 app/templates/scores_stats.html:143
-#: app/templates/view_checkins.html:42
+#: app/templates/view_checkins.html:54
 msgid "To"
 msgstr ""
 
-#: app/templates/audit_list.html:39 app/templates/view_checkins.html:57
+#: app/templates/audit_list.html:39 app/templates/view_checkins.html:69
 msgid "Apply Filters"
 msgstr ""
 
 #: app/templates/audit_list.html:40 app/templates/live_arrivals.html:66
-#: app/templates/teams_list.html:35 app/templates/view_checkins.html:58
+#: app/templates/teams_list.html:35 app/templates/view_checkins.html:70
 msgid "Reset"
 msgstr ""
 
@@ -1425,7 +1502,7 @@ msgstr ""
 msgid "No audit events match your filters."
 msgstr ""
 
-#: app/templates/audit_list.html:99 app/templates/view_checkins.html:138
+#: app/templates/audit_list.html:99 app/templates/view_checkins.html:150
 #, python-format
 msgid "Page %(page)s of %(pages)s"
 msgstr ""
@@ -1434,11 +1511,11 @@ msgstr ""
 msgid "First"
 msgstr ""
 
-#: app/templates/audit_list.html:109 app/templates/view_checkins.html:136
+#: app/templates/audit_list.html:109 app/templates/view_checkins.html:148
 msgid "Previous"
 msgstr ""
 
-#: app/templates/audit_list.html:115 app/templates/view_checkins.html:141
+#: app/templates/audit_list.html:115 app/templates/view_checkins.html:153
 msgid "Next"
 msgstr ""
 
@@ -1446,151 +1523,168 @@ msgstr ""
 msgid "Last"
 msgstr ""
 
-#: app/templates/base.html:7 app/templates/base.html:46
+#: app/templates/base.html:7 app/templates/base.html:51
 msgid "RFID Checkpoint System"
 msgstr ""
 
-#: app/templates/base.html:48
+#: app/templates/base.html:53
 msgid "Toggle navigation"
 msgstr ""
 
-#: app/templates/base.html:57 app/templates/competition_select.html:3
+#: app/templates/base.html:62 app/templates/competition_select.html:3
 msgid "Select Competition"
 msgstr ""
 
-#: app/templates/base.html:72
+#: app/templates/base.html:77
 msgid "No competitions yet"
 msgstr ""
 
-#: app/templates/base.html:76
+#: app/templates/base.html:81
 msgid "Manage Competitions"
 msgstr ""
 
-#: app/templates/base.html:81
+#: app/templates/base.html:86
 #, python-format
 msgid "Signed in as %(user)s (%(role)s)"
 msgstr ""
 
-#: app/templates/base.html:81
+#: app/templates/base.html:86
 msgid "member"
 msgstr ""
 
-#: app/templates/base.html:85
+#: app/templates/base.html:90
 msgid "Logout"
 msgstr ""
 
-#: app/templates/base.html:89 app/templates/change_password.html:5
+#: app/templates/base.html:94 app/templates/change_password.html:5
 #: app/templates/change_password.html:21
 msgid "Change Password"
 msgstr ""
 
-#: app/templates/base.html:93 app/templates/landing.html:10
+#: app/templates/base.html:98 app/templates/landing.html:10
 msgid "Login"
 msgstr ""
 
-#: app/templates/base.html:96 app/templates/register.html:5
+#: app/templates/base.html:103
+msgid "Manage"
+msgstr ""
+
+#: app/templates/base.html:106 app/templates/register.html:5
 msgid "Create User"
 msgstr ""
 
-#: app/templates/base.html:99 app/templates/users_list.html:2
+#: app/templates/base.html:107 app/templates/users_list.html:2
 #: app/templates/users_list.html:5
 msgid "Users"
 msgstr ""
 
-#: app/templates/base.html:100 app/templates/users_list.html:7
+#: app/templates/base.html:108 app/templates/checkpoints_list.html:26
+#: app/templates/users_list.html:7
 msgid "Judges"
 msgstr ""
 
-#: app/templates/base.html:101 app/templates/firmware_list.html:2
+#: app/templates/base.html:109 app/templates/firmware_list.html:2
 msgid "Firmware"
 msgstr ""
 
-#: app/templates/base.html:106
+#: app/templates/base.html:116
 msgid "Dark mode"
 msgstr ""
 
-#: app/templates/base.html:139 app/templates/live_arrivals.html:76
+#: app/templates/base.html:149 app/templates/live_arrivals.html:76
 #: app/templates/scores_stats.html:31 app/templates/scores_stats.html:85
 #: app/templates/teams_list.html:3
 msgid "Teams"
 msgstr ""
 
-#: app/templates/base.html:143 app/templates/checkpoints_list.html:2
-#: app/templates/checkpoints_list.html:7 app/templates/group_edit.html:29
+#: app/templates/base.html:154 app/templates/checkpoints_list.html:2
+#: app/templates/checkpoints_list.html:7 app/templates/group_edit.html:38
 #: app/templates/groups_list.html:34
 msgid "Checkpoints"
 msgstr ""
 
-#: app/templates/base.html:147 app/templates/live_arrivals.html:34
+#: app/templates/base.html:155 app/templates/live_arrivals.html:34
 msgid "View Check-ins"
 msgstr ""
 
-#: app/templates/base.html:148 app/templates/live_arrivals.html:2
+#: app/templates/base.html:156 app/templates/live_arrivals.html:2
 #: app/templates/live_arrivals.html:26
 msgid "Live Arrivals"
 msgstr ""
 
-#: app/templates/base.html:151
-msgid "Map RFID ↔ Team"
-msgstr ""
-
-#: app/templates/base.html:152
+#: app/templates/base.html:158
 msgid "Judge RFID"
 msgstr ""
 
-#: app/templates/base.html:153 app/templates/score_judge.html:164
+#: app/templates/base.html:159 app/templates/score_judge.html:164
 msgid "Score"
 msgstr ""
 
-#: app/templates/base.html:154 app/templates/scores_view.html:2
+#: app/templates/base.html:160 app/templates/scores_view.html:2
 #: app/templates/scores_view.html:31
 msgid "Scores"
 msgstr ""
 
-#: app/templates/base.html:156 app/templates/scores_submissions.html:2
+#: app/templates/base.html:161 app/templates/rfid_finish.html:2
+msgid "Finish Check"
+msgstr ""
+
+#: app/templates/base.html:167
+msgid "More"
+msgstr ""
+
+#: app/templates/base.html:170
+msgid "Map RFID ↔ Team"
+msgstr ""
+
+#: app/templates/base.html:172 app/templates/scores_submissions.html:2
 #: app/templates/scores_submissions.html:8
 msgid "Score Submissions"
 msgstr ""
 
-#: app/templates/base.html:158 app/templates/scores_stats.html:2
+#: app/templates/base.html:174 app/templates/scores_stats.html:2
 msgid "Stats"
 msgstr ""
 
-#: app/templates/base.html:159 app/templates/rfid_finish.html:2
-msgid "Finish Check"
-msgstr ""
-
-#: app/templates/base.html:162 app/templates/lora_list.html:2
+#: app/templates/base.html:175 app/templates/lora_list.html:2
 #: app/templates/lora_list.html:5
 msgid "Devices"
 msgstr ""
 
-#: app/templates/base.html:165
-msgid "Messages"
-msgstr ""
-
-#: app/templates/base.html:169
+#: app/templates/base.html:177
 msgid "Map"
 msgstr ""
 
-#: app/templates/base.html:172 app/templates/lora_map.html:2
+#: app/templates/base.html:180 app/templates/lora_map.html:2
 msgid "Device Map"
 msgstr ""
 
-#: app/templates/base.html:175
+#: app/templates/base.html:183
+msgid "Messages"
+msgstr ""
+
+#: app/templates/base.html:192
+msgid "Admin"
+msgstr ""
+
+#: app/templates/base.html:195
 msgid "Sheets"
 msgstr ""
 
-#: app/templates/base.html:176 app/templates/score_rules.html:2
+#: app/templates/base.html:196 app/templates/score_rules.html:2
 msgid "Score Rules"
 msgstr ""
 
-#: app/templates/base.html:180
+#: app/templates/base.html:200
 msgid "Settings"
 msgstr ""
 
-#: app/templates/base.html:184
+#: app/templates/base.html:206
 msgid "Superadmin"
+msgstr ""
+
+#: app/templates/base.html:231 app/templates/checkpoints_list.html:103
+msgid "Close"
 msgstr ""
 
 #: app/templates/change_password.html:9
@@ -1613,7 +1707,7 @@ msgstr ""
 msgid "Edit Check-in"
 msgstr ""
 
-#: app/templates/checkin_edit.html:38 app/templates/view_checkins.html:89
+#: app/templates/checkin_edit.html:38 app/templates/view_checkins.html:101
 msgid "Time"
 msgstr ""
 
@@ -1628,9 +1722,10 @@ msgid ""
 msgstr ""
 
 #: app/templates/checkin_edit.html:66 app/templates/checkpoint_edit.html:108
-#: app/templates/competition_settings.html:95 app/templates/group_edit.html:70
+#: app/templates/checkpoints_list.html:129
+#: app/templates/competition_settings.html:95 app/templates/group_edit.html:79
 #: app/templates/lora_add.html:21 app/templates/lora_edit.html:25
-#: app/templates/sheets_admin.html:22 app/templates/team_edit.html:79
+#: app/templates/sheets_admin.html:22 app/templates/team_edit.html:98
 #: app/templates/user_edit.html:43
 msgid "Save"
 msgstr ""
@@ -1717,41 +1812,56 @@ msgstr ""
 msgid "Location"
 msgstr ""
 
-#: app/templates/checkpoints_list.html:27
+#: app/templates/checkpoints_list.html:28
 #: app/templates/competition_settings.html:135
 #: app/templates/firmware_list.html:25 app/templates/groups_list.html:35
 #: app/templates/lora_list.html:13 app/templates/rfid_list.html:27
 #: app/templates/score_rules.html:192 app/templates/score_rules.html:240
-#: app/templates/scores_view.html:64 app/templates/sheets_admin.html:342
-#: app/templates/teams_list.html:72 app/templates/users_list.html:51
-#: app/templates/view_checkins.html:95
+#: app/templates/scores_view.html:70 app/templates/sheets_admin.html:359
+#: app/templates/superadmin_index.html:53 app/templates/teams_list.html:89
+#: app/templates/users_list.html:65 app/templates/view_checkins.html:107
 msgid "Actions"
 msgstr ""
 
-#: app/templates/checkpoints_list.html:35
+#: app/templates/checkpoints_list.html:36
 msgid "Virtual"
 msgstr ""
 
-#: app/templates/checkpoints_list.html:50 app/templates/groups_list.html:54
+#: app/templates/checkpoints_list.html:64
+msgid "Edit judges"
+msgstr ""
+
+#: app/templates/checkpoints_list.html:68 app/templates/groups_list.html:54
 #: app/templates/lora_list.html:26 app/templates/rfid_list.html:40
-#: app/templates/teams_list.html:96 app/templates/users_list.html:61
-#: app/templates/view_checkins.html:111
+#: app/templates/teams_list.html:126 app/templates/users_list.html:75
+#: app/templates/view_checkins.html:123
 msgid "Edit"
 msgstr ""
 
-#: app/templates/checkpoints_list.html:55
+#: app/templates/checkpoints_list.html:73
 msgid "Delete this checkpoint?"
 msgstr ""
 
-#: app/templates/checkpoints_list.html:57 app/templates/firmware_list.html:44
+#: app/templates/checkpoints_list.html:75 app/templates/firmware_list.html:44
 #: app/templates/groups_list.html:61 app/templates/lora_list.html:31
 #: app/templates/rfid_list.html:46 app/templates/score_rules.html:211
-#: app/templates/score_rules.html:257 app/templates/sheets_admin.html:365
-#: app/templates/teams_list.html:105 app/templates/view_checkins.html:117
+#: app/templates/score_rules.html:257 app/templates/sheets_admin.html:382
+#: app/templates/superadmin_index.html:96
+#: app/templates/superadmin_index.html:100 app/templates/teams_list.html:135
+#: app/templates/view_checkins.html:129
 msgid "Delete"
 msgstr ""
 
-#: app/templates/checkpoints_list.html:68
+#: app/templates/checkpoints_list.html:102
+#, python-format
+msgid "Judges for %(name)s"
+msgstr ""
+
+#: app/templates/checkpoints_list.html:124
+msgid "No competition members to assign."
+msgstr ""
+
+#: app/templates/checkpoints_list.html:138
 msgid "No checkpoints yet."
 msgstr ""
 
@@ -1762,8 +1872,8 @@ msgstr ""
 #: app/templates/competition_select.html:19
 #: app/templates/competition_settings.html:113
 #: app/templates/competition_settings.html:132
-#: app/templates/superadmin_index.html:48 app/templates/users_list.html:29
-#: app/templates/users_list.html:50
+#: app/templates/superadmin_index.html:51 app/templates/users_list.html:43
+#: app/templates/users_list.html:64
 msgid "Role"
 msgstr ""
 
@@ -1889,22 +1999,22 @@ msgstr ""
 
 #: app/templates/competition_settings.html:109
 #: app/templates/competition_settings.html:131
-#: app/templates/superadmin_index.html:47
+#: app/templates/superadmin_index.html:50
 msgid "Email"
 msgstr ""
 
 #: app/templates/competition_settings.html:115 app/templates/register.html:24
-#: app/templates/users_list.html:31
+#: app/templates/superadmin_bulk_add.html:43 app/templates/users_list.html:45
 msgid "viewer"
 msgstr ""
 
 #: app/templates/competition_settings.html:116 app/templates/register.html:25
-#: app/templates/users_list.html:32
+#: app/templates/superadmin_bulk_add.html:44 app/templates/users_list.html:46
 msgid "judge"
 msgstr ""
 
 #: app/templates/competition_settings.html:117 app/templates/register.html:26
-#: app/templates/users_list.html:33
+#: app/templates/superadmin_bulk_add.html:45 app/templates/users_list.html:47
 msgid "admin"
 msgstr ""
 
@@ -2053,7 +2163,7 @@ msgid "No conflicts found — ready to merge."
 msgstr ""
 
 #: app/templates/competition_transfer.html:144
-#: app/templates/firmware_list.html:18 app/templates/sheets_admin.html:340
+#: app/templates/firmware_list.html:18 app/templates/sheets_admin.html:357
 msgid "Type"
 msgstr ""
 
@@ -2114,13 +2224,15 @@ msgid "Create Admin Account"
 msgstr ""
 
 #: app/templates/create_admin.html:9 app/templates/register.html:9
-#: app/templates/superadmin_index.html:46 app/templates/user_edit.html:9
-#: app/templates/users_list.html:49
+#: app/templates/superadmin_bulk_results.html:38
+#: app/templates/superadmin_index.html:49 app/templates/user_edit.html:9
+#: app/templates/users_list.html:63
 msgid "Username"
 msgstr ""
 
 #: app/templates/create_admin.html:13 app/templates/login.html:13
-#: app/templates/register.html:18 app/templates/user_edit.html:16
+#: app/templates/register.html:18 app/templates/superadmin_bulk_results.html:39
+#: app/templates/user_edit.html:16
 msgid "Password"
 msgstr ""
 
@@ -2359,36 +2471,47 @@ msgstr ""
 msgid "Used for random team numbers (e.g. 1xx → 100-199)."
 msgstr ""
 
+#: app/templates/group_edit.html:32
+msgid "Group traverses route in reverse direction"
+msgstr ""
+
 #: app/templates/group_edit.html:34
+msgid ""
+"Flips the checkpoint order shown in live arrivals and used for "
+"start/finish detection. Useful when this group starts at the opposite end"
+" of the route."
+msgstr ""
+
+#: app/templates/group_edit.html:43
 msgid "Selected order"
 msgstr ""
 
-#: app/templates/group_edit.html:35
+#: app/templates/group_edit.html:44
 msgid "Drag the handle to reorder"
 msgstr ""
 
-#: app/templates/group_edit.html:37 app/templates/group_edit.html:46
+#: app/templates/group_edit.html:46 app/templates/group_edit.html:55
 msgid "No checkpoints selected yet."
 msgstr ""
 
-#: app/templates/group_edit.html:42 app/templates/group_edit.html:164
-#: app/templates/users_list.html:66 app/templates/users_list.html:69
+#: app/templates/group_edit.html:51 app/templates/group_edit.html:173
+#: app/templates/users_list.html:80 app/templates/users_list.html:83
 msgid "Remove"
 msgstr ""
 
-#: app/templates/group_edit.html:51
+#: app/templates/group_edit.html:60
 msgid "Add checkpoint"
 msgstr ""
 
-#: app/templates/group_edit.html:54 app/templates/group_edit.html:121
+#: app/templates/group_edit.html:63 app/templates/group_edit.html:130
 msgid "Select checkpoint"
 msgstr ""
 
-#: app/templates/group_edit.html:59
+#: app/templates/group_edit.html:68
 msgid "Add"
 msgstr ""
 
-#: app/templates/group_edit.html:61
+#: app/templates/group_edit.html:70
 msgid ""
 "Add checkpoints to include them in the group. Use drag-and-drop to "
 "arrange the visit order."
@@ -2488,35 +2611,35 @@ msgid "Public Results"
 msgstr ""
 
 #: app/templates/live_arrivals.html:6 app/templates/live_arrivals.html:92
-#: app/templates/live_arrivals.html:190 app/templates/live_arrivals.html:234
+#: app/templates/live_arrivals.html:190 app/templates/live_arrivals.html:244
 #: app/templates/scores_stats.html:33 app/templates/scores_stats.html:87
-#: app/templates/scores_view.html:59 app/templates/scores_view.html:159
+#: app/templates/scores_view.html:65 app/templates/scores_view.html:170
 msgid "Finished"
 msgstr ""
 
 #: app/templates/live_arrivals.html:8 app/templates/live_arrivals.html:108
-#: app/templates/live_arrivals.html:235 app/templates/scores_view.html:79
-#: app/templates/scores_view.html:88 app/templates/scores_view.html:98
-#: app/templates/scores_view.html:181 app/templates/scores_view.html:190
-#: app/templates/scores_view.html:201 app/templates/scores_view.html:213
-#: app/templates/scores_view.html:220 app/templates/scores_view.html:228
+#: app/templates/live_arrivals.html:245 app/templates/scores_view.html:85
+#: app/templates/scores_view.html:98 app/templates/scores_view.html:109
+#: app/templates/scores_view.html:192 app/templates/scores_view.html:201
+#: app/templates/scores_view.html:212 app/templates/scores_view.html:224
+#: app/templates/scores_view.html:231 app/templates/scores_view.html:239
 msgid "DNF"
 msgstr ""
 
-#: app/templates/live_arrivals.html:10 app/templates/live_arrivals.html:236
+#: app/templates/live_arrivals.html:10 app/templates/live_arrivals.html:246
 msgid "On course"
 msgstr ""
 
 #: app/templates/live_arrivals.html:12 app/templates/live_arrivals.html:84
-#: app/templates/live_arrivals.html:189 app/templates/live_arrivals.html:237
+#: app/templates/live_arrivals.html:189 app/templates/live_arrivals.html:247
 msgid "Started"
 msgstr ""
 
-#: app/templates/live_arrivals.html:14 app/templates/live_arrivals.html:238
+#: app/templates/live_arrivals.html:14 app/templates/live_arrivals.html:248
 msgid "Not started"
 msgstr ""
 
-#: app/templates/live_arrivals.html:16 app/templates/live_arrivals.html:239
+#: app/templates/live_arrivals.html:16 app/templates/live_arrivals.html:249
 msgid "Not routed"
 msgstr ""
 
@@ -2525,7 +2648,7 @@ msgid "Last updated"
 msgstr ""
 
 #: app/templates/live_arrivals.html:47 app/templates/scores_submissions.html:11
-#: app/templates/scores_view.html:42 app/templates/teams_list.html:14
+#: app/templates/scores_view.html:48 app/templates/teams_list.html:14
 msgid "All groups"
 msgstr ""
 
@@ -2585,15 +2708,15 @@ msgstr ""
 msgid "Progress"
 msgstr ""
 
-#: app/templates/live_arrivals.html:144 app/templates/live_arrivals.html:233
+#: app/templates/live_arrivals.html:144 app/templates/live_arrivals.html:243
 msgid "Extra"
 msgstr ""
 
-#: app/templates/live_arrivals.html:164 app/templates/live_arrivals.html:230
+#: app/templates/live_arrivals.html:164 app/templates/live_arrivals.html:240
 msgid "None yet"
 msgstr ""
 
-#: app/templates/live_arrivals.html:170 app/templates/live_arrivals.html:231
+#: app/templates/live_arrivals.html:170 app/templates/live_arrivals.html:241
 msgid "No checkpoints to show."
 msgstr ""
 
@@ -2613,11 +2736,19 @@ msgstr ""
 msgid "Latest time"
 msgstr ""
 
-#: app/templates/live_arrivals.html:210 app/templates/live_arrivals.html:232
+#: app/templates/live_arrivals.html:194
+msgid "Missed"
+msgstr ""
+
+#: app/templates/live_arrivals.html:214 app/templates/live_arrivals.html:250
+msgid "No missed checkpoints"
+msgstr ""
+
+#: app/templates/live_arrivals.html:220 app/templates/live_arrivals.html:242
 msgid "No teams to show."
 msgstr ""
 
-#: app/templates/live_arrivals.html:229
+#: app/templates/live_arrivals.html:239
 msgid "Refresh failed"
 msgstr ""
 
@@ -2678,13 +2809,13 @@ msgstr ""
 msgid "Last Seen"
 msgstr ""
 
-#: app/templates/lora_list.html:21 app/templates/scores_view.html:81
-#: app/templates/scores_view.html:183
+#: app/templates/lora_list.html:21 app/templates/scores_view.html:87
+#: app/templates/scores_view.html:194
 msgid "Yes"
 msgstr ""
 
-#: app/templates/lora_list.html:21 app/templates/scores_view.html:83
-#: app/templates/scores_view.html:185
+#: app/templates/lora_list.html:21 app/templates/scores_view.html:89
+#: app/templates/scores_view.html:196
 msgid "No"
 msgstr ""
 
@@ -3078,7 +3209,7 @@ msgstr ""
 msgid "UID"
 msgstr ""
 
-#: app/templates/rfid_list.html:25 app/templates/view_checkins.html:91
+#: app/templates/rfid_list.html:25 app/templates/view_checkins.html:103
 msgid "Team #"
 msgstr ""
 
@@ -3112,10 +3243,6 @@ msgstr ""
 
 #: app/templates/score_judge.html:46
 msgid "Or select team"
-msgstr ""
-
-#: app/templates/score_judge.html:52
-msgid "Type number or name"
 msgstr ""
 
 #: app/templates/score_judge.html:59
@@ -3467,15 +3594,15 @@ msgstr ""
 msgid "No segment data yet."
 msgstr ""
 
-#: app/templates/scores_submissions.html:17 app/templates/view_checkins.html:12
+#: app/templates/scores_submissions.html:17
 msgid "All teams"
 msgstr ""
 
-#: app/templates/scores_submissions.html:25 app/templates/view_checkins.html:25
+#: app/templates/scores_submissions.html:25 app/templates/view_checkins.html:37
 msgid "All checkpoints"
 msgstr ""
 
-#: app/templates/scores_submissions.html:30 app/templates/scores_view.html:47
+#: app/templates/scores_submissions.html:30 app/templates/scores_view.html:53
 msgid "Filter"
 msgstr ""
 
@@ -3491,8 +3618,8 @@ msgstr ""
 msgid "Dead time"
 msgstr ""
 
-#: app/templates/scores_submissions.html:42 app/templates/scores_view.html:62
-#: app/templates/scores_view.html:132 app/templates/scores_view.html:167
+#: app/templates/scores_submissions.html:42 app/templates/scores_view.html:68
+#: app/templates/scores_view.html:143 app/templates/scores_view.html:178
 msgid "Total points"
 msgstr ""
 
@@ -3520,59 +3647,67 @@ msgstr ""
 msgid "Scan to view"
 msgstr ""
 
-#: app/templates/scores_view.html:38 app/templates/scores_view.html:256
+#: app/templates/scores_view.html:38 app/templates/scores_view.html:267
 msgid "Show per-checkpoint"
 msgstr ""
 
-#: app/templates/scores_view.html:55 app/templates/scores_view.html:155
-msgid "Place"
-msgstr ""
-
-#: app/templates/scores_view.html:60 app/templates/scores_view.html:160
-msgid "Time (min)"
+#: app/templates/scores_view.html:43 app/templates/view_checkins.html:81
+msgid "Export CSV"
 msgstr ""
 
 #: app/templates/scores_view.html:61 app/templates/scores_view.html:166
+msgid "Place"
+msgstr ""
+
+#: app/templates/scores_view.html:66
+msgid "Time-trial"
+msgstr ""
+
+#: app/templates/scores_view.html:67 app/templates/scores_view.html:177
 msgid "Dead time (sum)"
 msgstr ""
 
-#: app/templates/scores_view.html:110
+#: app/templates/scores_view.html:121
 msgid "View submissions"
 msgstr ""
 
-#: app/templates/scores_view.html:118 app/templates/scores_view.html:240
+#: app/templates/scores_view.html:129 app/templates/scores_view.html:251
 msgid "No scores yet."
 msgstr ""
 
-#: app/templates/scores_view.html:124
+#: app/templates/scores_view.html:135
 msgid "Dead time is summed from the latest score per checkpoint."
 msgstr ""
 
-#: app/templates/scores_view.html:126
+#: app/templates/scores_view.html:137
 msgid "Organization totals"
 msgstr ""
 
-#: app/templates/scores_view.html:131
+#: app/templates/scores_view.html:142
 msgid "Organization"
 msgstr ""
 
-#: app/templates/scores_view.html:143
+#: app/templates/scores_view.html:154
 msgid "No organization totals yet."
 msgstr ""
 
-#: app/templates/scores_view.html:149
+#: app/templates/scores_view.html:160
 msgid "DNF teams do not count toward organization totals."
 msgstr ""
 
-#: app/templates/scores_view.html:164
+#: app/templates/scores_view.html:171
+msgid "Time (min)"
+msgstr ""
+
+#: app/templates/scores_view.html:175
 msgid "Time points"
 msgstr ""
 
-#: app/templates/scores_view.html:165
+#: app/templates/scores_view.html:176
 msgid "Found points"
 msgstr ""
 
-#: app/templates/scores_view.html:257
+#: app/templates/scores_view.html:268
 msgid "Hide per-checkpoint"
 msgstr ""
 
@@ -3608,7 +3743,7 @@ msgstr ""
 msgid "Local only (no Sheets)"
 msgstr ""
 
-#: app/templates/sheets_admin.html:38 app/templates/sheets_admin.html:408
+#: app/templates/sheets_admin.html:38 app/templates/sheets_admin.html:425
 msgid "Show ordering"
 msgstr ""
 
@@ -3640,17 +3775,17 @@ msgstr ""
 msgid "Wizard: create tabs for all checkpoints"
 msgstr ""
 
-#: app/templates/sheets_admin.html:120 app/templates/sheets_admin.html:288
+#: app/templates/sheets_admin.html:120 app/templates/sheets_admin.html:305
 #: app/templates/sheets_lang.html:18
 msgid "Arrived header"
 msgstr ""
 
-#: app/templates/sheets_admin.html:124 app/templates/sheets_admin.html:292
+#: app/templates/sheets_admin.html:124 app/templates/sheets_admin.html:309
 #: app/templates/sheets_lang.html:22 app/templates/sheets_lang.html:53
 msgid "Points header"
 msgstr ""
 
-#: app/templates/sheets_admin.html:128 app/templates/sheets_admin.html:306
+#: app/templates/sheets_admin.html:128 app/templates/sheets_admin.html:323
 #: app/templates/sheets_lang.html:26
 msgid "Dead time header"
 msgstr ""
@@ -3675,7 +3810,7 @@ msgstr ""
 msgid "Run wizard"
 msgstr ""
 
-#: app/templates/sheets_admin.html:190
+#: app/templates/sheets_admin.html:189
 msgid ""
 "Publish the competition to the target Google Sheet. Works for both first-"
 "time publishing (local-only configs) and switching to a different "
@@ -3686,143 +3821,162 @@ msgid ""
 "no-op."
 msgstr ""
 
-#: app/templates/sheets_admin.html:195
+#: app/templates/sheets_admin.html:193
+msgid "Target spreadsheet ID"
+msgstr ""
+
+#: app/templates/sheets_admin.html:199
+msgid "e.g. 1aBcD…XyZ"
+msgstr ""
+
+#: app/templates/sheets_admin.html:202
+msgid "Paste the new sheet ID here to publish/repoint all per-CP tabs to it."
+msgstr ""
+
+#: app/templates/sheets_admin.html:207
 msgid ""
 "This will create or overwrite tabs on the target spreadsheet and rebind "
 "every SheetConfig (including any currently bound to another sheet). "
 "Continue?"
 msgstr ""
 
-#: app/templates/sheets_admin.html:196
+#: app/templates/sheets_admin.html:208
 msgid "Publish / repoint to sheet"
 msgstr ""
 
-#: app/templates/sheets_admin.html:208
-msgid "Arrivals tab name"
-msgstr ""
-
-#: app/templates/sheets_admin.html:212 app/templates/sheets_admin.html:228
-#: app/templates/sheets_admin.html:249
-msgid "Build / Refresh"
-msgstr ""
-
-#: app/templates/sheets_admin.html:220
-msgid "Teams tab name"
-msgstr ""
-
-#: app/templates/sheets_admin.html:224
-msgid "Teams headers (comma)"
+#: app/templates/sheets_admin.html:213
+msgid ""
+"After publish, every per-CP tab is rebuilt on the target sheet and all "
+"SheetConfigs are rebound. The old sheet's tabs are abandoned but not "
+"deleted."
 msgstr ""
 
 #: app/templates/sheets_admin.html:225
-msgid "(optional override)"
+msgid "Arrivals tab name"
 msgstr ""
 
-#: app/templates/sheets_admin.html:238
-msgid "Score tab name"
+#: app/templates/sheets_admin.html:229 app/templates/sheets_admin.html:245
+#: app/templates/sheets_admin.html:266
+msgid "Build / Refresh"
+msgstr ""
+
+#: app/templates/sheets_admin.html:237
+msgid "Teams tab name"
+msgstr ""
+
+#: app/templates/sheets_admin.html:241
+msgid "Teams headers (comma)"
 msgstr ""
 
 #: app/templates/sheets_admin.html:242
-msgid "Include dead time sum"
+msgid "(optional override)"
 msgstr ""
 
-#: app/templates/sheets_admin.html:245
-msgid "Add dead time sum column"
+#: app/templates/sheets_admin.html:255
+msgid "Score tab name"
 msgstr ""
 
 #: app/templates/sheets_admin.html:259
+msgid "Include dead time sum"
+msgstr ""
+
+#: app/templates/sheets_admin.html:262
+msgid "Add dead time sum column"
+msgstr ""
+
+#: app/templates/sheets_admin.html:276
 msgid "Add checkpoint tab"
 msgstr ""
 
-#: app/templates/sheets_admin.html:266
+#: app/templates/sheets_admin.html:283
 msgid "Tab title"
 msgstr ""
 
-#: app/templates/sheets_admin.html:267
+#: app/templates/sheets_admin.html:284
 msgid "Checkpoint tab (e.g., Timeline)"
 msgstr ""
 
-#: app/templates/sheets_admin.html:271
+#: app/templates/sheets_admin.html:288
 msgid "Checkpoint (optional)"
 msgstr ""
 
-#: app/templates/sheets_admin.html:273
+#: app/templates/sheets_admin.html:290
 msgid "— none —"
 msgstr ""
 
-#: app/templates/sheets_admin.html:281
+#: app/templates/sheets_admin.html:298
 msgid "Groups & fields"
 msgstr ""
 
-#: app/templates/sheets_admin.html:282
+#: app/templates/sheets_admin.html:299
 msgid "GroupName|field1,field2"
 msgstr ""
 
-#: app/templates/sheets_admin.html:283
+#: app/templates/sheets_admin.html:300
 msgid "One line per group. Format: GroupName|field1,field2. Fields are optional."
 msgstr ""
 
-#: app/templates/sheets_admin.html:299
+#: app/templates/sheets_admin.html:316
 msgid "Include dead time column"
 msgstr ""
 
-#: app/templates/sheets_admin.html:303
+#: app/templates/sheets_admin.html:320
 msgid "Include time column"
 msgstr ""
 
-#: app/templates/sheets_admin.html:310 app/templates/sheets_lang.html:30
+#: app/templates/sheets_admin.html:327 app/templates/sheets_lang.html:30
 msgid "Time header"
 msgstr ""
 
-#: app/templates/sheets_admin.html:316
+#: app/templates/sheets_admin.html:333
 msgid "Overwrite if exists"
 msgstr ""
 
-#: app/templates/sheets_admin.html:318
+#: app/templates/sheets_admin.html:335
 msgid "Add tab"
 msgstr ""
 
-#: app/templates/sheets_admin.html:327
+#: app/templates/sheets_admin.html:344
 msgid "Existing sheet configs"
 msgstr ""
 
-#: app/templates/sheets_admin.html:332
+#: app/templates/sheets_admin.html:349
 msgid "Prune missing tabs"
 msgstr ""
 
-#: app/templates/sheets_admin.html:338
+#: app/templates/sheets_admin.html:355
 msgid "Spreadsheet"
 msgstr ""
 
-#: app/templates/sheets_admin.html:339
+#: app/templates/sheets_admin.html:356
 msgid "Tab"
 msgstr ""
 
-#: app/templates/sheets_admin.html:343 app/templates/superadmin_index.html:49
+#: app/templates/sheets_admin.html:360 app/templates/superadmin_index.html:52
 msgid "Created"
 msgstr ""
 
-#: app/templates/sheets_admin.html:359
+#: app/templates/sheets_admin.html:376
 msgid "Sync team numbers"
 msgstr ""
 
-#: app/templates/sheets_admin.html:363
+#: app/templates/sheets_admin.html:380
 msgid "Delete this config?"
 msgstr ""
 
-#: app/templates/sheets_admin.html:369
+#: app/templates/sheets_admin.html:386
 msgid "Delete config AND remote tab from spreadsheet?"
 msgstr ""
 
-#: app/templates/sheets_admin.html:372
+#: app/templates/sheets_admin.html:389
 msgid "Delete + remote"
 msgstr ""
 
-#: app/templates/sheets_admin.html:384
+#: app/templates/sheets_admin.html:401
 msgid "No sheet configs yet."
 msgstr ""
 
-#: app/templates/sheets_admin.html:409
+#: app/templates/sheets_admin.html:426
 msgid "Hide ordering"
 msgstr ""
 
@@ -3910,49 +4064,163 @@ msgstr ""
 msgid "Save language pack"
 msgstr ""
 
+#: app/templates/superadmin_bulk_add.html:2
+#: app/templates/superadmin_bulk_add.html:6
+#: app/templates/superadmin_index.html:8
+msgid "Bulk add users"
+msgstr ""
+
+#: app/templates/superadmin_bulk_add.html:7
+#: app/templates/superadmin_bulk_results.html:9
+msgid "Back to console"
+msgstr ""
+
+#: app/templates/superadmin_bulk_add.html:13
+msgid ""
+"One username per line. Passwords are generated automatically and shown "
+"once after submit — save them before leaving the next page."
+msgstr ""
+
+#: app/templates/superadmin_bulk_add.html:18
+msgid "Usernames"
+msgstr ""
+
+#: app/templates/superadmin_bulk_add.html:22
+msgid ""
+"Allowed characters: letters, numbers, dot, underscore, hyphen. Max 50 "
+"characters per username."
+msgstr ""
+
+#: app/templates/superadmin_bulk_add.html:27
+msgid "Competition"
+msgstr ""
+
+#: app/templates/superadmin_bulk_add.html:29
+msgid "Choose a competition…"
+msgstr ""
+
+#: app/templates/superadmin_bulk_add.html:33
+msgid "No competitions exist yet."
+msgstr ""
+
+#: app/templates/superadmin_bulk_add.html:37
+msgid "Every user gets a membership row in this competition with the chosen role."
+msgstr ""
+
+#: app/templates/superadmin_bulk_add.html:41
+msgid "Role in the competition"
+msgstr ""
+
+#: app/templates/superadmin_bulk_add.html:48
+msgid ""
+"System-level role stays 'public'; only the per-competition membership "
+"role is set here."
+msgstr ""
+
+#: app/templates/superadmin_bulk_add.html:52
+msgid "Create users"
+msgstr ""
+
+#: app/templates/superadmin_bulk_results.html:2
+msgid "Bulk add users — results"
+msgstr ""
+
+#: app/templates/superadmin_bulk_results.html:6
+#, python-format
+msgid "Created %(n)d user(s)"
+msgstr ""
+
+#: app/templates/superadmin_bulk_results.html:8
+msgid "Create more"
+msgstr ""
+
+#: app/templates/superadmin_bulk_results.html:14
+msgid "Save these passwords now."
+msgstr ""
+
+#: app/templates/superadmin_bulk_results.html:15
+msgid ""
+"They are shown once and are not stored in plaintext anywhere. Leaving or "
+"refreshing this page loses them."
+msgstr ""
+
+#: app/templates/superadmin_bulk_results.html:23
+#, python-format
+msgid "Competition: %(comp)s · membership role: %(role)s"
+msgstr ""
+
+#: app/templates/superadmin_bulk_results.html:25
+#, python-format
+msgid "Role: %(role)s"
+msgstr ""
+
+#: app/templates/superadmin_bulk_results.html:28
+#: app/templates/superadmin_bulk_results.html:64
+msgid "Copy as CSV"
+msgstr ""
+
+#: app/templates/superadmin_bulk_results.html:63
+msgid "Copied!"
+msgstr ""
+
+#: app/templates/superadmin_bulk_results.html:66
+msgid "Copy failed"
+msgstr ""
+
 #: app/templates/superadmin_index.html:2 app/templates/superadmin_index.html:6
 msgid "Superadmin console"
 msgstr ""
 
-#: app/templates/superadmin_index.html:7
+#: app/templates/superadmin_index.html:9
 msgid "Cross-competition"
 msgstr ""
 
-#: app/templates/superadmin_index.html:14
+#: app/templates/superadmin_index.html:17
 msgid "Sheets API quota"
 msgstr ""
 
-#: app/templates/superadmin_index.html:16
+#: app/templates/superadmin_index.html:19
 msgid ""
 "Calls used in the rolling 40-per-60-second throttle window. Updates every"
 " 2 seconds."
 msgstr ""
 
-#: app/templates/superadmin_index.html:27
+#: app/templates/superadmin_index.html:30
 msgid "this minute"
 msgstr ""
 
-#: app/templates/superadmin_index.html:30
+#: app/templates/superadmin_index.html:33
 msgid "Awaiting first sample..."
 msgstr ""
 
-#: app/templates/superadmin_index.html:40
+#: app/templates/superadmin_index.html:43
 msgid "All registered users"
 msgstr ""
 
-#: app/templates/superadmin_index.html:70
+#: app/templates/superadmin_index.html:94
+#, python-format
+msgid ""
+"Permanently delete user %(user)s? This removes them from every "
+"competition."
+msgstr ""
+
+#: app/templates/superadmin_index.html:105
 msgid "No users."
 msgstr ""
 
-#: app/templates/superadmin_index.html:113
-msgid "window resets in"
-msgstr ""
-
-#: app/templates/superadmin_index.html:114
+#: app/templates/superadmin_index.html:149
 msgid "client not initialised yet"
 msgstr ""
 
-#: app/templates/superadmin_index.html:117
+#: app/templates/superadmin_index.html:153
+msgid "throttling — waiting for window reset"
+msgstr ""
+
+#: app/templates/superadmin_index.html:156
+msgid "window resets in"
+msgstr ""
+
+#: app/templates/superadmin_index.html:160
 msgid "Status fetch failed."
 msgstr ""
 
@@ -3960,7 +4228,7 @@ msgstr ""
 msgid "Edit Team"
 msgstr ""
 
-#: app/templates/team_edit.html:15 app/templates/teams_list.html:68
+#: app/templates/team_edit.html:15 app/templates/teams_list.html:85
 msgid "Rod / Org"
 msgstr ""
 
@@ -3972,15 +4240,15 @@ msgstr ""
 msgid "DNF (Did Not Finish)"
 msgstr ""
 
-#: app/templates/team_edit.html:61
+#: app/templates/team_edit.html:80
 msgid "Optional; saves an RFID mapping for this team."
 msgstr ""
 
-#: app/templates/team_edit.html:63
+#: app/templates/team_edit.html:82
 msgid "Current mapping ID"
 msgstr ""
 
-#: app/templates/teams_list.html:24 app/templates/view_checkins.html:48
+#: app/templates/teams_list.html:24 app/templates/view_checkins.html:60
 msgid "Sort"
 msgstr ""
 
@@ -3992,20 +4260,28 @@ msgstr ""
 msgid "Randomise Team Numbers"
 msgstr ""
 
-#: app/templates/teams_list.html:57
+#: app/templates/teams_list.html:58
 #, python-format
 msgid "Total: %(count)s"
 msgstr ""
 
-#: app/templates/teams_list.html:60
+#: app/templates/teams_list.html:66
+msgid "Search teams (number or name)"
+msgstr ""
+
+#: app/templates/teams_list.html:77
 msgid "No teams found."
 msgstr ""
 
-#: app/templates/teams_list.html:129
+#: app/templates/teams_list.html:108
+msgid "Team has notes"
+msgstr ""
+
+#: app/templates/teams_list.html:210
 msgid "Delete this team?"
 msgstr ""
 
-#: app/templates/teams_list.html:130
+#: app/templates/teams_list.html:211
 msgid "This team has existing check-ins. Type Delete to confirm."
 msgstr ""
 
@@ -4034,59 +4310,71 @@ msgstr ""
 msgid "Add Existing User To This Competition"
 msgstr ""
 
-#: app/templates/users_list.html:26
+#: app/templates/users_list.html:21
+msgid "Select an existing user..."
+msgstr ""
+
+#: app/templates/users_list.html:27
+msgid "No users available to attach."
+msgstr ""
+
+#: app/templates/users_list.html:30
+msgid "Superadmin view: every existing user not already in this competition."
+msgstr ""
+
+#: app/templates/users_list.html:39
 msgid "Use an existing global username or email address."
 msgstr ""
 
-#: app/templates/users_list.html:37
+#: app/templates/users_list.html:51
 msgid "Add Existing User"
 msgstr ""
 
-#: app/templates/users_list.html:64
+#: app/templates/users_list.html:78
 #, python-format
 msgid ""
 "Remove %(user)s from this competition? This will not affect other "
 "competitions."
 msgstr ""
 
-#: app/templates/users_list.html:69
+#: app/templates/users_list.html:83
 msgid "Cannot remove yourself"
 msgstr ""
 
-#: app/templates/users_list.html:78
+#: app/templates/users_list.html:92
 msgid "No users yet."
 msgstr ""
 
-#: app/templates/view_checkins.html:50
+#: app/templates/view_checkins.html:24
+msgid "All teams (type to filter)"
+msgstr ""
+
+#: app/templates/view_checkins.html:62
 msgid "Newest first"
 msgstr ""
 
-#: app/templates/view_checkins.html:51
+#: app/templates/view_checkins.html:63
 msgid "Oldest first"
 msgstr ""
 
-#: app/templates/view_checkins.html:52
+#: app/templates/view_checkins.html:64
 msgid "Team (name, number)"
 msgstr ""
 
-#: app/templates/view_checkins.html:69
-msgid "Export CSV"
-msgstr ""
-
-#: app/templates/view_checkins.html:93
+#: app/templates/view_checkins.html:105
 msgid "Created By"
 msgstr ""
 
-#: app/templates/view_checkins.html:115
+#: app/templates/view_checkins.html:127
 msgid "Delete this check-in?"
 msgstr ""
 
-#: app/templates/view_checkins.html:131
+#: app/templates/view_checkins.html:143
 #, python-format
 msgid "Showing %(count)s of %(total)s check-ins"
 msgstr ""
 
-#: app/templates/view_checkins.html:147
+#: app/templates/view_checkins.html:159
 msgid "No check-ins match your filters."
 msgstr ""
 

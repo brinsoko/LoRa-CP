@@ -23,8 +23,9 @@
               <th>{{ _('Location') }}</th>
               <th>{{ _('Description') }}</th>
               <th>{{ _('Groups') }}</th>
+              <th>{{ _('Judges') }}</th>
               {% if has_role('judge','admin') %}
-                <th class="text-end" style="width: 180px;">{{ _('Actions') }}</th>
+                <th class="text-end" style="width: 220px;">{{ _('Actions') }}</th>
               {% endif %}
             </tr>
           </thead>
@@ -44,8 +45,25 @@
                   <span class="text-muted">—</span>
                 {% endif %}
               </td>
+              <td>
+                {% if cp.assigned_judges %}
+                  {% for j in cp.assigned_judges %}
+                    <span class="badge text-bg-light border">{{ j.username }}</span>
+                  {% endfor %}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
               {% if has_role('judge','admin') %}
               <td class="text-end">
+                {% if has_role('admin') %}
+                  <button type="button"
+                          class="btn btn-sm btn-outline-secondary"
+                          data-bs-toggle="modal"
+                          data-bs-target="#judgesModal-{{ cp.id }}">
+                    {{ _('Edit judges') }}
+                  </button>
+                {% endif %}
                 <a href="{{ url_for('checkpoints.edit_checkpoint', cp_id=cp.id) }}"
                    class="btn btn-sm btn-outline-primary">{{ _('Edit') }}</a>
                 {% if has_role('admin') %}
@@ -64,6 +82,58 @@
           </tbody>
         </table>
       </div>
+
+      {% if has_role('admin') %}
+        {# Per-checkpoint modal: flat list of competition members so admins
+           can assign/remove judges without leaving the list page. Form
+           POSTs to checkpoints.update_checkpoint_judges which scopes the
+           update by competition_id. #}
+        {% set assigned_lookup = {} %}
+        {% for cp in checkpoints %}
+          {% set _ = assigned_lookup.update({cp.id: (cp.assigned_judges or []) | map(attribute='id') | list}) %}
+        {% endfor %}
+        {% for cp in checkpoints %}
+          <div class="modal fade" id="judgesModal-{{ cp.id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-scrollable">
+              <div class="modal-content">
+                <form method="post" action="{{ url_for('checkpoints.update_checkpoint_judges', cp_id=cp.id) }}">
+                  {{ csrf_input() }}
+                  <div class="modal-header">
+                    <h5 class="modal-title">{{ _('Judges for %(name)s', name=cp.name) }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ _('Close') }}"></button>
+                  </div>
+                  <div class="modal-body">
+                    {% if eligible_users %}
+                      <div class="d-flex flex-column gap-2">
+                        {% for u in eligible_users %}
+                          <div class="form-check">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   name="user_ids"
+                                   value="{{ u.id }}"
+                                   id="judge-{{ cp.id }}-{{ u.id }}"
+                                   {% if u.id in assigned_lookup[cp.id] %}checked{% endif %}>
+                            <label class="form-check-label" for="judge-{{ cp.id }}-{{ u.id }}">
+                              {{ u.username }}
+                              <span class="text-muted small">({{ u.role }})</span>
+                            </label>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    {% else %}
+                      <p class="text-muted mb-0">{{ _('No competition members to assign.') }}</p>
+                    {% endif %}
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ _('Cancel') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ _('Save') }}</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
     {% else %}
       <p class="text-muted mb-0">{{ _('No checkpoints yet.') }}</p>
     {% endif %}
