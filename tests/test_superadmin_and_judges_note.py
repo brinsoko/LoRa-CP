@@ -429,7 +429,7 @@ def test_assigned_judges_list_shows_app_judges_alongside_note(client, app):
         add_membership(admin, comp, role="admin")
         add_membership(judge, comp, role="judge")
         cp = create_checkpoint(comp, name="CP-Two")
-        db.session.add(JudgeCheckpoint(user_id=judge.id, checkpoint_id=cp.id))
+        db.session.add(JudgeCheckpoint(user_id=judge.id, checkpoint_id=cp.id, competition_id=comp.id))
         db.session.commit()
         login_as(client, admin, comp)
 

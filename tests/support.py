@@ -201,11 +201,17 @@ def create_checkin(
 def assign_judge_checkpoint(user: User, checkpoint: Checkpoint, *, is_default: bool = False) -> JudgeCheckpoint:
     if is_default:
         (
-            JudgeCheckpoint.query.filter(JudgeCheckpoint.user_id == user.id).update(
-                {JudgeCheckpoint.is_default: False}, synchronize_session=False
-            )
+            JudgeCheckpoint.query.filter(
+                JudgeCheckpoint.user_id == user.id,
+                JudgeCheckpoint.competition_id == checkpoint.competition_id,
+            ).update({JudgeCheckpoint.is_default: False}, synchronize_session=False)
         )
-    assignment = JudgeCheckpoint(user_id=user.id, checkpoint_id=checkpoint.id, is_default=is_default)
+    assignment = JudgeCheckpoint(
+        user_id=user.id,
+        checkpoint_id=checkpoint.id,
+        competition_id=checkpoint.competition_id,
+        is_default=is_default,
+    )
     db.session.add(assignment)
     db.session.commit()
     return assignment
