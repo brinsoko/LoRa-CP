@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-05-24 20:51+0200\n"
+"POT-Creation-Date: 2026-05-24 21:06+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -169,9 +169,9 @@ msgstr ""
 #: app/blueprints/main/routes.py:421 app/blueprints/main/routes.py:458
 #: app/blueprints/main/routes.py:486 app/blueprints/scores/routes.py:87
 #: app/blueprints/scores/routes.py:240 app/blueprints/scores/routes.py:258
-#: app/blueprints/scores/routes.py:333 app/blueprints/scores/routes.py:741
-#: app/blueprints/scores/routes.py:761 app/blueprints/scores/routes.py:886
-#: app/blueprints/scores/routes.py:1160 app/blueprints/sheets/routes.py:60
+#: app/blueprints/scores/routes.py:333 app/blueprints/scores/routes.py:812
+#: app/blueprints/scores/routes.py:832 app/blueprints/scores/routes.py:957
+#: app/blueprints/scores/routes.py:1231 app/blueprints/sheets/routes.py:60
 #: app/blueprints/users/routes.py:43 app/blueprints/users/routes.py:87
 #: app/blueprints/users/routes.py:154 app/blueprints/users/routes.py:217
 #: app/blueprints/users/routes.py:304
@@ -711,11 +711,11 @@ msgstr ""
 msgid "Global rule deleted."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:837 app/blueprints/scores/routes.py:1148
+#: app/blueprints/scores/routes.py:908 app/blueprints/scores/routes.py:1219
 msgid "Public results are not enabled for this competition."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:1226
+#: app/blueprints/scores/routes.py:1297
 msgid "Legacy or unknown"
 msgstr ""
 
@@ -1150,7 +1150,7 @@ msgstr ""
 #: app/templates/rfid_finish.html:88 app/templates/rfid_judge.html:92
 #: app/templates/rfid_list.html:24 app/templates/score_judge.html:161
 #: app/templates/scores_submissions.html:39 app/templates/scores_view.html:64
-#: app/templates/scores_view.html:173 app/templates/view_checkins.html:10
+#: app/templates/scores_view.html:164 app/templates/view_checkins.html:10
 #: app/templates/view_checkins.html:102
 msgid "Team"
 msgstr ""
@@ -1289,7 +1289,7 @@ msgid "Organizations"
 msgstr ""
 
 #: app/templates/add_team.html:24 app/templates/scores_view.html:63
-#: app/templates/scores_view.html:172 app/templates/team_edit.html:25
+#: app/templates/scores_view.html:163 app/templates/team_edit.html:25
 #: app/templates/teams_list.html:86
 msgid "Number"
 msgstr ""
@@ -1302,7 +1302,7 @@ msgstr ""
 #: app/templates/live_arrivals.html:187 app/templates/score_judge.html:163
 #: app/templates/score_rules.html:22 app/templates/score_rules.html:101
 #: app/templates/score_rules.html:190 app/templates/score_rules.html:238
-#: app/templates/scores_view.html:62 app/templates/scores_view.html:171
+#: app/templates/scores_view.html:62 app/templates/scores_view.html:162
 #: app/templates/team_edit.html:31 app/templates/teams_list.html:12
 msgid "Group"
 msgstr ""
@@ -2613,17 +2613,17 @@ msgstr ""
 #: app/templates/live_arrivals.html:6 app/templates/live_arrivals.html:92
 #: app/templates/live_arrivals.html:190 app/templates/live_arrivals.html:248
 #: app/templates/scores_stats.html:33 app/templates/scores_stats.html:87
-#: app/templates/scores_view.html:65 app/templates/scores_view.html:174
+#: app/templates/scores_view.html:65 app/templates/scores_view.html:165
 msgid "Finished"
 msgstr ""
 
 #: app/templates/live_arrivals.html:8 app/templates/live_arrivals.html:108
 #: app/templates/live_arrivals.html:249 app/templates/scores_view.html:85
-#: app/templates/scores_view.html:99 app/templates/scores_view.html:113
-#: app/templates/scores_view.html:197 app/templates/scores_view.html:206
-#: app/templates/scores_view.html:217 app/templates/scores_view.html:238
-#: app/templates/scores_view.html:251 app/templates/scores_view.html:258
-#: app/templates/scores_view.html:266
+#: app/templates/scores_view.html:94 app/templates/scores_view.html:104
+#: app/templates/scores_view.html:188 app/templates/scores_view.html:197
+#: app/templates/scores_view.html:208 app/templates/scores_view.html:230
+#: app/templates/scores_view.html:243 app/templates/scores_view.html:250
+#: app/templates/scores_view.html:258
 msgid "DNF"
 msgstr ""
 
@@ -2811,12 +2811,12 @@ msgid "Last Seen"
 msgstr ""
 
 #: app/templates/lora_list.html:21 app/templates/scores_view.html:87
-#: app/templates/scores_view.html:199
+#: app/templates/scores_view.html:190
 msgid "Yes"
 msgstr ""
 
 #: app/templates/lora_list.html:21 app/templates/scores_view.html:89
-#: app/templates/scores_view.html:201
+#: app/templates/scores_view.html:192
 msgid "No"
 msgstr ""
 
@@ -3572,7 +3572,7 @@ msgid "Fastest team"
 msgstr ""
 
 #: app/templates/scores_stats.html:68 app/templates/scores_stats.html:120
-#: app/templates/scores_view.html:105 app/templates/scores_view.html:243
+#: app/templates/scores_view.html:235
 msgid "min"
 msgstr ""
 
@@ -3621,7 +3621,7 @@ msgid "Dead time"
 msgstr ""
 
 #: app/templates/scores_submissions.html:42 app/templates/scores_view.html:68
-#: app/templates/scores_view.html:147 app/templates/scores_view.html:183
+#: app/templates/scores_view.html:138 app/templates/scores_view.html:174
 msgid "Total points"
 msgstr ""
 
@@ -3649,7 +3649,7 @@ msgstr ""
 msgid "Scan to view"
 msgstr ""
 
-#: app/templates/scores_view.html:38 app/templates/scores_view.html:294
+#: app/templates/scores_view.html:38 app/templates/scores_view.html:286
 msgid "Show per-checkpoint"
 msgstr ""
 
@@ -3657,63 +3657,59 @@ msgstr ""
 msgid "Export CSV"
 msgstr ""
 
-#: app/templates/scores_view.html:61 app/templates/scores_view.html:170
+#: app/templates/scores_view.html:61 app/templates/scores_view.html:161
 msgid "Place"
 msgstr ""
 
-#: app/templates/scores_view.html:66
-msgid "Time-trial"
-msgstr ""
-
-#: app/templates/scores_view.html:67 app/templates/scores_view.html:182
-msgid "Dead time (sum)"
-msgstr ""
-
-#: app/templates/scores_view.html:125
-msgid "View submissions"
-msgstr ""
-
-#: app/templates/scores_view.html:133 app/templates/scores_view.html:278
-msgid "No scores yet."
-msgstr ""
-
-#: app/templates/scores_view.html:139
-msgid "Dead time is summed from the latest score per checkpoint."
-msgstr ""
-
-#: app/templates/scores_view.html:141
-msgid "Organization totals"
-msgstr ""
-
-#: app/templates/scores_view.html:146
-msgid "Organization"
-msgstr ""
-
-#: app/templates/scores_view.html:158
-msgid "No organization totals yet."
-msgstr ""
-
-#: app/templates/scores_view.html:164
-msgid "DNF teams do not count toward organization totals."
-msgstr ""
-
-#: app/templates/scores_view.html:175
+#: app/templates/scores_view.html:66 app/templates/scores_view.html:166
 msgid "Time (min)"
 msgstr ""
 
-#: app/templates/scores_view.html:179
+#: app/templates/scores_view.html:67 app/templates/scores_view.html:173
+msgid "Dead time (sum)"
+msgstr ""
+
+#: app/templates/scores_view.html:116
+msgid "View submissions"
+msgstr ""
+
+#: app/templates/scores_view.html:124 app/templates/scores_view.html:270
+msgid "No scores yet."
+msgstr ""
+
+#: app/templates/scores_view.html:130
+msgid "Dead time is summed from the latest score per checkpoint."
+msgstr ""
+
+#: app/templates/scores_view.html:132
+msgid "Organization totals"
+msgstr ""
+
+#: app/templates/scores_view.html:137
+msgid "Organization"
+msgstr ""
+
+#: app/templates/scores_view.html:149
+msgid "No organization totals yet."
+msgstr ""
+
+#: app/templates/scores_view.html:155
+msgid "DNF teams do not count toward organization totals."
+msgstr ""
+
+#: app/templates/scores_view.html:170
 msgid "Time-trial leg"
 msgstr ""
 
-#: app/templates/scores_view.html:180
+#: app/templates/scores_view.html:171
 msgid "Time points"
 msgstr ""
 
-#: app/templates/scores_view.html:181
+#: app/templates/scores_view.html:172
 msgid "Found points"
 msgstr ""
 
-#: app/templates/scores_view.html:295
+#: app/templates/scores_view.html:287
 msgid "Hide per-checkpoint"
 msgstr ""
 

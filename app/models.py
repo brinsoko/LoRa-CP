@@ -429,6 +429,14 @@ class Checkpoint(db.Model):
     # after positioned ones; existing rows were backfilled by migration
     # c6d7e8f9a0b1 with row-number-by-name to preserve current ordering.
     position = db.Column(db.Integer, nullable=True)
+    # When True, this CP is excluded from per-CP scoreboard columns and
+    # from per-CP Google Sheet output. Check-ins are still recorded so
+    # arrival tracking + time-trial leg end detection still work — the
+    # CP just doesn't get its own column on every team row. Typical use:
+    # a finish line that's also a time-trial leg's end_cp; we don't want
+    # it cluttering the leaderboard as "Cilj: 0" since the leg cell
+    # already reports the leg result.
+    hide_from_results = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
 
     # Device mapping (one device ↔ one checkpoint)
     lora_device_id = db.Column(

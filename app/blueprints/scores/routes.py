@@ -415,11 +415,10 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     # start/finish CP via the global time rule form.
     global_rules = GlobalScoreRule.query.filter(GlobalScoreRule.competition_id == comp_id).all()
     global_rules_map = {rule.group_id: rule.rules for rule in global_rules}
-    # Per-group time-trial leg metadata: which two CPs form the timed leg
-    # (e.g. B→C). The leaderboard surfaces this as a single "Time-trial leg"
-    # column with the leg's points + time taken — replacing the per-CP cells
-    # for those two CPs which used to show 0/redundant rank values.
-    group_leg_info: dict[int, dict] = {}
+    # Whole-race time (Start → Cilj) start/end overrides — apply to
+    # team_time_minutes display. This is the existing GlobalScoreRule.time
+    # field and is NOT the time-trial leg (which is a separate config
+    # below).
     for rule in global_rules:
         time_rule = (rule.rules or {}).get("time") or {}
         try:
@@ -431,17 +430,41 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             group_start_checkpoint[rule.group_id] = start_override
         if end_override:
             group_final_checkpoint[rule.group_id] = end_override
-        if start_override and end_override:
-            group_leg_info[rule.group_id] = {
-                "start_cp_id": start_override,
-                "end_cp_id": end_override,
-            }
-    # Resolve CP names for the legs in one query so we can build labels.
-    leg_cp_ids = {cid for leg in group_leg_info.values() for cid in (leg["start_cp_id"], leg["end_cp_id"])}
-    if leg_cp_ids:
+
+    # Per-group TIME-TRIAL LEG metadata, sourced from the existing
+    # ScoreRule.time_race configuration on /scores/rules. Each time_race
+    # rule defines a leg between two chosen CPs (the rank-based scoring
+    # is applied at rule.checkpoint_id with start/end CPs in the rules
+    # JSON). The leaderboard surfaces this as a single "Time-trial leg"
+    # column with the leg's points + time taken, and hides the leg
+    # endpoints from the per-CP iteration so we don't render "B: 0".
+    group_leg_info: dict[int, dict] = {}
+    time_race_rules_for_leg = ScoreRule.query.filter(ScoreRule.competition_id == comp_id).all()
+    leg_cp_ids_all: set[int] = set()
+    for rule in time_race_rules_for_leg:
+        tr = (rule.rules or {}).get("time_race") or {}
+        try:
+            leg_start = int(tr.get("start_checkpoint_id")) if tr.get("start_checkpoint_id") else None
+            leg_end = int(tr.get("end_checkpoint_id")) if tr.get("end_checkpoint_id") else None
+        except (TypeError, ValueError):
+            leg_start = leg_end = None
+        if not (leg_start and leg_end):
+            continue
+        # First time_race rule per group wins for the leg display. If
+        # operators ever configure two legs for the same group we still
+        # score both via per_team_points; the display shows the first.
+        if rule.group_id in group_leg_info:
+            continue
+        group_leg_info[rule.group_id] = {
+            "start_cp_id": leg_start,
+            "end_cp_id": leg_end,
+            "scoring_cp_id": rule.checkpoint_id,
+        }
+        leg_cp_ids_all.update({leg_start, leg_end})
+    if leg_cp_ids_all:
         leg_cp_names = {
             cp.id: cp.name
-            for cp in Checkpoint.query.filter(Checkpoint.id.in_(leg_cp_ids)).all()
+            for cp in Checkpoint.query.filter(Checkpoint.id.in_(leg_cp_ids_all)).all()
         }
         for leg in group_leg_info.values():
             start_name = leg_cp_names.get(leg["start_cp_id"], "?")
@@ -581,6 +604,35 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         for tid, val in scores.items():
             rank_score_by_team[tid] = val
 
+    # Per-team leg elapsed minutes. Points come from per_team_points
+    # (populated by the live time_race block below — same source as the
+    # offline recompute), so we don't need to recompute scoring here.
+    leg_minutes_by_team: dict[int, float] = {}
+    if group_leg_info:
+        leg_cp_ids_query = {
+            cid
+            for leg in group_leg_info.values()
+            for cid in (leg["start_cp_id"], leg["end_cp_id"])
+        }
+        leg_checkins = (
+            Checkin.query.filter(Checkin.competition_id == comp_id)
+            .filter(Checkin.team_id.in_(team_ids))
+            .filter(Checkin.checkpoint_id.in_(leg_cp_ids_query))
+            .order_by(Checkin.timestamp.asc())
+            .all()
+        )
+        leg_cp_times: dict[int, dict[int, datetime]] = {tid: {} for tid in team_ids}
+        for c in leg_checkins:
+            if c.checkpoint_id not in leg_cp_times.get(c.team_id, {}):
+                leg_cp_times.setdefault(c.team_id, {})[c.checkpoint_id] = c.timestamp
+        for gid, leg in group_leg_info.items():
+            group_team_ids = [tid for tid in team_ids if team_group_ids.get(tid) == gid]
+            for tid in group_team_ids:
+                start_ts = leg_cp_times.get(tid, {}).get(leg["start_cp_id"])
+                end_ts = leg_cp_times.get(tid, {}).get(leg["end_cp_id"])
+                if start_ts and end_ts and end_ts >= start_ts:
+                    leg_minutes_by_team[tid] = (end_ts - start_ts).total_seconds() / 60.0
+
     global_totals = {}
     global_time_points = {}
     global_found_points = {}
@@ -656,24 +708,35 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             except (TypeError, ValueError):
                 pass
         effective_min = max(0.0, raw_min - team_dead) if raw_min is not None else None
+        # Leg points already flow into `totals` via per_team_points (the
+        # live time_race block puts them in per_team_points[team][rule.cp]
+        # and we sum that into totals). Pull the same value back here for
+        # the leg-display column so the cell can show points + time.
+        leg_points = None
+        leg_minutes = leg_minutes_by_team.get(team.id)
+        if leg_for_team and leg_for_team.get("scoring_cp_id"):
+            leg_points = per_team_points.get(team.id, {}).get(leg_for_team["scoring_cp_id"])
+        team_total = totals.get(team.id, 0.0) + global_totals.get(team.id, 0.0)
         rows.append(
             {
                 "id": team.id,
                 "name": team.name,
                 "number": team.number,
                 "group": team_groups.get(team.id, ""),
-                "total": (totals.get(team.id, 0.0) + global_totals.get(team.id, 0.0)),
+                "total": team_total,
                 "dead_time": dead_times.get(team.id, 0.0),
                 "bonus_dead_time": float(team_obj.bonus_dead_time) if (team_obj and team_obj.bonus_dead_time) else 0.0,
                 "global_time": global_time_points.get(team.id, 0.0),
                 "global_found": global_found_points.get(team.id, 0.0),
                 "time_minutes": raw_min,
-                # effective minutes for the unified time-trial display
-                # (item 2). Templates can show "<time_points> (<eff_min> min)".
+                # Whole-race effective minutes (raw - dead). Distinct from
+                # leg_minutes which is leg start→end elapsed.
                 "effective_time_minutes": effective_min,
                 "notes": team_obj.notes if team_obj and team_obj.notes else "",
                 "leg_label": leg_for_team.get("label") if leg_for_team else "",
                 "leg_cp_ids": leg_for_team.get("cp_ids") if leg_for_team else frozenset(),
+                "leg_minutes": leg_minutes,
+                "leg_points": leg_points,
                 "dnf": bool(team.dnf),
                 "finished": finished_map.get(team.id, False),
                 "organization": team.organization or "",

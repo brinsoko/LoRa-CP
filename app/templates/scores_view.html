@@ -63,7 +63,7 @@
             <th>{{ _('Number') }}</th>
             <th>{{ _('Team') }}</th>
             <th>{{ _('Finished') }}</th>
-            <th class="text-end">{{ _('Time-trial') }}</th>
+            <th class="text-end">{{ _('Time (min)') }}</th>
             <th class="text-end">{{ _('Dead time (sum)') }}</th>
             <th class="text-end">{{ _('Total points') }}</th>
             {% if show_actions %}
@@ -89,20 +89,11 @@
                   <span class="badge text-bg-secondary">{{ _('No') }}</span>
                 {% endif %}
               </td>
-              {# Unified time-trial cell: leg label + score + effective minutes.
-                 Shows the points the team gets from the GlobalScoreRule.time
-                 (either absolute or rank mode), the effective elapsed time
-                 (raw - dead time), and which two CPs define the leg so the
-                 number isn't context-free. #}
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}
-                {% elif row.effective_time_minutes is not none %}
-                  {% if row.leg_label %}
-                    <span class="text-muted small me-1">{{ row.leg_label }}:</span>
-                  {% endif %}
-                  {{ '%.2f'|format(row.global_time or 0) }}
-                  <span class="text-muted small">({{ '%.1f'|format(row.effective_time_minutes) }} {{ _('min') }})</span>
+                {% elif row.time_minutes is not none %}
+                  {{ '%.1f'|format(row.time_minutes) }}
                 {% else %}
                   —
                 {% endif %}
@@ -229,18 +220,19 @@
                   {% endif %}
                 </td>
               {% endfor %}
-              {# Single column showing the time-trial leg for this team's group:
-                 leg label (e.g. "B→C") + points + time. Replaces the per-CP
-                 cells for the leg endpoints, which only ever showed 0 or
-                 redundant rank values. #}
+              {# Time-trial leg cell: the LEG label (e.g. "B→C") + the LEG
+                 points (rank-based, 100→10 by default) + the time it took
+                 the team to traverse the leg. Independent of the whole-race
+                 time block above — these are points awarded specifically
+                 for the chosen leg between two intermediate CPs. #}
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}
                 {% elif row.leg_label %}
                   <span class="text-muted small me-1">{{ row.leg_label }}:</span>
-                  {{ '%.2f'|format(row.global_time or 0) }}
-                  {% if row.effective_time_minutes is not none %}
-                    <span class="text-muted small">({{ '%.1f'|format(row.effective_time_minutes) }} {{ _('min') }})</span>
+                  {{ '%.2f'|format(row.leg_points or 0) }}
+                  {% if row.leg_minutes is not none %}
+                    <span class="text-muted small">({{ '%.1f'|format(row.leg_minutes) }} {{ _('min') }})</span>
                   {% endif %}
                 {% else %}
                   —
