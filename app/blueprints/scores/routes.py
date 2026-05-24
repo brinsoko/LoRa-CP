@@ -47,7 +47,9 @@ def judge_score():
         role = get_current_competition_role()
         if role == "admin":
             checkpoints = (
-                Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
+                Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
+                .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
+                .all()
             )
             default_checkpoint_id = checkpoints[0].id if checkpoints else None
         else:
@@ -57,7 +59,7 @@ def judge_score():
                     JudgeCheckpoint.user_id == current_user.id,
                     Checkpoint.competition_id == comp_id,
                 )
-                .order_by(Checkpoint.name.asc())
+                .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
                 .all()
             )
             checkpoints = [jc.checkpoint for jc in assigned if jc.checkpoint]
@@ -85,7 +87,11 @@ def score_rules():
         flash(_("Select a competition first."), "warning")
         return redirect(url_for("main.select_competition"))
 
-    checkpoints = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
+    checkpoints = (
+        Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
+        .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
+        .all()
+    )
     groups = (
         CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
@@ -472,7 +478,12 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         if not group_team_ids:
             continue
         live_scores = _compute_time_race_scores_from_checkins(
-            group_team_ids, comp_id, start_cp_i, end_cp_i, min_points, max_points,
+            group_team_ids,
+            comp_id,
+            start_cp_i,
+            end_cp_i,
+            min_points,
+            max_points,
         )
         cp_id = rule.checkpoint_id
         for team_id, new_total in live_scores.items():
@@ -513,6 +524,41 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             if start_ts and end_ts and end_ts >= start_ts:
                 team_time_minutes[team_id] = (end_ts - start_ts).total_seconds() / 60.0
 
+    # Pre-compute per-group rank scores for any GlobalScoreRule.time block
+    # whose mode is "rank". Rank scoring depends on the SET of finishers
+    # in the group (fastest gets max_points, slowest gets min_points, linear
+    # interp by effective duration), so we compute it once per group here
+    # and pass each team's score into _compute_global_contrib below.
+    rank_score_by_team: dict[int, float] = {}
+    for group_id_iter, rule_blob in global_rules_map.items():
+        time_rule = (rule_blob or {}).get("time") or {}
+        if (time_rule.get("mode") or "absolute").strip().lower() != "rank":
+            continue
+        start_cp = time_rule.get("start_checkpoint_id")
+        end_cp = time_rule.get("end_checkpoint_id")
+        if not start_cp or not end_cp:
+            continue
+        try:
+            start_cp_i = int(start_cp)
+            end_cp_i = int(end_cp)
+        except (TypeError, ValueError):
+            continue
+        max_pts = float(time_rule.get("max_points") or 100)
+        min_pts = float(time_rule.get("min_points") or 10)
+        group_team_ids = [tid for tid in team_ids if team_group_ids.get(tid) == group_id_iter]
+        if not group_team_ids:
+            continue
+        scores = _compute_time_race_scores_from_checkins(
+            group_team_ids,
+            comp_id,
+            start_cp_i,
+            end_cp_i,
+            min_pts,
+            max_pts,
+        )
+        for tid, val in scores.items():
+            rank_score_by_team[tid] = val
+
     global_totals = {}
     global_time_points = {}
     global_found_points = {}
@@ -525,7 +571,13 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             global_found_points[team_id] = 0.0
             continue
         global_rule = global_rules_map.get(group_id_for_team)
-        global_data = _compute_global_contrib(comp_id, team_id, group_id_for_team, global_rule)
+        global_data = _compute_global_contrib(
+            comp_id,
+            team_id,
+            group_id_for_team,
+            global_rule,
+            precomputed_rank_score=rank_score_by_team.get(team_id),
+        )
         global_totals[team_id] = global_data["total"] or 0.0
         global_time_points[team_id] = global_data["time_points"] or 0.0
         global_found_points[team_id] = global_data["found_points"] or 0.0
@@ -566,6 +618,20 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
                 finished_map[team_id] = True
 
     for team in teams:
+        raw_min = team_time_minutes.get(team.id)
+        # effective time = raw elapsed minus all dead-time (CP-bound +
+        # team-level bonus). This is the value the rules actually score
+        # against; previously the leaderboard only showed raw elapsed,
+        # which confused operators when penalty points didn't match what
+        # math-from-display said they should.
+        team_dead = dead_times.get(team.id, 0.0)
+        team_obj = next((t for t in teams if t.id == team.id), None)
+        if team_obj and team_obj.bonus_dead_time:
+            try:
+                team_dead = team_dead + float(team_obj.bonus_dead_time)
+            except (TypeError, ValueError):
+                pass
+        effective_min = max(0.0, raw_min - team_dead) if raw_min is not None else None
         rows.append(
             {
                 "id": team.id,
@@ -574,9 +640,14 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
                 "group": team_groups.get(team.id, ""),
                 "total": (totals.get(team.id, 0.0) + global_totals.get(team.id, 0.0)),
                 "dead_time": dead_times.get(team.id, 0.0),
+                "bonus_dead_time": float(team_obj.bonus_dead_time) if (team_obj and team_obj.bonus_dead_time) else 0.0,
                 "global_time": global_time_points.get(team.id, 0.0),
                 "global_found": global_found_points.get(team.id, 0.0),
-                "time_minutes": team_time_minutes.get(team.id),
+                "time_minutes": raw_min,
+                # effective minutes for the unified time-trial display
+                # (item 2). Templates can show "<time_points> (<eff_min> min)".
+                "effective_time_minutes": effective_min,
+                "notes": team_obj.notes if team_obj and team_obj.notes else "",
                 "dnf": bool(team.dnf),
                 "finished": finished_map.get(team.id, False),
                 "organization": team.organization or "",
@@ -623,7 +694,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         cp_ids = [row[0] for row in group_cp_ids]
         if cp_ids:
             checkpoints_query = checkpoints_query.filter(Checkpoint.id.in_(cp_ids))
-    checkpoints = checkpoints_query.order_by(Checkpoint.name.asc()).all()
+    checkpoints = checkpoints_query.order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc()).all()
 
     return {
         "rows": rows,
@@ -675,9 +746,14 @@ def view_scores_export_csv():
 
     buf = io.StringIO()
     w = csv.writer(buf)
-    header = ["rank", "group", "number", "team", "organization",
-              "finished", "dnf", "time_minutes"]
-    header += [f"cp.{cp.name}" for cp in checkpoints]
+    header = ["rank", "group", "number", "team", "organization", "finished", "dnf", "time_minutes"]
+    # Per-CP header: "<name> — <description>" if a description exists,
+    # else just the name. Was "cp.<name>" before — operators wanted the
+    # raw CP name plus context, without a synthetic prefix muddying it.
+    header += [
+        f"{cp.name} — {cp.description.strip()}" if (cp.description and cp.description.strip()) else cp.name
+        for cp in checkpoints
+    ]
     header += ["time_points", "found_points", "dead_time", "total"]
     w.writerow(header)
 
@@ -699,21 +775,23 @@ def view_scores_export_csv():
                 per_cp_cells.append("0")
             else:
                 per_cp_cells.append("")
-        w.writerow([
-            i,
-            r.get("group", ""),
-            r.get("number", "") if r.get("number") is not None else "",
-            r.get("name", ""),
-            r.get("organization", ""),
-            "YES" if r.get("finished") else "",
-            "YES" if r.get("dnf") else "",
-            fmt(r.get("time_minutes"), ".2f"),
-            *per_cp_cells,
-            fmt(r.get("global_time"), ".2f"),
-            fmt(r.get("global_found"), ".2f"),
-            fmt(r.get("dead_time"), ".0f"),
-            fmt(r.get("total"), ".2f"),
-        ])
+        w.writerow(
+            [
+                i,
+                r.get("group", ""),
+                r.get("number", "") if r.get("number") is not None else "",
+                r.get("name", ""),
+                r.get("organization", ""),
+                "YES" if r.get("finished") else "",
+                "YES" if r.get("dnf") else "",
+                fmt(r.get("time_minutes"), ".2f"),
+                *per_cp_cells,
+                fmt(r.get("global_time"), ".2f"),
+                fmt(r.get("global_found"), ".2f"),
+                fmt(r.get("dead_time"), ".0f"),
+                fmt(r.get("total"), ".2f"),
+            ]
+        )
 
     filename = f"scores_comp{comp_id}"
     if group_id:
@@ -986,9 +1064,7 @@ def _build_stats_context(comp_id: int) -> dict:
     overall_completion_rate = (overall_finished / overall_team_count) if overall_team_count else 0
     scored_rows_all = [r for r in rows if not r.get("dnf")]
     overall_avg_points = (
-        sum(float(r.get("total") or 0.0) for r in scored_rows_all) / len(scored_rows_all)
-        if scored_rows_all
-        else None
+        sum(float(r.get("total") or 0.0) for r in scored_rows_all) / len(scored_rows_all) if scored_rows_all else None
     )
     overall_avg_time = None
     overall_median_time = None
@@ -1009,9 +1085,7 @@ def _build_stats_context(comp_id: int) -> dict:
         overall_fastest_group = fastest[1]
         overall_fastest_minutes = fastest[3]
     overall_avg_checkpoint_count = (
-        sum(overall_checkpoint_counts) / len(overall_checkpoint_counts)
-        if overall_checkpoint_counts
-        else None
+        sum(overall_checkpoint_counts) / len(overall_checkpoint_counts) if overall_checkpoint_counts else None
     )
 
     overall = {
@@ -1071,7 +1145,11 @@ def score_submissions():
         )
     teams = teams_query.order_by(Team.number.asc().nulls_last(), Team.name.asc()).all()
 
-    checkpoints = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
+    checkpoints = (
+        Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
+        .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
+        .all()
+    )
     groups = (
         CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
