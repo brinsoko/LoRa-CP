@@ -251,27 +251,17 @@ def _compute_global_contrib(
     team_id: int,
     group_id: int,
     global_rule: dict | None,
-    *,
-    precomputed_rank_score: float | None = None,
 ) -> dict:
     """Per-team contribution from the group's GlobalScoreRule.
 
-    The time rule supports two modes (set via ``rules['time']['mode']``):
+    Time rule is the classic threshold-and-penalty formula: ``max_points``
+    if the team finishes within ``threshold_minutes``, lose
+    ``penalty_points`` per ``penalty_minutes`` over, clamped at
+    ``min_points``. Auto-DNF triggers if effective duration exceeds
+    ``threshold_minutes * dq_multiplier``.
 
-    - ``"absolute"`` (default for backward compat): the classic
-      threshold-and-penalty formula. ``max_points`` if you finish under
-      ``threshold_minutes``, then lose ``penalty_points`` per
-      ``penalty_minutes`` over until you hit ``min_points``.
-    - ``"rank"``: fastest finisher in the group gets ``max_points``,
-      slowest gets ``min_points``, everyone else linearly interpolated by
-      effective duration. The caller (``_build_scores_context``) must
-      pre-compute the per-group rank map once and pass this team's score
-      via ``precomputed_rank_score`` so we don't re-rank the whole field
-      for every team.
-
-    Auto-DNF (``dq_multiplier``) still applies in rank mode — a team
-    that's massively over threshold is DNF regardless of where they
-    ranked against an even-slower team.
+    For rank-based scoring on a short leg between two intermediate CPs,
+    use ScoreRule.time_race (configured per group on /scores/rules).
     """
     if not global_rule:
         return {"total": None, "found_points": None, "time_points": None, "auto_dnf": False}
@@ -318,7 +308,6 @@ def _compute_global_contrib(
             used = True
 
     time_rule = global_rule.get("time") or {}
-    mode = (time_rule.get("mode") or "absolute").strip().lower()
     start_cp = time_rule.get("start_checkpoint_id")
     end_cp = time_rule.get("end_checkpoint_id")
     max_points = _to_number(time_rule.get("max_points"))
@@ -327,11 +316,14 @@ def _compute_global_contrib(
     penalty_points = _to_number(time_rule.get("penalty_points"))
     min_points = _to_number(time_rule.get("min_points")) or 0.0
     dq_multiplier = _to_number(time_rule.get("dq_multiplier"))
-
-    # Auto-DQ check is shared between modes: compute effective duration
-    # if start+end check-ins exist, regardless of mode.
-    effective_duration_minutes = None
-    if start_cp and end_cp:
+    if (
+        start_cp
+        and end_cp
+        and max_points is not None
+        and threshold_minutes is not None
+        and penalty_minutes
+        and penalty_points is not None
+    ):
         start_row = (
             Checkin.query.filter(
                 Checkin.competition_id == competition_id,
@@ -353,35 +345,13 @@ def _compute_global_contrib(
         if start_row and end_row:
             raw_duration = (end_row.timestamp - start_row.timestamp).total_seconds() / 60.0
             dead_time_total = _get_team_dead_time_total(competition_id, team_id)
-            effective_duration_minutes = max(0.0, raw_duration - dead_time_total)
-            if (
-                dq_multiplier is not None
-                and dq_multiplier > 0
-                and threshold_minutes is not None
-                and effective_duration_minutes > threshold_minutes * dq_multiplier
-            ):
+            duration_minutes = max(0.0, raw_duration - dead_time_total)
+            if dq_multiplier is not None and dq_multiplier > 0 and duration_minutes > threshold_minutes * dq_multiplier:
                 auto_dnf = True
-
-    if mode == "rank":
-        # Rank mode: caller supplied the precomputed score (or None for
-        # teams that didn't finish or aren't in any rank group).
-        if precomputed_rank_score is not None and max_points is not None:
-            time_points = _round_score(_clamp_non_negative(precomputed_rank_score))
-            total += time_points
-            used = True
-    else:
-        # Absolute mode (default): threshold + penalty.
-        if (
-            effective_duration_minutes is not None
-            and max_points is not None
-            and threshold_minutes is not None
-            and penalty_minutes
-            and penalty_points is not None
-        ):
-            if effective_duration_minutes <= threshold_minutes:
+            if duration_minutes <= threshold_minutes:
                 time_points = max_points
             else:
-                over = max(0.0, effective_duration_minutes - threshold_minutes)
+                over = max(0.0, duration_minutes - threshold_minutes)
                 time_points = max_points - (over / penalty_minutes) * penalty_points
             time_points = _round_score(_clamp_non_negative(max(time_points, min_points)))
             total += time_points

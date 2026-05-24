@@ -242,101 +242,17 @@ def enqueue_build_score_tab(
     )
 
 
-def enqueue_recompute_rank_time_push(app, competition_id: int, group_id: int) -> None:
-    """Triggered from ingest when a Checkin lands at a rank-mode time
-    rule's end checkpoint. Recomputes the per-team rank scores for the
-    group, writes them to ScoreEntry rows (so sheet sync has data to
-    push), then refreshes the per-CP sheet tabs for the competition so
-    the leaderboard there reflects the new ranks. Cheap because the work
-    is scoped to a single group and the per-CP tabs sync is throttled
-    per-row by SheetsClient anyway."""
+def enqueue_recompute_time_race_push(app, competition_id: int, checkpoint_id: int, group_id: int) -> None:
+    """Triggered from ingest when a Checkin lands on the END checkpoint
+    of a ScoreRule.time_race rule. Recomputes the per-team rank scores
+    for that (checkpoint, group) rule via the existing offline
+    recompute_scores_for_rule path — which both writes ScoreEntry rows
+    and pushes them to the per-CP sheet tab. Scoped to one rule so the
+    cost is small even for big competitions."""
 
-    def _job(comp_id: int, gid: int) -> None:
-        from app.extensions import db
-        from app.models import (
-            Checkpoint,
-            CheckpointGroup,
-            GlobalScoreRule,
-            ScoreEntry,
-            TeamGroup,
-        )
-        from app.resources.scores import _compute_time_race_scores_from_checkins
-        from app.utils.sheets_sync import update_checkpoint_scores_sync
-        from app.utils.time import utcnow_naive
+    def _job(comp_id: int, cp_id: int, gid: int) -> None:
+        from app.resources.scores import recompute_scores_for_rule
 
-        rule = GlobalScoreRule.query.filter_by(competition_id=comp_id, group_id=gid).first()
-        if not rule:
-            return
-        tr = (rule.rules or {}).get("time") or {}
-        if (tr.get("mode") or "").lower() != "rank":
-            return
-        start_cp = tr.get("start_checkpoint_id")
-        end_cp = tr.get("end_checkpoint_id")
-        if not start_cp or not end_cp:
-            return
-        try:
-            start_cp_i = int(start_cp)
-            end_cp_i = int(end_cp)
-        except (TypeError, ValueError):
-            return
-        max_pts = float(tr.get("max_points") or 100)
-        min_pts = float(tr.get("min_points") or 10)
+        recompute_scores_for_rule(comp_id, cp_id, gid)
 
-        team_ids = [tg.team_id for tg in TeamGroup.query.filter_by(group_id=gid, active=True).all()]
-        if not team_ids:
-            return
-
-        scores = _compute_time_race_scores_from_checkins(
-            team_ids,
-            comp_id,
-            start_cp_i,
-            end_cp_i,
-            min_pts,
-            max_pts,
-        )
-        if not scores:
-            return
-
-        # Persist into ScoreEntry at the end-CP so the sheet has a row to
-        # push. The sheet's per-team Points column for the end-CP will
-        # then carry the rank-based value. Other tabs are unaffected.
-        group = CheckpointGroup.query.get(gid)
-        group_name = group.name if group else f"group_{gid}"
-        end_checkpoint = Checkpoint.query.get(end_cp_i)
-        if not end_checkpoint:
-            return
-
-        for team_id, score in scores.items():
-            existing = (
-                ScoreEntry.query.filter_by(
-                    competition_id=comp_id,
-                    team_id=team_id,
-                    checkpoint_id=end_cp_i,
-                )
-                .order_by(ScoreEntry.created_at.desc())
-                .first()
-            )
-            raw_fields = dict((existing.raw_fields or {}) if existing else {})
-            raw_fields["points"] = score
-            if existing:
-                existing.total = score
-                existing.raw_fields = raw_fields
-                created_at = existing.created_at
-            else:
-                created = ScoreEntry(
-                    competition_id=comp_id,
-                    team_id=team_id,
-                    checkpoint_id=end_cp_i,
-                    raw_fields=raw_fields,
-                    total=score,
-                    created_at=utcnow_naive(),
-                )
-                db.session.add(created)
-                created_at = created.created_at
-            db.session.commit()
-            try:
-                update_checkpoint_scores_sync(team_id, end_cp_i, group_name, raw_fields, created_at)
-            except Exception:
-                logging.exception("rank_time_push: sheet push failed for team=%s", team_id)
-
-    _submit(app, _job, competition_id, group_id)
+    _submit(app, _job, competition_id, checkpoint_id, group_id)

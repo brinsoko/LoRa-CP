@@ -437,26 +437,28 @@ def ingest_post():
                     # do not fail ingest if Sheets update fails
                     pass
 
-                # If this check-in lands at the END checkpoint of a rank-mode
-                # GlobalScoreRule.time, the team's time-trial points just
-                # crystallized (and every other finished team's score may
-                # have shifted because the spread changed). Trigger an
-                # async recompute + sheet push so the leaderboard + sheet
-                # both update without a manual judge form submission.
-                # No-op if the team isn't in a rank-mode group, or sheets
-                # sync is disabled.
+                # If this check-in lands on the END checkpoint of a
+                # ScoreRule.time_race rule, the team's leg time just
+                # crystallized — and every other finished team's rank
+                # may have shifted because the spread changed. Push an
+                # async recompute so the leaderboard + sheet update
+                # without waiting for a judge form submission. No-op
+                # for non-leg CPs or when sheets sync is disabled.
                 try:
-                    from app.models import GlobalScoreRule as _GSR
-                    from app.utils.sheets_sync_worker import enqueue_recompute_rank_time_push as _enqueue
+                    from app.models import ScoreRule as _SR
+                    from app.utils.sheets_sync_worker import enqueue_recompute_time_race_push as _enqueue
 
-                    rules_at_end = _GSR.query.filter(_GSR.competition_id == competition_id).all()
-                    for _r in rules_at_end:
-                        tr = (_r.rules or {}).get("time") or {}
-                        if (tr.get("mode") or "").lower() != "rank":
-                            continue
+                    rules = _SR.query.filter(_SR.competition_id == competition_id).all()
+                    for _r in rules:
+                        tr = (_r.rules or {}).get("time_race") or {}
                         if str(tr.get("end_checkpoint_id") or "") != str(cp.id):
                             continue
-                        _enqueue(current_app._get_current_object(), competition_id, _r.group_id)
+                        _enqueue(
+                            current_app._get_current_object(),
+                            competition_id,
+                            _r.checkpoint_id,
+                            _r.group_id,
+                        )
                 except Exception:
                     pass
 

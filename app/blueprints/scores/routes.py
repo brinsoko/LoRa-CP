@@ -569,41 +569,6 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             if start_ts and end_ts and end_ts >= start_ts:
                 team_time_minutes[team_id] = (end_ts - start_ts).total_seconds() / 60.0
 
-    # Pre-compute per-group rank scores for any GlobalScoreRule.time block
-    # whose mode is "rank". Rank scoring depends on the SET of finishers
-    # in the group (fastest gets max_points, slowest gets min_points, linear
-    # interp by effective duration), so we compute it once per group here
-    # and pass each team's score into _compute_global_contrib below.
-    rank_score_by_team: dict[int, float] = {}
-    for group_id_iter, rule_blob in global_rules_map.items():
-        time_rule = (rule_blob or {}).get("time") or {}
-        if (time_rule.get("mode") or "absolute").strip().lower() != "rank":
-            continue
-        start_cp = time_rule.get("start_checkpoint_id")
-        end_cp = time_rule.get("end_checkpoint_id")
-        if not start_cp or not end_cp:
-            continue
-        try:
-            start_cp_i = int(start_cp)
-            end_cp_i = int(end_cp)
-        except (TypeError, ValueError):
-            continue
-        max_pts = float(time_rule.get("max_points") or 100)
-        min_pts = float(time_rule.get("min_points") or 10)
-        group_team_ids = [tid for tid in team_ids if team_group_ids.get(tid) == group_id_iter]
-        if not group_team_ids:
-            continue
-        scores = _compute_time_race_scores_from_checkins(
-            group_team_ids,
-            comp_id,
-            start_cp_i,
-            end_cp_i,
-            min_pts,
-            max_pts,
-        )
-        for tid, val in scores.items():
-            rank_score_by_team[tid] = val
-
     # Per-team leg elapsed minutes. Points come from per_team_points
     # (populated by the live time_race block below — same source as the
     # offline recompute), so we don't need to recompute scoring here.
@@ -645,13 +610,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             global_found_points[team_id] = 0.0
             continue
         global_rule = global_rules_map.get(group_id_for_team)
-        global_data = _compute_global_contrib(
-            comp_id,
-            team_id,
-            group_id_for_team,
-            global_rule,
-            precomputed_rank_score=rank_score_by_team.get(team_id),
-        )
+        global_data = _compute_global_contrib(comp_id, team_id, group_id_for_team, global_rule)
         global_totals[team_id] = global_data["total"] or 0.0
         global_time_points[team_id] = global_data["time_points"] or 0.0
         global_found_points[team_id] = global_data["found_points"] or 0.0
@@ -695,19 +654,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         team_group_id = team_group_ids.get(team.id)
         leg_for_team = group_leg_info.get(team_group_id) if team_group_id else None
         raw_min = team_time_minutes.get(team.id)
-        # effective time = raw elapsed minus all dead-time (CP-bound +
-        # team-level bonus). This is the value the rules actually score
-        # against; previously the leaderboard only showed raw elapsed,
-        # which confused operators when penalty points didn't match what
-        # math-from-display said they should.
-        team_dead = dead_times.get(team.id, 0.0)
         team_obj = next((t for t in teams if t.id == team.id), None)
-        if team_obj and team_obj.bonus_dead_time:
-            try:
-                team_dead = team_dead + float(team_obj.bonus_dead_time)
-            except (TypeError, ValueError):
-                pass
-        effective_min = max(0.0, raw_min - team_dead) if raw_min is not None else None
         # Leg points already flow into `totals` via per_team_points (the
         # live time_race block puts them in per_team_points[team][rule.cp]
         # and we sum that into totals). Pull the same value back here for
@@ -729,9 +676,6 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
                 "global_time": global_time_points.get(team.id, 0.0),
                 "global_found": global_found_points.get(team.id, 0.0),
                 "time_minutes": raw_min,
-                # Whole-race effective minutes (raw - dead). Distinct from
-                # leg_minutes which is leg start→end elapsed.
-                "effective_time_minutes": effective_min,
                 "notes": team_obj.notes if team_obj and team_obj.notes else "",
                 "leg_label": leg_for_team.get("label") if leg_for_team else "",
                 "leg_cp_ids": leg_for_team.get("cp_ids") if leg_for_team else frozenset(),
