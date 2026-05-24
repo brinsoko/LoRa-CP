@@ -134,19 +134,23 @@
         <table class="table table-striped align-middle">
           <thead>
             <tr>
+              <th style="width: 60px;">{{ _('Place') }}</th>
               <th>{{ _('Organization') }}</th>
+              <th class="text-end">{{ _('Teams') }}</th>
               <th class="text-end">{{ _('Total points') }}</th>
             </tr>
           </thead>
           <tbody>
             {% for org in org_totals %}
               <tr>
+                <td>{{ loop.index }}</td>
                 <td>{{ org.name }}</td>
+                <td class="text-end">{{ org.team_count }}</td>
                 <td class="text-end">{{ '%.2f'|format(org.total or 0) }}</td>
               </tr>
             {% else %}
               <tr>
-                <td colspan="2" class="text-muted text-center py-3">{{ _('No organization totals yet.') }}</td>
+                <td colspan="4" class="text-muted text-center py-3">{{ _('No organization totals yet.') }}</td>
               </tr>
             {% endfor %}
           </tbody>

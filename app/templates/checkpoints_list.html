@@ -104,14 +104,42 @@
                   </div>
                   <div class="modal-body">
                     {% if eligible_users %}
-                      <div class="d-flex flex-column gap-2">
+                      {# Search + filter toolbar. Search matches against
+                         username case-insensitively. "Show selected only"
+                         narrows the list to currently-checked rows so
+                         operators can review assignments without
+                         scrolling past everyone. Pure client-side — no
+                         pagination round-trips; the visible-count badge
+                         updates as you type. #}
+                      <div class="d-flex flex-wrap gap-2 mb-2 align-items-center sticky-top bg-body pt-1 pb-2"
+                           style="z-index:5;">
+                        <input type="search"
+                               class="form-control form-control-sm judge-search-input flex-grow-1"
+                               placeholder="{{ _('Search judges…') }}"
+                               data-cp-id="{{ cp.id }}"
+                               autocomplete="off"
+                               style="min-width:160px;">
+                        <div class="form-check form-switch mb-0">
+                          <input class="form-check-input judge-checked-only" type="checkbox"
+                                 id="judgeCheckedOnly-{{ cp.id }}"
+                                 data-cp-id="{{ cp.id }}">
+                          <label class="form-check-label small" for="judgeCheckedOnly-{{ cp.id }}">
+                            {{ _('Selected only') }}
+                          </label>
+                        </div>
+                        <span class="badge text-bg-secondary judge-visible-count"
+                              data-cp-id="{{ cp.id }}">{{ eligible_users|length }}</span>
+                      </div>
+                      <div class="d-flex flex-column gap-2 judge-list" data-cp-id="{{ cp.id }}">
                         {% for u in eligible_users %}
-                          <div class="form-check">
-                            <input class="form-check-input"
+                          <div class="form-check judge-row"
+                               data-username="{{ u.username|lower }}">
+                            <input class="form-check-input judge-checkbox"
                                    type="checkbox"
                                    name="user_ids"
                                    value="{{ u.id }}"
                                    id="judge-{{ cp.id }}-{{ u.id }}"
+                                   data-cp-id="{{ cp.id }}"
                                    {% if u.id in assigned_lookup[cp.id] %}checked{% endif %}>
                             <label class="form-check-label" for="judge-{{ cp.id }}-{{ u.id }}">
                               {{ u.username }}
@@ -140,5 +168,44 @@
   </div>
 </div>
 
+{# Judges-modal search + "selected only" filter. One handler attached
+   per cp; scoped to the modal via data-cp-id so multiple modals on the
+   page don't fight each other. Pure client-side filter; no API calls. #}
+<script>
+(function () {
+  function applyFilter(cpId) {
+    const list = document.querySelector('.judge-list[data-cp-id="' + cpId + '"]');
+    if (!list) return;
+    const searchEl = document.querySelector('.judge-search-input[data-cp-id="' + cpId + '"]');
+    const checkedOnlyEl = document.querySelector('.judge-checked-only[data-cp-id="' + cpId + '"]');
+    const countEl = document.querySelector('.judge-visible-count[data-cp-id="' + cpId + '"]');
+    const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+    const checkedOnly = checkedOnlyEl ? checkedOnlyEl.checked : false;
+    let visible = 0;
+    list.querySelectorAll('.judge-row').forEach((row) => {
+      const username = row.dataset.username || '';
+      const cb = row.querySelector('.judge-checkbox');
+      const matchesSearch = !q || username.indexOf(q) !== -1;
+      const matchesChecked = !checkedOnly || (cb && cb.checked);
+      const show = matchesSearch && matchesChecked;
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    if (countEl) countEl.textContent = visible;
+  }
+
+  document.querySelectorAll('.judge-search-input').forEach((el) => {
+    el.addEventListener('input', () => applyFilter(el.dataset.cpId));
+  });
+  document.querySelectorAll('.judge-checked-only').forEach((el) => {
+    el.addEventListener('change', () => applyFilter(el.dataset.cpId));
+  });
+  // Re-apply when a row's checkbox toggles so the "selected only" view
+  // doesn't strand the row the user just unchecked.
+  document.querySelectorAll('.judge-checkbox').forEach((el) => {
+    el.addEventListener('change', () => applyFilter(el.dataset.cpId));
+  });
+})();
+</script>
 
 {% endblock %}

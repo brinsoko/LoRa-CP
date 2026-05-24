@@ -711,13 +711,20 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         place_by_team[row["id"]] = current_place
         row["place"] = current_place
 
-    org_totals_map = {}
+    org_totals_map: dict[str, dict] = {}
     for row in rows:
         org = (row.get("organization") or "").strip()
         if not org or row.get("dnf"):
             continue
-        org_totals_map[org] = org_totals_map.get(org, 0.0) + float(row.get("total") or 0.0)
-    org_totals = [{"name": name, "total": total} for name, total in sorted(org_totals_map.items())]
+        entry = org_totals_map.setdefault(org, {"name": org, "total": 0.0, "team_count": 0})
+        entry["total"] += float(row.get("total") or 0.0)
+        entry["team_count"] += 1
+    # Sort by total descending so the org-totals table reads as a
+    # leaderboard, not an alphabetical list. Tie-break on name for stability.
+    org_totals = sorted(
+        org_totals_map.values(),
+        key=lambda e: (-float(e["total"] or 0.0), e["name"].lower()),
+    )
 
     checkpoints_query = Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
     if group_id:
