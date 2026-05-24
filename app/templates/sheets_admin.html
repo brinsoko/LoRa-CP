@@ -184,10 +184,22 @@
     <hr>
     <form method="post" action="{{ url_for('sheets_admin.publish_local') }}" class="row g-2 mb-3">
       {{ csrf_input() }}
-      <input type="hidden" name="spreadsheet_id" class="sheet-id-target">
       <div class="col-12">
         <div class="form-text mb-2">
           {{ _('Publish the competition to the target Google Sheet. Works for both first-time publishing (local-only configs) and switching to a different spreadsheet (rebinds all configs to the new sheet ID). Creates one tab per checkpoint with headers + team numbers + any existing score data, then builds the Teams / Arrivals / Score summary tabs so the spreadsheet is a self-contained backup. Re-publishing to the same target is a safe no-op.') }}
+        </div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="publish_spreadsheet_id">{{ _('Target spreadsheet ID') }}</label>
+        <div class="input-group">
+          <input type="text" class="form-control"
+                 id="publish_spreadsheet_id"
+                 name="spreadsheet_id"
+                 value="{{ remembered_spreadsheet_id or '' }}"
+                 placeholder="{{ _('e.g. 1aBcD…XyZ') }}">
+        </div>
+        <div class="form-text">
+          {{ _('Paste the new sheet ID here to publish/repoint all per-CP tabs to it.') }}
         </div>
       </div>
       <div class="col-md-3 d-flex align-items-end">
@@ -195,6 +207,11 @@
                 onclick="return confirm('{{ _('This will create or overwrite tabs on the target spreadsheet and rebind every SheetConfig (including any currently bound to another sheet). Continue?') }}');">
           {{ _('Publish / repoint to sheet') }}
         </button>
+      </div>
+      <div class="col-12">
+        <div class="form-text">
+          {{ _('After publish, every per-CP tab is rebuilt on the target sheet and all SheetConfigs are rebound. The old sheet\'s tabs are abandoned but not deleted.') }}
+        </div>
       </div>
     </form>
     <hr>
