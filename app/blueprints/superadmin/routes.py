@@ -107,9 +107,7 @@ def index():
     )
     memberships_by_user: dict[int, list[dict]] = {}
     for member, comp in rows:
-        memberships_by_user.setdefault(member.user_id, []).append(
-            {"role": member.role, "competition_name": comp.name}
-        )
+        memberships_by_user.setdefault(member.user_id, []).append({"role": member.role, "competition_name": comp.name})
     for u in users:
         u.memberships_summary = memberships_by_user.get(u.id, [])
 
@@ -264,8 +262,7 @@ def bulk_add_users():
         )
 
     current_app.logger.info(
-        "superadmin %s bulk-created %d new user(s) and attached %d existing user(s) "
-        "to competition %s as %s",
+        "superadmin %s bulk-created %d new user(s) and attached %d existing user(s) to competition %s as %s",
         getattr(current_user, "username", "?"),
         len(created),
         len(attached_existing),

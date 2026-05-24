@@ -333,10 +333,7 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
         raw_judge_pass = os.environ.get("SEED_JUDGE_PASS")
         judge_pass = raw_judge_pass if raw_judge_pass is not None else DEV_JUDGE_PASS
         if is_prod and (raw_judge_pass is None or judge_pass == DEV_JUDGE_PASS):
-            sys.exit(
-                "FATAL: SEED_JUDGE_PASS must be set explicitly when "
-                "FLASK_ENV=production."
-            )
+            sys.exit("FATAL: SEED_JUDGE_PASS must be set explicitly when FLASK_ENV=production.")
         judge = get_or_create_user(judge_user, "judge", judge_pass)
 
         super_user = (os.environ.get("SEED_SUPERADMIN_USER") or "").strip()
@@ -344,10 +341,7 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
             raw_super_pass = os.environ.get("SEED_SUPERADMIN_PASS")
             super_pass = raw_super_pass if raw_super_pass is not None else DEV_SUPER_PASS
             if is_prod and (raw_super_pass is None or super_pass == DEV_SUPER_PASS):
-                sys.exit(
-                    "FATAL: SEED_SUPERADMIN_PASS must be set explicitly when "
-                    "FLASK_ENV=production."
-                )
+                sys.exit("FATAL: SEED_SUPERADMIN_PASS must be set explicitly when FLASK_ENV=production.")
             get_or_create_user(super_user, "superadmin", super_pass)
 
         competition = ensure_default_competition()
@@ -464,7 +458,7 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
                     Checkpoint.query.join(Checkpoint.groups)
                     .filter(CheckpointGroup.id.in_(group_ids))
                     .distinct()
-                    .order_by(Checkpoint.name.asc())
+                    .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
                 )
                 return q.all()
 

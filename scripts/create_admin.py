@@ -28,10 +28,7 @@ def main() -> None:
     # Refuse the dev default in production. Operators must supply
     # ADMIN_PASS explicitly. The dev convenience stays intact for
     # `make admin` runs locally.
-    if (
-        os.environ.get("FLASK_ENV") == "production"
-        and (raw_pass_env is None or password == DEV_DEFAULT_PASSWORD)
-    ):
+    if os.environ.get("FLASK_ENV") == "production" and (raw_pass_env is None or password == DEV_DEFAULT_PASSWORD):
         raise SystemExit(
             "FATAL: ADMIN_PASS must be set explicitly when FLASK_ENV=production. "
             f"The dev default {DEV_DEFAULT_PASSWORD!r} is not allowed in production."

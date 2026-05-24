@@ -60,10 +60,15 @@ def main() -> None:
         members = t.get("members") or []
         members_sorted = sorted(members, key=lambda m: m.get("position") or 0)
         member_names = " | ".join(m.get("name", "") for m in members_sorted if m.get("name"))
-        rows.append([
-            t.get("number", ""), t.get("name", ""), t.get("organization", ""),
-            "YES" if t.get("dnf") else "", member_names,
-        ])
+        rows.append(
+            [
+                t.get("number", ""),
+                t.get("name", ""),
+                t.get("organization", ""),
+                "YES" if t.get("dnf") else "",
+                member_names,
+            ]
+        )
     _w(os.path.join(args.out_dir, "03_teams.csv"), ["number", "name", "organization", "dnf", "members"], rows)
 
     # 4. team -> group assignments
@@ -76,10 +81,14 @@ def main() -> None:
     # 5. checkpoints
     rows = [
         [
-            c.get("name", ""), c.get("description", ""), c.get("location", ""),
-            c.get("easting", ""), c.get("northing", ""),
+            c.get("name", ""),
+            c.get("description", ""),
+            c.get("location", ""),
+            c.get("easting", ""),
+            c.get("northing", ""),
             "YES" if c.get("is_virtual") else "",
-            c.get("judges_note", ""), c.get("scoring_text", ""),
+            c.get("judges_note", ""),
+            c.get("scoring_text", ""),
         ]
         for c in data.get("checkpoints", []) or []
     ]
@@ -91,29 +100,37 @@ def main() -> None:
 
     # 6. group -> checkpoint links (route definition)
     rows = sorted(
-        ([link.get("group_name", ""), link.get("position", ""), link.get("checkpoint_name", "")]
-         for link in data.get("group_checkpoint_links", []) or []),
+        (
+            [link.get("group_name", ""), link.get("position", ""), link.get("checkpoint_name", "")]
+            for link in data.get("group_checkpoint_links", []) or []
+        ),
         key=lambda r: (r[0], r[1] if r[1] != "" else 0),
     )
     _w(os.path.join(args.out_dir, "06_group_routes.csv"), ["group", "position", "checkpoint"], rows)
 
     # 7. RFID cards
-    rows = [
-        [c.get("team_name", ""), c.get("uid", ""), c.get("number", "")]
-        for c in data.get("rfid_cards", []) or []
-    ]
+    rows = [[c.get("team_name", ""), c.get("uid", ""), c.get("number", "")] for c in data.get("rfid_cards", []) or []]
     _w(os.path.join(args.out_dir, "07_rfid_cards.csv"), ["team", "uid", "number"], rows)
 
     # 8. check-ins, sorted by time
     rows = sorted(
-        ([
-            ci.get("timestamp", ""), ci.get("team_name", ""), ci.get("checkpoint_name", ""),
-            ci.get("created_by_username", "") or "", ci.get("created_by_dev_num", "") or "",
-        ] for ci in data.get("checkins", []) or []),
+        (
+            [
+                ci.get("timestamp", ""),
+                ci.get("team_name", ""),
+                ci.get("checkpoint_name", ""),
+                ci.get("created_by_username", "") or "",
+                ci.get("created_by_dev_num", "") or "",
+            ]
+            for ci in data.get("checkins", []) or []
+        ),
         key=lambda r: r[0],
     )
-    _w(os.path.join(args.out_dir, "08_checkins.csv"),
-       ["timestamp", "team", "checkpoint", "created_by_user", "created_by_dev_num"], rows)
+    _w(
+        os.path.join(args.out_dir, "08_checkins.csv"),
+        ["timestamp", "team", "checkpoint", "created_by_user", "created_by_dev_num"],
+        rows,
+    )
 
     # 9. scores — raw_fields varies per CP, so expand all unique keys as columns
     scores = data.get("scores", []) or []
@@ -126,20 +143,24 @@ def main() -> None:
                 field_keys.append(k)
     header = ["created_at", "team", "checkpoint", "total", "judge"] + [f"field.{k}" for k in field_keys]
     rows = sorted(
-        ([
-            s.get("created_at", ""), s.get("team_name", ""), s.get("checkpoint_name", ""),
-            s.get("total", "") if s.get("total") is not None else "",
-            s.get("judge_username", "") or "",
-            *[(s.get("raw_fields") or {}).get(k, "") for k in field_keys],
-        ] for s in scores),
+        (
+            [
+                s.get("created_at", ""),
+                s.get("team_name", ""),
+                s.get("checkpoint_name", ""),
+                s.get("total", "") if s.get("total") is not None else "",
+                s.get("judge_username", "") or "",
+                *[(s.get("raw_fields") or {}).get(k, "") for k in field_keys],
+            ]
+            for s in scores
+        ),
         key=lambda r: r[0],
     )
     _w(os.path.join(args.out_dir, "09_scores.csv"), header, rows)
 
     # 10. score rules — JSON blob per (checkpoint, group), one row each
     rows = [
-        [sr.get("checkpoint_name", ""), sr.get("group_name", ""),
-         json.dumps(sr.get("rules") or {}, ensure_ascii=False)]
+        [sr.get("checkpoint_name", ""), sr.get("group_name", ""), json.dumps(sr.get("rules") or {}, ensure_ascii=False)]
         for sr in data.get("score_rules", []) or []
     ]
     _w(os.path.join(args.out_dir, "10_score_rules.csv"), ["checkpoint", "group", "rules_json"], rows)
@@ -153,12 +174,15 @@ def main() -> None:
 
     # 12. sheet configs (templates the Google Sheets sync uses)
     rows = [
-        [sc.get("tab_name", ""), sc.get("tab_type", ""), sc.get("checkpoint_name", "") or "",
-         json.dumps(sc.get("config") or {}, ensure_ascii=False)]
+        [
+            sc.get("tab_name", ""),
+            sc.get("tab_type", ""),
+            sc.get("checkpoint_name", "") or "",
+            json.dumps(sc.get("config") or {}, ensure_ascii=False),
+        ]
         for sc in data.get("sheet_configs", []) or []
     ]
-    _w(os.path.join(args.out_dir, "12_sheet_configs.csv"),
-       ["tab_name", "tab_type", "checkpoint", "config_json"], rows)
+    _w(os.path.join(args.out_dir, "12_sheet_configs.csv"), ["tab_name", "tab_type", "checkpoint", "config_json"], rows)
 
     # 13. devices (LoRa)
     rows = [

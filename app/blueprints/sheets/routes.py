@@ -105,7 +105,11 @@ def list_sheets():
     configs = (
         SheetConfig.query.filter(SheetConfig.competition_id == comp_id).order_by(SheetConfig.created_at.desc()).all()
     )
-    checkpoints = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
+    checkpoints = (
+        Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
+        .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
+        .all()
+    )
     groups = (
         CheckpointGroup.query.options(
             db.joinedload(CheckpointGroup.checkpoint_links).joinedload(CheckpointGroupLink.checkpoint)
@@ -431,7 +435,11 @@ def wizard_checkpoints():
         request.form.get("dead_time_header") or lang.get("dead_time_header") or "Dead Time [min]"
     ).strip()
     time_header = (request.form.get("time_header") or lang.get("time_header") or "Čas").strip()
-    checkpoints = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
+    checkpoints = (
+        Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
+        .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
+        .all()
+    )
     group_order_raw = request.form.get("group_order") or ""
     checkpoint_order_raw = (request.form.get("checkpoint_order") or "").strip()
     checkpoint_order = (
@@ -658,9 +666,7 @@ def sync_team_numbers(config_id: int):
                     if err:
                         summary_errors.append(f"{label} on {sid}: {err}")
                 except Exception as exc:
-                    current_app.logger.exception(
-                        "Failed to rebuild %s on %s during sync_team_numbers", label, sid
-                    )
+                    current_app.logger.exception("Failed to rebuild %s on %s during sync_team_numbers", label, sid)
                     summary_errors.append(f"{label} on {sid}: {exc}")
 
         if summary_errors:
@@ -677,9 +683,7 @@ def sync_team_numbers(config_id: int):
                 "success",
             )
     else:
-        enqueue_sync_all_checkpoint_tabs(
-            current_app._get_current_object(), competition_id=comp_id
-        )
+        enqueue_sync_all_checkpoint_tabs(current_app._get_current_object(), competition_id=comp_id)
         for _label, tab_name, _build_fn, enqueue_fn in summary_builders:
             for sid in real_sheet_ids:
                 enqueue_fn(
@@ -745,9 +749,7 @@ def publish_local():
     else:
         from app.utils.sheets_sync_worker import enqueue_publish_local
 
-        enqueue_publish_local(
-            current_app._get_current_object(), comp_id, spreadsheet_id
-        )
+        enqueue_publish_local(current_app._get_current_object(), comp_id, spreadsheet_id)
         flash(
             _(
                 "Publish to %(sid)s queued. This takes ~30 seconds for a 15-CP "

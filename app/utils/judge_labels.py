@@ -175,10 +175,7 @@ def derive_widget(rule: dict | None, max_button_choices: int = 6) -> dict:
     except (TypeError, ValueError):
         pass
 
-    is_binary_pass_fail = (
-        len(items) == 2
-        and {str(k) for k, _ in items} == {"0", "1"}
-    )
+    is_binary_pass_fail = len(items) == 2 and {str(k) for k, _ in items} == {"0", "1"}
 
     choices: list[dict] = []
     for key, pts in items:
@@ -190,11 +187,13 @@ def derive_widget(rule: dict | None, max_button_choices: int = 6) -> dict:
                 label = f"Da ({_fmt_num(pts_num)})"
         else:
             label = f"{key} → {_fmt_num(pts_num)}"
-        choices.append({
-            "value": str(key),
-            "label": label,
-            "points": pts_num,
-        })
+        choices.append(
+            {
+                "value": str(key),
+                "label": label,
+                "points": pts_num,
+            }
+        )
     return {"widget": "buttons", "widget_choices": choices}
 
 

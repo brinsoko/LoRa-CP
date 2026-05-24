@@ -113,12 +113,8 @@ def _export_competition(comp: Competition) -> dict:
                 "team_name": c.team.name if c.team else None,
                 "checkpoint_name": c.checkpoint.name if c.checkpoint else None,
                 "timestamp": c.timestamp.isoformat() if c.timestamp else None,
-                "created_by_username": (
-                    c.created_by_user.username if c.created_by_user else None
-                ),
-                "created_by_dev_num": (
-                    c.created_by_device.dev_num if c.created_by_device else None
-                ),
+                "created_by_username": (c.created_by_user.username if c.created_by_user else None),
+                "created_by_dev_num": (c.created_by_device.dev_num if c.created_by_device else None),
             }
             for c in checkins
         ],
@@ -518,9 +514,7 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
             created_by_device_id = None
             created_by_dev_num = ci_data.get("created_by_dev_num")
             if created_by_dev_num is not None:
-                d = LoRaDevice.query.filter_by(
-                    competition_id=comp.id, dev_num=created_by_dev_num
-                ).first()
+                d = LoRaDevice.query.filter_by(competition_id=comp.id, dev_num=created_by_dev_num).first()
                 if d:
                     created_by_device_id = d.id
 
@@ -847,9 +841,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
     db.session.flush()
     existing_team_groups = {
         (tg.team_id, tg.group_id)
-        for tg in TeamGroup.query.join(Team, TeamGroup.team_id == Team.id)
-        .filter(Team.competition_id == comp.id)
-        .all()
+        for tg in TeamGroup.query.join(Team, TeamGroup.team_id == Team.id).filter(Team.competition_id == comp.id).all()
     }
     for tg_data in data.get("team_groups", []):
         team = team_map.get(tg_data.get("team_name"))
@@ -873,9 +865,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
     # arrivals/score builds that gate on CheckpointGroupLink.
     existing_group_links = {
         (gl.group_id, gl.checkpoint_id)
-        for gl in CheckpointGroupLink.query.join(
-            CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id
-        )
+        for gl in CheckpointGroupLink.query.join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
         .filter(CheckpointGroup.competition_id == comp.id)
         .all()
     }
@@ -929,8 +919,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
     # Score entries (add only new ones, matched by team+checkpoint).
     # Local-only: no Google Sheets sync helpers are invoked here.
     existing_scores = {
-        (s.team_id, s.checkpoint_id): s
-        for s in ScoreEntry.query.filter_by(competition_id=comp.id).all()
+        (s.team_id, s.checkpoint_id): s for s in ScoreEntry.query.filter_by(competition_id=comp.id).all()
     }
     for s_data in data.get("scores", []):
         team = team_map.get(s_data.get("team_name"))
@@ -977,10 +966,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
     # whose (tab_type, tab_name) pair isn't already present locally; existing
     # ones are left alone so a merge can't clobber the admin's hand-tuned
     # Google Sheets wiring. New configs get a local-only spreadsheet_id.
-    existing_configs = {
-        (sc.tab_type, sc.tab_name)
-        for sc in SheetConfig.query.filter_by(competition_id=comp.id).all()
-    }
+    existing_configs = {(sc.tab_type, sc.tab_name) for sc in SheetConfig.query.filter_by(competition_id=comp.id).all()}
     local_ss_id = _local_spreadsheet_id(comp.id)
     for sc_data in data.get("sheet_configs", []):
         tab_type = sc_data.get("tab_type") or "checkpoint"
@@ -1009,8 +995,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
     # (checkpoint_name, group_name) pair has no local rule yet — admins
     # often hand-tune these so a merge must not clobber existing logic.
     existing_score_rules = {
-        (r.checkpoint_id, r.group_id)
-        for r in ScoreRule.query.filter_by(competition_id=comp.id).all()
+        (r.checkpoint_id, r.group_id) for r in ScoreRule.query.filter_by(competition_id=comp.id).all()
     }
     for sr_data in data.get("score_rules", []):
         cp = cp_map.get(sr_data.get("checkpoint_name"))
@@ -1031,9 +1016,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
         added["score_rules"] += 1
 
     # Global score rules (per group). Same add-new-only semantics.
-    existing_global_rules = {
-        r.group_id for r in GlobalScoreRule.query.filter_by(competition_id=comp.id).all()
-    }
+    existing_global_rules = {r.group_id for r in GlobalScoreRule.query.filter_by(competition_id=comp.id).all()}
     for gr_data in data.get("global_score_rules", []):
         group = group_map.get(gr_data.get("group_name"))
         if not group:
@@ -1051,9 +1034,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
         added["global_score_rules"] += 1
 
     # LoRa devices (matched by dev_num within the competition).
-    existing_dev_nums = {
-        d.dev_num for d in LoRaDevice.query.filter_by(competition_id=comp.id).all()
-    }
+    existing_dev_nums = {d.dev_num for d in LoRaDevice.query.filter_by(competition_id=comp.id).all()}
     for d_data in data.get("devices", []):
         dev_num = d_data.get("dev_num")
         if dev_num is None or dev_num in existing_dev_nums:
@@ -1074,9 +1055,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
     # RFID cards (matched by uid within the competition). UIDs are
     # normalized to the canonical /api/ingest lookup form.
     db.session.flush()
-    existing_uids = {
-        card.uid for card in RFIDCard.query.filter_by(competition_id=comp.id).all()
-    }
+    existing_uids = {card.uid for card in RFIDCard.query.filter_by(competition_id=comp.id).all()}
     for card_data in data.get("rfid_cards", []):
         uid = normalize_uid(card_data.get("uid", ""))
         if not uid or uid in existing_uids:

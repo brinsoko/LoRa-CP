@@ -118,11 +118,7 @@ def main(argv: list[str] | None = None) -> int:
     csv_roster = _parse_csv(args.csv)
     print(f"Parsed {len(csv_roster)} team(s) from {args.csv}")
 
-    delete_names = {
-        _normalize(n)
-        for n in (args.delete.split(",") if args.delete else [])
-        if n.strip()
-    }
+    delete_names = {_normalize(n) for n in (args.delete.split(",") if args.delete else []) if n.strip()}
 
     app = create_app()
     with app.app_context():
@@ -167,9 +163,7 @@ def main(argv: list[str] | None = None) -> int:
 
         print(f"  Teams skipped (already have members): {len(skipped_existing)}")
         for t in skipped_existing:
-            print(
-                f"    = {t.name!r} (id={t.id}): {len(t.members)} member(s) — pass --force to overwrite"
-            )
+            print(f"    = {t.name!r} (id={t.id}): {len(t.members)} member(s) — pass --force to overwrite")
 
         print(f"  DB teams with no CSV registration: {len(unmatched_db)}")
         for t in unmatched_db:
@@ -181,10 +175,7 @@ def main(argv: list[str] | None = None) -> int:
 
         print(f"  Teams to delete: {len(to_delete)}")
         for t in to_delete:
-            print(
-                f"    - {t.name!r} (id={t.id}): "
-                f"{len(t.members)} member(s), cascade deletes follow"
-            )
+            print(f"    - {t.name!r} (id={t.id}): {len(t.members)} member(s), cascade deletes follow")
 
         if not_found_delete:
             print(f"  WARN: --delete names not present in DB: {not_found_delete}")
@@ -214,9 +205,7 @@ def main(argv: list[str] | None = None) -> int:
 
         db.session.commit()
         print()
-        print(
-            f"Applied: populated {len(adds)} team(s), deleted {len(to_delete)} team(s)."
-        )
+        print(f"Applied: populated {len(adds)} team(s), deleted {len(to_delete)} team(s).")
         return 0
 
 

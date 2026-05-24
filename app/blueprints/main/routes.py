@@ -13,6 +13,7 @@ from app.utils.audit import record_audit_event
 from app.utils.competition import (
     create_invite,
     get_current_competition_id,
+    get_current_competition_role,
     get_user_memberships,
     set_current_competition_id,
 )
@@ -112,6 +113,12 @@ def set_competition(competition_id: int):
         flash(_("You don't have access to that competition."), "warning")
         return redirect(url_for("main.select_competition"))
     flash(_("Competition selected."), "success")
+    # Land judges on the score-entry form (their main workflow during a race)
+    # instead of the Teams list. Admins still default to Teams since they
+    # may be doing setup work; superadmins likewise.
+    role = (get_current_competition_role() or "").strip().lower()
+    if role == "judge":
+        return redirect(url_for("scores.judge_score"))
     return redirect(url_for("teams.list_teams"))
 
 
@@ -165,7 +172,11 @@ def view_checkins():
         flash(_("Select a competition first."), "warning")
         return redirect(url_for("main.select_competition"))
     teams = Team.query.filter(Team.competition_id == comp_id).order_by(Team.name.asc()).all()
-    cps = Checkpoint.query.filter(Checkpoint.competition_id == comp_id).order_by(Checkpoint.name.asc()).all()
+    cps = (
+        Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
+        .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
+        .all()
+    )
     team_id = request.args.get("team_id", type=int)
     cp_id = request.args.get("checkpoint_id", type=int)
     df = request.args.get("date_from")
