@@ -208,7 +208,11 @@
                 <td>
                   {% if team.missed_checkpoints %}
                     {% for cp in team.missed_checkpoints %}
-                      <span class="badge text-bg-light border text-muted me-1">{{ cp.name }}</span>
+                      {# text-bg-warning has guaranteed readable contrast in
+                         both light and dark modes (Bootstrap 5.3+ auto-adapts).
+                         Avoids the text-muted+text-bg-light combo that vanished
+                         against dark backgrounds. #}
+                      <span class="badge text-bg-warning me-1">{{ cp.name }}</span>
                     {% endfor %}
                   {% else %}
                     <span class="text-success" title="{{ _('No missed checkpoints') }}">✓</span>
@@ -323,7 +327,7 @@
         const teamNumber = row.number === null || row.number === undefined ? "" : ` (${escapeHtml(row.number)})`;
         const missed = Array.isArray(row.missed_checkpoints) ? row.missed_checkpoints : [];
         const missedCell = missed.length
-          ? missed.map((cp) => `<span class="badge text-bg-light border text-muted me-1">${escapeHtml(cp.name)}</span>`).join("")
+          ? missed.map((cp) => `<span class="badge text-bg-warning me-1">${escapeHtml(cp.name)}</span>`).join("")
           : `<span class="text-success" title="${escapeHtml(labels.noMissed)}">✓</span>`;
         return `
           <tr>

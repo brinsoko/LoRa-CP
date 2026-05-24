@@ -194,21 +194,25 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
 
     checkpoint_ids_for_view = {checkpoint.id for checkpoint in checkpoints}
 
-    # Name lookup used for the per-team "missed" badge list. Covers every
-    # non-virtual checkpoint in the competition so we can label missed CPs
-    # even when the page is filtered to a single group's subset.
-    checkpoint_name_lookup: dict[int, str] = {checkpoint.id: checkpoint.name for checkpoint in checkpoints}
+    # Name lookup used for the per-team "missed" badge list. Tracks both
+    # the display name AND whether the CP is virtual so we can exclude
+    # virtual ones from the missed list — virtual CPs are scoring slots
+    # judges fill in at admin time, not physical points teams visit, so
+    # they should never appear in a team's "missed" list.
+    checkpoint_meta_lookup: dict[int, tuple[str, bool]] = {
+        checkpoint.id: (checkpoint.name, bool(checkpoint.is_virtual)) for checkpoint in checkpoints
+    }
     all_route_checkpoint_ids: set[int] = set()
     for ordered_ids in group_checkpoint_order.values():
         all_route_checkpoint_ids.update(ordered_ids)
-    missing_name_ids = all_route_checkpoint_ids - set(checkpoint_name_lookup.keys())
+    missing_name_ids = all_route_checkpoint_ids - set(checkpoint_meta_lookup.keys())
     if missing_name_ids:
         extra_cps = Checkpoint.query.filter(
             Checkpoint.competition_id == comp_id,
             Checkpoint.id.in_(missing_name_ids),
         ).all()
         for cp in extra_cps:
-            checkpoint_name_lookup[cp.id] = cp.name
+            checkpoint_meta_lookup[cp.id] = (cp.name, bool(cp.is_virtual))
 
     team_group_ids: dict[int, list[int]] = {}
     group_team_ids: dict[int, set[int]] = {}
@@ -336,6 +340,8 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
         # Skipped-CP detection: expected route (already direction-flipped by
         # _build_group_routes) minus actual arrivals, preserving route order
         # so operators see the visit sequence rather than an id-sorted set.
+        # Virtual CPs are excluded — judges fill them in at admin time, no
+        # team "visits" them.
         missed_checkpoints: list[dict] = []
         if route_group_id:
             expected_route = group_checkpoint_order.get(route_group_id, [])
@@ -343,8 +349,11 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
             for cp_id in expected_route:
                 if cp_id in arrived_ids:
                     continue
-                name = checkpoint_name_lookup.get(cp_id)
-                if not name:
+                meta = checkpoint_meta_lookup.get(cp_id)
+                if not meta:
+                    continue
+                name, is_virtual = meta
+                if is_virtual:
                     continue
                 missed_checkpoints.append({"id": cp_id, "name": name})
 

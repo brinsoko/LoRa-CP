@@ -168,11 +168,10 @@
             <th>{{ _('Number') }}</th>
             <th>{{ _('Team') }}</th>
             <th>{{ _('Finished') }}</th>
-            <th class="text-end">{{ _('Time (min)') }}</th>
+            <th class="text-end">{{ _('Time-trial') }}</th>
             {% for cp in checkpoints %}
               <th class="text-end">{{ cp.name }}</th>
             {% endfor %}
-            <th class="text-end">{{ _('Time points') }}</th>
             <th class="text-end">{{ _('Found points') }}</th>
             <th class="text-end">{{ _('Dead time (sum)') }}</th>
             <th class="text-end">{{ _('Total points') }}</th>
@@ -196,11 +195,14 @@
                   <span class="badge text-bg-secondary">{{ _('No') }}</span>
                 {% endif %}
               </td>
+              {# Unified time-trial cell: score followed by effective minutes.
+                 Mirrors the main table so the extended view doesn't drift. #}
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}
-                {% elif row.time_minutes is not none %}
-                  {{ '%.1f'|format(row.time_minutes) }}
+                {% elif row.effective_time_minutes is not none %}
+                  {{ '%.2f'|format(row.global_time or 0) }}
+                  <span class="text-muted small">({{ '%.1f'|format(row.effective_time_minutes) }} min)</span>
                 {% else %}
                   —
                 {% endif %}
@@ -219,13 +221,6 @@
                   {% endif %}
                 </td>
               {% endfor %}
-              <td class="text-end">
-                {% if row.dnf %}
-                  {{ _('DNF') }}
-                {% else %}
-                  {{ '%.2f'|format(row.global_time or 0) }}
-                {% endif %}
-              </td>
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}
