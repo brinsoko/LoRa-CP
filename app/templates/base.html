@@ -13,6 +13,11 @@
         integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
         crossorigin="anonymous">
 
+  <!-- Bootstrap Icons (for flash message icons, notes indicator, etc.) -->
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+        crossorigin="anonymous">
+
   <!-- Initialize theme early (avoid flash) -->
   <script>
     (function() {
@@ -93,12 +98,17 @@
           <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-outline-primary">{{ _('Login') }}</a>
         {% endif %}
         {% if current_user.is_authenticated and current_competition_role == 'admin' %}
-          <a href="{{ url_for('auth.register') }}" class="btn btn-sm btn-outline-success">{{ _('Create User') }}</a>
-        {% endif %}
-        {% if current_user.is_authenticated and current_competition_role == 'admin' %}
-          <a href="{{ url_for('users.list_users') }}" class="btn btn-sm btn-outline-secondary">{{ _('Users') }}</a>
-          <a href="{{ url_for('judges.assign_checkpoints') }}" class="btn btn-sm btn-outline-secondary">{{ _('Judges') }}</a>
-          <a href="{{ url_for('firmware.firmware_list') }}" class="btn btn-sm btn-outline-secondary">{{ _('Firmware') }}</a>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              {{ _('Manage') }}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="{{ url_for('auth.register') }}">{{ _('Create User') }}</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('users.list_users') }}">{{ _('Users') }}</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('judges.assign_checkpoints') }}">{{ _('Judges') }}</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('firmware.firmware_list') }}">{{ _('Firmware') }}</a></li>
+            </ul>
+          </div>
         {% endif %}
 
         <!-- THEME TOGGLE -->
@@ -140,44 +150,56 @@
     {% endif %}
 
     {% if current_competition and current_user.is_authenticated and current_competition_role in ['judge','admin'] %}
+      {# High-frequency-during-race tabs: keep visible #}
       <a href="{{ url_for('checkpoints.list_checkpoints') }}" class="btn btn-outline-secondary">{{ _('Checkpoints') }}</a>
-      
-
-      
       <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-outline-info">{{ _('View Check-ins') }}</a>
       <a href="{{ url_for('checkins.live_arrivals') }}" class="btn btn-outline-info">{{ _('Live Arrivals') }}</a>
       <a href="{{ url_for('checkins.add_checkin') }}" class="btn btn-success">{{ _('Add Check-in') }}</a>
-
-      <a href="{{ url_for('rfid.list_rfid') }}" class="btn btn-outline-info">{{ _('Map RFID ↔ Team') }}</a>
       <a href="{{ url_for('rfid.judge_console') }}" class="btn btn-outline-primary">{{ _('Judge RFID') }}</a>
       <a href="{{ url_for('scores.judge_score') }}" class="btn btn-outline-primary">{{ _('Score') }}</a>
       <a href="{{ url_for('scores.view_scores') }}" class="btn btn-outline-secondary">{{ _('Scores') }}</a>
-      {% if not current_competition.hide_score_submissions %}
-      <a href="{{ url_for('scores.score_submissions') }}" class="btn btn-outline-secondary">{{ _('Score Submissions') }}</a>
-      {% endif %}
-      <a href="{{ url_for('scores.score_stats') }}" class="btn btn-outline-secondary">{{ _('Stats') }}</a>
       <a href="{{ url_for('rfid.finish_console') }}" class="btn btn-outline-success">{{ _('Finish Check') }}</a>
-
       <a href="{{ url_for('groups.list_groups') }}" class="btn btn-outline-secondary">{{ _('Groups') }}</a>
-      <a href="{{ url_for('lora.lora_list') }}" class="btn btn-outline-secondary">{{ _('Devices') }}</a>
-      {% if current_user.is_authenticated and current_competition_role == 'admin' and not current_competition.hide_audit_messages %}
 
-          <a class="btn btn-outline-secondary" href="{{ url_for('messages.list_messages') }}">{{ _('Messages') }}</a>
+      {# Lower-traffic-during-race utilities: collapse under "More" #}
+      <div class="dropdown">
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          {{ _('More') }}
+        </button>
+        <ul class="dropdown-menu">
+          <li><a class="dropdown-item" href="{{ url_for('rfid.list_rfid') }}">{{ _('Map RFID ↔ Team') }}</a></li>
+          {% if not current_competition.hide_score_submissions %}
+          <li><a class="dropdown-item" href="{{ url_for('scores.score_submissions') }}">{{ _('Score Submissions') }}</a></li>
+          {% endif %}
+          <li><a class="dropdown-item" href="{{ url_for('scores.score_stats') }}">{{ _('Stats') }}</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('lora.lora_list') }}">{{ _('Devices') }}</a></li>
+          {% if not current_competition.hide_gps_map %}
+          <li><a class="dropdown-item" href="{{ url_for('maps.index') }}">{{ _('Map') }}</a></li>
+          {% endif %}
+          {% if not current_competition.hide_dev_map %}
+          <li><a class="dropdown-item" href="{{ url_for('maps.lora_map') }}">{{ _('Device Map') }}</a></li>
+          {% endif %}
+          {% if current_competition_role == 'admin' and not current_competition.hide_audit_messages %}
+          <li><a class="dropdown-item" href="{{ url_for('messages.list_messages') }}">{{ _('Messages') }}</a></li>
+          {% endif %}
+        </ul>
+      </div>
 
-      {% endif %}
-      {% if not current_competition.hide_gps_map %}
-      <a href="{{ url_for('maps.index') }}" class="btn btn-outline-primary">{{ _('Map') }}</a>
-      {% endif %}
-      {% if not current_competition.hide_dev_map %}
-      <a href="{{ url_for('maps.lora_map') }}" class="btn btn-outline-primary">{{ _('Device Map') }}</a>
-      {% endif %}
-      {% if current_user.is_authenticated and current_competition_role == 'admin' %}
-      <a href="{{ url_for('sheets_admin.list_sheets') }}" class="btn btn-outline-secondary">{{ _('Sheets') }}</a>
-      <a href="{{ url_for('scores.score_rules') }}" class="btn btn-outline-secondary">{{ _('Score Rules') }}</a>
-      {% if not current_competition.hide_audit_messages %}
-      <a href="{{ url_for('audit.list_audit_events') }}" class="btn btn-outline-secondary">{{ _('Audit') }}</a>
-      {% endif %}
-      <a href="{{ url_for('main.competition_settings') }}" class="btn btn-outline-secondary">{{ _('Settings') }}</a>
+      {# Admin-only operational tools: collapse under "Admin" #}
+      {% if current_competition_role == 'admin' %}
+      <div class="dropdown">
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          {{ _('Admin') }}
+        </button>
+        <ul class="dropdown-menu">
+          <li><a class="dropdown-item" href="{{ url_for('sheets_admin.list_sheets') }}">{{ _('Sheets') }}</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('scores.score_rules') }}">{{ _('Score Rules') }}</a></li>
+          {% if not current_competition.hide_audit_messages %}
+          <li><a class="dropdown-item" href="{{ url_for('audit.list_audit_events') }}">{{ _('Audit') }}</a></li>
+          {% endif %}
+          <li><a class="dropdown-item" href="{{ url_for('main.competition_settings') }}">{{ _('Settings') }}</a></li>
+        </ul>
+      </div>
       {% endif %}
     {% endif %}
     {% if current_user.is_authenticated and current_user.role == 'superadmin' %}
@@ -189,11 +211,43 @@
   <!-- FLASH MESSAGES -->
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-      <div class="mb-3">
+      {% set icon_map = {
+        'success': 'check-circle-fill',
+        'warning': 'exclamation-triangle-fill',
+        'danger': 'x-circle-fill',
+        'error': 'x-circle-fill',
+        'info': 'info-circle-fill',
+        'secondary': 'chat-square-text',
+      } %}
+      <div class="mb-3" id="flashMessages">
         {% for category, msg in messages %}
-          <div class="alert alert-{{ 'warning' if category=='warning' else category }} mb-2">{{ msg }}</div>
+          {% set effective_category = 'danger' if category == 'error' else ('warning' if category == 'warning' else category) %}
+          {% set icon_name = icon_map.get(category, icon_map.get(effective_category, 'chat-square-text')) %}
+          <div class="alert alert-{{ effective_category }} alert-dismissible fade show d-flex align-items-start gap-2 mb-2"
+               role="alert"
+               data-auto-dismiss="{{ 5000 if effective_category == 'success' else 0 }}">
+            <i class="bi bi-{{ icon_name }} flex-shrink-0" aria-hidden="true"></i>
+            <div class="flex-grow-1">{{ msg }}</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ _('Close') }}"></button>
+          </div>
         {% endfor %}
       </div>
+      <script>
+        (function () {
+          document.querySelectorAll('#flashMessages .alert[data-auto-dismiss]').forEach((el) => {
+            const ttl = parseInt(el.dataset.autoDismiss || '0', 10);
+            if (ttl > 0) {
+              setTimeout(() => {
+                try {
+                  bootstrap.Alert.getOrCreateInstance(el).close();
+                } catch (e) {
+                  /* bootstrap not loaded yet — leave the alert visible */
+                }
+              }, ttl);
+            }
+          });
+        })();
+      </script>
     {% endif %}
   {% endwith %}
 

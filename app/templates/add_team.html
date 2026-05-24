@@ -44,6 +44,25 @@
       </div>
 
       <div class="mb-3">
+        <label class="form-label" for="teamNotes">{{ _('Notes') }}</label>
+        <textarea id="teamNotes" name="notes" rows="3" class="form-control"
+                  maxlength="2000"
+                  placeholder="{{ _('Special events, organizer adjustments, anything judges should know.') }}"></textarea>
+        <div class="form-text">{{ _('Optional. Visible to judges and admins on the team list.') }}</div>
+      </div>
+
+      {% if has_role('admin') %}
+      <div class="mb-3">
+        <label class="form-label" for="bonusDeadTime">{{ _('Team-level dead time (minutes)') }}</label>
+        <input id="bonusDeadTime" type="number" step="0.1" min="0" name="bonus_dead_time"
+               class="form-control" value="0">
+        <div class="form-text">
+          {{ _('For delays the team had no control over (organizer-caused, etc.). Added to the per-CP dead-time sum before time-trial scoring.') }}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="mb-3">
         <label class="form-label">{{ _('RFID UID') }}</label>
         <input name="rfid_uid" class="form-control" placeholder="{{ _('Tap tag or paste UID') }}">
         <div class="form-text">{{ _('Optional; creates an RFID mapping for this team.') }}</div>

@@ -148,17 +148,29 @@ def add_team():
             )
 
         members = _parse_members_text(request.form.get("members_text"))
+        notes = (request.form.get("notes") or "").strip()
+
+        create_payload = {
+            "name": name,
+            "number": number,
+            "organization": organization,
+            "group_id": selected_group_id,
+            "members": members,
+            "notes": notes,
+        }
+        if (get_current_competition_role() or "") == "admin":
+            raw_bonus = (request.form.get("bonus_dead_time") or "").strip()
+            if raw_bonus:
+                try:
+                    bonus_value = max(0.0, float(raw_bonus))
+                except (TypeError, ValueError):
+                    bonus_value = 0.0
+                create_payload["bonus_dead_time"] = bonus_value
 
         resp, payload = api_json(
             "POST",
             "/api/teams",
-            json={
-                "name": name,
-                "number": number,
-                "organization": organization,
-                "group_id": selected_group_id,
-                "members": members,
-            },
+            json=create_payload,
         )
 
         if resp.status_code == 201:
@@ -263,9 +275,19 @@ def edit_team(team_id: int):
             "organization": organization,
             "group_id": selected_group_id,
             "members": _parse_members_text(request.form.get("members_text")),
+            "notes": (request.form.get("notes") or "").strip(),
         }
         if (get_current_competition_role() or "") == "admin":
             update_payload["dnf"] = bool(request.form.get("dnf"))
+            raw_bonus = (request.form.get("bonus_dead_time") or "").strip()
+            if raw_bonus:
+                try:
+                    bonus_value = max(0.0, float(raw_bonus))
+                except (TypeError, ValueError):
+                    bonus_value = 0.0
+            else:
+                bonus_value = 0.0
+            update_payload["bonus_dead_time"] = bonus_value
 
         resp, payload = api_json(
             "PATCH",

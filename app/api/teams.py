@@ -19,7 +19,7 @@ from app.utils.competition import get_current_competition_role, require_current_
 from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.sheets_sync import sync_all_checkpoint_tabs
 from app.utils.sheets_sync_worker import enqueue_sync_all_checkpoint_tabs
-from app.utils.validators import validate_text
+from app.utils.validators import validate_finite_float, validate_text
 
 
 def _dispatch_sync_all(comp_id: int) -> None:
@@ -33,11 +33,10 @@ def _dispatch_sync_all(comp_id: int) -> None:
             pass
         return
     try:
-        enqueue_sync_all_checkpoint_tabs(
-            current_app._get_current_object(), competition_id=comp_id
-        )
+        enqueue_sync_all_checkpoint_tabs(current_app._get_current_object(), competition_id=comp_id)
     except Exception:
         pass
+
 
 teams_api_bp = Blueprint("api_teams", __name__)
 
@@ -75,10 +74,7 @@ def _apply_members(team: Team, members_payload) -> None:
     for existing in list(team.members):
         db.session.delete(existing)
     db.session.flush()
-    team.members = [
-        TeamMember(name=n, role=r, position=idx)
-        for idx, (n, r) in enumerate(parsed)
-    ]
+    team.members = [TeamMember(name=n, role=r, position=idx) for idx, (n, r) in enumerate(parsed)]
 
 
 def _serialize_team(team: Team) -> dict:
@@ -88,6 +84,8 @@ def _serialize_team(team: Team) -> dict:
         "number": team.number,
         "organization": team.organization,
         "dnf": bool(team.dnf),
+        "notes": team.notes or "",
+        "bonus_dead_time": float(team.bonus_dead_time or 0),
         "checkins_count": len(team.checkins or []),
         "groups": [
             {
@@ -235,6 +233,24 @@ def team_create():
         if (get_current_competition_role() or "") != "admin":
             return jsonify({"error": "forbidden", "detail": "dnf requires admin role"}), 403
         team.dnf = bool(payload.get("dnf"))
+    if "notes" in payload:
+        raw_notes = payload.get("notes")
+        if raw_notes is None:
+            team.notes = None
+        else:
+            notes_value, notes_error = validate_text(raw_notes, field_name="notes", max_length=2000, multiline=True)
+            if notes_error:
+                return jsonify({"error": "validation_error", "detail": notes_error}), 400
+            team.notes = notes_value or None
+    if "bonus_dead_time" in payload and (get_current_competition_role() or "") == "admin":
+        bonus_value, bonus_error = validate_finite_float(
+            payload.get("bonus_dead_time"),
+            field_name="bonus_dead_time",
+            minimum=0.0,
+        )
+        if bonus_error:
+            return jsonify({"error": "validation_error", "detail": bonus_error}), 400
+        team.bonus_dead_time = bonus_value if bonus_value is not None else 0.0
     if number is not None:
         try:
             num_val = int(number)
@@ -359,6 +375,29 @@ def _update_team(team_id: int, partial: bool):
         if (get_current_competition_role() or "") != "admin":
             return jsonify({"error": "forbidden", "detail": "dnf requires admin role"}), 403
         team.dnf = bool(payload.get("dnf"))
+
+    if "notes" in payload:
+        raw_notes = payload.get("notes")
+        if raw_notes is None:
+            team.notes = None
+        else:
+            notes_value, notes_error = validate_text(raw_notes, field_name="notes", max_length=2000, multiline=True)
+            if notes_error:
+                return jsonify({"error": "validation_error", "detail": notes_error}), 400
+            team.notes = notes_value or None
+
+    if "bonus_dead_time" in payload:
+        # Admin-only field. Silently drop for non-admins so a judge edit
+        # of an unrelated field doesn't 403 the whole request.
+        if (get_current_competition_role() or "") == "admin":
+            bonus_value, bonus_error = validate_finite_float(
+                payload.get("bonus_dead_time"),
+                field_name="bonus_dead_time",
+                minimum=0.0,
+            )
+            if bonus_error:
+                return jsonify({"error": "validation_error", "detail": bonus_error}), 400
+            team.bonus_dead_time = bonus_value if bonus_value is not None else 0.0
 
     change_group = False
     selected_group_id: int | None = None
