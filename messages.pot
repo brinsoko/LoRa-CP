@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-05-24 19:20+0200\n"
+"POT-Creation-Date: 2026-05-24 20:51+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -169,9 +169,9 @@ msgstr ""
 #: app/blueprints/main/routes.py:421 app/blueprints/main/routes.py:458
 #: app/blueprints/main/routes.py:486 app/blueprints/scores/routes.py:87
 #: app/blueprints/scores/routes.py:240 app/blueprints/scores/routes.py:258
-#: app/blueprints/scores/routes.py:333 app/blueprints/scores/routes.py:715
-#: app/blueprints/scores/routes.py:735 app/blueprints/scores/routes.py:860
-#: app/blueprints/scores/routes.py:1134 app/blueprints/sheets/routes.py:61
+#: app/blueprints/scores/routes.py:333 app/blueprints/scores/routes.py:741
+#: app/blueprints/scores/routes.py:761 app/blueprints/scores/routes.py:886
+#: app/blueprints/scores/routes.py:1160 app/blueprints/sheets/routes.py:60
 #: app/blueprints/users/routes.py:43 app/blueprints/users/routes.py:87
 #: app/blueprints/users/routes.py:154 app/blueprints/users/routes.py:217
 #: app/blueprints/users/routes.py:304
@@ -711,166 +711,166 @@ msgstr ""
 msgid "Global rule deleted."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:811 app/blueprints/scores/routes.py:1122
+#: app/blueprints/scores/routes.py:837 app/blueprints/scores/routes.py:1148
 msgid "Public results are not enabled for this competition."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:1200
+#: app/blueprints/scores/routes.py:1226
 msgid "Legacy or unknown"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:68
+#: app/blueprints/sheets/routes.py:67
 msgid "Sheets sync is disabled."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:167
+#: app/blueprints/sheets/routes.py:166
 msgid "Language pack saved."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:176
+#: app/blueprints/sheets/routes.py:175
 msgid "Sheets settings saved."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:208
+#: app/blueprints/sheets/routes.py:207
 msgid "Spreadsheet ID is required to build arrivals."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:226
+#: app/blueprints/sheets/routes.py:225
 #, python-format
 msgid "Failed to build arrivals tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:228
+#: app/blueprints/sheets/routes.py:227
 #, python-format
 msgid "Arrivals tab '%(tab)s' updated."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:245
+#: app/blueprints/sheets/routes.py:244
 #, python-format
 msgid "Arrivals tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:270 app/blueprints/sheets/routes.py:326
-#: app/blueprints/sheets/routes.py:522 app/blueprints/sheets/routes.py:825
+#: app/blueprints/sheets/routes.py:269 app/blueprints/sheets/routes.py:325
+#: app/blueprints/sheets/routes.py:521 app/blueprints/sheets/routes.py:840
 msgid "Spreadsheet ID is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:286
+#: app/blueprints/sheets/routes.py:285
 #, python-format
 msgid "Failed to build teams tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:288
+#: app/blueprints/sheets/routes.py:287
 #, python-format
 msgid "Teams tab '%(tab)s' updated."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:301
+#: app/blueprints/sheets/routes.py:300
 #, python-format
 msgid "Teams tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:352
+#: app/blueprints/sheets/routes.py:351
 #, python-format
 msgid "Failed to build score tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:354
+#: app/blueprints/sheets/routes.py:353
 #, python-format
 msgid "Score tab '%(tab)s' updated."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:369
+#: app/blueprints/sheets/routes.py:368
 #, python-format
 msgid "Score tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:386
+#: app/blueprints/sheets/routes.py:385
 msgid "No configs to prune."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:394
+#: app/blueprints/sheets/routes.py:393
 #, python-format
 msgid "Could not init Sheets client: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:415
+#: app/blueprints/sheets/routes.py:414
 #, python-format
 msgid "Pruned %(count)s stale config(s) (tabs no longer exist)."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:417
+#: app/blueprints/sheets/routes.py:416
 msgid "No stale configs found."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:527
+#: app/blueprints/sheets/routes.py:526
 msgid "Select at least one checkpoint to create."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:572
+#: app/blueprints/sheets/routes.py:571
 #, python-format
 msgid "Wizard failed: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:578
+#: app/blueprints/sheets/routes.py:577
 #, python-format
 msgid ""
 "Wizard completed. Created %(created)s local configs, skipped %(skipped)s "
 "existing."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:587
+#: app/blueprints/sheets/routes.py:586
 #, python-format
 msgid "Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:607 app/blueprints/sheets/routes.py:774
+#: app/blueprints/sheets/routes.py:606 app/blueprints/sheets/routes.py:789
 msgid "Config not found."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:610
+#: app/blueprints/sheets/routes.py:609
 msgid "Config is missing groups; cannot sync."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:658
+#: app/blueprints/sheets/routes.py:657
 #, python-format
 msgid "Failed to sync team numbers: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:675
+#: app/blueprints/sheets/routes.py:674
 #, python-format
 msgid "Synced checkpoint tabs but some summary rebuilds reported errors: %(errs)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:682
+#: app/blueprints/sheets/routes.py:681
 msgid "Synced team numbers and rebuilt Ekipe, Prihodi, and Skupni seštevek."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:696
+#: app/blueprints/sheets/routes.py:711
 msgid "Team-number sync queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:720
+#: app/blueprints/sheets/routes.py:735
 msgid "Target spreadsheet ID is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:724
+#: app/blueprints/sheets/routes.py:739
 msgid "Target spreadsheet must be a real Google Sheets ID, not a local: sentinel."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:734
+#: app/blueprints/sheets/routes.py:749
 #, python-format
 msgid "Publish failed: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:740
+#: app/blueprints/sheets/routes.py:755
 #, python-format
 msgid ""
 "Published %(count)s checkpoint tab(s), skipped %(skip)s. Summary tabs "
 "built: %(s)s."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:755
+#: app/blueprints/sheets/routes.py:770
 #, python-format
 msgid ""
 "Publish to %(sid)s queued. This takes ~30 seconds for a 15-CP "
@@ -878,53 +878,53 @@ msgid ""
 "log."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:788
+#: app/blueprints/sheets/routes.py:803
 #, python-format
 msgid "Remote tab could not be deleted: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:792
+#: app/blueprints/sheets/routes.py:807
 #, python-format
 msgid "Config '%(tab)s' deleted."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:820
+#: app/blueprints/sheets/routes.py:835
 msgid "Tab title is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:830
+#: app/blueprints/sheets/routes.py:845
 msgid "At least one group line is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:883
+#: app/blueprints/sheets/routes.py:898
 #, python-format
 msgid "Could not add tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:886
+#: app/blueprints/sheets/routes.py:901
 msgid ""
 "Check that the spreadsheet ID is correct and that the service account "
 "email has Editor access to it."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:896
+#: app/blueprints/sheets/routes.py:911
 #, python-format
 msgid ""
 "A config for tab '%(tab)s' already exists. Submit again with overwrite "
 "enabled to replace it."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:919
+#: app/blueprints/sheets/routes.py:934
 #, python-format
 msgid "Tab '%(tab)s' overwritten."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:933
+#: app/blueprints/sheets/routes.py:948
 #, python-format
 msgid "Added local tab '%(tab)s'."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:935
+#: app/blueprints/sheets/routes.py:950
 #, python-format
 msgid "Added tab '%(tab)s' to spreadsheet."
 msgstr ""
@@ -1150,7 +1150,7 @@ msgstr ""
 #: app/templates/rfid_finish.html:88 app/templates/rfid_judge.html:92
 #: app/templates/rfid_list.html:24 app/templates/score_judge.html:161
 #: app/templates/scores_submissions.html:39 app/templates/scores_view.html:64
-#: app/templates/scores_view.html:169 app/templates/view_checkins.html:10
+#: app/templates/scores_view.html:173 app/templates/view_checkins.html:10
 #: app/templates/view_checkins.html:102
 msgid "Team"
 msgstr ""
@@ -1289,7 +1289,7 @@ msgid "Organizations"
 msgstr ""
 
 #: app/templates/add_team.html:24 app/templates/scores_view.html:63
-#: app/templates/scores_view.html:168 app/templates/team_edit.html:25
+#: app/templates/scores_view.html:172 app/templates/team_edit.html:25
 #: app/templates/teams_list.html:86
 msgid "Number"
 msgstr ""
@@ -1302,7 +1302,7 @@ msgstr ""
 #: app/templates/live_arrivals.html:187 app/templates/score_judge.html:163
 #: app/templates/score_rules.html:22 app/templates/score_rules.html:101
 #: app/templates/score_rules.html:190 app/templates/score_rules.html:238
-#: app/templates/scores_view.html:62 app/templates/scores_view.html:167
+#: app/templates/scores_view.html:62 app/templates/scores_view.html:171
 #: app/templates/team_edit.html:31 app/templates/teams_list.html:12
 msgid "Group"
 msgstr ""
@@ -2611,35 +2611,36 @@ msgid "Public Results"
 msgstr ""
 
 #: app/templates/live_arrivals.html:6 app/templates/live_arrivals.html:92
-#: app/templates/live_arrivals.html:190 app/templates/live_arrivals.html:244
+#: app/templates/live_arrivals.html:190 app/templates/live_arrivals.html:248
 #: app/templates/scores_stats.html:33 app/templates/scores_stats.html:87
-#: app/templates/scores_view.html:65 app/templates/scores_view.html:170
+#: app/templates/scores_view.html:65 app/templates/scores_view.html:174
 msgid "Finished"
 msgstr ""
 
 #: app/templates/live_arrivals.html:8 app/templates/live_arrivals.html:108
-#: app/templates/live_arrivals.html:245 app/templates/scores_view.html:85
-#: app/templates/scores_view.html:98 app/templates/scores_view.html:109
-#: app/templates/scores_view.html:192 app/templates/scores_view.html:201
-#: app/templates/scores_view.html:212 app/templates/scores_view.html:224
-#: app/templates/scores_view.html:231 app/templates/scores_view.html:239
+#: app/templates/live_arrivals.html:249 app/templates/scores_view.html:85
+#: app/templates/scores_view.html:99 app/templates/scores_view.html:113
+#: app/templates/scores_view.html:197 app/templates/scores_view.html:206
+#: app/templates/scores_view.html:217 app/templates/scores_view.html:238
+#: app/templates/scores_view.html:251 app/templates/scores_view.html:258
+#: app/templates/scores_view.html:266
 msgid "DNF"
 msgstr ""
 
-#: app/templates/live_arrivals.html:10 app/templates/live_arrivals.html:246
+#: app/templates/live_arrivals.html:10 app/templates/live_arrivals.html:250
 msgid "On course"
 msgstr ""
 
 #: app/templates/live_arrivals.html:12 app/templates/live_arrivals.html:84
-#: app/templates/live_arrivals.html:189 app/templates/live_arrivals.html:247
+#: app/templates/live_arrivals.html:189 app/templates/live_arrivals.html:251
 msgid "Started"
 msgstr ""
 
-#: app/templates/live_arrivals.html:14 app/templates/live_arrivals.html:248
+#: app/templates/live_arrivals.html:14 app/templates/live_arrivals.html:252
 msgid "Not started"
 msgstr ""
 
-#: app/templates/live_arrivals.html:16 app/templates/live_arrivals.html:249
+#: app/templates/live_arrivals.html:16 app/templates/live_arrivals.html:253
 msgid "Not routed"
 msgstr ""
 
@@ -2708,15 +2709,15 @@ msgstr ""
 msgid "Progress"
 msgstr ""
 
-#: app/templates/live_arrivals.html:144 app/templates/live_arrivals.html:243
+#: app/templates/live_arrivals.html:144 app/templates/live_arrivals.html:247
 msgid "Extra"
 msgstr ""
 
-#: app/templates/live_arrivals.html:164 app/templates/live_arrivals.html:240
+#: app/templates/live_arrivals.html:164 app/templates/live_arrivals.html:244
 msgid "None yet"
 msgstr ""
 
-#: app/templates/live_arrivals.html:170 app/templates/live_arrivals.html:241
+#: app/templates/live_arrivals.html:170 app/templates/live_arrivals.html:245
 msgid "No checkpoints to show."
 msgstr ""
 
@@ -2740,15 +2741,15 @@ msgstr ""
 msgid "Missed"
 msgstr ""
 
-#: app/templates/live_arrivals.html:214 app/templates/live_arrivals.html:250
+#: app/templates/live_arrivals.html:218 app/templates/live_arrivals.html:254
 msgid "No missed checkpoints"
 msgstr ""
 
-#: app/templates/live_arrivals.html:220 app/templates/live_arrivals.html:242
+#: app/templates/live_arrivals.html:224 app/templates/live_arrivals.html:246
 msgid "No teams to show."
 msgstr ""
 
-#: app/templates/live_arrivals.html:239
+#: app/templates/live_arrivals.html:243
 msgid "Refresh failed"
 msgstr ""
 
@@ -2810,12 +2811,12 @@ msgid "Last Seen"
 msgstr ""
 
 #: app/templates/lora_list.html:21 app/templates/scores_view.html:87
-#: app/templates/scores_view.html:194
+#: app/templates/scores_view.html:199
 msgid "Yes"
 msgstr ""
 
 #: app/templates/lora_list.html:21 app/templates/scores_view.html:89
-#: app/templates/scores_view.html:196
+#: app/templates/scores_view.html:201
 msgid "No"
 msgstr ""
 
@@ -3571,6 +3572,7 @@ msgid "Fastest team"
 msgstr ""
 
 #: app/templates/scores_stats.html:68 app/templates/scores_stats.html:120
+#: app/templates/scores_view.html:105 app/templates/scores_view.html:243
 msgid "min"
 msgstr ""
 
@@ -3619,7 +3621,7 @@ msgid "Dead time"
 msgstr ""
 
 #: app/templates/scores_submissions.html:42 app/templates/scores_view.html:68
-#: app/templates/scores_view.html:143 app/templates/scores_view.html:178
+#: app/templates/scores_view.html:147 app/templates/scores_view.html:183
 msgid "Total points"
 msgstr ""
 
@@ -3647,7 +3649,7 @@ msgstr ""
 msgid "Scan to view"
 msgstr ""
 
-#: app/templates/scores_view.html:38 app/templates/scores_view.html:267
+#: app/templates/scores_view.html:38 app/templates/scores_view.html:294
 msgid "Show per-checkpoint"
 msgstr ""
 
@@ -3655,7 +3657,7 @@ msgstr ""
 msgid "Export CSV"
 msgstr ""
 
-#: app/templates/scores_view.html:61 app/templates/scores_view.html:166
+#: app/templates/scores_view.html:61 app/templates/scores_view.html:170
 msgid "Place"
 msgstr ""
 
@@ -3663,51 +3665,55 @@ msgstr ""
 msgid "Time-trial"
 msgstr ""
 
-#: app/templates/scores_view.html:67 app/templates/scores_view.html:177
+#: app/templates/scores_view.html:67 app/templates/scores_view.html:182
 msgid "Dead time (sum)"
 msgstr ""
 
-#: app/templates/scores_view.html:121
+#: app/templates/scores_view.html:125
 msgid "View submissions"
 msgstr ""
 
-#: app/templates/scores_view.html:129 app/templates/scores_view.html:251
+#: app/templates/scores_view.html:133 app/templates/scores_view.html:278
 msgid "No scores yet."
 msgstr ""
 
-#: app/templates/scores_view.html:135
+#: app/templates/scores_view.html:139
 msgid "Dead time is summed from the latest score per checkpoint."
 msgstr ""
 
-#: app/templates/scores_view.html:137
+#: app/templates/scores_view.html:141
 msgid "Organization totals"
 msgstr ""
 
-#: app/templates/scores_view.html:142
+#: app/templates/scores_view.html:146
 msgid "Organization"
 msgstr ""
 
-#: app/templates/scores_view.html:154
+#: app/templates/scores_view.html:158
 msgid "No organization totals yet."
 msgstr ""
 
-#: app/templates/scores_view.html:160
+#: app/templates/scores_view.html:164
 msgid "DNF teams do not count toward organization totals."
 msgstr ""
 
-#: app/templates/scores_view.html:171
+#: app/templates/scores_view.html:175
 msgid "Time (min)"
 msgstr ""
 
-#: app/templates/scores_view.html:175
+#: app/templates/scores_view.html:179
+msgid "Time-trial leg"
+msgstr ""
+
+#: app/templates/scores_view.html:180
 msgid "Time points"
 msgstr ""
 
-#: app/templates/scores_view.html:176
+#: app/templates/scores_view.html:181
 msgid "Found points"
 msgstr ""
 
-#: app/templates/scores_view.html:268
+#: app/templates/scores_view.html:295
 msgid "Hide per-checkpoint"
 msgstr ""
 

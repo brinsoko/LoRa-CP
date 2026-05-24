@@ -34,7 +34,6 @@ from app.utils.sheets_sync_worker import (
     enqueue_build_arrivals_tab,
     enqueue_build_score_tab,
     enqueue_build_teams_tab,
-    enqueue_sync_all_checkpoint_tabs,
 )
 
 sheets_bp = Blueprint("sheets_admin", __name__, template_folder="../../templates")
@@ -683,8 +682,24 @@ def sync_team_numbers(config_id: int):
                 "success",
             )
     else:
-        enqueue_sync_all_checkpoint_tabs(current_app._get_current_object(), competition_id=comp_id)
-        for _label, tab_name, _build_fn, enqueue_fn in summary_builders:
+        # Late import + module-attribute lookup so tests can monkeypatch
+        # the worker functions. Top-level imports bind a local reference
+        # at module-load time, which is invisible to monkeypatch.setattr
+        # on the worker module — same pattern as build_arrivals route.
+        from app.utils import sheets_sync_worker as _worker
+
+        _worker.enqueue_sync_all_checkpoint_tabs(
+            current_app._get_current_object(), competition_id=comp_id
+        )
+        worker_fn_by_label = {
+            "Ekipe": _worker.enqueue_build_teams_tab,
+            "Prihodi": _worker.enqueue_build_arrivals_tab,
+            "Skupni seštevek": _worker.enqueue_build_score_tab,
+        }
+        for label, tab_name, _build_fn, _enqueue_fn in summary_builders:
+            enqueue_fn = worker_fn_by_label.get(label)
+            if enqueue_fn is None:
+                continue
             for sid in real_sheet_ids:
                 enqueue_fn(
                     current_app._get_current_object(),

@@ -415,6 +415,11 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     # start/finish CP via the global time rule form.
     global_rules = GlobalScoreRule.query.filter(GlobalScoreRule.competition_id == comp_id).all()
     global_rules_map = {rule.group_id: rule.rules for rule in global_rules}
+    # Per-group time-trial leg metadata: which two CPs form the timed leg
+    # (e.g. B→C). The leaderboard surfaces this as a single "Time-trial leg"
+    # column with the leg's points + time taken — replacing the per-CP cells
+    # for those two CPs which used to show 0/redundant rank values.
+    group_leg_info: dict[int, dict] = {}
     for rule in global_rules:
         time_rule = (rule.rules or {}).get("time") or {}
         try:
@@ -426,6 +431,23 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             group_start_checkpoint[rule.group_id] = start_override
         if end_override:
             group_final_checkpoint[rule.group_id] = end_override
+        if start_override and end_override:
+            group_leg_info[rule.group_id] = {
+                "start_cp_id": start_override,
+                "end_cp_id": end_override,
+            }
+    # Resolve CP names for the legs in one query so we can build labels.
+    leg_cp_ids = {cid for leg in group_leg_info.values() for cid in (leg["start_cp_id"], leg["end_cp_id"])}
+    if leg_cp_ids:
+        leg_cp_names = {
+            cp.id: cp.name
+            for cp in Checkpoint.query.filter(Checkpoint.id.in_(leg_cp_ids)).all()
+        }
+        for leg in group_leg_info.values():
+            start_name = leg_cp_names.get(leg["start_cp_id"], "?")
+            end_name = leg_cp_names.get(leg["end_cp_id"], "?")
+            leg["label"] = f"{start_name}→{end_name}"
+            leg["cp_ids"] = frozenset({leg["start_cp_id"], leg["end_cp_id"]})
 
     totals = {team_id: 0.0 for team_id in team_ids}
     dead_times = {team_id: 0.0 for team_id in team_ids}
@@ -618,6 +640,8 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
                 finished_map[team_id] = True
 
     for team in teams:
+        team_group_id = team_group_ids.get(team.id)
+        leg_for_team = group_leg_info.get(team_group_id) if team_group_id else None
         raw_min = team_time_minutes.get(team.id)
         # effective time = raw elapsed minus all dead-time (CP-bound +
         # team-level bonus). This is the value the rules actually score
@@ -648,6 +672,8 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
                 # (item 2). Templates can show "<time_points> (<eff_min> min)".
                 "effective_time_minutes": effective_min,
                 "notes": team_obj.notes if team_obj and team_obj.notes else "",
+                "leg_label": leg_for_team.get("label") if leg_for_team else "",
+                "leg_cp_ids": leg_for_team.get("cp_ids") if leg_for_team else frozenset(),
                 "dnf": bool(team.dnf),
                 "finished": finished_map.get(team.id, False),
                 "organization": team.organization or "",
