@@ -28,6 +28,9 @@ from app.models import (
 from app.resources.scores import (
     _compute_global_contrib,
     _compute_time_race_scores_from_checkins,
+    _compute_total,
+    _get_checkpoint_fields,
+    _to_number,
     recompute_scores_for_rule,
 )
 from app.utils.competition import get_current_competition_id, get_current_competition_role
@@ -439,9 +442,9 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     # column with the leg's points + time taken, and hides the leg
     # endpoints from the per-CP iteration so we don't render "B: 0".
     group_leg_info: dict[int, dict] = {}
-    time_race_rules_for_leg = ScoreRule.query.filter(ScoreRule.competition_id == comp_id).all()
+    comp_score_rules = ScoreRule.query.filter(ScoreRule.competition_id == comp_id).all()
     leg_cp_ids_all: set[int] = set()
-    for rule in time_race_rules_for_leg:
+    for rule in comp_score_rules:
         tr = (rule.rules or {}).get("time_race") or {}
         try:
             leg_start = int(tr.get("start_checkpoint_id")) if tr.get("start_checkpoint_id") else None
@@ -492,7 +495,9 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             dead_num = float(dead_val)
         except Exception:
             dead_num = None
-        if dead_num is not None:
+        # Legacy rows may hold negative dead_time; skip them to match
+        # _get_team_dead_time_total's positive-only filter.
+        if dead_num is not None and dead_num > 0:
             dead_times[team_id] += dead_num
     for team_id in team_ids:
         group_id_for_team = team_group_ids.get(team_id)
@@ -504,9 +509,10 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     # original code path only ran via recompute_scores_for_rule (triggered by
     # judge form submit or rule edit), so LoRa auto-arrivals never made the
     # points appear. Recomputing on every render keeps the leaderboard live
-    # as teams finish — same authoritative source the offline recompute uses.
-    time_race_rules = ScoreRule.query.filter(ScoreRule.competition_id == comp_id).all()
-    for rule in time_race_rules:
+    # as teams finish, using the same canonical number the offline recompute
+    # stores: base points from the latest entry's raw fields + rank points.
+    group_name_by_id = {g.id: g.name or "" for g in groups}
+    for rule in comp_score_rules:
         tr = (rule.rules or {}).get("time_race") or {}
         start_cp = tr.get("start_checkpoint_id")
         end_cp = tr.get("end_checkpoint_id")
@@ -517,8 +523,12 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             end_cp_i = int(end_cp)
         except (TypeError, ValueError):
             continue
-        max_points = float(tr.get("max_points") or 0)
-        min_points = float(tr.get("min_points") or 0)
+        max_points = _to_number(tr.get("max_points"))
+        if max_points is None:
+            max_points = 0.0
+        min_points = _to_number(tr.get("min_points"))
+        if min_points is None:
+            min_points = 0.0
         group_team_ids = [tid for tid in team_ids if team_group_ids.get(tid) == rule.group_id]
         if not group_team_ids:
             continue
@@ -530,10 +540,28 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             min_points,
             max_points,
         )
+        if not live_scores:
+            continue
         cp_id = rule.checkpoint_id
-        for team_id, new_total in live_scores.items():
-            # Live rank-based value supersedes any ScoreEntry total from the
-            # offline recompute — subtract the stale contribution from totals
+        points_header = (
+            _get_checkpoint_fields(comp_id, cp_id, group_name_by_id.get(rule.group_id, ""), rule.group_id).get(
+                "headers"
+            )
+            or {}
+        ).get("points")
+        for team_id, leg_points in live_scores.items():
+            entry = latest.get((team_id, cp_id))
+            base_total = None
+            if entry is not None:
+                base_total = _compute_total(
+                    entry.raw_fields or {},
+                    points_header,
+                    rule.rules,
+                    {"team_id": team_id, "competition_id": comp_id, "group_id": rule.group_id},
+                )
+            new_total = (base_total or 0.0) + leg_points
+            # Live value supersedes any stale ScoreEntry total from the
+            # offline recompute: subtract the stale contribution from totals
             # before writing the fresh one so we never double-count.
             old = per_team_points.get(team_id, {}).get(cp_id)
             if old is not None:
@@ -601,6 +629,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     global_totals = {}
     global_time_points = {}
     global_found_points = {}
+    auto_dnf_team_ids: set[int] = set()
     excluded_checkpoints_by_team: dict[int, set[int]] = {team_id: set() for team_id in team_ids}
     for team_id in team_ids:
         group_id_for_team = team_group_ids.get(team_id)
@@ -614,12 +643,11 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         global_totals[team_id] = global_data["total"] or 0.0
         global_time_points[team_id] = global_data["time_points"] or 0.0
         global_found_points[team_id] = global_data["found_points"] or 0.0
-        # Auto-DQ from timeline
+        # Auto-DQ from timeline is display-only: rendering must never
+        # mutate the DB (this also runs on the public endpoint). The
+        # persisted Team.dnf flag stays manual.
         if global_data.get("auto_dnf"):
-            team_obj = Team.query.get(team_id)
-            if team_obj and not team_obj.dnf:
-                team_obj.dnf = True
-                db.session.commit()
+            auto_dnf_team_ids.add(team_id)
         if global_rule:
             found_rule = global_rule.get("found") or {}
             time_rule = global_rule.get("time") or {}
@@ -654,7 +682,6 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         team_group_id = team_group_ids.get(team.id)
         leg_for_team = group_leg_info.get(team_group_id) if team_group_id else None
         raw_min = team_time_minutes.get(team.id)
-        team_obj = next((t for t in teams if t.id == team.id), None)
         # Leg points already flow into `totals` via per_team_points (the
         # live time_race block puts them in per_team_points[team][rule.cp]
         # and we sum that into totals). Pull the same value back here for
@@ -672,16 +699,16 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
                 "group": team_groups.get(team.id, ""),
                 "total": team_total,
                 "dead_time": dead_times.get(team.id, 0.0),
-                "bonus_dead_time": float(team_obj.bonus_dead_time) if (team_obj and team_obj.bonus_dead_time) else 0.0,
+                "bonus_dead_time": float(team.bonus_dead_time) if team.bonus_dead_time else 0.0,
                 "global_time": global_time_points.get(team.id, 0.0),
                 "global_found": global_found_points.get(team.id, 0.0),
                 "time_minutes": raw_min,
-                "notes": team_obj.notes if team_obj and team_obj.notes else "",
+                "notes": team.notes or "",
                 "leg_label": leg_for_team.get("label") if leg_for_team else "",
                 "leg_cp_ids": leg_for_team.get("cp_ids") if leg_for_team else frozenset(),
                 "leg_minutes": leg_minutes,
                 "leg_points": leg_points,
-                "dnf": bool(team.dnf),
+                "dnf": bool(team.dnf) or team.id in auto_dnf_team_ids,
                 "finished": finished_map.get(team.id, False),
                 "organization": team.organization or "",
                 "allowed_checkpoints": allowed_checkpoint_ids.get(team.id, set()),
@@ -797,7 +824,7 @@ def view_scores_export_csv():
     header += ["time_points", "found_points", "dead_time", "total"]
     w.writerow(header)
 
-    for i, r in enumerate(rows, 1):
+    for r in rows:
         team_id = r.get("id")
         team_cp_points = per_team_points.get(team_id, {}) if team_id else {}
         allowed = r.get("allowed_checkpoints") or set()
@@ -817,7 +844,9 @@ def view_scores_export_csv():
                 per_cp_cells.append("")
         w.writerow(
             [
-                i,
+                # Same per-group placement the on-screen table shows, so the
+                # rank column restarts at 1 for each group.
+                r.get("place"),
                 r.get("group", ""),
                 r.get("number", "") if r.get("number") is not None else "",
                 r.get("name", ""),
@@ -1034,11 +1063,12 @@ def _build_stats_context(comp_id: int) -> dict:
                     median_time_minutes = sorted_minutes[mid]
                 else:
                     median_time_minutes = (sorted_minutes[mid - 1] + sorted_minutes[mid]) / 2.0
+                row_by_team_id = {r.get("id"): r for r in group_rows}
                 fastest_tid, fastest_minutes = min(durations, key=lambda d: d[1])
-                fastest_row = next((r for r in group_rows if r.get("id") == fastest_tid), None)
+                fastest_row = row_by_team_id.get(fastest_tid)
                 fastest_team = fastest_row.get("name") if fastest_row else None
                 for tid, minutes in durations:
-                    team_row = next((r for r in group_rows if r.get("id") == tid), None)
+                    team_row = row_by_team_id.get(tid)
                     team_name = team_row.get("name") if team_row else None
                     overall_durations.append((tid, group.name, team_name, minutes))
 

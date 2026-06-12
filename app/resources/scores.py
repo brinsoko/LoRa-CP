@@ -471,6 +471,91 @@ def _compute_time_race_scores_from_checkins(
     return scores
 
 
+def _recompute_time_race_totals(
+    competition_id: int,
+    checkpoint_id: int,
+    group_id: int,
+    group_name: str,
+    rule: dict,
+) -> bool:
+    """Recompute the latest ScoreEntry per team for a time_race
+    checkpoint+group. Canonical total = base points from the entry's raw
+    fields + rank points from the leg. Commits the new totals and syncs
+    ranked entries to Sheets.
+
+    Returns False when the rule has no usable time_race config, so
+    callers can fall back to the generic recompute path.
+    """
+    tr = (rule or {}).get("time_race") or {}
+    start_checkpoint_id = tr.get("start_checkpoint_id")
+    end_checkpoint_id = tr.get("end_checkpoint_id")
+    if not start_checkpoint_id or not end_checkpoint_id:
+        return False
+
+    # Explicit None checks: a configured 0 is a valid value, not a
+    # missing one.
+    min_points = _to_number(tr.get("min_points"))
+    if min_points is None:
+        min_points = 0.0
+    max_points = _to_number(tr.get("max_points"))
+    if max_points is None:
+        max_points = 0.0
+
+    points_header = (
+        _get_checkpoint_fields(competition_id, checkpoint_id, group_name, group_id).get("headers") or {}
+    ).get("points")
+
+    latest_entries = (
+        ScoreEntry.query.join(TeamGroup, TeamGroup.team_id == ScoreEntry.team_id)
+        .filter(
+            ScoreEntry.competition_id == competition_id,
+            ScoreEntry.checkpoint_id == checkpoint_id,
+            TeamGroup.group_id == group_id,
+            TeamGroup.active.is_(True),
+        )
+        .order_by(ScoreEntry.created_at.desc())
+        .all()
+    )
+    latest_by_team: dict[int, ScoreEntry] = {}
+    for entry in latest_entries:
+        if entry.team_id not in latest_by_team:
+            latest_by_team[entry.team_id] = entry
+    entries = list(latest_by_team.values())
+    if not entries:
+        return True
+
+    scores = _compute_time_race_scores_from_checkins(
+        [entry.team_id for entry in entries],
+        competition_id,
+        int(start_checkpoint_id),
+        int(end_checkpoint_id),
+        min_points,
+        max_points,
+    )
+    for entry in entries:
+        base_total = _compute_total(
+            entry.raw_fields or {},
+            points_header,
+            rule,
+            {"team_id": entry.team_id, "competition_id": competition_id, "group_id": group_id},
+        )
+        if entry.team_id in scores:
+            entry.total = (base_total or 0.0) + scores[entry.team_id]
+        else:
+            entry.total = base_total
+    db.session.commit()
+
+    for entry in entries:
+        if entry.team_id in scores:
+            try:
+                values = dict(entry.raw_fields or {})
+                values["points"] = entry.total
+                update_checkpoint_scores(entry.team_id, checkpoint_id, group_name, values, entry.created_at)
+            except Exception:
+                pass
+    return True
+
+
 def recompute_scores_for_rule(competition_id: int, checkpoint_id: int, group_id: int) -> None:
     from app.models import CheckpointGroup
 
@@ -482,6 +567,10 @@ def recompute_scores_for_rule(competition_id: int, checkpoint_id: int, group_id:
         return
     group_name = group.name or ""
     rule = _get_score_rule(competition_id, checkpoint_id, group_id)
+
+    if rule and rule.get("time_race"):
+        if _recompute_time_race_totals(competition_id, checkpoint_id, group_id, group_name, rule):
+            return
 
     latest_entries = (
         ScoreEntry.query.join(TeamGroup, TeamGroup.team_id == ScoreEntry.team_id)
@@ -501,37 +590,6 @@ def recompute_scores_for_rule(competition_id: int, checkpoint_id: int, group_id:
     entries = list(latest_by_team.values())
     if not entries:
         return
-
-    if rule and rule.get("time_race"):
-        tr = rule["time_race"] or {}
-        start_checkpoint_id = tr.get("start_checkpoint_id")
-        end_checkpoint_id = tr.get("end_checkpoint_id")
-        if start_checkpoint_id and end_checkpoint_id:
-            min_points = _to_number(tr.get("min_points")) or 0.0
-            max_points = _to_number(tr.get("max_points")) or 0.0
-            team_ids = [entry.team_id for entry in entries]
-            scores = _compute_time_race_scores_from_checkins(
-                team_ids,
-                competition_id,
-                int(start_checkpoint_id),
-                int(end_checkpoint_id),
-                min_points,
-                max_points,
-            )
-            for entry in entries:
-                if entry.team_id in scores:
-                    entry.total = scores[entry.team_id]
-            db.session.commit()
-
-            for entry in entries:
-                if entry.team_id in scores:
-                    try:
-                        values = dict(entry.raw_fields or {})
-                        values["points"] = scores[entry.team_id]
-                        update_checkpoint_scores(entry.team_id, checkpoint_id, group_name, values, entry.created_at)
-                    except Exception:
-                        pass
-            return
 
     for entry in entries:
         total = _compute_total(
@@ -699,10 +757,10 @@ def score_submit():
     # Same normalization as /api/ingest — see note in score_resolve.
     uid = normalize_uid((payload.get("uid") or "").split("|", 1)[0])
 
-    # Validate no negative numeric inputs (dead_time excluded — it's always >= 0)
-    for key, val in fields.items():
+    # Validate no negative numeric inputs (dead_time included; it must be >= 0)
+    for val in fields.values():
         num = _to_number(val)
-        if num is not None and num < 0 and key != "dead_time":
+        if num is not None and num < 0:
             from flask_babel import gettext as _
 
             return jsonify({"error": "validation_error", "detail": _("Score cannot be negative.")}), 400
@@ -827,61 +885,10 @@ def score_submit():
     except Exception:
         pass
 
-    # Time-based race scoring: recompute latest entries for this checkpoint+group.
-    if rule and rule.get("time_race"):
-        tr = rule["time_race"] or {}
-        start_checkpoint_id = tr.get("start_checkpoint_id")
-        end_checkpoint_id = tr.get("end_checkpoint_id")
-        if start_checkpoint_id and end_checkpoint_id:
-            min_points = _to_number(tr.get("min_points")) or 0.0
-            max_points = _to_number(tr.get("max_points")) or (total if total is not None else 0.0)
-            latest_entries = (
-                ScoreEntry.query.join(TeamGroup, TeamGroup.team_id == ScoreEntry.team_id)
-                .filter(
-                    ScoreEntry.competition_id == comp_id,
-                    ScoreEntry.checkpoint_id == checkpoint_id,
-                    TeamGroup.group_id == group_id,
-                    TeamGroup.active.is_(True),
-                )
-                .order_by(ScoreEntry.created_at.desc())
-                .all()
-            )
-            latest_by_team = {}
-            for e in latest_entries:
-                if e.team_id not in latest_by_team:
-                    latest_by_team[e.team_id] = e
-            entries = list(latest_by_team.values())
-            team_ids = [e.team_id for e in entries]
-            scores = _compute_time_race_scores_from_checkins(
-                team_ids,
-                comp_id,
-                int(start_checkpoint_id),
-                int(end_checkpoint_id),
-                min_points,
-                max_points,
-            )
-            for e in entries:
-                base_total = _compute_total(
-                    e.raw_fields or {},
-                    points_header,
-                    rule,
-                    {"team_id": e.team_id, "competition_id": comp_id, "group_id": group_id},
-                )
-                if e.team_id in scores:
-                    base_val = base_total or 0.0
-                    e.total = base_val + scores[e.team_id]
-                else:
-                    e.total = base_total
-            db.session.commit()
-
-            for e in entries:
-                if e.team_id in scores:
-                    try:
-                        values = dict(e.raw_fields or {})
-                        values["points"] = e.total
-                        update_checkpoint_scores(e.team_id, checkpoint_id, group_name, values, e.created_at)
-                    except Exception:
-                        pass
+    # Time-based race scoring: recompute the latest entry per team for this
+    # checkpoint+group as base + rank points (the canonical time_race total).
+    if rule and rule.get("time_race") and group_id:
+        _recompute_time_race_totals(comp_id, checkpoint_id, group_id, group_name, rule)
 
     card_writeback = None
     writeback_error = None
