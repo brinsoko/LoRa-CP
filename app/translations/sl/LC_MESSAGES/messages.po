@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LoRa KT\n"
 "Report-Msgid-Bugs-To: brin.soko@gmail.com\n"
-"POT-Creation-Date: 2026-05-24 21:40+0200\n"
+"POT-Creation-Date: 2026-06-12 11:36+0200\n"
 "PO-Revision-Date: 2025-12-04 00:00+0100\n"
 "Last-Translator: Brin Soko <brin.soko@gmail.com>\n"
 "Language: sl\n"
@@ -126,7 +126,7 @@ msgstr "Številke ekip so bile naključno dodeljene."
 msgid "Checkpoint %(name)s created."
 msgstr "Kontrolna točka %(name)s je bila ustvarjena."
 
-#: app/blueprints/audit/routes.py:90 app/blueprints/checkpoints/routes.py:322
+#: app/blueprints/audit/routes.py:90 app/blueprints/checkpoints/routes.py:321
 msgid "Checkpoint updated."
 msgstr "Kontrolna točka posodobljena."
 
@@ -168,22 +168,22 @@ msgid "Device %(name)s deleted."
 msgstr "Naprava %(name)s je bila izbrisana."
 
 #: app/blueprints/audit/routes.py:115 app/blueprints/checkins/routes.py:171
-#: app/blueprints/checkpoints/routes.py:164
+#: app/blueprints/checkpoints/routes.py:163
 #: app/blueprints/firmware/routes.py:41 app/blueprints/judges/routes.py:18
-#: app/blueprints/main/routes.py:172 app/blueprints/main/routes.py:236
+#: app/blueprints/main/routes.py:173 app/blueprints/main/routes.py:237
 #: app/blueprints/main/routes.py:421 app/blueprints/main/routes.py:458
-#: app/blueprints/main/routes.py:486 app/blueprints/scores/routes.py:87
-#: app/blueprints/scores/routes.py:240 app/blueprints/scores/routes.py:258
-#: app/blueprints/scores/routes.py:333 app/blueprints/scores/routes.py:755
-#: app/blueprints/scores/routes.py:775 app/blueprints/scores/routes.py:900
-#: app/blueprints/scores/routes.py:1174 app/blueprints/sheets/routes.py:60
+#: app/blueprints/main/routes.py:486 app/blueprints/scores/routes.py:90
+#: app/blueprints/scores/routes.py:243 app/blueprints/scores/routes.py:261
+#: app/blueprints/scores/routes.py:336 app/blueprints/scores/routes.py:782
+#: app/blueprints/scores/routes.py:802 app/blueprints/scores/routes.py:929
+#: app/blueprints/scores/routes.py:1204 app/blueprints/sheets/routes.py:60
 #: app/blueprints/users/routes.py:43 app/blueprints/users/routes.py:87
-#: app/blueprints/users/routes.py:154 app/blueprints/users/routes.py:217
-#: app/blueprints/users/routes.py:304
+#: app/blueprints/users/routes.py:154 app/blueprints/users/routes.py:219
+#: app/blueprints/users/routes.py:306
 msgid "Select a competition first."
 msgstr "Najprej izberi tekmovanje."
 
-#: app/blueprints/audit/routes.py:129 app/blueprints/main/routes.py:187
+#: app/blueprints/audit/routes.py:129 app/blueprints/main/routes.py:188
 msgid "Invalid date filter; showing unfiltered results."
 msgstr "Neveljaven filter datuma; prikazani so vsi rezultati."
 
@@ -191,11 +191,11 @@ msgstr "Neveljaven filter datuma; prikazani so vsi rezultati."
 msgid "Please fill in all fields."
 msgstr "Izpolnite vsa polja."
 
-#: app/blueprints/auth/routes.py:26 app/blueprints/users/routes.py:267
+#: app/blueprints/auth/routes.py:26 app/blueprints/users/routes.py:269
 msgid "New passwords do not match."
 msgstr "Novi gesli se ne ujemata."
 
-#: app/blueprints/auth/routes.py:28 app/blueprints/users/routes.py:264
+#: app/blueprints/auth/routes.py:28 app/blueprints/users/routes.py:266
 msgid "New password must be at least 8 characters."
 msgstr "Novo geslo mora imeti vsaj 8 znakov."
 
@@ -258,7 +258,7 @@ msgstr "Skupine ni bilo mogoče ustvariti."
 msgid "Signed out."
 msgstr "Odjavljeni."
 
-#: app/blueprints/auth/routes.py:246 app/blueprints/users/routes.py:246
+#: app/blueprints/auth/routes.py:246 app/blueprints/users/routes.py:248
 msgid "Invalid form data."
 msgstr "Neveljavni podatki obrazca."
 
@@ -301,7 +301,7 @@ msgstr "Ekipe ni bilo mogoče ustvariti."
 msgid "Could not load teams."
 msgstr "Ekip ni bilo mogoče naložiti."
 
-#: app/blueprints/checkins/routes.py:34 app/blueprints/checkpoints/routes.py:52
+#: app/blueprints/checkins/routes.py:34 app/blueprints/checkpoints/routes.py:53
 #: app/blueprints/groups/routes.py:50
 msgid "Could not load checkpoints."
 msgstr "Ni bilo mogoče naložiti kontrolnih točk."
@@ -346,76 +346,81 @@ msgstr ""
 "/api/checkins.Uvoz JSON prek vmesnika je onemogočen. Uporabite končno "
 "točko /api/checkins."
 
-#: app/blueprints/checkpoints/routes.py:20
+#: app/blueprints/checkpoints/routes.py:21
 #, python-format
 msgid "Device is already assigned to %(checkpoint)s."
 msgstr "Naprava je že dodeljena kontrolni točki %(checkpoint)s."
 
-#: app/blueprints/checkpoints/routes.py:21
+#: app/blueprints/checkpoints/routes.py:22
 msgid "Device is already assigned to another checkpoint."
 msgstr "Naprava je že dodeljena drugi kontrolni točki."
 
-#: app/blueprints/checkpoints/routes.py:23
+#: app/blueprints/checkpoints/routes.py:24
 msgid "Selected device does not exist."
 msgstr "Izbrana naprava ne obstaja."
 
-#: app/blueprints/checkpoints/routes.py:25
+#: app/blueprints/checkpoints/routes.py:26
 msgid "Selected device is not available for this competition."
 msgstr "Izbrana naprava ni na voljo za to tekmovanje."
 
-#: app/blueprints/checkpoints/routes.py:27
+#: app/blueprints/checkpoints/routes.py:28
 msgid "Checkpoint name already exists."
 msgstr "Ime kontrolne točke že obstaja."
 
-#: app/blueprints/checkpoints/routes.py:36 app/blueprints/groups/routes.py:60
+#: app/blueprints/checkpoints/routes.py:37 app/blueprints/groups/routes.py:60
 #: app/blueprints/teams/routes.py:101
 msgid "Could not load groups."
 msgstr "Ni bilo mogoče naložiti skupin."
 
-#: app/blueprints/checkpoints/routes.py:44 app/blueprints/lora/routes.py:47
+#: app/blueprints/checkpoints/routes.py:45 app/blueprints/lora/routes.py:47
 #: app/blueprints/rfid/routes.py:35
 msgid "Could not load devices."
 msgstr "Ni bilo mogoče naložiti naprav."
 
-#: app/blueprints/checkpoints/routes.py:169
-#: app/blueprints/checkpoints/routes.py:274
+#: app/blueprints/checkpoints/routes.py:64
+#, fuzzy, python-format
+msgid "%(field)s must be an integer."
+msgstr "group_id mora biti celo število."
+
+#: app/blueprints/checkpoints/routes.py:168
+#: app/blueprints/checkpoints/routes.py:273
 msgid "Checkpoint not found."
 msgstr "Kontrolna točka ni najdena."
 
-#: app/blueprints/checkpoints/routes.py:221
+#: app/blueprints/checkpoints/routes.py:220
 #, fuzzy
 msgid "Checkpoint judges updated."
 msgstr "Kontrolna točka posodobljena."
 
-#: app/blueprints/checkpoints/routes.py:244
-#: app/blueprints/checkpoints/routes.py:305
+#: app/blueprints/checkpoints/routes.py:243
+#: app/blueprints/checkpoints/routes.py:304
 #: app/blueprints/firmware/routes.py:101
 msgid "Name is required."
 msgstr "Ime je obvezno."
 
-#: app/blueprints/checkpoints/routes.py:255
+#: app/blueprints/checkpoints/routes.py:254
 msgid "Checkpoint added."
 msgstr "Kontrolna točka dodana."
 
-#: app/blueprints/checkpoints/routes.py:356
+#: app/blueprints/checkpoints/routes.py:355
 msgid "Checkpoint deleted."
 msgstr "Kontrolna točka izbrisana."
 
-#: app/blueprints/checkpoints/routes.py:358
-#: app/blueprints/checkpoints/routes.py:362
+#: app/blueprints/checkpoints/routes.py:357
+#: app/blueprints/checkpoints/routes.py:361
 msgid "Could not delete checkpoint."
 msgstr "Kontrolne točke ni bilo mogoče izbrisati."
 
-#: app/blueprints/checkpoints/routes.py:397
+#: app/blueprints/checkpoints/routes.py:396
 msgid "Paste JSON payload to import."
 msgstr "Prilepite vsebino JSON za uvoz."
 
-#: app/blueprints/checkpoints/routes.py:403 app/blueprints/scores/routes.py:125
+#: app/blueprints/checkpoints/routes.py:402 app/blueprints/scores/routes.py:128
 #, python-format
 msgid "Invalid JSON: %(error)s"
 msgstr "Neveljaven JSON: %(error)s"
 
-#: app/blueprints/checkpoints/routes.py:427
+#: app/blueprints/checkpoints/routes.py:426
 #, fuzzy
 msgid ""
 "JSON must be an array of checkpoints, an object with 'items', or an "
@@ -424,17 +429,17 @@ msgstr ""
 "Prilepi JSON ali naloži datoteko. Sprejemljivo: seznam točk, objekt z "
 "items ali mapa s cps (e/n/name) kot pri izvozu zemljevida."
 
-#: app/blueprints/checkpoints/routes.py:434
+#: app/blueprints/checkpoints/routes.py:433
 #: app/templates/competition_transfer.html:88
 msgid "Import failed."
 msgstr "Uvoz ni uspel."
 
-#: app/blueprints/checkpoints/routes.py:435
+#: app/blueprints/checkpoints/routes.py:434
 #, , python-format
 msgid "Import failed: %(detail)s"
 msgstr "Uvoz ni uspel: %(detail)s"
 
-#: app/blueprints/checkpoints/routes.py:442
+#: app/blueprints/checkpoints/routes.py:441
 #, fuzzy, python-format
 msgid ""
 "Imported checkpoints: created %(created)s, updated %(updated)s, skipped "
@@ -444,7 +449,7 @@ msgstr ""
 "obstoječih: %(skipped)s.Carovnik koncan. Ustvarjenih %(created)s "
 "zavihkov, preskocenih %(skipped)s obstoječih."
 
-#: app/blueprints/checkpoints/routes.py:450
+#: app/blueprints/checkpoints/routes.py:449
 #, python-format
 msgid "%(count)s row(s) reported errors; see logs."
 msgstr "%(count)s vrstic je prijavilo napake; glej dnevnik."
@@ -584,40 +589,40 @@ msgstr "Naprava je bila posodobljena."
 msgid "Could not delete device."
 msgstr "Ekipe ni bilo mogoče izbrisati."
 
-#: app/blueprints/main/routes.py:64 app/blueprints/main/routes.py:346
+#: app/blueprints/main/routes.py:65 app/blueprints/main/routes.py:346
 msgid "A competition with that name already exists."
 msgstr "Tekmovanje s tem imenom že obstaja."
 
-#: app/blueprints/main/routes.py:105
+#: app/blueprints/main/routes.py:106
 msgid "Competition created."
 msgstr "Tekmovanje je ustvarjeno."
 
-#: app/blueprints/main/routes.py:113
+#: app/blueprints/main/routes.py:114
 msgid "You don't have access to that competition."
 msgstr "Nimaš dostopa do tega tekmovanja."
 
-#: app/blueprints/main/routes.py:115
+#: app/blueprints/main/routes.py:116
 msgid "Competition selected."
 msgstr "Tekmovanje izbrano."
 
-#: app/blueprints/main/routes.py:241 app/blueprints/main/routes.py:463
+#: app/blueprints/main/routes.py:242 app/blueprints/main/routes.py:463
 #: app/blueprints/main/routes.py:491
 msgid "Competition not found."
 msgstr "Tekmovanje ni bilo najdeno."
 
-#: app/blueprints/main/routes.py:254
+#: app/blueprints/main/routes.py:253
 msgid "Valid email is required."
 msgstr "Veljaven e-poštni naslov je obvezen."
 
-#: app/blueprints/main/routes.py:257 app/blueprints/users/routes.py:99
+#: app/blueprints/main/routes.py:256 app/blueprints/users/routes.py:99
 msgid "Invalid role selected."
 msgstr "Izbrana vloga ni veljavna."
 
-#: app/blueprints/main/routes.py:266
+#: app/blueprints/main/routes.py:265
 msgid "An active invite already exists for this email."
 msgstr "Aktivno povabilo za ta e-poštni naslov že obstaja."
 
-#: app/blueprints/main/routes.py:323
+#: app/blueprints/main/routes.py:322
 msgid "Invite saved."
 msgstr "Povabilo shranjeno."
 
@@ -682,78 +687,78 @@ msgstr "Ni še povezav RFID."
 msgid "Could not delete RFID mapping."
 msgstr "Tekmovanja ni bilo mogoče izbrisati."
 
-#: app/blueprints/scores/routes.py:119
+#: app/blueprints/scores/routes.py:122
 msgid "Checkpoint, group, and rules JSON are required."
 msgstr "Kontrolna točka, skupina in pravila JSON so obvezni."
 
-#: app/blueprints/scores/routes.py:129 app/templates/score_rules.html:295
+#: app/blueprints/scores/routes.py:132 app/templates/score_rules.html:295
 msgid "Rules JSON must be an object."
 msgstr "Pravila JSON morajo biti objekt."
 
-#: app/blueprints/scores/routes.py:138 app/templates/score_rules.html:296
+#: app/blueprints/scores/routes.py:141 app/templates/score_rules.html:296
 msgid "Time-based scoring requires start and end checkpoints."
 msgstr "Časovno točkovanje zahteva začetno in končno kontrolno točko."
 
-#: app/blueprints/scores/routes.py:157
+#: app/blueprints/scores/routes.py:160
 msgid "No groups are linked to this checkpoint, nothing to apply."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:186
+#: app/blueprints/scores/routes.py:189
 #, python-format
 msgid "Applied to %(count)s groups (created %(created)s, updated %(updated)s)."
 msgstr ""
 "Uporabljeno na %(count)s skupinah (ustvarjenih %(created)s, posodobljenih"
 " %(updated)s)."
 
-#: app/blueprints/scores/routes.py:207
+#: app/blueprints/scores/routes.py:210
 msgid "Score rule updated."
 msgstr "Pravilo točkovanja posodobljeno."
 
-#: app/blueprints/scores/routes.py:216
+#: app/blueprints/scores/routes.py:219
 msgid "Score rule created."
 msgstr "Pravilo točkovanja ustvarjeno."
 
-#: app/blueprints/scores/routes.py:244
+#: app/blueprints/scores/routes.py:247
 msgid "Score rule not found."
 msgstr "Pravilo točkovanja ni najdeno."
 
-#: app/blueprints/scores/routes.py:249
+#: app/blueprints/scores/routes.py:252
 msgid "Score rule deleted."
 msgstr "Pravilo točkovanja izbrisano."
 
-#: app/blueprints/scores/routes.py:277
+#: app/blueprints/scores/routes.py:280
 msgid "Group is required for global rules."
 msgstr "Skupina je obvezna za globalna pravila."
 
-#: app/blueprints/scores/routes.py:289
+#: app/blueprints/scores/routes.py:292
 msgid "Global time rule requires start and end checkpoints."
 msgstr "Globalno pravilo časa zahteva začetno in končno kontrolno točko."
 
-#: app/blueprints/scores/routes.py:304
+#: app/blueprints/scores/routes.py:307
 msgid "Select at least one global rule."
 msgstr "Izberi vsaj eno globalno pravilo."
 
-#: app/blueprints/scores/routes.py:313
+#: app/blueprints/scores/routes.py:316
 msgid "Global rules updated."
 msgstr "Globalna pravila posodobljena."
 
-#: app/blueprints/scores/routes.py:321
+#: app/blueprints/scores/routes.py:324
 msgid "Global rules created."
 msgstr "Globalna pravila ustvarjena."
 
-#: app/blueprints/scores/routes.py:340
+#: app/blueprints/scores/routes.py:343
 msgid "Global rule not found."
 msgstr "Globalno pravilo ni najdeno."
 
-#: app/blueprints/scores/routes.py:345
+#: app/blueprints/scores/routes.py:348
 msgid "Global rule deleted."
 msgstr "Globalno pravilo izbrisano."
 
-#: app/blueprints/scores/routes.py:851 app/blueprints/scores/routes.py:1162
+#: app/blueprints/scores/routes.py:880 app/blueprints/scores/routes.py:1192
 msgid "Public results are not enabled for this competition."
 msgstr "Javni rezultati za to tekmovanje niso omogočeni."
 
-#: app/blueprints/scores/routes.py:1240
+#: app/blueprints/scores/routes.py:1270
 msgid "Legacy or unknown"
 msgstr "Staro ali neznano"
 
@@ -1021,8 +1026,8 @@ msgstr ""
 msgid "You cannot delete your own account."
 msgstr "Kontrolne točke ni bilo mogoče izbrisati."
 
-#: app/blueprints/superadmin/routes.py:296 app/blueprints/users/routes.py:231
-#: app/blueprints/users/routes.py:311
+#: app/blueprints/superadmin/routes.py:296 app/blueprints/users/routes.py:233
+#: app/blueprints/users/routes.py:313
 msgid "User not found."
 msgstr "Uporabnik ni najden."
 
@@ -1136,24 +1141,24 @@ msgstr "Izpolni vsa polja. Vloga mora biti gledalec/sodnik/skrbnik."
 msgid "Username already exists."
 msgstr "Uporabniško ime že obstaja."
 
-#: app/blueprints/users/routes.py:206
+#: app/blueprints/users/routes.py:208
 #, python-format
 msgid "User '%(user)s' created."
 msgstr "Uporabnik '%(user)s' je ustvarjen."
 
-#: app/blueprints/users/routes.py:251
+#: app/blueprints/users/routes.py:253
 msgid "Another user already has that username."
 msgstr "Drugi uporabnik že ima to uporabniško ime."
 
-#: app/blueprints/users/routes.py:270
+#: app/blueprints/users/routes.py:272
 msgid "Password should not contain the username."
 msgstr "Geslo ne sme vsebovati uporabniškega imena."
 
-#: app/blueprints/users/routes.py:293
+#: app/blueprints/users/routes.py:295
 msgid "User updated."
 msgstr "Uporabnik posodobljen."
 
-#: app/blueprints/users/routes.py:338
+#: app/blueprints/users/routes.py:340
 #, fuzzy
 msgid "User removed from this competition."
 msgstr "Uporabnik %(user)s je bil odstranjen iz tekmovanja."
@@ -1199,7 +1204,7 @@ msgid "No UID read (check device, cable, or increase timeout)."
 msgstr "UID ni bil prebran (preveri napravo, kabel ali povečaj časovno omejitev)."
 
 # Score validation
-#: app/resources/scores.py:708
+#: app/resources/scores.py:766
 msgid "Score cannot be negative."
 msgstr "Rezultat ne more biti negativen."
 
@@ -4597,6 +4602,67 @@ msgstr "Uporabnik %(id)s"
 #: app/utils/audit.py:64 app/utils/audit.py:91
 msgid "System"
 msgstr "Sistem"
+
+#: app/utils/validators.py:34
+#, python-format
+msgid "%(field)s must be a number"
+msgstr ""
+
+#: app/utils/validators.py:36
+#, fuzzy, python-format
+msgid "%(field)s must be a finite number"
+msgstr "group_id mora biti celo število."
+
+#: app/utils/validators.py:38
+#, python-format
+msgid "%(field)s must be >= %(minimum)s"
+msgstr ""
+
+#: app/utils/validators.py:40 app/utils/validators.py:60
+#, python-format
+msgid "%(field)s must be <= %(maximum)s"
+msgstr ""
+
+#: app/utils/validators.py:56
+#, fuzzy, python-format
+msgid "%(field)s must be an integer"
+msgstr "group_id mora biti celo število."
+
+#: app/utils/validators.py:58
+#, python-format
+msgid "%(field)s must be > 0"
+msgstr ""
+
+#: app/utils/validators.py:79
+#, fuzzy, python-format
+msgid "%(field)s is required"
+msgstr "uid je obvezen"
+
+#: app/utils/validators.py:82
+#, python-format
+msgid "%(field)s must be at most %(max_length)s characters"
+msgstr ""
+
+#: app/utils/validators.py:84
+#, python-format
+msgid "%(field)s contains invalid control characters"
+msgstr ""
+
+#: app/utils/validators.py:86
+#, python-format
+msgid "%(field)s must be a single line"
+msgstr ""
+
+#: app/utils/validators.py:95
+#, fuzzy
+msgid "username may contain only letters, numbers, dot, underscore, and hyphen"
+msgstr ""
+"Uporabniško ime lahko vsebuje samo črke, številke, pike, podčrtaje in "
+"vezaje."
+
+#: app/utils/validators.py:105
+msgid "email is invalid"
+msgstr ""
 
 # Base layout / navbar
 #~ msgid "RFID Checkpoint System"

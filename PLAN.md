@@ -1,3 +1,41 @@
+# Audit hardening (llm_audit) - plan
+
+Source: whole-codebase review (2026-06-12), 15 verified findings + overflow.
+Branch: `llm_audit @ 18c3e60` (fast-forwarded to master). Tests + ruff must be
+green before each commit lands.
+
+## Work groups (one agent each, disjoint file ownership)
+
+| # | Group | Files | Fixes |
+|---|---|---|---|
+| 1 | transfer-idor | `app/api/transfer.py` | Export/merge authorize against URL `comp_id` (active admin membership or superadmin), not the session competition. |
+| 2 | scoring | `app/resources/scores.py`, `app/blueprints/scores/routes.py` | Auto-DNF becomes compute-only on GET (no commit during render); CSV rank uses per-group `place`; legacy time_race paths unified to base+rank via one shared helper; negative `dead_time` rejected; `max_points=0` honored (no `or` falsy-zero); duplicate ScoreRule query and O(N^2) self-lookups removed. |
+| 3 | ingest | `app/resources/ingest.py` | Device `ts` bounds-checked (fallback to server time + log); LoRaDevice get-or-create wrapped in savepoint with IntegrityError retry; bare `except: pass` blocks get logging. |
+| 4 | checkins | `app/resources/checkins.py` | `_parse_timestamp` converts offset-aware ISO strings to naive UTC instead of dropping the offset. |
+| 5 | platform | `app/extensions.py`, `config.py`, `app/__init__.py`, `app/utils/competition.py` | SQLite WAL + busy_timeout pragmas; `db.create_all()` only on fresh DB; `ensure_default_competition` race-safe; CRITICAL startup warning when running on dev secrets. |
+| 6 | misc-routes | `app/blueprints/users/routes.py`, `app/blueprints/checkpoints/routes.py`, `app/blueprints/firmware/routes.py`, `app/utils/validators.py` | `add_user` keeps `User.role` to `public` (membership carries the real role); checkpoint float parse 500 -> flash; firmware non-dict JSON guard; i18n f-string/extraction fixes. |
+| 7 | sheets | `app/utils/sheets_sync.py` | Score sync no longer clobbers the arrival time cell; `sync_all_checkpoint_tabs` keeps score columns aligned with renumbered teams; `datetime.now()` fallback -> naive UTC. |
+
+## Decisions
+
+- **Auto-DNF**: rendering must not mutate; DNF from timeline is computed into the
+  row display each render. Persisted `team.dnf` stays manual/explicit.
+- **time_race**: canonical total = base points + rank points (what `score_submit`
+  stores). Recompute and live paths align to it. Legacy path kept per the
+  post-race plan; rank-mode GlobalScoreRule is the successor.
+- **Secrets**: non-breaking hardening; loud CRITICAL log instead of refusing to
+  boot when FLASK_ENV is unset and dev secrets are active.
+
+## Deferred (documented, needs own design)
+
+- Cross-process Sheets throttle/ordering (two gunicorn workers, per-process
+  queues); needs a file lock or a single sync process.
+- CSRF exemption on `/api/auth/login` (login-CSRF); removing it breaks API clients.
+- Sheets/API timestamp display-timezone policy (UTC written today, consistently).
+- Translating API `detail` strings surfaced in flashes.
+
+---
+
 # Post-race overhaul — plan
 
 Branch: `post-race-improvements`. Starts from `master @ 04f2c70`.
