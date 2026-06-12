@@ -44,5 +44,11 @@ def _set_sqlite_pragma(dbapi_connection, connection_record):
     cur = dbapi_connection.cursor()
     try:
         cur.execute("PRAGMA foreign_keys=ON")
+        # WAL lets the two gunicorn workers read while one writes;
+        # busy_timeout makes the losing writer wait for the lock instead
+        # of raising "database is locked". In-memory test DBs report
+        # journal_mode=memory here, which is harmless.
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA busy_timeout=15000")
     finally:
         cur.close()

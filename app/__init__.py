@@ -6,7 +6,7 @@ import tempfile
 from flask import Flask, current_app, g, request, session
 from flask_babel import get_locale
 from flask_login import current_user
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -112,6 +112,17 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.logger.setLevel(log_level)
     logging.getLogger("werkzeug").setLevel(logging.INFO)
 
+    # Loud but non-fatal warnings when the insecure fallback secrets from
+    # config.py are active. config.py already hard-exits when FLASK_ENV is
+    # "production"; this catches deployments where FLASK_ENV was never set.
+    if app.config["SECRET_KEY"] == "dev-secret":
+        app.logger.critical("SECRET_KEY is the insecure 'dev-secret' fallback; set SECRET_KEY in the environment.")
+    if app.config.get("LORA_WEBHOOK_SECRET") == "CHANGE_LATER":
+        app.logger.critical(
+            "LORA_WEBHOOK_SECRET is the insecure 'CHANGE_LATER' fallback; "
+            "set LORA_WEBHOOK_SECRET in the environment."
+        )
+
     if log_level == logging.DEBUG:
 
         @app.before_request
@@ -198,10 +209,13 @@ def create_app(config_overrides: dict | None = None) -> Flask:
 
     with app.app_context():
         # Schema management:
-        #   - Fresh installs: db.create_all() builds the full schema from
-        #     models. Pair with `alembic stamp head` after first boot to
-        #     mark the DB as already at HEAD.
+        #   - Fresh installs (no schema yet): db.create_all() builds the
+        #     full schema from models. Pair with `alembic stamp head` after
+        #     first boot to mark the DB as already at HEAD.
         #   - Existing installs: run `alembic upgrade head` before booting.
+        #     create_all() is skipped once a core table exists, so parallel
+        #     gunicorn workers don't race each other (or a just-applied
+        #     migration) with DDL on every boot.
         # The "ensure column exists" / "CREATE INDEX IF NOT EXISTS" blocks
         # that used to live here have been moved into Alembic revisions
         # (see alembic/versions/d4e5f6a7b8c9_codify_runtime_schema_drift.py).
@@ -210,7 +224,8 @@ def create_app(config_overrides: dict | None = None) -> Flask:
         # migrations: we want metadata loaded but no DDL side effects,
         # so Alembic can apply migrations against a real empty DB.
         if not app.config.get("SKIP_DB_BOOTSTRAP"):
-            db.create_all()
+            if not inspect(db.engine).has_table("users"):
+                db.create_all()
             try:
                 ensure_default_competition()
             except Exception:

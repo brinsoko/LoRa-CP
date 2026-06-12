@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 from flask import session
 from flask_login import current_user
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models import CheckpointGroup, Competition, CompetitionInvite, CompetitionMember, User
@@ -17,8 +18,9 @@ INVITE_EXPIRY_DAYS = 7
 
 
 def ensure_default_competition() -> Competition | None:
-    if Competition.query.count():
-        return Competition.query.order_by(Competition.created_at.asc()).first()
+    existing = Competition.query.order_by(Competition.created_at.asc()).first()
+    if existing:
+        return existing
 
     admin_user = User.query.filter(User.role.in_(["superadmin", "admin"])).order_by(User.id.asc()).first()
     competition = Competition(
@@ -26,19 +28,30 @@ def ensure_default_competition() -> Competition | None:
         created_by_user_id=admin_user.id if admin_user else None,
     )
     db.session.add(competition)
-    db.session.flush()
+    try:
+        db.session.flush()
 
-    if admin_user:
-        db.session.add(
-            CompetitionMember(
-                competition_id=competition.id,
-                user_id=admin_user.id,
-                role="admin",
-                active=True,
+        if admin_user:
+            db.session.add(
+                CompetitionMember(
+                    competition_id=competition.id,
+                    user_id=admin_user.id,
+                    role="admin",
+                    active=True,
+                )
             )
-        )
 
-    db.session.commit()
+        db.session.commit()
+    except IntegrityError:
+        # Another worker booted concurrently and committed first. Recover
+        # by returning whatever exists instead of failing the boot; the
+        # created_at fallback also covers rows not caught by the unique
+        # name constraint.
+        db.session.rollback()
+        existing = Competition.query.order_by(Competition.created_at.asc()).first()
+        if existing:
+            return existing
+        raise
     return competition
 
 
