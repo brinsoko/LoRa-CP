@@ -165,8 +165,10 @@ def add_user():
             flash(_("Username already exists."), "warning")
             return render_template("user_edit.html", mode="add")
 
-        user_role = "public" if role == "viewer" else role
-        u = User(username=username, role=user_role)
+        # User.role is the system-level role (superadmin/public) and stays
+        # "public" here. The per-competition role lives only in
+        # CompetitionMember.
+        u = User(username=username, role="public")
         u.set_password(password)
         db.session.add(u)
         db.session.flush()

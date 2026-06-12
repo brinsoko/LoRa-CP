@@ -56,7 +56,8 @@ def create_competition():
         required=True,
     )
     if name_error:
-        flash(_(name_error), "warning")
+        # name_error is already lazy-translated by the validator.
+        flash(str(name_error), "warning")
         return redirect(url_for("main.select_competition"))
 
     existing = Competition.query.filter_by(name=name).first()
@@ -247,11 +248,9 @@ def competition_settings():
             email, email_error = validate_email(request.form.get("invite_email"))
             role = (request.form.get("invite_role") or "judge").strip().lower()
             if email_error or not email:
-                # email_error comes from validate_email() and is already
-                # an English message; gettext can't extract a runtime
-                # variable, so use the validator's message verbatim and
-                # fall back to a literal that pybabel CAN extract.
-                flash(email_error or _("Valid email is required."), "warning")
+                # email_error is already lazy-translated by validate_email();
+                # fall back to a literal when the field was left empty.
+                flash(str(email_error) if email_error else _("Valid email is required."), "warning")
                 return redirect(url_for("main.competition_settings"))
             if role not in ("viewer", "judge", "admin"):
                 flash(_("Invalid role selected."), "warning")
@@ -339,7 +338,8 @@ def competition_settings():
             required=True,
         )
         if name_error:
-            flash(_(name_error), "warning")
+            # name_error is already lazy-translated by the validator.
+            flash(str(name_error), "warning")
             return redirect(url_for("main.competition_settings"))
         existing = Competition.query.filter(Competition.id != competition.id, Competition.name == new_name).first()
         if existing:

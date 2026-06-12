@@ -8,6 +8,7 @@ from flask_babel import gettext as _
 
 from app.utils.frontend_api import api_json
 from app.utils.perms import roles_required
+from app.utils.validators import validate_finite_float
 
 checkpoints_bp = Blueprint("checkpoints", __name__, template_folder="../../templates")
 
@@ -60,7 +61,7 @@ def _parse_optional_int(raw_value, field_label: str) -> tuple[int | None, str | 
     try:
         return int(str(raw_value).strip()), None
     except (TypeError, ValueError):
-        return None, _(f"{field_label} must be an integer.")
+        return None, _("%(field)s must be an integer.", field=field_label)
 
 
 def _parse_int_list(values, field_label: str) -> tuple[list[int], str | None]:
@@ -80,10 +81,8 @@ def _normalize_checkpoint_form(form):
     description = (form.get("description") or "").strip() or None
     scoring_text = (form.get("scoring_text") or "").strip() or None
     judges_note = (form.get("judges_note") or "").strip() or None
-    easting_raw = form.get("easting")
-    northing_raw = form.get("northing")
-    easting = float(easting_raw) if easting_raw else None
-    northing = float(northing_raw) if northing_raw else None
+    easting, easting_error = validate_finite_float(form.get("easting"), field_name="Easting")
+    northing, northing_error = validate_finite_float(form.get("northing"), field_name="Northing")
     lora_device_id, lora_device_error = _parse_optional_int(form.get("lora_device_id"), "Device ID")
     group_ids, group_ids_error = _parse_int_list(form.getlist("group_ids"), "Group ID")
 
@@ -100,7 +99,7 @@ def _normalize_checkpoint_form(form):
         "lora_device_id": lora_device_id,
         "group_ids": group_ids,
         "is_virtual": is_virtual,
-    }, lora_device_error or group_ids_error
+    }, easting_error or northing_error or lora_device_error or group_ids_error
 
 
 def _fetch_competition_members() -> list[dict]:

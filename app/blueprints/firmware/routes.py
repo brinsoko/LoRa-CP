@@ -306,14 +306,16 @@ def firmware_nvs_binary(device_id: int, fw_id: int):
     webhook_secret = cfg.get("LORA_WEBHOOK_SECRET") or ""
     hmac_len = int(cfg.get("DEVICE_CARD_HMAC_LEN", 12))
 
-    # WiFi params from POST body (receiver devices)
+    # WiFi params from POST body (receiver devices). The body may be any
+    # JSON value, so only dicts count as configuration.
     wifi_ssid = ""
     wifi_pass = ""
     ingest_url = ""
-    if request.is_json and request.json:
-        wifi_ssid = (request.json.get("wifi_ssid") or "").strip()
-        wifi_pass = (request.json.get("wifi_pass") or "").strip()
-        ingest_url = (request.json.get("ingest_url") or "").strip()
+    body = request.get_json(silent=True)
+    if isinstance(body, dict):
+        wifi_ssid = (body.get("wifi_ssid") or "").strip()
+        wifi_pass = (body.get("wifi_pass") or "").strip()
+        ingest_url = (body.get("ingest_url") or "").strip()
 
     partition_size = int(fw.nvs_size or 0)
     if partition_size <= 0 or partition_size % 4096 != 0:
