@@ -30,45 +30,57 @@ from app.utils.time import utc_from_timestamp_naive, utcnow_naive
 
 ingest_api_bp = Blueprint("api_ingest", __name__)
 
+# Device clocks can reset to epoch or drift wildly. A "ts" outside these
+# bounds (relative to server UTC now) is untrusted and replaced with server
+# time, so a bogus clock cannot backdate check-ins or pin the 10s dedup
+# window in the wrong place.
+DEVICE_TS_MAX_PAST = timedelta(hours=48)
+DEVICE_TS_MAX_FUTURE = timedelta(minutes=10)
+
 
 def resolve_checkpoint_for_dev(competition_id: int, dev_num: int) -> tuple[Checkpoint, LoRaDevice, bool, bool]:
     device = LoRaDevice.query.filter_by(competition_id=competition_id, dev_num=dev_num).first()
     created_device = False
     created_checkpoint = False
 
-    if device:
-        if device.checkpoint:
-            return device.checkpoint, device, created_device, created_checkpoint
+    if not device:
+        # Two gunicorn workers can race on the first packet from a new
+        # device. Insert inside a SAVEPOINT so the loser's
+        # uq_device_competition_devnum violation rolls back cleanly and the
+        # winner's row is re-read instead of aborting the whole ingest.
+        try:
+            with db.session.begin_nested():
+                device = LoRaDevice(competition_id=competition_id, dev_num=dev_num, name=f"DEV-{dev_num}", active=True)
+                db.session.add(device)
+            created_device = True
+        except IntegrityError:
+            device = LoRaDevice.query.filter_by(competition_id=competition_id, dev_num=dev_num).first()
+            if device is None:
+                raise
 
-        cp = Checkpoint.query.filter_by(lora_device_id=device.id).first()
-        if cp:
-            return cp, device, created_device, created_checkpoint
+    if device.checkpoint:
+        return device.checkpoint, device, created_device, created_checkpoint
 
-        cp = Checkpoint(
-            competition_id=competition_id,
-            name=f"Device {dev_num}",
-            description="Auto-created from device ingest",
-            lora_device_id=device.id,
-        )
-        db.session.add(cp)
-        db.session.flush()
-        created_checkpoint = True
+    cp = Checkpoint.query.filter_by(lora_device_id=device.id).first()
+    if cp:
         return cp, device, created_device, created_checkpoint
 
-    device = LoRaDevice(competition_id=competition_id, dev_num=dev_num, name=f"DEV-{dev_num}", active=True)
-    db.session.add(device)
-    db.session.flush()
-    created_device = True
-
-    cp = Checkpoint(
-        competition_id=competition_id,
-        name=f"Device {dev_num}",
-        description="Auto-created from device ingest",
-        lora_device_id=device.id,
-    )
-    db.session.add(cp)
-    db.session.flush()
-    created_checkpoint = True
+    # Same race on the auto-created checkpoint (unique lora_device_id and
+    # unique name per competition): recover the concurrent winner's row.
+    try:
+        with db.session.begin_nested():
+            cp = Checkpoint(
+                competition_id=competition_id,
+                name=f"Device {dev_num}",
+                description="Auto-created from device ingest",
+                lora_device_id=device.id,
+            )
+            db.session.add(cp)
+        created_checkpoint = True
+    except IntegrityError:
+        cp = Checkpoint.query.filter_by(lora_device_id=device.id).first()
+        if cp is None:
+            raise
     return cp, device, created_device, created_checkpoint
 
 
@@ -216,7 +228,21 @@ def ingest_post():
     gps_age = args.get("gps_age_ms")
     ingest_password = args.get("ingest_password") or args.get("password")
 
-    received_at = utc_from_timestamp_naive(ts_unix) if ts_unix else utcnow_naive()
+    now = utcnow_naive()
+    received_at = now
+    if ts_unix:
+        try:
+            device_ts = utc_from_timestamp_naive(ts_unix)
+        except (OverflowError, OSError, ValueError):
+            device_ts = None
+        if device_ts is not None and (now - DEVICE_TS_MAX_PAST) <= device_ts <= (now + DEVICE_TS_MAX_FUTURE):
+            received_at = device_ts
+        else:
+            current_app.logger.warning(
+                "Ingest ts out of bounds (dev_num=%s, ts=%r); using server time instead",
+                dev_id,
+                ts_unix,
+            )
 
     competition = db.session.get(Competition, competition_id)
     if not competition:
@@ -434,8 +460,14 @@ def ingest_post():
                 try:
                     mark_arrival_checkbox(team.id, cp.id, arrived_at)
                 except Exception:
-                    # do not fail ingest if Sheets update fails
-                    pass
+                    # Do not fail ingest if the Sheets update fails: the
+                    # check-in is persisted and the device needs its ACK.
+                    # Log so sheet desync is traceable.
+                    current_app.logger.exception(
+                        "Ingest: mark_arrival_checkbox failed (team=%s, checkpoint=%s)",
+                        team.id,
+                        cp.id,
+                    )
 
                 # If this check-in lands on the END checkpoint of a
                 # ScoreRule.time_race rule, the team's leg time just
@@ -460,7 +492,13 @@ def ingest_post():
                             _r.group_id,
                         )
                 except Exception:
-                    pass
+                    # Swallow so the device still gets its ACK, but log so a
+                    # stale leaderboard/sheet can be traced back here.
+                    current_app.logger.exception(
+                        "Ingest: time_race recompute enqueue failed (competition=%s, checkpoint=%s)",
+                        competition_id,
+                        cp.id,
+                    )
 
         # Skip writeback for non-UID payloads (GPS frames, comma-list data)
         # AND for inputs whose shape doesn't match a real card UID. The old
