@@ -293,9 +293,11 @@ def test_sync_uses_one_batch_call_per_cp_not_one_per_group(sheets_app, monkeypat
             f"Expected 5 batch calls (one per CP), got {len(fake.batch_update_columns_calls)}: "
             f"{[c[0] for c in fake.batch_update_columns_calls]}"
         )
-        # Each batch call carries 5 column updates (one per group).
+        # Each batch call carries the full data block: 5 groups x 4
+        # columns (team number, time, task1, points). The whole block is
+        # rewritten so scores stay on the same row as the team number.
         for tab_name, cols in fake.batch_update_columns_calls:
-            assert len(cols) == 5, f"{tab_name}: expected 5 group columns, got {len(cols)}"
+            assert len(cols) == 20, f"{tab_name}: expected 20 block columns, got {len(cols)}"
             # Each column has 4 values (teams_per_group).
             for c in cols:
                 assert len(c["values"]) == 4, f"{tab_name} col {c['col']}: expected 4 values, got {len(c['values'])}"
@@ -317,11 +319,11 @@ def test_sync_writes_correct_team_numbers_per_group(sheets_app, monkeypatch):
         # Group G1 has prefix "1" => 100, 101, 102
         # Group G2 has prefix "2" => 200, 201, 202
         nums_by_col = {c["col"]: c["values"] for c in cols}
-        # Find the column for G0 (start_col=1), G1, G2 — block width = 1+1+1+1 = 4
-        # (name + time + task1 + points)
-        # So G0 starts at col 1, G1 at col 5, G2 at col 9.
+        # Block width = 1+1+1+1 = 4 (name + time + task1 + points), so
+        # G0 starts at col 1, G1 at col 5, G2 at col 9. The full block is
+        # rewritten (12 columns), not just the team-number columns.
         # Team numbers per helper: (g_idx+1)*100 + t_idx+1
-        assert sorted(nums_by_col.keys()) == [1, 5, 9]
+        assert sorted(nums_by_col.keys()) == list(range(1, 13))
         assert nums_by_col[1] == [101, 102, 103]
         assert nums_by_col[5] == [201, 202, 203]
         assert nums_by_col[9] == [301, 302, 303]

@@ -22,6 +22,7 @@ from app.utils.export_safety import escape_formula_cell
 from app.utils.lang_store import load_lang
 from app.utils.sheets_client import get_sheets_client
 from app.utils.sheets_settings import sheets_sync_enabled
+from app.utils.time import utcnow_naive
 
 
 def _norm_name(value: str | None) -> str:
@@ -256,14 +257,25 @@ def _build_global_rule_formulas(
 
 
 def sync_all_checkpoint_tabs(competition_id: int | None = None):
-    """Refresh team numbers across every checkpoint-type tab.
+    """Refresh every checkpoint-type tab from the local DB.
+
+    Each group block is rewritten as a whole (team number, dead time,
+    arrival time, raw fields, points) from the publish-from-local grid so
+    the score cells stay on the same row as the team number. An earlier
+    version rewrote only the team-number column: after a renumber the
+    numbers moved while dead_time/time/points kept their old row order,
+    so every number paired with another team's scores and the Score
+    tab's MATCH(team_number) lookups credited the wrong team. Points
+    columns flagged ``points_formula`` are left untouched; the published
+    formulas read raw cells in their own row, so they recompute
+    correctly after the rewrite.
 
     Batches all column writes per CP into one Sheets API call (one
     ws.batch_update per tab) so a large competition can finish well
-    inside the gunicorn worker timeout. The earlier implementation did
-    one update_column per (CP × group), which on a 15-CP × 5-group
+    inside the gunicorn worker timeout. The first implementation did
+    one update_column per (CP x group), which on a 15-CP x 5-group
     competition hit the 40-calls/60s throttle and forced a 60-second
-    sleep mid-request — the worker then timed out at 30 s and returned
+    sleep mid-request - the worker then timed out at 30 s and returned
     500. Batched, the same work is ~15 API calls total and finishes in
     a few seconds.
     """
@@ -285,26 +297,57 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
     group_cache: dict[int, list[CheckpointGroup]] = {}
     for cfg in configs:
         comp_id = cfg.competition_id
-        groups = (cfg.config or {}).get("groups", [])
+        cfg_blob = cfg.config or {}
+        groups = cfg_blob.get("groups", [])
         if not groups:
             continue
-        group_cols = _group_start_cols_from_config(cfg.config or {})
+        group_cols = _group_start_cols_from_config(cfg_blob)
+        dead_time_enabled = bool(cfg_blob.get("dead_time_enabled"))
+        time_enabled = bool(cfg_blob.get("time_enabled"))
+
+        # Rebuild the full data block from the DB. with_points_formulas
+        # is off because this path routes cells through
+        # batch_update_columns, which escapes a leading '=' to literal
+        # text; formula-driven Points columns are skipped below instead.
+        grid, _ = _build_local_cp_grid(cfg, comp_id, with_points_formulas=False)
+        data_rows = grid[1:]
 
         columns_for_this_cp: list[dict] = []
         for grp, start_col in zip(groups, group_cols, strict=False):
             db_group = _resolve_group_from_cfg(comp_id, grp, group_cache)
             if not db_group:
                 continue
-            nums = (
-                db.session.query(Team.id, Team.number, Team.name)
-                .join(TeamGroup, TeamGroup.team_id == Team.id)
-                .filter(TeamGroup.group_id == db_group.id, Team.competition_id == comp_id)
-                .order_by(Team.number.asc().nulls_last(), Team.name.asc())
-                .all()
-            )
-            values = [n[1] if n[1] is not None else (n[2] or "") for n in nums]
-            if values:
-                columns_for_this_cp.append({"col": start_col, "start_row": 2, "values": values})
+            labels = [r[start_col - 1] if len(r) >= start_col else "" for r in data_rows]
+            if not any(v not in ("", None) for v in labels):
+                # The grid builder keys blocks by group_id; a legacy
+                # config that resolves only by name (or a group with no
+                # teams left) yields an empty block. Fall back to the
+                # numbers-only write so we never blank out a block we
+                # could not rebuild.
+                nums = (
+                    db.session.query(Team.id, Team.number, Team.name)
+                    .join(TeamGroup, TeamGroup.team_id == Team.id)
+                    .filter(TeamGroup.group_id == db_group.id, Team.competition_id == comp_id)
+                    .order_by(Team.number.asc().nulls_last(), Team.name.asc())
+                    .all()
+                )
+                values = [n[1] if n[1] is not None else (n[2] or "") for n in nums]
+                if values:
+                    columns_for_this_cp.append({"col": start_col, "start_row": 2, "values": values})
+                continue
+            fields = list(grp.get("fields") or [])
+            width = 1 + (1 if dead_time_enabled else 0) + (1 if time_enabled else 0) + len(fields) + 1
+            points_col = start_col + width - 1
+            for col in range(start_col, start_col + width):
+                if col == points_col and grp.get("points_formula"):
+                    continue
+                columns_for_this_cp.append(
+                    {
+                        "col": col,
+                        "start_row": 2,
+                        "values": [r[col - 1] if len(r) >= col else "" for r in data_rows],
+                    }
+                )
 
         if columns_for_this_cp:
             try:
@@ -491,7 +534,10 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
         current_app.logger.warning("Sheets arrival sync skipped: %s", exc)
         return
 
-    ts = arrived_at or datetime.now()
+    # Callers pass naive-UTC checkin timestamps; the fallback must stay on
+    # the same clock (datetime.now() would be naive *local* time and skew
+    # the column by the server's UTC offset).
+    ts = arrived_at or utcnow_naive()
     ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
 
     # Team may belong to multiple groups; mark in each matching block.
@@ -577,8 +623,14 @@ def update_checkpoint_scores_sync(
         respective writes and the column-shift bookkeeping.
       * Per-group ``points_formula=True`` still skips the Points cell so
         a published formula is never clobbered by a raw value.
-      * The ``scored_at`` fallback for the time cell still applies when
-        no explicit time value is in ``values``.
+      * The time cell is written only when ``values`` carries an explicit
+        time entry. On a time-enabled CP that cell holds the *arrival*
+        timestamp (mark_arrival_checkbox_sync and _build_local_cp_grid
+        write the check-in time there, and the Score tab's time-race and
+        found formulas read it), so the old ``scored_at`` fallback used
+        to overwrite a 10:00 arrival with the 10:25 scoring time.
+        ``scored_at`` stays in the signature for worker-dispatch
+        compatibility.
 
     Public signature unchanged so worker dispatch in
     ``app/utils/sheets_sync_worker.py:enqueue_update_scores`` benefits
@@ -653,20 +705,16 @@ def update_checkpoint_scores_sync(
                     )
                 col += 1
             if time_enabled:
+                # Arrival-time column: only an explicit time value may
+                # touch it. Writing scored_at here clobbered the real
+                # check-in timestamp and made the sheet's time-race
+                # formulas diverge from the app's checkin-based result.
                 if time_header in values or "time" in values:
                     column_writes.append(
                         {
                             "col": col,
                             "start_row": row,
                             "values": [values.get(time_header, values.get("time"))],
-                        }
-                    )
-                elif scored_at:
-                    column_writes.append(
-                        {
-                            "col": col,
-                            "start_row": row,
-                            "values": [scored_at.strftime("%Y-%m-%d %H:%M:%S")],
                         }
                     )
                 col += 1
@@ -1787,7 +1835,9 @@ def _points_formula_from_rule(
     return "=" + "+".join(pieces)
 
 
-def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> tuple[list[list], dict[int, bool]]:
+def _build_local_cp_grid(
+    cfg: SheetConfig, competition_id: int, *, with_points_formulas: bool = True
+) -> tuple[list[list], dict[int, bool]]:
     """Build the full per-checkpoint grid (headers + all team rows) from a
     SheetConfig, including any existing ScoreEntry data and check-in
     timestamps. Returned as a 2D list suitable for a single
@@ -1795,6 +1845,12 @@ def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> tuple[list[li
     along with a per-group dict marking which groups now have a
     Points cell that's a Sheets *formula* (so the system knows not to
     clobber it on subsequent score writes).
+
+    With ``with_points_formulas=False`` every Points cell carries the raw
+    system-computed total instead of a formula (and the returned dict is
+    all-False). sync_all_checkpoint_tabs needs this because it routes
+    cells through batch_update_columns, which escapes a leading '=' to
+    literal text.
 
     Writing the entire tab in one batched update is intentional: each CP
     costs ~2 Sheets API calls (add_tab + update) instead of the
@@ -1906,13 +1962,14 @@ def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> tuple[list[li
                 col_cursor += 1
             points_col_by_group[gid] = col_cursor  # 1-based column of Points
             field_cols_by_group[gid] = field_cols
-            rule = (
-                ScoreRule.query.filter_by(competition_id=competition_id, checkpoint_id=cp_id, group_id=gid)
-                .order_by(ScoreRule.created_at.desc())
-                .first()
-            )
-            if rule is not None:
-                rule_by_group[gid] = rule.rules or {}
+            if with_points_formulas:
+                rule = (
+                    ScoreRule.query.filter_by(competition_id=competition_id, checkpoint_id=cp_id, group_id=gid)
+                    .order_by(ScoreRule.created_at.desc())
+                    .first()
+                )
+                if rule is not None:
+                    rule_by_group[gid] = rule.rules or {}
 
     # Header row (escape any user-supplied strings)
     values: list[list] = [[escape_formula_cell(h) if isinstance(h, str) else h for h in headers]]
