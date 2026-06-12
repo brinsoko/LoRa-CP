@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from flask import Blueprint, jsonify, make_response, request
 from flask_login import current_user
@@ -99,9 +99,15 @@ def _parse_timestamp(payload: dict, fallback_dt: datetime | None = None) -> date
             pass
 
     try:
-        return datetime.fromisoformat(ts_str)
+        dt = datetime.fromisoformat(ts_str)
     except Exception:
         return default_dt
+    if dt.tzinfo is not None:
+        # Offset-bearing strings must be shifted to UTC before the offset
+        # is dropped, the column stores naive UTC.
+        return dt.astimezone(UTC).replace(tzinfo=None)
+    # Naive strings are interpreted as already-UTC (storage convention).
+    return dt
 
 
 def _serialize_checkin(c: Checkin) -> dict:
