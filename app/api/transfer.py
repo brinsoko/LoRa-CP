@@ -1081,12 +1081,32 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
 # ---- API endpoints ----
 
 
+def _admin_response_for(comp: Competition):
+    """Cross-competition guard. @json_roles_required checks the role for the
+    session-selected competition, but these handlers act on the URL comp_id,
+    so the caller must also be an admin of the target competition itself."""
+    if (getattr(current_user, "role", None) or "").strip().lower() == "superadmin":
+        return None
+    membership = CompetitionMember.query.filter(
+        CompetitionMember.user_id == current_user.id,
+        CompetitionMember.competition_id == comp.id,
+        CompetitionMember.role == "admin",
+        CompetitionMember.active.is_(True),
+    ).first()
+    if membership:
+        return None
+    return jsonify({"error": "forbidden", "code": 403}), 403
+
+
 @transfer_api_bp.get("/api/competition/<int:comp_id>/export")
 @json_roles_required("admin")
 def export_competition(comp_id: int):
     comp = Competition.query.get(comp_id)
     if not comp:
         return jsonify({"error": "not_found"}), 404
+    forbidden = _admin_response_for(comp)
+    if forbidden:
+        return forbidden
 
     payload = _export_competition(comp)
     resp = make_response(json.dumps(payload, indent=2, ensure_ascii=False))
@@ -1136,6 +1156,9 @@ def merge_competition(comp_id: int):
     comp = Competition.query.get(comp_id)
     if not comp:
         return jsonify({"error": "not_found"}), 404
+    forbidden = _admin_response_for(comp)
+    if forbidden:
+        return forbidden
 
     # Accept JSON body or file upload
     if request.content_type and "multipart" in request.content_type:
