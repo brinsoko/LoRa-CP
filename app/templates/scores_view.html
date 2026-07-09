@@ -238,6 +238,11 @@
                   {% if row.leg_minutes is not none %}
                     <span class="text-muted small">({{ '%.1f'|format(row.leg_minutes) }} {{ _('min') }})</span>
                   {% endif %}
+                  {% if row.leg_start_hms or row.leg_end_hms %}
+                    {# Arrival clock times at the two leg endpoints; a dash
+                       marks the endpoint the team has not reached yet. #}
+                    <div class="text-muted small">{{ row.leg_start_hms or '—' }} → {{ row.leg_end_hms or '—' }}</div>
+                  {% endif %}
                 {% else %}
                   —
                 {% endif %}

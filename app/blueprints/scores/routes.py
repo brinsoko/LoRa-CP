@@ -32,6 +32,7 @@ from app.resources.scores import (
 )
 from app.utils.competition import get_current_competition_id, get_current_competition_role
 from app.utils.perms import roles_required
+from app.utils.time import format_datetime_display, format_time_display
 
 scores_bp = Blueprint("scores", __name__, template_folder="../../templates")
 
@@ -573,6 +574,10 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     # (populated by the live time_race block below — same source as the
     # offline recompute), so we don't need to recompute scoring here.
     leg_minutes_by_team: dict[int, float] = {}
+    # Raw arrival timestamps at the leg endpoints, kept even when only one
+    # endpoint has a check-in so the display can show a partial leg
+    # ("A 10:03; B —") while the team is still on course.
+    leg_times_by_team: dict[int, tuple[datetime | None, datetime | None]] = {}
     if group_leg_info:
         leg_cp_ids_query = {
             cid
@@ -595,6 +600,8 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
             for tid in group_team_ids:
                 start_ts = leg_cp_times.get(tid, {}).get(leg["start_cp_id"])
                 end_ts = leg_cp_times.get(tid, {}).get(leg["end_cp_id"])
+                if start_ts or end_ts:
+                    leg_times_by_team[tid] = (start_ts, end_ts)
                 if start_ts and end_ts and end_ts >= start_ts:
                     leg_minutes_by_team[tid] = (end_ts - start_ts).total_seconds() / 60.0
 
@@ -661,6 +668,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         # the leg-display column so the cell can show points + time.
         leg_points = None
         leg_minutes = leg_minutes_by_team.get(team.id)
+        leg_start_ts, leg_end_ts = leg_times_by_team.get(team.id, (None, None))
         if leg_for_team and leg_for_team.get("scoring_cp_id"):
             leg_points = per_team_points.get(team.id, {}).get(leg_for_team["scoring_cp_id"])
         team_total = totals.get(team.id, 0.0) + global_totals.get(team.id, 0.0)
@@ -681,6 +689,10 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
                 "leg_cp_ids": leg_for_team.get("cp_ids") if leg_for_team else frozenset(),
                 "leg_minutes": leg_minutes,
                 "leg_points": leg_points,
+                "leg_start_at": leg_start_ts,
+                "leg_end_at": leg_end_ts,
+                "leg_start_hms": format_time_display(leg_start_ts),
+                "leg_end_hms": format_time_display(leg_end_ts),
                 "dnf": bool(team.dnf),
                 "finished": finished_map.get(team.id, False),
                 "organization": team.organization or "",
@@ -767,7 +779,8 @@ def view_scores_export_csv():
     """Same data as /scores/view's extended (per-CP) table, flattened
     to CSV. Honors ?group_id=. Columns mirror the on-screen extended
     table: rank/group/number/team/finished/time_minutes, one column per
-    checkpoint, then time_points/found_points/dead_time/total. Use this
+    checkpoint, the time-trial leg (label, start/end arrival, minutes,
+    points), then time_points/found_points/dead_time/total. Use this
     as the canonical export to recreate the leaderboard in Sheets when
     sheets sync is unavailable."""
     comp_id = get_current_competition_id()
@@ -794,6 +807,13 @@ def view_scores_export_csv():
         f"{cp.name} — {cp.description.strip()}" if (cp.description and cp.description.strip()) else cp.name
         for cp in checkpoints
     ]
+    header += [
+        "time_trial",
+        "time_trial_start",
+        "time_trial_end",
+        "time_trial_minutes",
+        "time_trial_points",
+    ]
     header += ["time_points", "found_points", "dead_time", "total"]
     w.writerow(header)
 
@@ -802,11 +822,16 @@ def view_scores_export_csv():
         team_cp_points = per_team_points.get(team_id, {}) if team_id else {}
         allowed = r.get("allowed_checkpoints") or set()
         excluded = r.get("excluded_checkpoints") or set()
+        leg_cp_ids = r.get("leg_cp_ids") or frozenset()
         per_cp_cells = []
         for cp in checkpoints:
             val = team_cp_points.get(cp.id)
             if r.get("dnf"):
                 per_cp_cells.append("DNF")
+            elif cp.id in leg_cp_ids:
+                # Leg endpoints are consolidated into the time_trial_*
+                # columns, same as the on-screen extended table.
+                per_cp_cells.append("")
             elif cp.id in excluded:
                 per_cp_cells.append("")
             elif val is not None:
@@ -826,6 +851,11 @@ def view_scores_export_csv():
                 "YES" if r.get("dnf") else "",
                 fmt(r.get("time_minutes"), ".2f"),
                 *per_cp_cells,
+                r.get("leg_label", ""),
+                format_datetime_display(r.get("leg_start_at")),
+                format_datetime_display(r.get("leg_end_at")),
+                fmt(r.get("leg_minutes"), ".2f"),
+                fmt(r.get("leg_points"), ".2f"),
                 fmt(r.get("global_time"), ".2f"),
                 fmt(r.get("global_found"), ".2f"),
                 fmt(r.get("dead_time"), ".0f"),
