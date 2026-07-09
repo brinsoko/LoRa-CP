@@ -145,11 +145,17 @@
 
   <!-- ACTION BAR -->
   <div class="mb-3 d-flex flex-wrap gap-2">
-    {% if current_competition %}
+    {% if current_competition and current_user.is_authenticated and current_competition_role == 'judge' %}
+      {# Judges get a minimal bar: the three screens used during a race.
+         Everything else is admin tooling and only clutters a phone. #}
+      <a href="{{ url_for('scores.judge_score') }}" class="btn btn-primary">{{ _('Score') }}</a>
+      <a href="{{ url_for('checkins.live_arrivals') }}" class="btn btn-outline-info">{{ _('Live Arrivals') }}</a>
+      <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-outline-info">{{ _('View Check-ins') }}</a>
+    {% elif current_competition %}
       <a href="{{ url_for('teams.list_teams') }}" class="btn btn-outline-primary">{{ _('Teams') }}</a>
     {% endif %}
 
-    {% if current_competition and current_user.is_authenticated and current_competition_role in ['judge','admin'] %}
+    {% if current_competition and current_user.is_authenticated and current_competition_role == 'admin' %}
       {# High-frequency-during-race tabs: keep visible #}
       <a href="{{ url_for('checkpoints.list_checkpoints') }}" class="btn btn-outline-secondary">{{ _('Checkpoints') }}</a>
       <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-outline-info">{{ _('View Check-ins') }}</a>
