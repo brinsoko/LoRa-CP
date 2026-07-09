@@ -517,6 +517,10 @@ class Checkpoint(db.Model):
     # checkpoint that is a timed segment's end stop (redesign plan 3.3);
     # enforced in the checkpoints API and segment admin.
     dead_time_enabled = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    # Stations like written tests are scored offline and entered in one
+    # sitting; this opts the checkpoint into the judge shell's bulk-entry
+    # grid (redesign plan 3.6).
+    bulk_entry_enabled = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
 
     # Device mapping (one device ↔ one checkpoint)
     lora_device_id = db.Column(

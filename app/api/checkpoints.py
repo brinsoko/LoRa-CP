@@ -46,6 +46,7 @@ def _serialize_checkpoint(cp: Checkpoint) -> dict:
         "is_virtual": cp.is_virtual,
         "counts_for_found": bool(cp.counts_for_found),
         "dead_time_enabled": bool(cp.dead_time_enabled),
+        "bulk_entry_enabled": bool(cp.bulk_entry_enabled),
         "paths": [
             {
                 "id": stop.path_id,
@@ -217,6 +218,7 @@ def checkpoint_create():
         is_virtual=bool(payload.get("is_virtual")),
         counts_for_found=bool(payload.get("counts_for_found", True)),
         dead_time_enabled=bool(payload.get("dead_time_enabled", False)),
+        bulk_entry_enabled=bool(payload.get("bulk_entry_enabled", False)),
     )
     db.session.add(cp)
     db.session.flush()
@@ -366,6 +368,9 @@ def _update_checkpoint(checkpoint_id: int, partial: bool):
                     }
                 ), 400
         cp.dead_time_enabled = enable
+
+    if "bulk_entry_enabled" in payload or not partial:
+        cp.bulk_entry_enabled = bool(payload.get("bulk_entry_enabled", False))
 
     if "path_ids" in payload:
         path_ids = _parse_path_ids(payload.get("path_ids"))
