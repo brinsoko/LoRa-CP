@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from flask_login import UserMixin
 from sqlalchemy import CheckConstraint, Index, UniqueConstraint, event
-from sqlalchemy.ext.associationproxy import association_proxy
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
@@ -92,6 +91,12 @@ class Competition(db.Model):
     )
     checkpoint_groups = db.relationship(
         "CheckpointGroup",
+        back_populates="competition",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    paths = db.relationship(
+        "Path",
         back_populates="competition",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -364,9 +369,86 @@ class RFIDCard(db.Model):
 
 
 # ====================
+# Path (ordered course through checkpoints)
+# ====================
+class Path(db.Model):
+    """An ordered course through checkpoints, shared between categories.
+
+    A CheckpointGroup references a Path plus a direction, so two groups
+    running the same course opposite ways share one Path row and can never
+    disagree about the stop order. Route resolution (direction applied)
+    lives in app/utils/paths.py; nothing else may derive start/finish.
+    """
+
+    __tablename__ = "paths"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name = db.Column(db.String(120), nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
+
+    competition = db.relationship("Competition", back_populates="paths")
+    stops = db.relationship(
+        "PathStop",
+        back_populates="path",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="PathStop.position.asc()",
+    )
+    groups = db.relationship("CheckpointGroup", back_populates="path")
+
+    __table_args__ = (UniqueConstraint("competition_id", "name", name="uq_path_competition_name"),)
+
+    def __repr__(self) -> str:
+        return f"<Path id={self.id} comp={self.competition_id} name={self.name!r}>"
+
+
+class PathStop(db.Model):
+    """One ordered stop on a Path.
+
+    Unique on (path_id, position) only; the same checkpoint may appear
+    twice on a path (out-and-back courses). Checkin recording for revisits
+    is a separate, still-open feature; the model just doesn't block it.
+    """
+
+    __tablename__ = "path_stops"
+
+    id = db.Column(db.Integer, primary_key=True)
+    path_id = db.Column(
+        db.Integer, db.ForeignKey("paths.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    checkpoint_id = db.Column(
+        db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    position = db.Column(db.Integer, nullable=False)
+    # Expected duration of the leg (previous stop -> this stop) in minutes,
+    # undirected. ETA fallback for the judge "who is still coming" view
+    # until enough observed leg times exist (redesign plan 3.1/3.5).
+    # Null on the first stop or when unknown.
+    expected_leg_minutes = db.Column(db.Float, nullable=True)
+
+    path = db.relationship("Path", back_populates="stops")
+    checkpoint = db.relationship("Checkpoint", back_populates="path_stops")
+
+    __table_args__ = (UniqueConstraint("path_id", "position", name="uq_path_stop_position"),)
+
+    def __repr__(self) -> str:
+        return (
+            f"<PathStop id={self.id} path_id={self.path_id} "
+            f"checkpoint_id={self.checkpoint_id} position={self.position}>"
+        )
+
+
+# ====================
 # CheckpointGroup
 # ====================
 class CheckpointGroup(db.Model):
+    """A category of teams: identity (name/prefix) + team assignment +
+    (path, direction). The ordered checkpoint list lives on the Path."""
+
     __tablename__ = "checkpoint_groups"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -377,31 +459,21 @@ class CheckpointGroup(db.Model):
     prefix = db.Column(db.String(20), nullable=True)
     description = db.Column(db.Text)
     position = db.Column(db.Integer, nullable=False, default=0)
-    # Per-group direction flag. When True, _build_group_routes flips the
-    # checkpoint order so the live arrivals view shows the route in the
-    # direction this group actually traverses it.
-    reverse = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    # The course this category runs, and in which direction. SET NULL on
+    # path delete keeps the category (teams, scoring scope) alive; the API
+    # additionally refuses to delete a path that groups still reference.
+    path_id = db.Column(
+        db.Integer, db.ForeignKey("paths.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    direction = db.Column(db.String(10), nullable=False, default="forward", server_default="forward")
 
     competition = db.relationship("Competition", back_populates="checkpoint_groups")
-    checkpoint_links = db.relationship(
-        "CheckpointGroupLink",
-        back_populates="group",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-        order_by="CheckpointGroupLink.position.asc()",
-    )
-    checkpoints = association_proxy(
-        "checkpoint_links",
-        "checkpoint",
-        creator=lambda checkpoint: CheckpointGroupLink(checkpoint=checkpoint),
-    )
+    path = db.relationship("Path", back_populates="groups")
 
-    # If you prefer explicit:
-    # team_assignments = db.relationship("TeamGroup", back_populates="group",
-    #                                    cascade="all, delete-orphan",
-    #                                    passive_deletes=True)
-
-    __table_args__ = (UniqueConstraint("competition_id", "name", name="uq_checkpoint_group_competition_name"),)
+    __table_args__ = (
+        UniqueConstraint("competition_id", "name", name="uq_checkpoint_group_competition_name"),
+        CheckConstraint("direction IN ('forward','reverse')", name="ck_group_direction"),
+    )
 
     def __repr__(self) -> str:
         return f"<CheckpointGroup id={self.id} comp={self.competition_id} name={self.name!r}>"
@@ -451,49 +523,17 @@ class Checkpoint(db.Model):
     checkins = db.relationship("Checkin", back_populates="checkpoint", lazy=True)
 
     competition = db.relationship("Competition", back_populates="checkpoints")
-    group_links = db.relationship(
-        "CheckpointGroupLink",
+    path_stops = db.relationship(
+        "PathStop",
         back_populates="checkpoint",
         cascade="all, delete-orphan",
         passive_deletes=True,
-    )
-    groups = association_proxy(
-        "group_links",
-        "group",
-        creator=lambda group: CheckpointGroupLink(group=group),
     )
 
     __table_args__ = (UniqueConstraint("competition_id", "name", name="uq_checkpoint_competition_name"),)
 
     def __repr__(self) -> str:
         return f"<Checkpoint id={self.id} comp={self.competition_id} name={self.name!r}>"
-
-
-class CheckpointGroupLink(db.Model):
-    __tablename__ = "checkpoint_group_links"
-
-    group_id = db.Column(
-        db.Integer,
-        db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    checkpoint_id = db.Column(
-        db.Integer,
-        db.ForeignKey("checkpoints.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    position = db.Column(db.Integer, nullable=False)
-
-    group = db.relationship("CheckpointGroup", back_populates="checkpoint_links")
-    checkpoint = db.relationship("Checkpoint", back_populates="group_links")
-
-    __table_args__ = (UniqueConstraint("checkpoint_id", "group_id", name="uq_cp_group"),)
-
-    def __repr__(self) -> str:
-        return (
-            f"<CheckpointGroupLink checkpoint_id={self.checkpoint_id} "
-            f"group_id={self.group_id} position={self.position}>"
-        )
 
 
 # =========
@@ -832,24 +872,10 @@ class GlobalScoreRule(db.Model):
         return f"<GlobalScoreRule id={self.id} competition_id={self.competition_id} group_id={self.group_id}>"
 
 
-def _assign_checkpoint_link_position(link: CheckpointGroupLink) -> None:
-    if link.position is not None:
+@event.listens_for(Path.stops, "append")
+def _on_path_stop_append(path: Path, stop: PathStop, *_):
+    """Assign the next position to stops appended via path.stops."""
+    if stop.position is not None:
         return
-    group = link.group
-    if not group:
-        return
-
-    existing_positions = [cl.position for cl in group.checkpoint_links if cl is not link and cl.position is not None]
-    link.position = (max(existing_positions) + 1) if existing_positions else 0
-
-
-@event.listens_for(CheckpointGroup.checkpoint_links, "append")
-def _on_group_link_append(group: CheckpointGroup, link: CheckpointGroupLink, *_):
-    """Ensure new links created via group.checkpoints get a position."""
-    _assign_checkpoint_link_position(link)
-
-
-@event.listens_for(Checkpoint.group_links, "append")
-def _on_checkpoint_link_append(checkpoint: Checkpoint, link: CheckpointGroupLink, *_):
-    """Ensure new links created via checkpoint.groups get a position."""
-    _assign_checkpoint_link_position(link)
+    existing = [s.position for s in path.stops if s is not stop and s.position is not None]
+    stop.position = (max(existing) + 1) if existing else 0
