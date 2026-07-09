@@ -417,10 +417,12 @@ green. Working agreement:
 - Show A/B arrival clock times in the existing time-trial leg cell
   (`scores_view.html`), and align the CSV export with the merged-leg format.
 - Surface `judges_note` on `score_judge`.
-- Fix the blank `display_timezone` on `add_checkin` (route never passes it).
 - Role-aware nav: judges stop seeing the 10-button action bar; keep only
   Score / Live / Check-ins for them. Pure template change, big decluttering
   payoff while the real judge shell is built.
+- (Dropped: the reported blank `display_timezone` on `add_checkin` was a
+  false positive; the value is injected globally by the context processor
+  in `app/__init__.py`, verified during implementation.)
 
 **Phase 1, paths:** new tables + resolver + backfill; group/category UI
 becomes path picker + direction; live arrivals, scoring context, ingest
