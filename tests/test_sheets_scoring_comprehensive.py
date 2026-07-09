@@ -20,7 +20,6 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    CheckpointGroupLink,
     ScoreEntry,
 )
 from tests.support import (
@@ -33,6 +32,7 @@ from tests.support import (
     create_team,
     create_user,
     login_as,
+    set_group_route,
 )
 
 SPREADSHEET_ID = os.environ.get("TEST_SPREADSHEET_ID", "")
@@ -126,11 +126,8 @@ def seeded(sheets_app, sheets_client):
     vcp.is_virtual = True
     db.session.commit()
 
-    for pos, cp in enumerate([cp1, cp2, vcp]):
-        db.session.add(CheckpointGroupLink(group_id=grp.id, checkpoint_id=cp.id, position=pos))
-    for pos, cp in enumerate([cp1, cp2]):
-        db.session.add(CheckpointGroupLink(group_id=grp2.id, checkpoint_id=cp.id, position=pos))
-    db.session.commit()
+    set_group_route(grp, [cp1, cp2, vcp])
+    set_group_route(grp2, [cp1, cp2])
 
     t1 = create_team(comp, name="Team-A", number=101, organization="Org-1")
     t2 = create_team(comp, name="Team-B", number=102, organization="Org-1")

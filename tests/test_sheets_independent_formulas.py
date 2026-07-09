@@ -24,7 +24,6 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    CheckpointGroupLink,
     GlobalScoreRule,
     ScoreEntry,
     ScoreRule,
@@ -40,6 +39,7 @@ from tests.support import (
     create_group,
     create_team,
     create_user,
+    set_group_route,
 )
 
 # ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ def _seed_competition_with_rule(rule_blob):
     cp = create_checkpoint(comp, name="CP-One")
     team = create_team(comp, name="Team-A1", number=101)
     assign_team_group(team, grp)
-    db.session.add(CheckpointGroupLink(group_id=grp.id, checkpoint_id=cp.id, position=0))
+    set_group_route(grp, [cp])
     cfg = SheetConfig(
         competition_id=comp.id,
         spreadsheet_id=f"local:{comp.id}",
@@ -558,8 +558,7 @@ def test_score_tab_found_formula_excludes_virtual_checkpoints(sheets_app, monkey
         loko.is_virtual = True
         team = create_team(comp, name="T1", number=101)
         assign_team_group(team, grp)
-        for pos, cp in enumerate([start, topo, mid, loko, cilj]):
-            db.session.add(CheckpointGroupLink(group_id=grp.id, checkpoint_id=cp.id, position=pos))
+        set_group_route(grp, [start, topo, mid, loko, cilj])
         # SheetConfigs with time_enabled so the Time column exists
         # (otherwise the formula short-circuits on missing column).
         for cp in (start, topo, mid, loko, cilj):
@@ -645,8 +644,7 @@ def test_score_tab_has_casovnica_and_found_columns(sheets_app, monkeypatch):
         mid = create_checkpoint(comp, name="CP-Mid")
         team = create_team(comp, name="T1", number=101)
         assign_team_group(team, grp)
-        for pos, cp in enumerate([start, mid, cilj]):
-            db.session.add(CheckpointGroupLink(group_id=grp.id, checkpoint_id=cp.id, position=pos))
+        set_group_route(grp, [start, mid, cilj])
         # SheetConfigs for each CP with time_enabled so the Time column
         # exists for the formulas to reference.
         for cp in (start, mid, cilj):

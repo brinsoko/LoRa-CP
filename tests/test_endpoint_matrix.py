@@ -7,7 +7,6 @@ import pytest
 from app.extensions import db
 from app.models import (
     Checkpoint,
-    CheckpointGroupLink,
     Competition,
     GlobalScoreRule,
     LoRaMessage,
@@ -30,6 +29,7 @@ from tests.support import (
     create_team,
     create_user,
     login_as,
+    set_group_route,
 )
 
 
@@ -78,9 +78,8 @@ def seeded_state(app):
     second_checkpoint = create_checkpoint(competition, name="Second CP")
     third_checkpoint = create_checkpoint(competition, name="Delete CP")
 
-    db.session.add(CheckpointGroupLink(group_id=first_group.id, checkpoint_id=checkpoint.id, position=0))
-    db.session.add(CheckpointGroupLink(group_id=first_group.id, checkpoint_id=second_checkpoint.id, position=1))
-    db.session.add(CheckpointGroupLink(group_id=second_group.id, checkpoint_id=second_checkpoint.id, position=0))
+    set_group_route(first_group, [checkpoint, second_checkpoint])
+    set_group_route(second_group, [second_checkpoint])
 
     team = create_team(competition, name="Matrix Team", number=10, organization="Org A")
     second_team = create_team(competition, name="Matrix Team 2", number=11, organization="Org B")
@@ -331,7 +330,7 @@ def test_group_api_remaining_endpoints(client, app, seeded_state):
     fetched = client.get(f"/api/groups/{seeded_state.group_id}")
     patched = client.patch(
         f"/api/groups/{seeded_state.second_group_id}",
-        json={"description": "Updated description", "checkpoint_ids": [seeded_state.second_checkpoint_id]},
+        json={"description": "Updated description", "direction": "reverse"},
     )
     ordered = client.post(
         "/api/groups/order",

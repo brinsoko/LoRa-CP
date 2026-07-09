@@ -39,9 +39,10 @@ from app.extensions import db
 from app.models import (
     Checkpoint,
     CheckpointGroup,
-    CheckpointGroupLink,
     Competition,
     LoRaDevice,
+    Path,
+    PathStop,
 )
 from scripts.seed_db import (
     assign_team_to_groups,
@@ -121,14 +122,21 @@ def link_device_to_checkpoint(competition_id: int, dev_id: int, checkpoint: Chec
 
 def set_group_checkpoints_idempotent(group: CheckpointGroup, checkpoints: list[Checkpoint]) -> None:
     """Same intent as seed_db.set_group_checkpoints but safe to re-run:
-    only adds missing links, preserves existing order, and never wipes
-    unrelated checkpoints from the group."""
-    existing_ids = {link.checkpoint_id for link in group.checkpoint_links}
-    next_pos = max((link.position for link in group.checkpoint_links), default=-1) + 1
+    only appends missing stops to the group's path, preserves existing
+    order, and never wipes unrelated checkpoints from the route."""
+    path = group.path
+    if path is None:
+        path = Path(competition_id=group.competition_id, name=f"{group.name} path")
+        db.session.add(path)
+        db.session.flush()
+        group.path = path
+        group.direction = "forward"
+    existing_ids = {stop.checkpoint_id for stop in path.stops}
+    next_pos = max((stop.position for stop in path.stops), default=-1) + 1
     for cp in checkpoints:
         if cp.id in existing_ids:
             continue
-        db.session.add(CheckpointGroupLink(group_id=group.id, checkpoint_id=cp.id, position=next_pos))
+        db.session.add(PathStop(path_id=path.id, checkpoint_id=cp.id, position=next_pos))
         next_pos += 1
 
 

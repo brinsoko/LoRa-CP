@@ -13,7 +13,6 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    CheckpointGroupLink,
     GlobalScoreRule,
     ScoreEntry,
     Team,
@@ -36,6 +35,7 @@ from tests.support import (
     create_team,
     create_user,
     login_as,
+    set_group_route,
 )
 
 T0 = datetime(2026, 6, 20, 8, 0, 0)
@@ -69,14 +69,10 @@ def seeded(app):
     vcp.is_virtual = True
     db.session.commit()
 
-    # Link checkpoints to groups
-    for pos, cp in enumerate([vcp, cp1, cp2, cp3, cp4, cp5]):
-        db.session.add(CheckpointGroupLink(group_id=cat1.id, checkpoint_id=cp.id, position=pos))
-    for pos, cp in enumerate([vcp, cp2, cp1, cp3, cp4, cp5]):  # reversed cp1/cp2 for cat2
-        db.session.add(CheckpointGroupLink(group_id=cat2.id, checkpoint_id=cp.id, position=pos))
-    for pos, cp in enumerate([vcp, cp1, cp2, cp3, cp4, cp5]):
-        db.session.add(CheckpointGroupLink(group_id=cat3.id, checkpoint_id=cp.id, position=pos))
-    db.session.commit()
+    # Routes (cat2 visits cp1/cp2 in swapped order)
+    set_group_route(cat1, [vcp, cp1, cp2, cp3, cp4, cp5])
+    set_group_route(cat2, [vcp, cp2, cp1, cp3, cp4, cp5])
+    set_group_route(cat3, [vcp, cp1, cp2, cp3, cp4, cp5])
 
     # --- Teams ---
     teams = {}

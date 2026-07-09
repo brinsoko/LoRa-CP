@@ -12,6 +12,8 @@ from app.models import (
     CompetitionMember,
     JudgeCheckpoint,
     LoRaDevice,
+    Path,
+    PathStop,
     RFIDCard,
     Team,
     TeamGroup,
@@ -111,6 +113,33 @@ def assign_team_group(team: Team, group: CheckpointGroup, *, active: bool = True
     db.session.add(link)
     db.session.commit()
     return link
+
+
+def set_group_route(
+    group: CheckpointGroup,
+    checkpoints: list,
+    *,
+    direction: str = "forward",
+    path_name: str | None = None,
+) -> Path:
+    """Give a group a route: creates a Path with the checkpoints (ids or
+    Checkpoint objects) as ordered stops and assigns it to the group.
+
+    Replacement for the old per-test CheckpointGroupLink construction; the
+    stop order is the stored (forward) order, `direction` flips traversal.
+    """
+    checkpoint_ids = [cp if isinstance(cp, int) else cp.id for cp in checkpoints]
+    path = Path(
+        competition_id=group.competition_id,
+        name=path_name or unique_name("path"),
+        stops=[PathStop(checkpoint_id=cp_id, position=idx) for idx, cp_id in enumerate(checkpoint_ids)],
+    )
+    db.session.add(path)
+    db.session.flush()
+    group.path_id = path.id
+    group.direction = direction
+    db.session.commit()
+    return path
 
 
 def create_device(

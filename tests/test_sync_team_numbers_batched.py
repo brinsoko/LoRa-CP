@@ -16,7 +16,6 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    CheckpointGroupLink,
     SheetConfig,
 )
 from app.utils import sheets_client as sheets_client_module
@@ -29,6 +28,7 @@ from tests.support import (
     create_group,
     create_team,
     create_user,
+    set_group_route,
 )
 
 
@@ -162,10 +162,10 @@ def _seed_competition_with_n_cps(n_cps: int, groups_per_cp: int = 5, teams_per_g
         for t_idx in range(teams_per_group):
             t = create_team(comp, name=f"{g.name}-T{t_idx}", number=(g_idx + 1) * 100 + t_idx + 1)
             assign_team_group(t, g)
+    cps = []
     for i in range(n_cps):
         cp = create_checkpoint(comp, name=f"CP-{i}")
-        for g in groups:
-            db.session.add(CheckpointGroupLink(group_id=g.id, checkpoint_id=cp.id, position=0))
+        cps.append(cp)
         db.session.add(
             SheetConfig(
                 competition_id=comp.id,
@@ -185,6 +185,8 @@ def _seed_competition_with_n_cps(n_cps: int, groups_per_cp: int = 5, teams_per_g
                 },
             )
         )
+    for g in groups:
+        set_group_route(g, cps)
     db.session.commit()
     return comp
 

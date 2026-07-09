@@ -33,15 +33,16 @@ from app.models import (
     Checkin,
     Checkpoint,
     CheckpointGroup,
-    CheckpointGroupLink,
     Competition,
     CompetitionMember,
+    PathStop,
     RFIDCard,
     ScoreEntry,
     Team,
     TeamGroup,
     User,
 )
+from app.models import Path as RoutePath
 from app.utils.competition import DEFAULT_COMPETITION_NAME, ensure_default_competition
 from app.utils.serial_helpers import normalize_uid
 from app.utils.time import utcnow_naive
@@ -220,8 +221,16 @@ def add_checkin(team: Team, cp: Checkpoint, when: datetime, competition_id: int)
 
 
 def set_group_checkpoints(group: CheckpointGroup, checkpoints: list[Checkpoint]):
-    """Assign ordered checkpoints to a group with positions."""
-    group.checkpoint_links = [CheckpointGroupLink(checkpoint=cp, position=idx) for idx, cp in enumerate(checkpoints)]
+    """Give the group a path with the ordered checkpoints as stops."""
+    path = RoutePath(
+        competition_id=group.competition_id,
+        name=f"{group.name} path",
+        stops=[PathStop(checkpoint_id=cp.id, position=idx) for idx, cp in enumerate(checkpoints)],
+    )
+    db.session.add(path)
+    db.session.flush()
+    group.path = path
+    group.direction = "forward"
 
 
 def load_teams_from_csv(csv_path: str) -> list[tuple[str, int | None, str, str | None]]:
@@ -451,12 +460,12 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
             now = utcnow_naive()
 
             def checkpoints_for_team(team: Team) -> list[Checkpoint]:
-                group_ids = [tg.group_id for tg in team.group_assignments]
-                if not group_ids:
+                path_ids = [tg.group.path_id for tg in team.group_assignments if tg.group and tg.group.path_id]
+                if not path_ids:
                     return []
                 q = (
-                    Checkpoint.query.join(Checkpoint.groups)
-                    .filter(CheckpointGroup.id.in_(group_ids))
+                    Checkpoint.query.join(PathStop, PathStop.checkpoint_id == Checkpoint.id)
+                    .filter(PathStop.path_id.in_(path_ids))
                     .distinct()
                     .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
                 )

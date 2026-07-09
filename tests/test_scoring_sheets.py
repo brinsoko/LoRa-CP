@@ -18,7 +18,6 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    CheckpointGroupLink,  # used in _seeded fixture
     ScoreEntry,
     SheetConfig,
 )
@@ -32,6 +31,7 @@ from tests.support import (
     create_team,
     create_user,
     login_as,
+    set_group_route,
 )
 
 SPREADSHEET_ID = os.environ.get("TEST_SPREADSHEET_ID", "")
@@ -89,10 +89,8 @@ def _seeded(sheets_app, sheets_client):
     assign_team_group(t2, group)
     assign_team_group(t3, group)
 
-    # Link checkpoints to group (required for wizard tab creation)
-    db.session.add(CheckpointGroupLink(group_id=group.id, checkpoint_id=cp1.id, position=0))
-    db.session.add(CheckpointGroupLink(group_id=group.id, checkpoint_id=cp2.id, position=1))
-    db.session.commit()
+    # Route (required for wizard tab creation)
+    set_group_route(group, [cp1, cp2])
 
     ci1 = create_checkin(comp, t1, cp1)
     ci2 = create_checkin(comp, t2, cp1)

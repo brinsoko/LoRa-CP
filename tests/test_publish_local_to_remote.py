@@ -13,7 +13,6 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    CheckpointGroupLink,
     ScoreEntry,
     SheetConfig,
 )
@@ -27,6 +26,7 @@ from tests.support import (
     create_group,
     create_team,
     create_user,
+    set_group_route,
 )
 
 
@@ -182,10 +182,8 @@ def _seed_imported_competition():
     assign_team_group(t3, grp_b)
     assign_team_group(t4, grp_b)
 
-    db.session.add(CheckpointGroupLink(group_id=grp_a.id, checkpoint_id=cp1.id, position=0))
-    db.session.add(CheckpointGroupLink(group_id=grp_a.id, checkpoint_id=cp2.id, position=1))
-    db.session.add(CheckpointGroupLink(group_id=grp_b.id, checkpoint_id=cp1.id, position=0))
-    db.session.add(CheckpointGroupLink(group_id=grp_b.id, checkpoint_id=cp2.id, position=1))
+    set_group_route(grp_a, [cp1, cp2])
+    set_group_route(grp_b, [cp1, cp2])
 
     local_id = f"local:{comp.id}"
     cfg1 = SheetConfig(

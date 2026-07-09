@@ -9,7 +9,6 @@ import pytest
 from app.extensions import db
 from app.models import (
     CheckpointGroup,
-    CheckpointGroupLink,
     Competition,
     GlobalScoreRule,
     LoRaDevice,
@@ -30,6 +29,7 @@ from tests.support import (
     create_team,
     create_user,
     login_as,
+    set_group_route,
 )
 
 
@@ -59,7 +59,7 @@ class TestExport:
         resp = client.get(f"/api/competition/{comp.id}/export")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["schema_version"] == "1.0.0"
+        assert data["schema_version"] == "1.1.0"
         assert "competition" in data
         assert "teams" in data
         assert "groups" in data
@@ -547,21 +547,17 @@ class TestMerge:
         after = TeamGroup.query.filter_by(team_id=t1.id, group_id=group.id).count()
         assert after == before, f"Re-merge duplicated TeamGroup row: {before} -> {after}"
 
-    def test_merge_carries_group_checkpoint_links(self, client, _seeded):
-        """Group -> checkpoint links must also flow through merge so that
-        the arrivals / score builders can find which groups score where."""
+    def test_merge_carries_legacy_group_checkpoint_links(self, client, _seeded):
+        """Legacy-format merge input (group_checkpoint_links, no paths
+        section) must still extend the group's route so old export files
+        keep working after the paths migration."""
         comp, _, group, cp, _, _ = _seeded
-        # Seed an existing link in the source export so we know what
-        # should round-trip.
-        db.session.add(
-            CheckpointGroupLink(group_id=group.id, checkpoint_id=cp.id, position=0)
-        )
-        db.session.commit()
+        set_group_route(group, [cp])
 
         export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
-        # Add a fresh checkpoint + link via the merge payload, simulating
-        # an admin who shipped a new checkpoint+group pairing in the
-        # source competition.
+        # Simulate a legacy file: no paths section, ordering carried only
+        # by group_checkpoint_links, plus a fresh checkpoint appended.
+        export_data.pop("paths", None)
         export_data["checkpoints"].append({"name": "CP-Merged", "is_virtual": False})
         export_data["group_checkpoint_links"] = list(
             export_data.get("group_checkpoint_links", [])
@@ -573,18 +569,51 @@ class TestMerge:
         summary = resp.get_json()["summary"]
         assert summary["added"]["group_checkpoint_links"] >= 1
 
-        new_cp = CheckpointGroup.query.filter_by(competition_id=comp.id, name=group.name).first()
-        assert new_cp is not None
-        # The link for the brand-new checkpoint must exist.
         from app.models import Checkpoint as _CP
+        from app.utils.paths import resolve_route_ids
 
         merged_cp = _CP.query.filter_by(competition_id=comp.id, name="CP-Merged").first()
         assert merged_cp is not None
-        link = CheckpointGroupLink.query.filter_by(
-            group_id=group.id, checkpoint_id=merged_cp.id
-        ).first()
-        assert link is not None, "group->checkpoint link did not land via merge"
-        assert link.position == 1
+        db.session.refresh(group)
+        route = resolve_route_ids(group)
+        assert merged_cp.id in route, "merged checkpoint did not land on the group's route"
+        assert route.index(merged_cp.id) == 1
+
+    def test_merge_carries_paths_section(self, client, _seeded):
+        """New-format merge input adds unknown paths and wires groups that
+        have no route yet, honoring the direction field."""
+        comp, _, group, cp, _, _ = _seeded
+        export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
+        export_data["checkpoints"].append({"name": "CP-New", "is_virtual": False})
+        export_data["paths"] = list(export_data.get("paths", [])) + [
+            {
+                "name": "Merged path",
+                "notes": None,
+                "stops": [
+                    {"checkpoint_name": cp.name, "position": 0},
+                    {"checkpoint_name": "CP-New", "position": 1},
+                ],
+            }
+        ]
+        for g_data in export_data["groups"]:
+            if g_data["name"] == group.name:
+                g_data["path_name"] = "Merged path"
+                g_data["direction"] = "reverse"
+        export_data["resolutions"] = {}
+
+        resp = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
+        assert resp.status_code == 200
+        summary = resp.get_json()["summary"]
+        assert summary["added"]["paths"] >= 1
+
+        from app.utils.paths import resolve_route_ids
+
+        db.session.refresh(group)
+        assert group.path is not None
+        assert group.path.name == "Merged path"
+        assert group.direction == "reverse"
+        route = resolve_route_ids(group)
+        assert route[-1] == cp.id, "reverse direction should flip the merged path"
 
     def test_merge_carries_score_rules(self, client, _seeded):
         """ScoreRule + GlobalScoreRule must land via merge. Without them

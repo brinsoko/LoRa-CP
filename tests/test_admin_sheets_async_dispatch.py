@@ -21,7 +21,7 @@ from __future__ import annotations
 import pytest
 
 from app.extensions import db
-from app.models import CheckpointGroupLink, SheetConfig
+from app.models import SheetConfig
 from app.utils import sheets_sync_worker
 from tests.support import (
     add_membership,
@@ -32,6 +32,7 @@ from tests.support import (
     create_team,
     create_user,
     login_as,
+    set_group_route,
 )
 
 
@@ -54,7 +55,7 @@ def _seed_minimal(comp_name: str):
     cp = create_checkpoint(comp, name="CP-One")
     team = create_team(comp, name="T1", number=101)
     assign_team_group(team, grp)
-    db.session.add(CheckpointGroupLink(group_id=grp.id, checkpoint_id=cp.id, position=0))
+    set_group_route(grp, [cp])
     cfg = SheetConfig(
         competition_id=comp.id,
         spreadsheet_id="local:1",

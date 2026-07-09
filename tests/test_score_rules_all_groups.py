@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 
 from app.extensions import db
-from app.models import CheckpointGroupLink, ScoreRule, SheetConfig
+from app.models import Path, PathStop, ScoreRule, SheetConfig
 from tests.support import (
     add_membership,
     create_checkpoint,
@@ -29,9 +29,15 @@ from tests.support import (
 
 
 def _link(group, checkpoint, position=0):
-    db.session.add(
-        CheckpointGroupLink(group_id=group.id, checkpoint_id=checkpoint.id, position=position)
-    )
+    """Append the checkpoint to the group's route (creates the path lazily)."""
+    path = group.path
+    if path is None:
+        path = Path(competition_id=group.competition_id, name=f"{group.name} path")
+        db.session.add(path)
+        db.session.flush()
+        group.path_id = path.id
+    next_pos = max((s.position for s in path.stops), default=-1) + 1
+    db.session.add(PathStop(path_id=path.id, checkpoint_id=checkpoint.id, position=next_pos))
 
 
 def _seed(client):
@@ -150,7 +156,7 @@ def test_all_groups_resubmit_updates_existing(client, app):
 
 
 def test_all_groups_with_no_links_flashes_warning(client, app):
-    """A checkpoint with no CheckpointGroupLink rows must not silently
+    """A checkpoint on no group route must not silently
     create zero rules — the admin needs to know nothing happened."""
     user = create_user(username="empty-admin", role="admin")
     comp = create_competition(name="Empty Race")
