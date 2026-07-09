@@ -217,8 +217,9 @@ def test_viewer_endpoint_matrix(client, app, seeded_state, method, path, expecte
         ("GET", "/rfid/", 200),
         ("GET", "/map/", 200),
         ("GET", "/map/devices", 200),
-        ("GET", "/scores/judge", 200),
-        ("GET", "/rfid/judge-console", 200),
+        # Superseded pages redirect judges to the /judge shell (phase 3/4).
+        ("GET", "/scores/judge", 302),
+        ("GET", "/rfid/judge-console", 302),
         ("GET", "/rfid/finish", 200),
         ("GET", "/users/", 403),
         ("GET", "/messages/", 403),

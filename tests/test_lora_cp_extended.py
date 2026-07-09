@@ -641,22 +641,26 @@ class TestCsvAndIsolation:
 
 
 class TestJudgeAssignments:
-    def test_judge_console_shows_only_assigned_checkpoints(self, client, app):
+    def test_judge_console_redirects_judges_to_scoped_shell(self, client, app):
+        """The old RFID console is superseded for judges by the /judge
+        shell (phase 3/4): judges get redirected, and the shell is scoped
+        to their assigned checkpoint only."""
         admin = create_user(username="assign-admin")
         judge = create_user(username="assign-judge")
         competition = create_competition(name="Judge Console Race")
         add_membership(admin, competition, role="admin")
         add_membership(judge, competition, role="judge")
         first = create_checkpoint(competition, name="Gate A")
-        # Side-effect only: assert below verifies "Gate B" is hidden from the page.
+        # Side-effect only: assert below verifies "Gate B" is hidden.
         create_checkpoint(competition, name="Gate B")
         assign_judge_checkpoint(judge, first, is_default=True)
         login_as(client, judge, competition)
 
         response = client.get("/rfid/judge-console")
-        html = response.data.decode("utf-8", errors="replace")
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/judge/")
 
-        assert response.status_code == 200
+        html = client.get("/judge/").data.decode("utf-8", errors="replace")
         assert "Gate A" in html
         assert "Gate B" not in html
 
