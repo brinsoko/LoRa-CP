@@ -85,6 +85,25 @@
       </div>
 
       <div class="mb-3">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="countsForFound" name="counts_for_found" value="true"
+                 {% if cp.counts_for_found %}checked{% endif %}>
+          <label class="form-check-label" for="countsForFound">
+            {{ _('Counts for found-checkpoint points') }}
+          </label>
+          <div class="form-text">{{ _('Untick for virtual checkpoints, start and finish.') }}</div>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="deadTimeEnabled" name="dead_time_enabled" value="true"
+                 {% if cp.dead_time_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="deadTimeEnabled">
+            {{ _('Judges enter dead time here') }}
+          </label>
+          <div class="form-text">{{ _('Not allowed on a timed segment\'s end checkpoint.') }}</div>
+        </div>
+      </div>
+
+      <div class="mb-3">
         <label class="form-label">{{ _('Paths') }}</label>
         <div class="row row-cols-1 row-cols-md-2 g-2">
           {% for p in paths %}

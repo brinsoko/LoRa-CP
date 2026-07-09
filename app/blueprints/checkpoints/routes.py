@@ -88,6 +88,8 @@ def _normalize_checkpoint_form(form):
     path_ids, path_ids_error = _parse_int_list(form.getlist("path_ids"), "Path ID")
 
     is_virtual = form.get("is_virtual") in ("on", "true", "True", "1")
+    counts_for_found = form.get("counts_for_found") in ("on", "true", "True", "1")
+    dead_time_enabled = form.get("dead_time_enabled") in ("on", "true", "True", "1")
 
     return {
         "name": name,
@@ -100,6 +102,8 @@ def _normalize_checkpoint_form(form):
         "lora_device_id": lora_device_id,
         "path_ids": path_ids,
         "is_virtual": is_virtual,
+        "counts_for_found": counts_for_found,
+        "dead_time_enabled": dead_time_enabled,
     }, lora_device_error or path_ids_error
 
 

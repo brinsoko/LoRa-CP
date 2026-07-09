@@ -44,6 +44,8 @@ def _serialize_checkpoint(cp: Checkpoint) -> dict:
         "easting": cp.easting,
         "northing": cp.northing,
         "is_virtual": cp.is_virtual,
+        "counts_for_found": bool(cp.counts_for_found),
+        "dead_time_enabled": bool(cp.dead_time_enabled),
         "paths": [
             {
                 "id": stop.path_id,
@@ -213,6 +215,8 @@ def checkpoint_create():
         easting=easting,
         northing=northing,
         is_virtual=bool(payload.get("is_virtual")),
+        counts_for_found=bool(payload.get("counts_for_found", True)),
+        dead_time_enabled=bool(payload.get("dead_time_enabled", False)),
     )
     db.session.add(cp)
     db.session.flush()
@@ -343,6 +347,25 @@ def _update_checkpoint(checkpoint_id: int, partial: bool):
 
     if "is_virtual" in payload or not partial:
         cp.is_virtual = bool(payload.get("is_virtual"))
+
+    if "counts_for_found" in payload or not partial:
+        cp.counts_for_found = bool(payload.get("counts_for_found", True))
+
+    if "dead_time_enabled" in payload:
+        enable = bool(payload.get("dead_time_enabled"))
+        if enable:
+            # Dead time may be awarded at a segment's start, never at its
+            # end (redesign plan 3.3); block the flag on end checkpoints.
+            from app.utils.scoring import segment_end_checkpoint_ids
+
+            if cp.id in segment_end_checkpoint_ids(comp_id):
+                return jsonify(
+                    {
+                        "error": "validation_error",
+                        "detail": "Dead time cannot be enabled on a timed segment's end checkpoint.",
+                    }
+                ), 400
+        cp.dead_time_enabled = enable
 
     if "path_ids" in payload:
         path_ids = _parse_path_ids(payload.get("path_ids"))
