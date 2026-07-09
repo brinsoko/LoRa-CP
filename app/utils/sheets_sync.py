@@ -264,6 +264,54 @@ def _build_group_scoring_formulas(
     return cas_formula, found_formula
 
 
+def _persist_row_maps(cfg: SheetConfig, row_maps_by_index: dict[int, dict[str, int]]) -> None:
+    """Cache team_id -> sheet row per group block in cfg.config, written
+    at the moment the tab's team column physically gets that order."""
+    if not row_maps_by_index:
+        return
+    config = dict(cfg.config or {})
+    groups_blob = [dict(g) if isinstance(g, dict) else g for g in config.get("groups") or []]
+    changed = False
+    for grp_index, row_map in row_maps_by_index.items():
+        if grp_index < len(groups_blob) and isinstance(groups_blob[grp_index], dict):
+            groups_blob[grp_index]["row_map"] = row_map
+            changed = True
+    if changed:
+        config["groups"] = groups_blob
+        cfg.config = config
+        db.session.commit()
+
+
+def _team_row_for_group(grp_def: dict, db_group, comp_id: int, team_id: int) -> int | None:
+    """Row of a team inside a group block on a CP tab.
+
+    Prefers the row_map cached in the config (written whenever the tab's
+    team column is rebuilt), so a roster change between enqueue and write
+    can't land data on a shifted row. Falls back to the legacy
+    recomputed-roster-order index for tabs published before the map
+    existed.
+    """
+    row_map = (grp_def or {}).get("row_map") or {}
+    cached = row_map.get(str(team_id))
+    if cached:
+        try:
+            return int(cached)
+        except (TypeError, ValueError):
+            pass
+    nums = (
+        db.session.query(Team.id)
+        .join(TeamGroup, TeamGroup.team_id == Team.id)
+        .filter(TeamGroup.group_id == db_group.id, Team.competition_id == comp_id)
+        .order_by(Team.number.asc().nulls_last(), Team.name.asc())
+        .all()
+    )
+    ordered = [n[0] for n in nums]
+    try:
+        return 2 + ordered.index(team_id)  # header at row 1
+    except ValueError:
+        return None
+
+
 def sync_all_checkpoint_tabs(competition_id: int | None = None):
     """Refresh team numbers across every checkpoint-type tab.
 
@@ -300,7 +348,8 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
         group_cols = _group_start_cols_from_config(cfg.config or {})
 
         columns_for_this_cp: list[dict] = []
-        for grp, start_col in zip(groups, group_cols, strict=False):
+        row_maps_by_index: dict[int, dict[str, int]] = {}
+        for grp_index, (grp, start_col) in enumerate(zip(groups, group_cols, strict=False)):
             db_group = _resolve_group_from_cfg(comp_id, grp, group_cache)
             if not db_group:
                 continue
@@ -314,10 +363,12 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
             values = [n[1] if n[1] is not None else (n[2] or "") for n in nums]
             if values:
                 columns_for_this_cp.append({"col": start_col, "start_row": 2, "values": values})
+                row_maps_by_index[grp_index] = {str(n[0]): 2 + idx for idx, n in enumerate(nums)}
 
         if columns_for_this_cp:
             try:
                 client.batch_update_columns(cfg.spreadsheet_id, cfg.tab_name, columns_for_this_cp)
+                _persist_row_maps(cfg, row_maps_by_index)
             except Exception as exc:
                 if _is_missing_worksheet(exc):
                     # The Sheets tab this SheetConfig binds to doesn't exist
@@ -394,7 +445,7 @@ def _heal_missing_checkpoint_tab(client, cfg: SheetConfig, competition_id: int) 
     of the mismatch the operator put their real tabs. Bailing out
     preserves any manual data and lets the operator fix the binding.
     """
-    grid, group_has_formula = _build_local_cp_grid(cfg, competition_id)
+    grid, group_has_formula, row_maps_by_index = _build_local_cp_grid(cfg, competition_id)
     if not grid or not grid[0]:
         raise RuntimeError(f"empty grid for tab {cfg.tab_name!r} — nothing to write")
     n_rows = max(len(grid) + 10, 50)
@@ -423,6 +474,7 @@ def _heal_missing_checkpoint_tab(client, cfg: SheetConfig, competition_id: int) 
         values=grid,
         value_input_option="USER_ENTERED",
     )
+    _persist_row_maps(cfg, row_maps_by_index)
     if group_has_formula:
         new_cfg_blob = dict(cfg.config or {})
         groups_blob = list(new_cfg_blob.get("groups") or [])
@@ -444,19 +496,32 @@ def _heal_missing_checkpoint_tab(client, cfg: SheetConfig, competition_id: int) 
 
 
 def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime | None = None):
-    """Public entrypoint — schedules the Sheets write on the background worker
-    when an app context is available, falls back to a synchronous call when
-    not (e.g. tests, CLI scripts, or direct callers that have already chosen
-    to take the latency)."""
+    """Public entrypoint: records the write in the durable outbox (the
+    dedicated sheets-worker drains it), or runs synchronously when there
+    is no app context / SHEETS_SYNC_INLINE is set (tests, CLI scripts)."""
     try:
         app = current_app._get_current_object()
     except RuntimeError:
         return mark_arrival_checkbox_sync(team_id, checkpoint_id, arrived_at)
     if app.config.get("SHEETS_SYNC_INLINE"):
         return mark_arrival_checkbox_sync(team_id, checkpoint_id, arrived_at)
-    from app.utils.sheets_sync_worker import enqueue_mark_arrival
+    from app.models import Checkpoint as _CP
+    from app.utils.sheets_outbox import enqueue_job
 
-    enqueue_mark_arrival(app, team_id, checkpoint_id, arrived_at)
+    checkpoint = db.session.get(_CP, checkpoint_id)
+    if checkpoint is None:
+        return
+    enqueue_job(
+        "arrival",
+        checkpoint.competition_id,
+        {
+            "team_id": team_id,
+            "checkpoint_id": checkpoint_id,
+            "arrived_at": arrived_at.isoformat() if arrived_at else None,
+        },
+        f"arrival:{team_id}:{checkpoint_id}",
+    )
+    db.session.commit()
 
 
 def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: datetime | None = None):
@@ -474,8 +539,7 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
     drops mark-arrival traffic from ~30 to ~15 calls per arrival burst,
     staying comfortably under the 40-calls/60s Sheets throttle.
 
-    Public signature unchanged so worker dispatch in
-    ``app/utils/sheets_sync_worker.py:enqueue_mark_arrival`` benefits
+    Public signature unchanged so the outbox worker dispatch benefits
     automatically.
     """
     if not sheets_sync_enabled():
@@ -523,20 +587,9 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
             belongs = TeamGroup.query.filter(TeamGroup.team_id == team.id, TeamGroup.group_id == db_group.id).first()
             if not belongs:
                 continue
-            # Determine row by sorted team numbers
-            nums = (
-                db.session.query(Team.id, Team.number, Team.name)
-                .join(TeamGroup, TeamGroup.team_id == Team.id)
-                .filter(TeamGroup.group_id == db_group.id)
-                .order_by(Team.number.asc().nulls_last(), Team.name.asc())
-                .all()
-            )
-            ordered = [n[0] for n in nums]
-            try:
-                idx = ordered.index(team.id)
-            except ValueError:
+            row = _team_row_for_group(grp_def, db_group, cfg.competition_id, team.id)
+            if row is None:
                 continue
-            row = 2 + idx  # header at row 1
             time_col = start_col + 1 + (1 if dead_time_enabled else 0)
             column_writes.append({"col": time_col, "start_row": row, "values": [ts_str]})
 
@@ -551,16 +604,32 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
 def update_checkpoint_scores(
     team_id: int, checkpoint_id: int, group_name: str, values: dict, scored_at: datetime | None = None
 ):
-    """Public entrypoint — see mark_arrival_checkbox for the dispatch policy."""
+    """Public entrypoint; see mark_arrival_checkbox for the dispatch policy."""
     try:
         app = current_app._get_current_object()
     except RuntimeError:
         return update_checkpoint_scores_sync(team_id, checkpoint_id, group_name, values, scored_at)
     if app.config.get("SHEETS_SYNC_INLINE"):
         return update_checkpoint_scores_sync(team_id, checkpoint_id, group_name, values, scored_at)
-    from app.utils.sheets_sync_worker import enqueue_update_scores
+    from app.models import Checkpoint as _CP
+    from app.utils.sheets_outbox import enqueue_job
 
-    enqueue_update_scores(app, team_id, checkpoint_id, group_name, values, scored_at)
+    checkpoint = db.session.get(_CP, checkpoint_id)
+    if checkpoint is None:
+        return
+    enqueue_job(
+        "scores",
+        checkpoint.competition_id,
+        {
+            "team_id": team_id,
+            "checkpoint_id": checkpoint_id,
+            "group_name": group_name,
+            "values": values,
+            "scored_at": scored_at.isoformat() if scored_at else None,
+        },
+        f"scores:{team_id}:{checkpoint_id}",
+    )
+    db.session.commit()
 
 
 def update_checkpoint_scores_sync(
@@ -589,8 +658,7 @@ def update_checkpoint_scores_sync(
       * The ``scored_at`` fallback for the time cell still applies when
         no explicit time value is in ``values``.
 
-    Public signature unchanged so worker dispatch in
-    ``app/utils/sheets_sync_worker.py:enqueue_update_scores`` benefits
+    Public signature unchanged so the outbox worker dispatch benefits
     automatically (it just calls into this _sync variant).
     """
     if not sheets_sync_enabled():
@@ -636,19 +704,9 @@ def update_checkpoint_scores_sync(
             if not db_group:
                 continue
 
-            nums = (
-                db.session.query(Team.id, Team.number, Team.name)
-                .join(TeamGroup, TeamGroup.team_id == Team.id)
-                .filter(TeamGroup.group_id == db_group.id, Team.competition_id == cfg.competition_id)
-                .order_by(Team.number.asc().nulls_last(), Team.name.asc())
-                .all()
-            )
-            ordered = [n[0] for n in nums]
-            try:
-                idx = ordered.index(team.id)
-            except ValueError:
+            row = _team_row_for_group(grp_def, db_group, cfg.competition_id, team.id)
+            if row is None:
                 continue
-            row = 2 + idx
 
             col = start_col + 1
             if dead_time_enabled:
@@ -1923,7 +1981,9 @@ def _points_formula_from_rule(
     return "=" + "+".join(pieces)
 
 
-def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> tuple[list[list], dict[int, bool]]:
+def _build_local_cp_grid(
+    cfg: SheetConfig, competition_id: int
+) -> tuple[list[list], dict[int, bool], dict[int, dict[str, int]]]:
     """Build the full per-checkpoint grid (headers + all team rows) from a
     SheetConfig, including any existing ScoreEntry data and check-in
     timestamps. Returned as a 2D list suitable for a single
@@ -2051,6 +2111,14 @@ def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> tuple[list[li
                     "total_fields": [f["key"] for f in resolved if f.get("counts_in_total", True)],
                 }
 
+    # team_id -> physical row per group block, persisted by callers so
+    # subsequent cell writes address rows by key (redesign plan 3.4).
+    row_maps_by_index: dict[int, dict[str, int]] = {}
+    for spec_index, group_rows in enumerate(teams_per_group):
+        row_maps_by_index[spec_index] = {
+            str(row["team_id"]): i + 2 for i, row in enumerate(group_rows) if row.get("team_id")
+        }
+
     # Header row (escape any user-supplied strings)
     values: list[list] = [[escape_formula_cell(h) if isinstance(h, str) else h for h in headers]]
 
@@ -2110,7 +2178,7 @@ def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> tuple[list[li
         if gid and gid not in group_has_formula:
             group_has_formula[gid] = False
 
-    return values, group_has_formula
+    return values, group_has_formula, row_maps_by_index
 
 
 def publish_local_configs_to_spreadsheet(
@@ -2217,7 +2285,7 @@ def publish_local_configs_to_spreadsheet(
                 db.session.delete(slot_holder)
                 db.session.flush()
 
-            grid, group_has_formula = _build_local_cp_grid(cfg, competition_id)
+            grid, group_has_formula, row_maps_by_index = _build_local_cp_grid(cfg, competition_id)
             if not grid or not grid[0]:
                 result["skipped"] += 1
                 continue
@@ -2257,6 +2325,7 @@ def publish_local_configs_to_spreadsheet(
             # Persist per-group flag so update_checkpoint_scores_sync
             # knows which Points cells are formula-driven and must not
             # be overwritten by future raw writes.
+            _persist_row_maps(cfg, row_maps_by_index)
             if group_has_formula:
                 new_cfg_blob = dict(cfg.config or {})
                 groups_blob = list(new_cfg_blob.get("groups") or [])
