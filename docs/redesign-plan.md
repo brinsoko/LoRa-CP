@@ -476,6 +476,27 @@ Phase 3 implementation notes:
 backoff + dirty-flag reconciliation + keyed row writes + health panel.
 Delete the in-memory queue.
 
+Phase 4 implementation notes:
+
+- Enqueue happens in its own tiny transaction immediately after the
+  domain commit (the call sites already ran post-commit); the loss
+  window is process death between the two commits, which the worker's
+  periodic re-verify heals. Everything else matches the plan: durable
+  rows, one worker (`flask sheets-worker`, own compose service),
+  dedup-key coalescing at enqueue time, exponential backoff, dead-letter
+  with a Retry button on the sheets admin page.
+- Keyed rows are implemented as a row_map cached in SheetConfig.config,
+  written at the exact moment a tab's team column is physically ordered
+  (sync_team_numbers / publish), with the legacy recomputed-index
+  fallback for tabs published before the map existed.
+- Roster changes dirty-flag the team-number columns AND the summary tabs
+  (teams/arrivals/total), so they refresh within one worker cycle; the
+  worker also re-enqueues sync_team_numbers per competition every 15
+  minutes as the healing pass (auto-recreates missing tabs).
+- Phase-5 leftover shipped here: judges are redirected from the old
+  score_judge / RFID console pages to the /judge shell (admins keep
+  them until full removal).
+
 **Phase 5, cleanup:** remove superseded judge pages/routes from judge role,
 slim admin nav, regenerate ERD/architecture docs, translation sweep, delete
 dead code. Optional: mount Flask-Admin under `/superadmin` as the row-level

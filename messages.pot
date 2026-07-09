@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-07-09 17:46+0200\n"
+"POT-Creation-Date: 2026-07-09 20:06+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -193,11 +193,11 @@ msgstr ""
 #: app/blueprints/judges/routes.py:18 app/blueprints/main/routes.py:172
 #: app/blueprints/main/routes.py:236 app/blueprints/main/routes.py:421
 #: app/blueprints/main/routes.py:458 app/blueprints/main/routes.py:486
-#: app/blueprints/scores/routes.py:94 app/blueprints/scores/routes.py:176
-#: app/blueprints/scores/routes.py:294 app/blueprints/scores/routes.py:360
-#: app/blueprints/scores/routes.py:378 app/blueprints/scores/routes.py:716
-#: app/blueprints/scores/routes.py:737 app/blueprints/scores/routes.py:882
-#: app/blueprints/scores/routes.py:1155 app/blueprints/sheets/routes.py:61
+#: app/blueprints/scores/routes.py:98 app/blueprints/scores/routes.py:180
+#: app/blueprints/scores/routes.py:298 app/blueprints/scores/routes.py:364
+#: app/blueprints/scores/routes.py:382 app/blueprints/scores/routes.py:720
+#: app/blueprints/scores/routes.py:741 app/blueprints/scores/routes.py:886
+#: app/blueprints/scores/routes.py:1159 app/blueprints/sheets/routes.py:56
 #: app/blueprints/users/routes.py:43 app/blueprints/users/routes.py:87
 #: app/blueprints/users/routes.py:154 app/blueprints/users/routes.py:217
 #: app/blueprints/users/routes.py:304
@@ -330,7 +330,7 @@ msgid "Could not load check-ins."
 msgstr ""
 
 #: app/blueprints/checkins/routes.py:182 app/blueprints/groups/routes.py:77
-#: app/blueprints/scores/routes.py:386
+#: app/blueprints/scores/routes.py:390
 msgid "Group not found."
 msgstr ""
 
@@ -394,7 +394,7 @@ msgid "Could not load devices."
 msgstr ""
 
 #: app/blueprints/checkpoints/routes.py:175
-#: app/blueprints/checkpoints/routes.py:280 app/blueprints/scores/routes.py:184
+#: app/blueprints/checkpoints/routes.py:280 app/blueprints/scores/routes.py:188
 msgid "Checkpoint not found."
 msgstr ""
 
@@ -693,7 +693,7 @@ msgstr ""
 msgid "Could not create path."
 msgstr ""
 
-#: app/blueprints/paths/routes.py:122 app/blueprints/scores/routes.py:300
+#: app/blueprints/paths/routes.py:122 app/blueprints/scores/routes.py:304
 msgid "Path not found."
 msgstr ""
 
@@ -749,209 +749,209 @@ msgstr ""
 msgid "Could not update RFID mapping."
 msgstr ""
 
-#: app/blueprints/rfid/routes.py:200
+#: app/blueprints/rfid/routes.py:205
 msgid "RFID mapping deleted."
 msgstr ""
 
-#: app/blueprints/rfid/routes.py:202
+#: app/blueprints/rfid/routes.py:207
 msgid "Could not delete RFID mapping."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:221 app/blueprints/scores/routes.py:232
+#: app/blueprints/scores/routes.py:225 app/blueprints/scores/routes.py:236
 #, python-format
 msgid "Invalid rule params for %(key)s: %(error)s"
 msgstr ""
 
-#: app/blueprints/scores/routes.py:284
+#: app/blueprints/scores/routes.py:288
 msgid "Score fields saved."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:307
+#: app/blueprints/scores/routes.py:311
 msgid "Segment endpoints must be two different checkpoints on the path."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:327
+#: app/blueprints/scores/routes.py:331
 msgid "A segment cannot end at a checkpoint with dead time enabled."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:351
+#: app/blueprints/scores/routes.py:355
 msgid "Timed segment added."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:368
+#: app/blueprints/scores/routes.py:372
 msgid "Timed segment deleted."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:406
+#: app/blueprints/scores/routes.py:410
 msgid ""
 "The race time rule needs max points, threshold, penalty minutes and "
 "penalty points."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:431
+#: app/blueprints/scores/routes.py:435
 msgid "Category scoring saved."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:833 app/blueprints/scores/routes.py:1143
+#: app/blueprints/scores/routes.py:837 app/blueprints/scores/routes.py:1147
 msgid "Public results are not enabled for this competition."
 msgstr ""
 
-#: app/blueprints/scores/routes.py:1221
+#: app/blueprints/scores/routes.py:1225
 msgid "Legacy or unknown"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:68
+#: app/blueprints/sheets/routes.py:63
 msgid "Sheets sync is disabled."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:170
+#: app/blueprints/sheets/routes.py:191
 msgid "Language pack saved."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:179
+#: app/blueprints/sheets/routes.py:200
 msgid "Sheets settings saved."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:211
+#: app/blueprints/sheets/routes.py:232
 msgid "Spreadsheet ID is required to build arrivals."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:229
+#: app/blueprints/sheets/routes.py:250
 #, python-format
 msgid "Failed to build arrivals tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:231
+#: app/blueprints/sheets/routes.py:252
 #, python-format
 msgid "Arrivals tab '%(tab)s' updated."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:248
+#: app/blueprints/sheets/routes.py:273
 #, python-format
 msgid "Arrivals tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:273 app/blueprints/sheets/routes.py:329
-#: app/blueprints/sheets/routes.py:525 app/blueprints/sheets/routes.py:844
+#: app/blueprints/sheets/routes.py:298 app/blueprints/sheets/routes.py:358
+#: app/blueprints/sheets/routes.py:558 app/blueprints/sheets/routes.py:867
 msgid "Spreadsheet ID is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:289
+#: app/blueprints/sheets/routes.py:314
 #, python-format
 msgid "Failed to build teams tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:291
+#: app/blueprints/sheets/routes.py:316
 #, python-format
 msgid "Teams tab '%(tab)s' updated."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:304
+#: app/blueprints/sheets/routes.py:333
 #, python-format
 msgid "Teams tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:355
+#: app/blueprints/sheets/routes.py:384
 #, python-format
 msgid "Failed to build score tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:357
+#: app/blueprints/sheets/routes.py:386
 #, python-format
 msgid "Score tab '%(tab)s' updated."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:372
+#: app/blueprints/sheets/routes.py:405
 #, python-format
 msgid "Score tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:389
+#: app/blueprints/sheets/routes.py:422
 msgid "No configs to prune."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:397
+#: app/blueprints/sheets/routes.py:430
 #, python-format
 msgid "Could not init Sheets client: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:418
+#: app/blueprints/sheets/routes.py:451
 #, python-format
 msgid "Pruned %(count)s stale config(s) (tabs no longer exist)."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:420
+#: app/blueprints/sheets/routes.py:453
 msgid "No stale configs found."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:530
+#: app/blueprints/sheets/routes.py:563
 msgid "Select at least one checkpoint to create."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:575
+#: app/blueprints/sheets/routes.py:608
 #, python-format
 msgid "Wizard failed: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:581
+#: app/blueprints/sheets/routes.py:614
 #, python-format
 msgid ""
 "Wizard completed. Created %(created)s local configs, skipped %(skipped)s "
 "existing."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:590
+#: app/blueprints/sheets/routes.py:623
 #, python-format
 msgid "Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:610 app/blueprints/sheets/routes.py:793
+#: app/blueprints/sheets/routes.py:643 app/blueprints/sheets/routes.py:816
 msgid "Config not found."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:613
+#: app/blueprints/sheets/routes.py:646
 msgid "Config is missing groups; cannot sync."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:661
+#: app/blueprints/sheets/routes.py:679
 #, python-format
 msgid "Failed to sync team numbers: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:678
+#: app/blueprints/sheets/routes.py:696
 #, python-format
 msgid "Synced checkpoint tabs but some summary rebuilds reported errors: %(errs)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:685
+#: app/blueprints/sheets/routes.py:703
 msgid "Synced team numbers and rebuilt Ekipe, Prihodi, and Skupni seštevek."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:715
+#: app/blueprints/sheets/routes.py:733
 msgid "Team-number sync queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:739
+#: app/blueprints/sheets/routes.py:757
 msgid "Target spreadsheet ID is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:743
+#: app/blueprints/sheets/routes.py:761
 msgid "Target spreadsheet must be a real Google Sheets ID, not a local: sentinel."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:753
+#: app/blueprints/sheets/routes.py:771
 #, python-format
 msgid "Publish failed: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:759
+#: app/blueprints/sheets/routes.py:777
 #, python-format
 msgid ""
 "Published %(count)s checkpoint tab(s), skipped %(skip)s. Summary tabs "
 "built: %(s)s."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:774
+#: app/blueprints/sheets/routes.py:797
 #, python-format
 msgid ""
 "Publish to %(sid)s queued. This takes ~30 seconds for a 15-CP "
@@ -959,55 +959,63 @@ msgid ""
 "log."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:807
+#: app/blueprints/sheets/routes.py:830
 #, python-format
 msgid "Remote tab could not be deleted: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:811
+#: app/blueprints/sheets/routes.py:834
 #, python-format
 msgid "Config '%(tab)s' deleted."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:839
+#: app/blueprints/sheets/routes.py:862
 msgid "Tab title is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:849
+#: app/blueprints/sheets/routes.py:872
 msgid "At least one group line is required."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:902
+#: app/blueprints/sheets/routes.py:925
 #, python-format
 msgid "Could not add tab: %(error)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:905
+#: app/blueprints/sheets/routes.py:928
 msgid ""
 "Check that the spreadsheet ID is correct and that the service account "
 "email has Editor access to it."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:915
+#: app/blueprints/sheets/routes.py:938
 #, python-format
 msgid ""
 "A config for tab '%(tab)s' already exists. Submit again with overwrite "
 "enabled to replace it."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:938
+#: app/blueprints/sheets/routes.py:961
 #, python-format
 msgid "Tab '%(tab)s' overwritten."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:952
+#: app/blueprints/sheets/routes.py:975
 #, python-format
 msgid "Added local tab '%(tab)s'."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:954
+#: app/blueprints/sheets/routes.py:977
 #, python-format
 msgid "Added tab '%(tab)s' to spreadsheet."
+msgstr ""
+
+#: app/blueprints/sheets/routes.py:998
+msgid "Sync job re-queued."
+msgstr ""
+
+#: app/blueprints/sheets/routes.py:1016
+msgid "Sync job deleted."
 msgstr ""
 
 #: app/blueprints/superadmin/routes.py:154
@@ -1242,7 +1250,7 @@ msgstr ""
 #: app/templates/lora_list.html:13 app/templates/rfid_judge.html:16
 #: app/templates/rfid_judge.html:93 app/templates/score_judge.html:16
 #: app/templates/score_judge.html:183 app/templates/scores_submissions.html:40
-#: app/templates/sheets_admin.html:131 app/templates/sheets_admin.html:352
+#: app/templates/sheets_admin.html:180 app/templates/sheets_admin.html:401
 #: app/templates/view_checkins.html:35 app/templates/view_checkins.html:104
 msgid "Checkpoint"
 msgstr ""
@@ -1381,7 +1389,7 @@ msgid ""
 msgstr ""
 
 #: app/templates/add_checkpoint.html:106 app/templates/add_team.html:82
-#: app/templates/register.html:30 app/templates/sheets_admin.html:130
+#: app/templates/register.html:30 app/templates/sheets_admin.html:179
 #: app/templates/user_edit.html:43
 msgid "Create"
 msgstr ""
@@ -1489,7 +1497,8 @@ msgstr ""
 msgid "Read"
 msgstr ""
 
-#: app/templates/add_team.html:99 app/templates/team_edit.html:115
+#: app/templates/add_team.html:99 app/templates/sheets_admin.html:14
+#: app/templates/team_edit.html:115
 msgid "Failed"
 msgstr ""
 
@@ -1734,7 +1743,7 @@ msgstr ""
 
 #: app/templates/base.html:169 app/templates/groups_list.html:3
 #: app/templates/groups_list.html:9 app/templates/scores_stats.html:29
-#: app/templates/sheets_admin.html:135 app/templates/teams_list.html:87
+#: app/templates/sheets_admin.html:184 app/templates/teams_list.html:87
 msgid "Groups"
 msgstr ""
 
@@ -1835,7 +1844,7 @@ msgstr ""
 #: app/templates/competition_settings.html:95 app/templates/group_edit.html:59
 #: app/templates/lora_add.html:21 app/templates/lora_edit.html:25
 #: app/templates/path_edit.html:79 app/templates/scoring_setup.html:246
-#: app/templates/sheets_admin.html:22 app/templates/team_edit.html:98
+#: app/templates/sheets_admin.html:71 app/templates/team_edit.html:98
 #: app/templates/user_edit.html:43
 msgid "Save"
 msgstr ""
@@ -1927,7 +1936,7 @@ msgstr ""
 #: app/templates/firmware_list.html:25 app/templates/groups_list.html:35
 #: app/templates/lora_list.html:13 app/templates/paths_list.html:20
 #: app/templates/rfid_list.html:27 app/templates/scores_view.html:70
-#: app/templates/sheets_admin.html:353 app/templates/superadmin_index.html:53
+#: app/templates/sheets_admin.html:402 app/templates/superadmin_index.html:53
 #: app/templates/teams_list.html:89 app/templates/users_list.html:65
 #: app/templates/view_checkins.html:107
 msgid "Actions"
@@ -1955,7 +1964,7 @@ msgstr ""
 #: app/templates/checkpoints_list.html:75 app/templates/firmware_list.html:44
 #: app/templates/groups_list.html:69 app/templates/lora_list.html:31
 #: app/templates/paths_list.html:58 app/templates/rfid_list.html:46
-#: app/templates/scoring_setup.html:159 app/templates/sheets_admin.html:376
+#: app/templates/scoring_setup.html:159 app/templates/sheets_admin.html:425
 #: app/templates/superadmin_index.html:96
 #: app/templates/superadmin_index.html:100 app/templates/teams_list.html:135
 #: app/templates/view_checkins.html:129
@@ -2163,6 +2172,7 @@ msgid "Expired"
 msgstr ""
 
 #: app/templates/competition_settings.html:149
+#: app/templates/sheets_admin.html:12
 msgid "Pending"
 msgstr ""
 
@@ -2281,7 +2291,7 @@ msgid "No conflicts found — ready to merge."
 msgstr ""
 
 #: app/templates/competition_transfer.html:144
-#: app/templates/firmware_list.html:18 app/templates/sheets_admin.html:351
+#: app/templates/firmware_list.html:18 app/templates/sheets_admin.html:400
 msgid "Type"
 msgstr ""
 
@@ -3990,98 +4000,134 @@ msgstr ""
 msgid "Google Sheets (admin)"
 msgstr ""
 
-#: app/templates/sheets_admin.html:12
-msgid "Sheets sync is disabled. Scoring will not update Google Sheets."
+#: app/templates/sheets_admin.html:10
+msgid "Sync queue"
 msgstr ""
 
-#: app/templates/sheets_admin.html:20
-msgid "Enable Sheets sync"
+#: app/templates/sheets_admin.html:13
+msgid "Running"
+msgstr ""
+
+#: app/templates/sheets_admin.html:16
+msgid "Last successful write"
+msgstr ""
+
+#: app/templates/sheets_admin.html:24
+msgid "Job"
+msgstr ""
+
+#: app/templates/sheets_admin.html:25
+msgid "Attempts"
 msgstr ""
 
 #: app/templates/sheets_admin.html:26
-msgid "Language pack settings"
+msgid "Last error"
 msgstr ""
 
-#: app/templates/sheets_admin.html:29
-msgid "Spreadsheet ID"
+#: app/templates/sheets_admin.html:39
+msgid "Retry"
 msgstr ""
 
-#: app/templates/sheets_admin.html:30
-msgid "Spreadsheet ID (used below)"
-msgstr ""
-
-#: app/templates/sheets_admin.html:34
-msgid "Local only (no Sheets)"
-msgstr ""
-
-#: app/templates/sheets_admin.html:38 app/templates/sheets_admin.html:419
-msgid "Show ordering"
-msgstr ""
-
-#: app/templates/sheets_admin.html:40
-msgid "Global group order"
-msgstr ""
-
-#: app/templates/sheets_admin.html:50
-msgid "Drag to reorder. This order applies to all checkpoint tabs."
+#: app/templates/sheets_admin.html:43
+msgid "Discard"
 msgstr ""
 
 #: app/templates/sheets_admin.html:52
+msgid "No failed sync jobs."
+msgstr ""
+
+#: app/templates/sheets_admin.html:61
+msgid "Sheets sync is disabled. Scoring will not update Google Sheets."
+msgstr ""
+
+#: app/templates/sheets_admin.html:69
+msgid "Enable Sheets sync"
+msgstr ""
+
+#: app/templates/sheets_admin.html:75
+msgid "Language pack settings"
+msgstr ""
+
+#: app/templates/sheets_admin.html:78
+msgid "Spreadsheet ID"
+msgstr ""
+
+#: app/templates/sheets_admin.html:79
+msgid "Spreadsheet ID (used below)"
+msgstr ""
+
+#: app/templates/sheets_admin.html:83
+msgid "Local only (no Sheets)"
+msgstr ""
+
+#: app/templates/sheets_admin.html:87 app/templates/sheets_admin.html:468
+msgid "Show ordering"
+msgstr ""
+
+#: app/templates/sheets_admin.html:89
+msgid "Global group order"
+msgstr ""
+
+#: app/templates/sheets_admin.html:99
+msgid "Drag to reorder. This order applies to all checkpoint tabs."
+msgstr ""
+
+#: app/templates/sheets_admin.html:101
 msgid "Global checkpoint order"
 msgstr ""
 
-#: app/templates/sheets_admin.html:62
+#: app/templates/sheets_admin.html:111
 msgid "Drag to reorder checkpoint columns."
 msgstr ""
 
-#: app/templates/sheets_admin.html:64
+#: app/templates/sheets_admin.html:113
 msgid "Per-group checkpoint order (drag within each group)"
 msgstr ""
 
-#: app/templates/sheets_admin.html:71
+#: app/templates/sheets_admin.html:120
 msgid "Drag to reorder; uncheck to exclude a checkpoint for this group."
 msgstr ""
 
-#: app/templates/sheets_admin.html:105
+#: app/templates/sheets_admin.html:154
 msgid "Wizard: create tabs for all checkpoints"
 msgstr ""
 
-#: app/templates/sheets_admin.html:114 app/templates/sheets_admin.html:299
+#: app/templates/sheets_admin.html:163 app/templates/sheets_admin.html:348
 #: app/templates/sheets_lang.html:18
 msgid "Arrived header"
 msgstr ""
 
-#: app/templates/sheets_admin.html:118 app/templates/sheets_admin.html:303
+#: app/templates/sheets_admin.html:167 app/templates/sheets_admin.html:352
 #: app/templates/sheets_lang.html:22 app/templates/sheets_lang.html:53
 msgid "Points header"
 msgstr ""
 
-#: app/templates/sheets_admin.html:122 app/templates/sheets_admin.html:317
+#: app/templates/sheets_admin.html:171 app/templates/sheets_admin.html:366
 #: app/templates/sheets_lang.html:26
 msgid "Dead time header"
 msgstr ""
 
-#: app/templates/sheets_admin.html:132
+#: app/templates/sheets_admin.html:181
 msgid "Dead time?"
 msgstr ""
 
-#: app/templates/sheets_admin.html:133
+#: app/templates/sheets_admin.html:182
 msgid "Record time?"
 msgstr ""
 
-#: app/templates/sheets_admin.html:134
+#: app/templates/sheets_admin.html:183
 msgid "Extra headers (comma list)"
 msgstr ""
 
-#: app/templates/sheets_admin.html:153
+#: app/templates/sheets_admin.html:202
 msgid "e.g. Start time, Finish time"
 msgstr ""
 
-#: app/templates/sheets_admin.html:175
+#: app/templates/sheets_admin.html:224
 msgid "Run wizard"
 msgstr ""
 
-#: app/templates/sheets_admin.html:183
+#: app/templates/sheets_admin.html:232
 msgid ""
 "Publish the competition to the target Google Sheet. Works for both first-"
 "time publishing (local-only configs) and switching to a different "
@@ -4092,162 +4138,162 @@ msgid ""
 "no-op."
 msgstr ""
 
-#: app/templates/sheets_admin.html:187
+#: app/templates/sheets_admin.html:236
 msgid "Target spreadsheet ID"
 msgstr ""
 
-#: app/templates/sheets_admin.html:193
+#: app/templates/sheets_admin.html:242
 msgid "e.g. 1aBcD…XyZ"
 msgstr ""
 
-#: app/templates/sheets_admin.html:196
+#: app/templates/sheets_admin.html:245
 msgid "Paste the new sheet ID here to publish/repoint all per-CP tabs to it."
 msgstr ""
 
-#: app/templates/sheets_admin.html:201
+#: app/templates/sheets_admin.html:250
 msgid ""
 "This will create or overwrite tabs on the target spreadsheet and rebind "
 "every SheetConfig (including any currently bound to another sheet). "
 "Continue?"
 msgstr ""
 
-#: app/templates/sheets_admin.html:202
+#: app/templates/sheets_admin.html:251
 msgid "Publish / repoint to sheet"
 msgstr ""
 
-#: app/templates/sheets_admin.html:207
+#: app/templates/sheets_admin.html:256
 msgid ""
 "After publish, every per-CP tab is rebuilt on the target sheet and all "
 "SheetConfigs are rebound. The old sheet's tabs are abandoned but not "
 "deleted."
 msgstr ""
 
-#: app/templates/sheets_admin.html:219
+#: app/templates/sheets_admin.html:268
 msgid "Arrivals tab name"
 msgstr ""
 
-#: app/templates/sheets_admin.html:223 app/templates/sheets_admin.html:239
-#: app/templates/sheets_admin.html:260
+#: app/templates/sheets_admin.html:272 app/templates/sheets_admin.html:288
+#: app/templates/sheets_admin.html:309
 msgid "Build / Refresh"
 msgstr ""
 
-#: app/templates/sheets_admin.html:231
+#: app/templates/sheets_admin.html:280
 msgid "Teams tab name"
 msgstr ""
 
-#: app/templates/sheets_admin.html:235
+#: app/templates/sheets_admin.html:284
 msgid "Teams headers (comma)"
 msgstr ""
 
-#: app/templates/sheets_admin.html:236
+#: app/templates/sheets_admin.html:285
 msgid "(optional override)"
 msgstr ""
 
-#: app/templates/sheets_admin.html:249
+#: app/templates/sheets_admin.html:298
 msgid "Score tab name"
 msgstr ""
 
-#: app/templates/sheets_admin.html:253
+#: app/templates/sheets_admin.html:302
 msgid "Include dead time sum"
 msgstr ""
 
-#: app/templates/sheets_admin.html:256
+#: app/templates/sheets_admin.html:305
 msgid "Add dead time sum column"
 msgstr ""
 
-#: app/templates/sheets_admin.html:270
+#: app/templates/sheets_admin.html:319
 msgid "Add checkpoint tab"
 msgstr ""
 
-#: app/templates/sheets_admin.html:277
+#: app/templates/sheets_admin.html:326
 msgid "Tab title"
 msgstr ""
 
-#: app/templates/sheets_admin.html:278
+#: app/templates/sheets_admin.html:327
 msgid "Checkpoint tab (e.g., Timeline)"
 msgstr ""
 
-#: app/templates/sheets_admin.html:282
+#: app/templates/sheets_admin.html:331
 msgid "Checkpoint (optional)"
 msgstr ""
 
-#: app/templates/sheets_admin.html:284
+#: app/templates/sheets_admin.html:333
 msgid "— none —"
 msgstr ""
 
-#: app/templates/sheets_admin.html:292
+#: app/templates/sheets_admin.html:341
 msgid "Groups & fields"
 msgstr ""
 
-#: app/templates/sheets_admin.html:293
+#: app/templates/sheets_admin.html:342
 msgid "GroupName|field1,field2"
 msgstr ""
 
-#: app/templates/sheets_admin.html:294
+#: app/templates/sheets_admin.html:343
 msgid "One line per group. Format: GroupName|field1,field2. Fields are optional."
 msgstr ""
 
-#: app/templates/sheets_admin.html:310
+#: app/templates/sheets_admin.html:359
 msgid "Include dead time column"
 msgstr ""
 
-#: app/templates/sheets_admin.html:314
+#: app/templates/sheets_admin.html:363
 msgid "Include time column"
 msgstr ""
 
-#: app/templates/sheets_admin.html:321 app/templates/sheets_lang.html:30
+#: app/templates/sheets_admin.html:370 app/templates/sheets_lang.html:30
 msgid "Time header"
 msgstr ""
 
-#: app/templates/sheets_admin.html:327
+#: app/templates/sheets_admin.html:376
 msgid "Overwrite if exists"
 msgstr ""
 
-#: app/templates/sheets_admin.html:329
+#: app/templates/sheets_admin.html:378
 msgid "Add tab"
 msgstr ""
 
-#: app/templates/sheets_admin.html:338
+#: app/templates/sheets_admin.html:387
 msgid "Existing sheet configs"
 msgstr ""
 
-#: app/templates/sheets_admin.html:343
+#: app/templates/sheets_admin.html:392
 msgid "Prune missing tabs"
 msgstr ""
 
-#: app/templates/sheets_admin.html:349
+#: app/templates/sheets_admin.html:398
 msgid "Spreadsheet"
 msgstr ""
 
-#: app/templates/sheets_admin.html:350
+#: app/templates/sheets_admin.html:399
 msgid "Tab"
 msgstr ""
 
-#: app/templates/sheets_admin.html:354 app/templates/superadmin_index.html:52
+#: app/templates/sheets_admin.html:403 app/templates/superadmin_index.html:52
 msgid "Created"
 msgstr ""
 
-#: app/templates/sheets_admin.html:370
+#: app/templates/sheets_admin.html:419
 msgid "Sync team numbers"
 msgstr ""
 
-#: app/templates/sheets_admin.html:374
+#: app/templates/sheets_admin.html:423
 msgid "Delete this config?"
 msgstr ""
 
-#: app/templates/sheets_admin.html:380
+#: app/templates/sheets_admin.html:429
 msgid "Delete config AND remote tab from spreadsheet?"
 msgstr ""
 
-#: app/templates/sheets_admin.html:383
+#: app/templates/sheets_admin.html:432
 msgid "Delete + remote"
 msgstr ""
 
-#: app/templates/sheets_admin.html:395
+#: app/templates/sheets_admin.html:444
 msgid "No sheet configs yet."
 msgstr ""
 
-#: app/templates/sheets_admin.html:420
+#: app/templates/sheets_admin.html:469
 msgid "Hide ordering"
 msgstr ""
 

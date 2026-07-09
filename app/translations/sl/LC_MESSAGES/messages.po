@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LoRa KT\n"
 "Report-Msgid-Bugs-To: brin.soko@gmail.com\n"
-"POT-Creation-Date: 2026-07-09 17:46+0200\n"
+"POT-Creation-Date: 2026-07-09 20:06+0200\n"
 "PO-Revision-Date: 2025-12-04 00:00+0100\n"
 "Last-Translator: Brin Soko <brin.soko@gmail.com>\n"
 "Language: sl\n"
@@ -198,11 +198,11 @@ msgstr "Naprava %(name)s je bila izbrisana."
 #: app/blueprints/judges/routes.py:18 app/blueprints/main/routes.py:172
 #: app/blueprints/main/routes.py:236 app/blueprints/main/routes.py:421
 #: app/blueprints/main/routes.py:458 app/blueprints/main/routes.py:486
-#: app/blueprints/scores/routes.py:94 app/blueprints/scores/routes.py:176
-#: app/blueprints/scores/routes.py:294 app/blueprints/scores/routes.py:360
-#: app/blueprints/scores/routes.py:378 app/blueprints/scores/routes.py:716
-#: app/blueprints/scores/routes.py:737 app/blueprints/scores/routes.py:882
-#: app/blueprints/scores/routes.py:1155 app/blueprints/sheets/routes.py:61
+#: app/blueprints/scores/routes.py:98 app/blueprints/scores/routes.py:180
+#: app/blueprints/scores/routes.py:298 app/blueprints/scores/routes.py:364
+#: app/blueprints/scores/routes.py:382 app/blueprints/scores/routes.py:720
+#: app/blueprints/scores/routes.py:741 app/blueprints/scores/routes.py:886
+#: app/blueprints/scores/routes.py:1159 app/blueprints/sheets/routes.py:56
 #: app/blueprints/users/routes.py:43 app/blueprints/users/routes.py:87
 #: app/blueprints/users/routes.py:154 app/blueprints/users/routes.py:217
 #: app/blueprints/users/routes.py:304
@@ -338,7 +338,7 @@ msgid "Could not load check-ins."
 msgstr "Ni bilo mogoče naložiti kontrolnih točk."
 
 #: app/blueprints/checkins/routes.py:182 app/blueprints/groups/routes.py:77
-#: app/blueprints/scores/routes.py:386
+#: app/blueprints/scores/routes.py:390
 msgid "Group not found."
 msgstr "Skupina ni najdena."
 
@@ -405,7 +405,7 @@ msgid "Could not load devices."
 msgstr "Ni bilo mogoče naložiti naprav."
 
 #: app/blueprints/checkpoints/routes.py:175
-#: app/blueprints/checkpoints/routes.py:280 app/blueprints/scores/routes.py:184
+#: app/blueprints/checkpoints/routes.py:280 app/blueprints/scores/routes.py:188
 msgid "Checkpoint not found."
 msgstr "Kontrolna točka ni najdena."
 
@@ -722,7 +722,7 @@ msgstr "Pot ustvarjena."
 msgid "Could not create path."
 msgstr "Poti ni bilo mogoče ustvariti."
 
-#: app/blueprints/paths/routes.py:122 app/blueprints/scores/routes.py:300
+#: app/blueprints/paths/routes.py:122 app/blueprints/scores/routes.py:304
 msgid "Path not found."
 msgstr "Pot ne obstaja."
 
@@ -784,42 +784,42 @@ msgstr "Ni še povezav RFID."
 msgid "Could not update RFID mapping."
 msgstr "Ekipe ni bilo mogoče posodobiti."
 
-#: app/blueprints/rfid/routes.py:200
+#: app/blueprints/rfid/routes.py:205
 #, fuzzy
 msgid "RFID mapping deleted."
 msgstr "Ni še povezav RFID."
 
-#: app/blueprints/rfid/routes.py:202
+#: app/blueprints/rfid/routes.py:207
 #, fuzzy
 msgid "Could not delete RFID mapping."
 msgstr "Tekmovanja ni bilo mogoče izbrisati."
 
-#: app/blueprints/scores/routes.py:221 app/blueprints/scores/routes.py:232
+#: app/blueprints/scores/routes.py:225 app/blueprints/scores/routes.py:236
 #, fuzzy, python-format
 msgid "Invalid rule params for %(key)s: %(error)s"
 msgstr "Neveljavni parametri pravila za %(key)s: %(error)s"
 
-#: app/blueprints/scores/routes.py:284
+#: app/blueprints/scores/routes.py:288
 msgid "Score fields saved."
 msgstr "Ocenjevalna polja shranjena."
 
-#: app/blueprints/scores/routes.py:307
+#: app/blueprints/scores/routes.py:311
 msgid "Segment endpoints must be two different checkpoints on the path."
 msgstr "Krajišči odseka morata biti dve različni kontrolni točki na poti."
 
-#: app/blueprints/scores/routes.py:327
+#: app/blueprints/scores/routes.py:331
 msgid "A segment cannot end at a checkpoint with dead time enabled."
 msgstr "Odsek se ne sme končati na kontrolni točki z vklopljenim mrtvim časom."
 
-#: app/blueprints/scores/routes.py:351
+#: app/blueprints/scores/routes.py:355
 msgid "Timed segment added."
 msgstr "Časovni odsek dodan."
 
-#: app/blueprints/scores/routes.py:368
+#: app/blueprints/scores/routes.py:372
 msgid "Timed segment deleted."
 msgstr "Časovni odsek izbrisan."
 
-#: app/blueprints/scores/routes.py:406
+#: app/blueprints/scores/routes.py:410
 msgid ""
 "The race time rule needs max points, threshold, penalty minutes and "
 "penalty points."
@@ -827,113 +827,113 @@ msgstr ""
 "Pravilo časovnice potrebuje največ točk, prag, kazenske minute in "
 "kazenske točke."
 
-#: app/blueprints/scores/routes.py:431
+#: app/blueprints/scores/routes.py:435
 msgid "Category scoring saved."
 msgstr "Točkovanje kategorije shranjeno."
 
-#: app/blueprints/scores/routes.py:833 app/blueprints/scores/routes.py:1143
+#: app/blueprints/scores/routes.py:837 app/blueprints/scores/routes.py:1147
 msgid "Public results are not enabled for this competition."
 msgstr "Javni rezultati za to tekmovanje niso omogočeni."
 
-#: app/blueprints/scores/routes.py:1221
+#: app/blueprints/scores/routes.py:1225
 msgid "Legacy or unknown"
 msgstr "Staro ali neznano"
 
-#: app/blueprints/sheets/routes.py:68
+#: app/blueprints/sheets/routes.py:63
 msgid "Sheets sync is disabled."
 msgstr "Sinhronizacija Sheets je izkljucena."
 
-#: app/blueprints/sheets/routes.py:170
+#: app/blueprints/sheets/routes.py:191
 msgid "Language pack saved."
 msgstr "Jezikovni paket shranjen."
 
-#: app/blueprints/sheets/routes.py:179
+#: app/blueprints/sheets/routes.py:200
 #, fuzzy
 msgid "Sheets settings saved."
 msgstr "Sinhronizacija Sheets je izkljucena."
 
-#: app/blueprints/sheets/routes.py:211
+#: app/blueprints/sheets/routes.py:232
 msgid "Spreadsheet ID is required to build arrivals."
 msgstr "Za izdelavo prihodov je potreben ID preglednice."
 
-#: app/blueprints/sheets/routes.py:229
+#: app/blueprints/sheets/routes.py:250
 #, python-format
 msgid "Failed to build arrivals tab: %(error)s"
 msgstr "Ni uspelo izdelati zavihka prihodov: %(error)s"
 
-#: app/blueprints/sheets/routes.py:231
+#: app/blueprints/sheets/routes.py:252
 #, python-format
 msgid "Arrivals tab '%(tab)s' updated."
 msgstr "Zavihek prihodov '%(tab)s' je posodobljen."
 
-#: app/blueprints/sheets/routes.py:248
+#: app/blueprints/sheets/routes.py:273
 #, python-format
 msgid "Arrivals tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:273 app/blueprints/sheets/routes.py:329
-#: app/blueprints/sheets/routes.py:525 app/blueprints/sheets/routes.py:844
+#: app/blueprints/sheets/routes.py:298 app/blueprints/sheets/routes.py:358
+#: app/blueprints/sheets/routes.py:558 app/blueprints/sheets/routes.py:867
 msgid "Spreadsheet ID is required."
 msgstr "ID preglednice je obvezen."
 
-#: app/blueprints/sheets/routes.py:289
+#: app/blueprints/sheets/routes.py:314
 #, python-format
 msgid "Failed to build teams tab: %(error)s"
 msgstr "Ni uspelo izdelati zavihka ekip: %(error)s"
 
-#: app/blueprints/sheets/routes.py:291
+#: app/blueprints/sheets/routes.py:316
 #, python-format
 msgid "Teams tab '%(tab)s' updated."
 msgstr "Zavihek ekip '%(tab)s' je posodobljen."
 
-#: app/blueprints/sheets/routes.py:304
+#: app/blueprints/sheets/routes.py:333
 #, python-format
 msgid "Teams tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:355
+#: app/blueprints/sheets/routes.py:384
 #, python-format
 msgid "Failed to build score tab: %(error)s"
 msgstr "Ni uspelo izdelati zavihka rezultatov: %(error)s"
 
-#: app/blueprints/sheets/routes.py:357
+#: app/blueprints/sheets/routes.py:386
 #, python-format
 msgid "Score tab '%(tab)s' updated."
 msgstr "Zavihek rezultatov '%(tab)s' je posodobljen."
 
-#: app/blueprints/sheets/routes.py:372
+#: app/blueprints/sheets/routes.py:405
 #, python-format
 msgid "Score tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:389
+#: app/blueprints/sheets/routes.py:422
 msgid "No configs to prune."
 msgstr "Ni nastavitev za ciscenje."
 
-#: app/blueprints/sheets/routes.py:397
+#: app/blueprints/sheets/routes.py:430
 #, python-format
 msgid "Could not init Sheets client: %(error)s"
 msgstr "Ni bilo mogoce inicializirati Sheets odjemalca: %(error)s"
 
-#: app/blueprints/sheets/routes.py:418
+#: app/blueprints/sheets/routes.py:451
 #, python-format
 msgid "Pruned %(count)s stale config(s) (tabs no longer exist)."
 msgstr "Pociscenih %(count)s zastarelih nastavitev (zavihki ne obstajajo)."
 
-#: app/blueprints/sheets/routes.py:420
+#: app/blueprints/sheets/routes.py:453
 msgid "No stale configs found."
 msgstr "Ni bilo najdenih zastarelih nastavitev."
 
-#: app/blueprints/sheets/routes.py:530
+#: app/blueprints/sheets/routes.py:563
 msgid "Select at least one checkpoint to create."
 msgstr "Izberite vsaj en checkpoint za ustvarjanje."
 
-#: app/blueprints/sheets/routes.py:575
+#: app/blueprints/sheets/routes.py:608
 #, python-format
 msgid "Wizard failed: %(error)s"
 msgstr "Carovnik ni uspel: %(error)s"
 
-#: app/blueprints/sheets/routes.py:581
+#: app/blueprints/sheets/routes.py:614
 #, python-format
 msgid ""
 "Wizard completed. Created %(created)s local configs, skipped %(skipped)s "
@@ -942,7 +942,7 @@ msgstr ""
 "Carovnik koncan. Ustvarjenih %(created)s lokalnih nastavitev, preskocenih"
 " %(skipped)s obstoječih."
 
-#: app/blueprints/sheets/routes.py:590
+#: app/blueprints/sheets/routes.py:623
 #, python-format
 msgid "Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing."
 msgstr ""
@@ -950,54 +950,54 @@ msgstr ""
 "obstoječih: %(skipped)s.Carovnik koncan. Ustvarjenih %(created)s "
 "zavihkov, preskocenih %(skipped)s obstoječih."
 
-#: app/blueprints/sheets/routes.py:610 app/blueprints/sheets/routes.py:793
+#: app/blueprints/sheets/routes.py:643 app/blueprints/sheets/routes.py:816
 msgid "Config not found."
 msgstr "Nastavitev ni bila najdena."
 
-#: app/blueprints/sheets/routes.py:613
+#: app/blueprints/sheets/routes.py:646
 msgid "Config is missing groups; cannot sync."
 msgstr "Nastavitvi manjkajo skupine; sinhronizacija ni mozna."
 
-#: app/blueprints/sheets/routes.py:661
+#: app/blueprints/sheets/routes.py:679
 #, python-format
 msgid "Failed to sync team numbers: %(error)s"
 msgstr "Sinhronizacija stevilk ekip ni uspela: %(error)s"
 
-#: app/blueprints/sheets/routes.py:678
+#: app/blueprints/sheets/routes.py:696
 #, python-format
 msgid "Synced checkpoint tabs but some summary rebuilds reported errors: %(errs)s"
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:685
+#: app/blueprints/sheets/routes.py:703
 msgid "Synced team numbers and rebuilt Ekipe, Prihodi, and Skupni seštevek."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:715
+#: app/blueprints/sheets/routes.py:733
 msgid "Team-number sync queued — refresh the spreadsheet in a few seconds."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:739
+#: app/blueprints/sheets/routes.py:757
 #, fuzzy
 msgid "Target spreadsheet ID is required."
 msgstr "ID preglednice je obvezen."
 
-#: app/blueprints/sheets/routes.py:743
+#: app/blueprints/sheets/routes.py:761
 msgid "Target spreadsheet must be a real Google Sheets ID, not a local: sentinel."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:753
+#: app/blueprints/sheets/routes.py:771
 #, fuzzy, python-format
 msgid "Publish failed: %(error)s"
 msgstr "Carovnik ni uspel: %(error)s"
 
-#: app/blueprints/sheets/routes.py:759
+#: app/blueprints/sheets/routes.py:777
 #, python-format
 msgid ""
 "Published %(count)s checkpoint tab(s), skipped %(skip)s. Summary tabs "
 "built: %(s)s."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:774
+#: app/blueprints/sheets/routes.py:797
 #, python-format
 msgid ""
 "Publish to %(sid)s queued. This takes ~30 seconds for a 15-CP "
@@ -1005,31 +1005,31 @@ msgid ""
 "log."
 msgstr ""
 
-#: app/blueprints/sheets/routes.py:807
+#: app/blueprints/sheets/routes.py:830
 #, python-format
 msgid "Remote tab could not be deleted: %(error)s"
 msgstr "Oddaljeni zavihek ni bilo mogoče izbrisati: %(error)s"
 
-#: app/blueprints/sheets/routes.py:811
+#: app/blueprints/sheets/routes.py:834
 #, python-format
 msgid "Config '%(tab)s' deleted."
 msgstr "Konfiguracija '%(tab)s' je bila izbrisana."
 
-#: app/blueprints/sheets/routes.py:839
+#: app/blueprints/sheets/routes.py:862
 #, fuzzy
 msgid "Tab title is required."
 msgstr "Ime je obvezno."
 
-#: app/blueprints/sheets/routes.py:849
+#: app/blueprints/sheets/routes.py:872
 msgid "At least one group line is required."
 msgstr "Potrebna je vsaj ena vrstica skupine."
 
-#: app/blueprints/sheets/routes.py:902
+#: app/blueprints/sheets/routes.py:925
 #, python-format
 msgid "Could not add tab: %(error)s"
 msgstr "Ni bilo mogoce dodati zavihka: %(error)s"
 
-#: app/blueprints/sheets/routes.py:905
+#: app/blueprints/sheets/routes.py:928
 msgid ""
 "Check that the spreadsheet ID is correct and that the service account "
 "email has Editor access to it."
@@ -1038,7 +1038,7 @@ msgstr ""
 "racuna urejevalni dostop."
 
 # Sheets duplicate / delete
-#: app/blueprints/sheets/routes.py:915
+#: app/blueprints/sheets/routes.py:938
 #, python-format
 msgid ""
 "A config for tab '%(tab)s' already exists. Submit again with overwrite "
@@ -1047,20 +1047,28 @@ msgstr ""
 "Konfiguracija za zavihek '%(tab)s' že obstaja. Oddajte znova z označeno "
 "možnostjo prepisa."
 
-#: app/blueprints/sheets/routes.py:938
+#: app/blueprints/sheets/routes.py:961
 #, python-format
 msgid "Tab '%(tab)s' overwritten."
 msgstr "Zavihek '%(tab)s' je bil prepisan."
 
-#: app/blueprints/sheets/routes.py:952
+#: app/blueprints/sheets/routes.py:975
 #, fuzzy, python-format
 msgid "Added local tab '%(tab)s'."
 msgstr "Zavihek '%(tab)s' je dodan v preglednico."
 
-#: app/blueprints/sheets/routes.py:954
+#: app/blueprints/sheets/routes.py:977
 #, python-format
 msgid "Added tab '%(tab)s' to spreadsheet."
 msgstr "Zavihek '%(tab)s' je dodan v preglednico."
+
+#: app/blueprints/sheets/routes.py:998
+msgid "Sync job re-queued."
+msgstr "Opravilo znova uvrščeno v vrsto."
+
+#: app/blueprints/sheets/routes.py:1016
+msgid "Sync job deleted."
+msgstr "Opravilo izbrisano."
 
 #: app/blueprints/superadmin/routes.py:154
 #, fuzzy
@@ -1307,7 +1315,7 @@ msgstr "Številke ekip so bile naključno dodeljene."
 #: app/templates/lora_list.html:13 app/templates/rfid_judge.html:16
 #: app/templates/rfid_judge.html:93 app/templates/score_judge.html:16
 #: app/templates/score_judge.html:183 app/templates/scores_submissions.html:40
-#: app/templates/sheets_admin.html:131 app/templates/sheets_admin.html:352
+#: app/templates/sheets_admin.html:180 app/templates/sheets_admin.html:401
 #: app/templates/view_checkins.html:35 app/templates/view_checkins.html:104
 msgid "Checkpoint"
 msgstr "Kontrolna točka"
@@ -1456,7 +1464,7 @@ msgstr ""
 "spremenijo za vse."
 
 #: app/templates/add_checkpoint.html:106 app/templates/add_team.html:82
-#: app/templates/register.html:30 app/templates/sheets_admin.html:130
+#: app/templates/register.html:30 app/templates/sheets_admin.html:179
 #: app/templates/user_edit.html:43
 msgid "Create"
 msgstr "Ustvari"
@@ -1568,9 +1576,10 @@ msgstr "Pripravljeno"
 msgid "Read"
 msgstr "Prebrano"
 
-#: app/templates/add_team.html:99 app/templates/team_edit.html:115
+#: app/templates/add_team.html:99 app/templates/sheets_admin.html:14
+#: app/templates/team_edit.html:115
 msgid "Failed"
-msgstr "Napaka"
+msgstr "Neuspešna"
 
 #: app/templates/add_team.html:100 app/templates/rfid_finish.html:100
 #: app/templates/rfid_judge.html:108 app/templates/team_edit.html:116
@@ -1816,7 +1825,7 @@ msgstr "Zaključni pregled"
 
 #: app/templates/base.html:169 app/templates/groups_list.html:3
 #: app/templates/groups_list.html:9 app/templates/scores_stats.html:29
-#: app/templates/sheets_admin.html:135 app/templates/teams_list.html:87
+#: app/templates/sheets_admin.html:184 app/templates/teams_list.html:87
 msgid "Groups"
 msgstr "Skupine"
 
@@ -1919,7 +1928,7 @@ msgstr "Za isto ekipo in točko že obstaja prihod. Pošlji za zamenjavo časa."
 #: app/templates/competition_settings.html:95 app/templates/group_edit.html:59
 #: app/templates/lora_add.html:21 app/templates/lora_edit.html:25
 #: app/templates/path_edit.html:79 app/templates/scoring_setup.html:246
-#: app/templates/sheets_admin.html:22 app/templates/team_edit.html:98
+#: app/templates/sheets_admin.html:71 app/templates/team_edit.html:98
 #: app/templates/user_edit.html:43
 msgid "Save"
 msgstr "Shrani"
@@ -2016,7 +2025,7 @@ msgstr "Lokacija"
 #: app/templates/firmware_list.html:25 app/templates/groups_list.html:35
 #: app/templates/lora_list.html:13 app/templates/paths_list.html:20
 #: app/templates/rfid_list.html:27 app/templates/scores_view.html:70
-#: app/templates/sheets_admin.html:353 app/templates/superadmin_index.html:53
+#: app/templates/sheets_admin.html:402 app/templates/superadmin_index.html:53
 #: app/templates/teams_list.html:89 app/templates/users_list.html:65
 #: app/templates/view_checkins.html:107
 msgid "Actions"
@@ -2044,7 +2053,7 @@ msgstr "Izbrišem to kontrolno točko?"
 #: app/templates/checkpoints_list.html:75 app/templates/firmware_list.html:44
 #: app/templates/groups_list.html:69 app/templates/lora_list.html:31
 #: app/templates/paths_list.html:58 app/templates/rfid_list.html:46
-#: app/templates/scoring_setup.html:159 app/templates/sheets_admin.html:376
+#: app/templates/scoring_setup.html:159 app/templates/sheets_admin.html:425
 #: app/templates/superadmin_index.html:96
 #: app/templates/superadmin_index.html:100 app/templates/teams_list.html:135
 #: app/templates/view_checkins.html:129
@@ -2264,8 +2273,9 @@ msgid "Expired"
 msgstr "Pretečeno"
 
 #: app/templates/competition_settings.html:149
+#: app/templates/sheets_admin.html:12
 msgid "Pending"
-msgstr "Čaka"
+msgstr "Čakajoča"
 
 #: app/templates/competition_settings.html:156
 msgid "Revoke this invite?"
@@ -2390,7 +2400,7 @@ msgid "No conflicts found — ready to merge."
 msgstr "Brez konfliktov — pripravljeno za združitev."
 
 #: app/templates/competition_transfer.html:144
-#: app/templates/firmware_list.html:18 app/templates/sheets_admin.html:351
+#: app/templates/firmware_list.html:18 app/templates/sheets_admin.html:400
 msgid "Type"
 msgstr "Tip"
 
@@ -2962,7 +2972,9 @@ msgid ""
 " Only changed rows are written; teams without an arrival get one "
 "recorded."
 msgstr ""
-"Skupinski vnos za točke, ocenjene na papirju: izpolni vrednosti in shrani vse naenkrat. Zapišejo se samo spremenjene vrstice; ekipam brez prihoda se ta zabeleži."
+"Skupinski vnos za točke, ocenjene na papirju: izpolni vrednosti in shrani"
+" vse naenkrat. Zapišejo se samo spremenjene vrstice; ekipam brez prihoda "
+"se ta zabeleži."
 
 #: app/templates/judge_table.html:24 app/templates/scoring_setup.html:41
 msgid "Total"
@@ -3025,8 +3037,7 @@ msgstr "Izpustile to kontrolno točko"
 msgid ""
 "These teams already checked in further along their route without visiting"
 " you."
-msgstr ""
-"Te ekipe so se že prijavile naprej po svoji poti, ne da bi prišle do tebe."
+msgstr "Te ekipe so se že prijavile naprej po svoji poti, ne da bi prišle do tebe."
 
 #: app/templates/landing.html:2 app/templates/landing.html:7
 msgid "Welcome"
@@ -3384,7 +3395,9 @@ msgid ""
 "The minutes box is the expected duration of the leg arriving at that "
 "stop; used as the ETA fallback until enough live data exists."
 msgstr ""
-"Polje z minutami je pričakovano trajanje etape do tega postanka; uporablja se kot rezerva za oceno prihoda, dokler ni dovolj podatkov v živo."
+"Polje z minutami je pričakovano trajanje etape do tega postanka; "
+"uporablja se kot rezerva za oceno prihoda, dokler ni dovolj podatkov v "
+"živo."
 
 #: app/templates/path_edit.html:62
 msgid "Add checkpoint"
@@ -4160,102 +4173,138 @@ msgstr "Upravljanje preglednic"
 msgid "Google Sheets (admin)"
 msgstr "Google Sheets (admin)"
 
-#: app/templates/sheets_admin.html:12
+#: app/templates/sheets_admin.html:10
+msgid "Sync queue"
+msgstr "Vrsta sinhronizacije"
+
+#: app/templates/sheets_admin.html:13
+msgid "Running"
+msgstr "V teku"
+
+#: app/templates/sheets_admin.html:16
+msgid "Last successful write"
+msgstr "Zadnji uspešen zapis"
+
+#: app/templates/sheets_admin.html:24
+msgid "Job"
+msgstr "Opravilo"
+
+#: app/templates/sheets_admin.html:25
+msgid "Attempts"
+msgstr "Poskusi"
+
+#: app/templates/sheets_admin.html:26
+msgid "Last error"
+msgstr "Zadnja napaka"
+
+#: app/templates/sheets_admin.html:39
+msgid "Retry"
+msgstr "Ponovi"
+
+#: app/templates/sheets_admin.html:43
+msgid "Discard"
+msgstr "Zavrzi"
+
+#: app/templates/sheets_admin.html:52
+msgid "No failed sync jobs."
+msgstr "Ni neuspešnih sinhronizacij."
+
+#: app/templates/sheets_admin.html:61
 msgid "Sheets sync is disabled. Scoring will not update Google Sheets."
 msgstr ""
 "Sinhronizacija Sheets je izkljucena. Rezultati se ne bodo posodabljali v "
 "Google Sheets."
 
-#: app/templates/sheets_admin.html:20
+#: app/templates/sheets_admin.html:69
 msgid "Enable Sheets sync"
 msgstr "Omogoci sinhronizacijo Sheets"
 
-#: app/templates/sheets_admin.html:26
+#: app/templates/sheets_admin.html:75
 msgid "Language pack settings"
 msgstr "Nastavitve jezikovnega paketa"
 
-#: app/templates/sheets_admin.html:29
+#: app/templates/sheets_admin.html:78
 msgid "Spreadsheet ID"
 msgstr "ID preglednice"
 
-#: app/templates/sheets_admin.html:30
+#: app/templates/sheets_admin.html:79
 msgid "Spreadsheet ID (used below)"
 msgstr "ID preglednice (uporabljen spodaj)"
 
-#: app/templates/sheets_admin.html:34
+#: app/templates/sheets_admin.html:83
 msgid "Local only (no Sheets)"
 msgstr "Samo lokalno (brez Sheets)"
 
-#: app/templates/sheets_admin.html:38 app/templates/sheets_admin.html:419
+#: app/templates/sheets_admin.html:87 app/templates/sheets_admin.html:468
 msgid "Show ordering"
 msgstr "Pokazi razvrstitev"
 
-#: app/templates/sheets_admin.html:40
+#: app/templates/sheets_admin.html:89
 msgid "Global group order"
 msgstr "Globalni vrstni red skupin"
 
-#: app/templates/sheets_admin.html:50
+#: app/templates/sheets_admin.html:99
 msgid "Drag to reorder. This order applies to all checkpoint tabs."
 msgstr "Povlecite za razvrstitev. Ta vrstni red velja za vse checkpoint zavihke."
 
-#: app/templates/sheets_admin.html:52
+#: app/templates/sheets_admin.html:101
 msgid "Global checkpoint order"
 msgstr "Globalni vrstni red checkpointov"
 
-#: app/templates/sheets_admin.html:62
+#: app/templates/sheets_admin.html:111
 msgid "Drag to reorder checkpoint columns."
 msgstr "Povlecite za razvrstitev stolpcev checkpointov."
 
-#: app/templates/sheets_admin.html:64
+#: app/templates/sheets_admin.html:113
 msgid "Per-group checkpoint order (drag within each group)"
 msgstr "Vrstni red checkpointov po skupinah (povlecite znotraj skupine)"
 
-#: app/templates/sheets_admin.html:71
+#: app/templates/sheets_admin.html:120
 msgid "Drag to reorder; uncheck to exclude a checkpoint for this group."
 msgstr ""
 "Povlecite za razvrstitev; odkljukajte, da checkpoint izkljucite iz "
 "skupine."
 
-#: app/templates/sheets_admin.html:105
+#: app/templates/sheets_admin.html:154
 msgid "Wizard: create tabs for all checkpoints"
 msgstr "Carovnik: ustvari zavihke za vse checkpointe"
 
-#: app/templates/sheets_admin.html:114 app/templates/sheets_admin.html:299
+#: app/templates/sheets_admin.html:163 app/templates/sheets_admin.html:348
 #: app/templates/sheets_lang.html:18
 msgid "Arrived header"
 msgstr "Naslov prihoda"
 
-#: app/templates/sheets_admin.html:118 app/templates/sheets_admin.html:303
+#: app/templates/sheets_admin.html:167 app/templates/sheets_admin.html:352
 #: app/templates/sheets_lang.html:22 app/templates/sheets_lang.html:53
 msgid "Points header"
 msgstr "Naslov tock"
 
-#: app/templates/sheets_admin.html:122 app/templates/sheets_admin.html:317
+#: app/templates/sheets_admin.html:171 app/templates/sheets_admin.html:366
 #: app/templates/sheets_lang.html:26
 msgid "Dead time header"
 msgstr "Naslov mrtvega casa"
 
-#: app/templates/sheets_admin.html:132
+#: app/templates/sheets_admin.html:181
 msgid "Dead time?"
 msgstr "Mrtvi cas?"
 
-#: app/templates/sheets_admin.html:133
+#: app/templates/sheets_admin.html:182
 msgid "Record time?"
 msgstr "Zabelezi cas?"
 
-#: app/templates/sheets_admin.html:134
+#: app/templates/sheets_admin.html:183
 msgid "Extra headers (comma list)"
 msgstr "Dodatni naslovi (seznam z vejicami)"
 
-#: app/templates/sheets_admin.html:153
+#: app/templates/sheets_admin.html:202
 msgid "e.g. Start time, Finish time"
 msgstr "npr. cas starta, cas cilja"
 
-#: app/templates/sheets_admin.html:175
+#: app/templates/sheets_admin.html:224
 msgid "Run wizard"
 msgstr "Zazeni carovnika"
 
-#: app/templates/sheets_admin.html:183
+#: app/templates/sheets_admin.html:232
 msgid ""
 "Publish the competition to the target Google Sheet. Works for both first-"
 "time publishing (local-only configs) and switching to a different "
@@ -4266,32 +4315,32 @@ msgid ""
 "no-op."
 msgstr ""
 
-#: app/templates/sheets_admin.html:187
+#: app/templates/sheets_admin.html:236
 msgid "Target spreadsheet ID"
 msgstr "ID ciljne preglednice"
 
-#: app/templates/sheets_admin.html:193
+#: app/templates/sheets_admin.html:242
 msgid "e.g. 1aBcD…XyZ"
 msgstr ""
 
-#: app/templates/sheets_admin.html:196
+#: app/templates/sheets_admin.html:245
 msgid "Paste the new sheet ID here to publish/repoint all per-CP tabs to it."
 msgstr ""
 "Prilepi ID nove preglednice in objavi/prenastavi vse zavihke kontrolnih "
 "točk nanjo."
 
-#: app/templates/sheets_admin.html:201
+#: app/templates/sheets_admin.html:250
 msgid ""
 "This will create or overwrite tabs on the target spreadsheet and rebind "
 "every SheetConfig (including any currently bound to another sheet). "
 "Continue?"
 msgstr ""
 
-#: app/templates/sheets_admin.html:202
+#: app/templates/sheets_admin.html:251
 msgid "Publish / repoint to sheet"
 msgstr "Objavi / prenastavi preglednico"
 
-#: app/templates/sheets_admin.html:207
+#: app/templates/sheets_admin.html:256
 msgid ""
 "After publish, every per-CP tab is rebuilt on the target sheet and all "
 "SheetConfigs are rebound. The old sheet's tabs are abandoned but not "
@@ -4301,134 +4350,134 @@ msgstr ""
 " ciljni preglednici in vse konfiguracije se preusmerijo. Zavihki stare "
 "preglednice ostanejo, a se ne posodabljajo več."
 
-#: app/templates/sheets_admin.html:219
+#: app/templates/sheets_admin.html:268
 msgid "Arrivals tab name"
 msgstr "Ime zavihka prihodov"
 
-#: app/templates/sheets_admin.html:223 app/templates/sheets_admin.html:239
-#: app/templates/sheets_admin.html:260
+#: app/templates/sheets_admin.html:272 app/templates/sheets_admin.html:288
+#: app/templates/sheets_admin.html:309
 msgid "Build / Refresh"
 msgstr "Ustvari / osvezi"
 
-#: app/templates/sheets_admin.html:231
+#: app/templates/sheets_admin.html:280
 msgid "Teams tab name"
 msgstr "Ime zavihka ekip"
 
-#: app/templates/sheets_admin.html:235
+#: app/templates/sheets_admin.html:284
 msgid "Teams headers (comma)"
 msgstr "Naslovi ekip (z vejicami)"
 
-#: app/templates/sheets_admin.html:236
+#: app/templates/sheets_admin.html:285
 msgid "(optional override)"
 msgstr "(neobvezna zamenjava)"
 
-#: app/templates/sheets_admin.html:249
+#: app/templates/sheets_admin.html:298
 msgid "Score tab name"
 msgstr "Ime zavihka rezultatov"
 
-#: app/templates/sheets_admin.html:253
+#: app/templates/sheets_admin.html:302
 msgid "Include dead time sum"
 msgstr "Vkljuci vsoto mrtvega casa"
 
-#: app/templates/sheets_admin.html:256
+#: app/templates/sheets_admin.html:305
 msgid "Add dead time sum column"
 msgstr "Dodaj stolpec vsote mrtvega casa"
 
-#: app/templates/sheets_admin.html:270
+#: app/templates/sheets_admin.html:319
 msgid "Add checkpoint tab"
 msgstr "Dodaj checkpoint zavihek"
 
-#: app/templates/sheets_admin.html:277
+#: app/templates/sheets_admin.html:326
 msgid "Tab title"
 msgstr "Naslov zavihka"
 
-#: app/templates/sheets_admin.html:278
+#: app/templates/sheets_admin.html:327
 msgid "Checkpoint tab (e.g., Timeline)"
 msgstr "Checkpoint zavihek (npr. casovnica)"
 
-#: app/templates/sheets_admin.html:282
+#: app/templates/sheets_admin.html:331
 msgid "Checkpoint (optional)"
 msgstr "Checkpoint (neobvezno)"
 
-#: app/templates/sheets_admin.html:284
+#: app/templates/sheets_admin.html:333
 msgid "— none —"
 msgstr "— brez —"
 
-#: app/templates/sheets_admin.html:292
+#: app/templates/sheets_admin.html:341
 msgid "Groups & fields"
 msgstr "Skupine in polja"
 
-#: app/templates/sheets_admin.html:293
+#: app/templates/sheets_admin.html:342
 msgid "GroupName|field1,field2"
 msgstr "GroupName|field1,field2"
 
-#: app/templates/sheets_admin.html:294
+#: app/templates/sheets_admin.html:343
 msgid "One line per group. Format: GroupName|field1,field2. Fields are optional."
 msgstr ""
 "Ena vrstica na skupino. Oblika: GroupName|field1,field2. Polja so "
 "neobvezna."
 
-#: app/templates/sheets_admin.html:310
+#: app/templates/sheets_admin.html:359
 msgid "Include dead time column"
 msgstr "Vkljuci stolpec mrtvega casa"
 
-#: app/templates/sheets_admin.html:314
+#: app/templates/sheets_admin.html:363
 msgid "Include time column"
 msgstr "Vkljuci stolpec casa"
 
-#: app/templates/sheets_admin.html:321 app/templates/sheets_lang.html:30
+#: app/templates/sheets_admin.html:370 app/templates/sheets_lang.html:30
 msgid "Time header"
 msgstr "Naslov casa"
 
-#: app/templates/sheets_admin.html:327
+#: app/templates/sheets_admin.html:376
 msgid "Overwrite if exists"
 msgstr "Prepiši, če že obstaja"
 
-#: app/templates/sheets_admin.html:329
+#: app/templates/sheets_admin.html:378
 msgid "Add tab"
 msgstr "Dodaj zavihek"
 
-#: app/templates/sheets_admin.html:338
+#: app/templates/sheets_admin.html:387
 msgid "Existing sheet configs"
 msgstr "Obstojece nastavitve preglednic"
 
-#: app/templates/sheets_admin.html:343
+#: app/templates/sheets_admin.html:392
 msgid "Prune missing tabs"
 msgstr "Pocisti manjkajoce zavihke"
 
-#: app/templates/sheets_admin.html:349
+#: app/templates/sheets_admin.html:398
 msgid "Spreadsheet"
 msgstr "Preglednica"
 
-#: app/templates/sheets_admin.html:350
+#: app/templates/sheets_admin.html:399
 msgid "Tab"
 msgstr "Zavihek"
 
-#: app/templates/sheets_admin.html:354 app/templates/superadmin_index.html:52
+#: app/templates/sheets_admin.html:403 app/templates/superadmin_index.html:52
 msgid "Created"
 msgstr "Ustvarjeno"
 
-#: app/templates/sheets_admin.html:370
+#: app/templates/sheets_admin.html:419
 msgid "Sync team numbers"
 msgstr "Sinhroniziraj stevilke ekip"
 
-#: app/templates/sheets_admin.html:374
+#: app/templates/sheets_admin.html:423
 msgid "Delete this config?"
 msgstr "Izbriši to konfiguracijo?"
 
-#: app/templates/sheets_admin.html:380
+#: app/templates/sheets_admin.html:429
 msgid "Delete config AND remote tab from spreadsheet?"
 msgstr "Izbriši konfiguracijo IN zavihek iz preglednice?"
 
-#: app/templates/sheets_admin.html:383
+#: app/templates/sheets_admin.html:432
 msgid "Delete + remote"
 msgstr "Izbriši + oddaljeni"
 
-#: app/templates/sheets_admin.html:395
+#: app/templates/sheets_admin.html:444
 msgid "No sheet configs yet."
 msgstr "Se ni nastavitev preglednic."
 
-#: app/templates/sheets_admin.html:420
+#: app/templates/sheets_admin.html:469
 msgid "Hide ordering"
 msgstr "Skrij razvrstitev"
 
