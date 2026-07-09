@@ -149,48 +149,73 @@ def _team_col_for_group_in_cp(cfg_blob: dict, group_name: str) -> int | None:
     return None
 
 
-def _build_global_rule_formulas(
+def _segment_time_lookup(cfg, group_name: str, row_idx: int) -> str:
+    """INDEX/MATCH formula returning the team's arrival time on a CP tab,
+    or '=""' when the tab/columns can't be resolved. cfg is resolved by
+    checkpoint_id upstream so renamed tabs keep working."""
+    from gspread.utils import rowcol_to_a1
+
+    if cfg is None:
+        return '=""'
+    tab_name = cfg.tab_name
+    time_col = _time_col_for_group_in_cp(cfg.config or {}, group_name)
+    team_col = _team_col_for_group_in_cp(cfg.config or {}, group_name)
+    if time_col is None or team_col is None:
+        return '=""'
+    tcl = rowcol_to_a1(1, time_col).rstrip("1")
+    acl = rowcol_to_a1(1, team_col).rstrip("1")
+    return (
+        f"=IFERROR(INDEX('{tab_name}'!{tcl}:{tcl}; "
+        f"MATCH(B{row_idx}; '{tab_name}'!{acl}:{acl}; 0)); \"\")"
+    )
+
+
+def _build_group_scoring_formulas(
     *,
     group,
-    global_rule: dict,
+    scoring,
+    route: list[int],
     cp_id_to_name: dict[int, str],
     relevant_cfgs: list,
     row_idx: int,
     dead_time_sum_expr: str,
-    virtual_cp_names: set[str] | None = None,
+    found_eligible_names: set[str] | None = None,
 ) -> tuple[str, str]:
-    """Construct the per-team Časovnica + Found-points formulas for the
-    Score tab so the spreadsheet computes the final score without our
-    system. Both formulas reach across per-CP tabs via INDEX/MATCH
-    against the Time column.
+    """Per-team Časovnica + Found-points formulas from GroupScoring.
 
-    Virtual CPs (Topo&Vrisovanje, Lokostrelstvo, etc.) are skipped from
-    the Found-points sum: by Article 38's spirit, "found" means physical
-    arrival; the in-app _compute_global_contrib enforces this naturally
-    (no Checkin row gets auto-created for virtual CPs), so the
-    spreadsheet must match.
+    Časovnica uses the route's directed start/finish and the STEPPED
+    penalty from the decisions log: deduct penalty_points per FULL
+    penalty_minutes block over the threshold (FLOOR), dead time
+    subtracted first, floored at min_points. Found points count arrivals
+    on counts_for_found checkpoints of the route.
 
-    Returns (casovnica_formula, found_formula). When the rule can't be
-    expressed (no start/end CP, or those tabs don't have time_enabled),
-    returns "=0" placeholders so the Total column still adds cleanly.
+    Returns (casovnica_formula, found_formula); "=0" placeholders when a
+    rule can't be expressed so the Total column still adds cleanly.
     """
-    virtual_cp_names = set(virtual_cp_names or ())
+    found_eligible_names = set(found_eligible_names or ())
     from gspread.utils import rowcol_to_a1
 
     def _col_letter(col: int) -> str:
         return rowcol_to_a1(1, col).rstrip("1")
 
-    # --- Časovnica (Article 39) ---
     cas_formula = "=0"
-    time_rule = global_rule.get("time") or {}
-    start_cp_name = cp_id_to_name.get(time_rule.get("start_checkpoint_id"))
-    end_cp_name = cp_id_to_name.get(time_rule.get("end_checkpoint_id"))
-    if start_cp_name and end_cp_name:
-        # Find the Time/Team columns on each of those tabs for this
-        # group. If either tab's time_enabled is off (no Time column
-        # was written), we can't compute the duration on the sheet.
-        start_cfg = next((c for c in relevant_cfgs if c.tab_name == start_cp_name), None)
-        end_cfg = next((c for c in relevant_cfgs if c.tab_name == end_cp_name), None)
+    if (
+        scoring is not None
+        and route
+        and scoring.race_max_points is not None
+        and scoring.race_threshold_minutes is not None
+        and scoring.race_penalty_minutes
+        and scoring.race_penalty_points is not None
+    ):
+        cfg_by_cp = {c.checkpoint_id: c for c in relevant_cfgs if c.checkpoint_id}
+        start_cfg = cfg_by_cp.get(route[0]) or next(
+            (c for c in relevant_cfgs if c.tab_name == cp_id_to_name.get(route[0])), None
+        )
+        end_cfg = cfg_by_cp.get(route[-1]) or next(
+            (c for c in relevant_cfgs if c.tab_name == cp_id_to_name.get(route[-1])), None
+        )
+        start_cp_name = start_cfg.tab_name if start_cfg else None
+        end_cp_name = end_cfg.tab_name if end_cfg else None
         if start_cfg is not None and end_cfg is not None:
             s_time_col = _time_col_for_group_in_cp(start_cfg.config or {}, group.name)
             s_team_col = _team_col_for_group_in_cp(start_cfg.config or {}, group.name)
@@ -205,54 +230,36 @@ def _build_global_rule_formulas(
                     f"INDEX('{start_cp_name}'!{s_t}:{s_t}; MATCH(B{row_idx}; '{start_cp_name}'!{s_a}:{s_a}; 0))"
                 )
                 end_lookup = f"INDEX('{end_cp_name}'!{e_t}:{e_t}; MATCH(B{row_idx}; '{end_cp_name}'!{e_a}:{e_a}; 0))"
-                max_p = _fmt_num(time_rule.get("max_points") or 0)
-                threshold = _fmt_num(time_rule.get("threshold_minutes") or 0)
-                penalty_p = _fmt_num(time_rule.get("penalty_points") or 0)
-                # penalty_minutes is the "per N minutes" denominator;
-                # never let it be 0 (would divide-by-zero in the sheet).
-                try:
-                    pm = float(time_rule.get("penalty_minutes") or 0)
-                except (TypeError, ValueError):
-                    pm = 0
-                penalty_m = _fmt_num(pm) if pm > 0 else "1"
-                min_p = _fmt_num(time_rule.get("min_points") or 0)
+                max_p = _fmt_num(scoring.race_max_points)
+                threshold = _fmt_num(scoring.race_threshold_minutes)
+                penalty_p = _fmt_num(scoring.race_penalty_points)
+                penalty_m = _fmt_num(scoring.race_penalty_minutes)
+                min_p = _fmt_num(scoring.race_min_points or 0)
                 cas_formula = (
                     f'=IFERROR(IF({end_lookup}=""; 0; '
-                    f"MAX({max_p}-MAX(0; ({end_lookup}-{start_lookup})*1440-({dead_time_sum_expr})-{threshold})"
-                    f"/{penalty_m}*{penalty_p}; {min_p})); 0)"
+                    f"MAX({max_p}-FLOOR(MAX(0; ({end_lookup}-{start_lookup})*1440-({dead_time_sum_expr})-{threshold})"
+                    f"/{penalty_m})*{penalty_p}; {min_p})); 0)"
                 )
 
-    # --- Found-points (Article 38) ---
     found_formula = "=0"
-    found_rule = global_rule.get("found") or {}
-    points_per = found_rule.get("points_per")
-    if points_per is not None:
-        excluded_names: set[str] = set()
-        if found_rule.get("exclude_start_checkpoint") and start_cp_name:
-            excluded_names.add(start_cp_name)
-        if found_rule.get("exclude_end_checkpoint") and end_cp_name:
-            excluded_names.add(end_cp_name)
+    if scoring is not None and scoring.found_points_per is not None:
+        route_names = {cp_id_to_name.get(cp_id) for cp_id in route}
         per_cp_terms: list[str] = []
         for cfg in relevant_cfgs:
-            if cfg.tab_name in excluded_names:
+            if cfg.tab_name not in found_eligible_names:
                 continue
-            if cfg.tab_name in virtual_cp_names:
-                # Virtual CPs don't represent a physical arrival, so
-                # they don't earn the Article 38 found bonus — matches
-                # what _compute_global_contrib does in the app.
+            if route_names and cfg.tab_name not in route_names:
                 continue
             t_col = _time_col_for_group_in_cp(cfg.config or {}, group.name)
             a_col = _team_col_for_group_in_cp(cfg.config or {}, group.name)
             if t_col is None or a_col is None:
-                # CP doesn't track time for this group; can't tell
-                # arrival from the sheet alone, so it doesn't contribute.
                 continue
             tcl = _col_letter(t_col)
             acl = _col_letter(a_col)
             lookup = f"INDEX('{cfg.tab_name}'!{tcl}:{tcl}; MATCH(B{row_idx}; '{cfg.tab_name}'!{acl}:{acl}; 0))"
             per_cp_terms.append(f'IFERROR(IF({lookup}<>""; 1; 0); 0)')
         if per_cp_terms:
-            found_formula = f"={_fmt_num(points_per)}*({'+'.join(per_cp_terms)})"
+            found_formula = f"={_fmt_num(scoring.found_points_per)}*({'+'.join(per_cp_terms)})"
 
     return cas_formula, found_formula
 
@@ -1018,29 +1025,33 @@ def build_score_tab(
         groups_query = groups_query.filter(CheckpointGroup.competition_id == competition_id)
     groups = _sort_groups(groups_query.all(), group_order)
 
-    # Phase 2 independence: read GlobalScoreRule per group so we can
-    # emit Časovnica (Article 39) and Found-points (Article 38) columns
-    # on the Score tab as formulas, not as system-computed values.
-    # Resolve start/end checkpoint names from the local Checkpoint
-    # rows; without those, no time-race formula is possible.
+    # Sheet independence: emit Časovnica (race time rule), Found-points
+    # and per-segment columns as formulas over the CP tabs' Time cells,
+    # so the spreadsheet computes the final score without our system,
+    # and hand-patched arrival times on CP tabs flow through everything.
     from app.models import Checkpoint as _CP
-    from app.models import GlobalScoreRule
+    from app.models import GroupScoring as _GS
+    from app.utils.paths import resolve_route_ids
+    from app.utils.scoring import resolve_group_segments
 
-    global_rules_by_group: dict[int, dict] = {}
+    scoring_by_group: dict[int, _GS] = {}
     if competition_id is not None:
-        for gr in GlobalScoreRule.query.filter_by(competition_id=competition_id).all():
-            global_rules_by_group[gr.group_id] = gr.rules or {}
+        for row in _GS.query.filter_by(competition_id=competition_id).all():
+            scoring_by_group[row.group_id] = row
     cp_id_to_name = (
         {c.id: c.name for c in _CP.query.filter(_CP.competition_id == competition_id).all()}
         if competition_id is not None
         else {}
     )
-    # Virtual CPs are excluded from the spreadsheet's Found-points sum
-    # so it matches the in-app calculation (no physical arrival = no
-    # +100 per Article 38). Compute once; the helper consults this set
-    # per row.
-    virtual_cp_names = (
-        {c.name for c in _CP.query.filter(_CP.competition_id == competition_id, _CP.is_virtual.is_(True)).all()}
+    # Only counts_for_found checkpoints earn found points (virtual CPs,
+    # start/finish etc. are unchecked); matches compute_group_contrib.
+    found_eligible_names = (
+        {
+            c.name
+            for c in _CP.query.filter(
+                _CP.competition_id == competition_id, _CP.counts_for_found.is_(True)
+            ).all()
+        }
         if competition_id is not None
         else set()
     )
@@ -1117,12 +1128,44 @@ def build_score_tab(
         header.extend([escape_formula_cell(cfg.tab_name) for cfg in relevant])
         if include_dead_time_sum:
             header.append(lang.get("score_dead_time_sum_header", "Mrtvi čas (sum)"))
-        # Phase 2: dedicated columns for the two global contributions
-        # so the spreadsheet can sum the final score on its own.
+        # Timed segments: four columns each (arrival A, arrival B, diff,
+        # points) per the redesign plan 3.3 contract. A/B/diff are
+        # formulas over the CP tabs' Time cells so a hand-entered time
+        # still computes; points rank-spread over the group's diff range.
+        group_segments = resolve_group_segments(g)
+        segment_col_specs = []
+        base_cols = len(header)
+        for seg_idx, segment in enumerate(group_segments):
+            start_name = cp_id_to_name.get(segment["start_checkpoint_id"], "?")
+            end_name = cp_id_to_name.get(segment["end_checkpoint_id"], "?")
+            label = segment["label"]
+            header.extend(
+                [
+                    f"{label} A",
+                    f"{label} B",
+                    f"{label} {lang.get('segment_minutes_header', 'čas (min)')}",
+                    f"{label} {lang.get('segment_points_header', 'točke')}",
+                ]
+            )
+            segment_col_specs.append(
+                {
+                    "segment": segment,
+                    "start_name": start_name,
+                    "end_name": end_name,
+                    "a_col": base_cols + 1 + seg_idx * 4,
+                    "b_col": base_cols + 2 + seg_idx * 4,
+                    "diff_col": base_cols + 3 + seg_idx * 4,
+                    "points_col": base_cols + 4 + seg_idx * 4,
+                }
+            )
+        # Dedicated columns for the two category-level contributions so
+        # the spreadsheet can sum the final score on its own.
         header.append(lang.get("score_casovnica_header", "Časovnica"))
         header.append(lang.get("score_found_header", "Najdene KT"))
         header.append(lang.get("score_total_header", "Skupaj točke"))
         start_row = len(values) + 1  # header row index (1-based)
+        data_start = start_row + 1
+        data_end = start_row + len(teams)
         values.append(header)
 
         # For each team, compute row with same column positions
@@ -1180,34 +1223,76 @@ def build_score_tab(
             def _strip_eq(expr: str) -> str:
                 return expr[1:] if expr.startswith("=") else expr
 
+            # Dead-time total: always computed (the Časovnica formula
+            # subtracts it even when the visible column is omitted), and
+            # includes the team-level bonus_dead_time constant so the
+            # sheet matches compute_group_contrib.
             dead_time_sum_expr = "0"
+            if dead_time_formulas and any(f not in ("=0", "0") for f in dead_time_formulas):
+                dead_time_sum_expr = f"SUM({';'.join(_strip_eq(f) for f in dead_time_formulas)})"
+            bonus_dead = float(t.bonus_dead_time or 0)
+            if bonus_dead:
+                dead_time_sum_expr = f"{dead_time_sum_expr}+{_fmt_num(bonus_dead)}"
             if include_dead_time_sum:
-                if dead_time_formulas and any(f not in ("=0", "0") for f in dead_time_formulas):
-                    dt_total_formula = f"=SUM({';'.join(_strip_eq(f) for f in dead_time_formulas)})"
-                    dead_time_sum_expr = f"SUM({';'.join(_strip_eq(f) for f in dead_time_formulas)})"
-                else:
-                    dt_total_formula = "=0"
+                dt_total_formula = "=0" if dead_time_sum_expr == "0" else f"={dead_time_sum_expr}"
                 row.append(dt_total_formula)
 
-            # Phase 2: Časovnica + Found formulas, derived from the
-            # per-CP tabs' Time columns. Each is computed entirely from
-            # cells on this spreadsheet so the system can be offline
-            # and the Score tab still produces the correct final total.
-            cas_formula, found_formula = _build_global_rule_formulas(
+            # Timed segment cells: A/B arrival lookups, diff as an
+            # in-sheet formula over the A/B cells (so hand-patched times
+            # recompute), points rank-spread over the group's diff range.
+            from gspread.utils import rowcol_to_a1 as _rc
+
+            def _letter(col: int) -> str:
+                return _rc(1, col).rstrip("1")
+
+            segment_point_cells = []
+            cfg_by_cp_id = {c.checkpoint_id: c for c in relevant if c.checkpoint_id}
+            for spec in segment_col_specs:
+                a_lookup = _segment_time_lookup(
+                    cfg_by_cp_id.get(spec["segment"]["start_checkpoint_id"]), g.name, row_idx
+                )
+                b_lookup = _segment_time_lookup(
+                    cfg_by_cp_id.get(spec["segment"]["end_checkpoint_id"]), g.name, row_idx
+                )
+                a_cell = f"{_letter(spec['a_col'])}{row_idx}"
+                b_cell = f"{_letter(spec['b_col'])}{row_idx}"
+                diff_cell = f"{_letter(spec['diff_col'])}{row_idx}"
+                diff_col_letter = _letter(spec["diff_col"])
+                rng = f"{diff_col_letter}{data_start}:{diff_col_letter}{data_end}"
+                maxp = _fmt_num(spec["segment"]["max_points"])
+                minp = _fmt_num(spec["segment"]["min_points"])
+                row.append(a_lookup)
+                row.append(b_lookup)
+                row.append(
+                    f'=IF(OR({a_cell}=""; {b_cell}=""); ""; ({b_cell}-{a_cell})*1440)'
+                )
+                row.append(
+                    f'=IF({diff_cell}=""; 0; IF(MAX({rng})=MIN({rng}); {maxp}; '
+                    f"MAX({maxp}-({diff_cell}-MIN({rng}))/(MAX({rng})-MIN({rng}))*({maxp}-({minp})); {minp})))"
+                )
+                segment_point_cells.append(f"{_letter(spec['points_col'])}{row_idx}")
+
+            # Časovnica + Found formulas from the category rules, derived
+            # from the per-CP tabs' Time columns, computed entirely from
+            # cells on this spreadsheet so the system can be offline and
+            # the Score tab still produces the correct final total.
+            cas_formula, found_formula = _build_group_scoring_formulas(
                 group=g,
-                global_rule=global_rules_by_group.get(g.id) or {},
+                scoring=scoring_by_group.get(g.id),
+                route=resolve_route_ids(g),
                 cp_id_to_name=cp_id_to_name,
                 relevant_cfgs=relevant,
                 row_idx=row_idx,
                 dead_time_sum_expr=dead_time_sum_expr,
-                virtual_cp_names=virtual_cp_names,
+                found_eligible_names=found_eligible_names,
             )
             row.append(cas_formula)
             row.append(found_formula)
 
-            # Total is now the sum of per-CP points + časovnica + found,
+            # Total = per-CP points + segment points + časovnica + found,
             # all computed from cells on the spreadsheet.
             total_pieces = [_strip_eq(f) for f in cp_formulas]
+            total_pieces.extend(segment_point_cells)
             total_pieces.append(_strip_eq(cas_formula))
             total_pieces.append(_strip_eq(found_formula))
             if total_pieces:
@@ -1233,14 +1318,14 @@ def build_score_tab(
         values.append([])
 
     # Organization summary at bottom
-    orgs = (
+    orgs_query = (
         db.session.query(Team.organization)
         .filter(Team.organization.isnot(None))
         .filter(func.trim(Team.organization) != "")
-        .distinct()
-        .order_by(Team.organization.asc())
-        .all()
     )
+    if competition_id is not None:
+        orgs_query = orgs_query.filter(Team.competition_id == competition_id)
+    orgs = orgs_query.distinct().order_by(Team.organization.asc()).all()
     org_names = [o[0] for o in orgs if o[0]]
     if org_names:
         values.append([])
@@ -1472,17 +1557,40 @@ def wizard_build_checkpoint_tabs(
         if per_checkpoint_groups and cp.id in per_checkpoint_groups:
             raw_groups = CheckpointGroup.query.filter(CheckpointGroup.id.in_(per_checkpoint_groups[cp.id])).all()
         else:
-            raw_groups = cp.groups or []
+            from app.utils.paths import group_ids_containing_checkpoint
+
+            member_ids = group_ids_containing_checkpoint(cp.competition_id, cp.id)
+            raw_groups = (
+                CheckpointGroup.query.filter(CheckpointGroup.id.in_(member_ids)).all() if member_ids else []
+            )
 
         def _sort_key(g):
             norm = g.name.lower().strip()
             return (group_order_norm.index(norm) if norm in group_order_norm else len(group_order_norm), g.name)
 
         ordered_groups = sorted(raw_groups, key=_sort_key)
-        extra_fields = per_checkpoint_extra_fields.get(cp.id, []) if per_checkpoint_extra_fields else []
         time_enabled = bool(record_time_cp and cp.id in record_time_cp)
-        groups_def = [{"group_id": g.id, "name": g.name, "fields": list(extra_fields)} for g in ordered_groups]
-        dead_time_enabled = per_checkpoint_dead_time.get(cp.id, True) if per_checkpoint_dead_time else True
+        # Tab layout is generated from ScoreField (per-group resolution);
+        # the legacy per_checkpoint_extra_fields override is honored when
+        # a caller still passes it.
+        from app.utils.scoring import resolve_fields as _resolve_fields
+
+        if per_checkpoint_extra_fields and cp.id in per_checkpoint_extra_fields:
+            extra_fields = per_checkpoint_extra_fields.get(cp.id, [])
+            groups_def = [{"group_id": g.id, "name": g.name, "fields": list(extra_fields)} for g in ordered_groups]
+        else:
+            groups_def = [
+                {
+                    "group_id": g.id,
+                    "name": g.name,
+                    "fields": [f["key"] for f in _resolve_fields(cp.id, g.id)],
+                }
+                for g in ordered_groups
+            ]
+        if per_checkpoint_dead_time:
+            dead_time_enabled = per_checkpoint_dead_time.get(cp.id, bool(cp.dead_time_enabled))
+        else:
+            dead_time_enabled = bool(cp.dead_time_enabled)
         if not groups_def:
             continue
 
@@ -1605,17 +1713,40 @@ def wizard_create_checkpoint_configs(
         if per_checkpoint_groups and cp.id in per_checkpoint_groups:
             raw_groups = CheckpointGroup.query.filter(CheckpointGroup.id.in_(per_checkpoint_groups[cp.id])).all()
         else:
-            raw_groups = cp.groups or []
+            from app.utils.paths import group_ids_containing_checkpoint
+
+            member_ids = group_ids_containing_checkpoint(cp.competition_id, cp.id)
+            raw_groups = (
+                CheckpointGroup.query.filter(CheckpointGroup.id.in_(member_ids)).all() if member_ids else []
+            )
 
         def _sort_key(g):
             norm = g.name.lower().strip()
             return (group_order_norm.index(norm) if norm in group_order_norm else len(group_order_norm), g.name)
 
         ordered_groups = sorted(raw_groups, key=_sort_key)
-        extra_fields = per_checkpoint_extra_fields.get(cp.id, []) if per_checkpoint_extra_fields else []
         time_enabled = bool(record_time_cp and cp.id in record_time_cp)
-        groups_def = [{"group_id": g.id, "name": g.name, "fields": list(extra_fields)} for g in ordered_groups]
-        dead_time_enabled = per_checkpoint_dead_time.get(cp.id, True) if per_checkpoint_dead_time else True
+        # Tab layout is generated from ScoreField (per-group resolution);
+        # the legacy per_checkpoint_extra_fields override is honored when
+        # a caller still passes it.
+        from app.utils.scoring import resolve_fields as _resolve_fields
+
+        if per_checkpoint_extra_fields and cp.id in per_checkpoint_extra_fields:
+            extra_fields = per_checkpoint_extra_fields.get(cp.id, [])
+            groups_def = [{"group_id": g.id, "name": g.name, "fields": list(extra_fields)} for g in ordered_groups]
+        else:
+            groups_def = [
+                {
+                    "group_id": g.id,
+                    "name": g.name,
+                    "fields": [f["key"] for f in _resolve_fields(cp.id, g.id)],
+                }
+                for g in ordered_groups
+            ]
+        if per_checkpoint_dead_time:
+            dead_time_enabled = per_checkpoint_dead_time.get(cp.id, bool(cp.dead_time_enabled))
+        else:
+            dead_time_enabled = bool(cp.dead_time_enabled)
         if not groups_def:
             continue
 
@@ -1664,7 +1795,7 @@ def _fmt_num(value) -> str:
 
 
 def _field_rule_to_formula(rule, cell_ref: str) -> str | None:
-    """Translate one ScoreRule field rule into a Sheets formula expression
+    """Translate one field rule into a Sheets formula expression
     (no leading '=') that reads `cell_ref` and produces the field's
     point contribution.
 
@@ -1745,7 +1876,7 @@ def _points_formula_from_rule(
     row: int,
 ) -> str | None:
     """Compose the Points-cell formula for one (CP, group) from a
-    ScoreRule blob.
+    legacy-shaped rule blob (built from ScoreField rows).
 
     `field_columns` maps each field name to its 1-based column index
     inside the group block; `row` is the spreadsheet row of the team.
@@ -1775,7 +1906,10 @@ def _points_formula_from_rule(
     for f in total_fields:
         col = field_columns.get(f)
         if col is None:
-            continue
+            # A counted field with no column on the tab (added after the
+            # wizard ran) would silently undercount; fall back to the
+            # system-written total instead.
+            return None
         cell_ref = rowcol_to_a1(row, col)
         rule = field_rules.get(f)
         piece = _field_rule_to_formula(rule, cell_ref)
@@ -1803,8 +1937,6 @@ def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> tuple[list[li
     per-column wizard pattern that costs 1 per group, so a 14-CP publish
     stays comfortably under the 40-calls-per-60s quota.
     """
-    from app.models import ScoreRule
-
     cfg_blob = cfg.config or {}
     groups_def = cfg_blob.get("groups") or []
     dead_time_enabled = bool(cfg_blob.get("dead_time_enabled"))
@@ -1908,13 +2040,16 @@ def _build_local_cp_grid(cfg: SheetConfig, competition_id: int) -> tuple[list[li
                 col_cursor += 1
             points_col_by_group[gid] = col_cursor  # 1-based column of Points
             field_cols_by_group[gid] = field_cols
-            rule = (
-                ScoreRule.query.filter_by(competition_id=competition_id, checkpoint_id=cp_id, group_id=gid)
-                .order_by(ScoreRule.created_at.desc())
-                .first()
-            )
-            if rule is not None:
-                rule_by_group[gid] = rule.rules or {}
+            # Legacy-shaped rule blob from the resolved ScoreField rows so
+            # _points_formula_from_rule keeps working unchanged.
+            from app.utils.scoring import resolve_fields as _resolve_fields
+
+            resolved = _resolve_fields(cp_id, gid)
+            if resolved:
+                rule_by_group[gid] = {
+                    "field_rules": {f["key"]: (f.get("rule") or {}) for f in resolved},
+                    "total_fields": [f["key"] for f in resolved if f.get("counts_in_total", True)],
+                }
 
     # Header row (escape any user-supplied strings)
     values: list[list] = [[escape_formula_cell(h) if isinstance(h, str) else h for h in headers]]
