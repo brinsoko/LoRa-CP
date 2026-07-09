@@ -1,21 +1,24 @@
-"""Audit, submissions, and score-rules views render dict blobs for
-human eyes. Jinja's built-in `tojson` ASCII-escapes everything (emoji,
-š/č/ž, mojibake leftovers), producing ugly `\\u00f0` sequences on the
-page. The `pretty_json` filter preserves UTF-8 while still
-HTML-escaping for XSS safety."""
+"""Audit and submissions views render dict blobs for human eyes.
+Jinja's built-in `tojson` ASCII-escapes everything (emoji, š/č/ž,
+mojibake leftovers), producing ugly `\\u00f0` sequences on the page.
+The `pretty_json` filter preserves UTF-8 while still HTML-escaping for
+XSS safety. The scoring setup page (successor of the score-rules view)
+renders field keys/labels via plain Jinja escaping, which must likewise
+keep unicode glyphs intact."""
 
 from __future__ import annotations
 
 from datetime import datetime
 
 from app.extensions import db
-from app.models import AuditEvent, ScoreEntry, ScoreRule
+from app.models import AuditEvent, ScoreEntry
 from tests.support import (
     add_membership,
     assign_team_group,
     create_checkpoint,
     create_competition,
     create_group,
+    create_score_field,
     create_team,
     create_user,
     login_as,
@@ -135,34 +138,28 @@ def test_audit_details_render_unicode_payload(client, app):
     assert "\\ud83" not in body, "Audit page still ASCII-escaping emojis"
 
 
-def test_score_rules_pre_renders_unicode_field_names(client, app):
-    """The score-rules listing shows each rule's JSON in a <pre>. Field
-    names with accents should render as those accents, not escapes."""
-    admin = create_user(username="rules-admin", role="admin")
+def test_scoring_setup_renders_unicode_field_names(client, app):
+    """The scoring setup page (successor of the /scores/rules listing)
+    shows each field's key and label in form inputs. Names with accents
+    should render as those accents, not escapes."""
+    admin = create_user(username="rules-admin")
     comp = create_competition(name="Diacritic Race")
     add_membership(admin, comp, role="admin")
-    group = create_group(comp, name="Alpha", prefix="1xx")
+    create_group(comp, name="Alpha", prefix="1xx")
     cp = create_checkpoint(comp, name="CP-Diacritic")
-    db.session.add(
-        ScoreRule(
-            competition_id=comp.id,
-            checkpoint_id=cp.id,
-            group_id=group.id,
-            rules={"field_rules": {"točke": {"type": "multiplier", "factor": 2}}},
-        )
-    )
-    db.session.commit()
+    create_score_field(cp, "točke", label="Točke", rule_type="multiplier", rule_params={"factor": 2})
     login_as(client, admin, comp)
 
-    resp = client.get("/scores/rules")
+    resp = client.get("/scores/setup")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8", errors="replace")
 
     # Slovenian č appears as the glyph, not as a č escape.
     assert "točke" in body
-    # The JS-embedding tojson on the Load button is still allowed —
-    # check we didn't accidentally break that path (data-rule attr).
-    assert "data-rule=" in body
+    assert "Točke" in body
+    # The rule params still render as JSON in the edit input (the
+    # JSON-embedding tojson path is still allowed there).
+    assert "factor" in body
 
 
 def test_pretty_json_html_escapes_dangerous_values(app):

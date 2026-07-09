@@ -8,10 +8,8 @@ from app.extensions import db
 from app.models import (
     Checkpoint,
     Competition,
-    GlobalScoreRule,
     LoRaMessage,
     ScoreEntry,
-    ScoreRule,
     SheetConfig,
     Team,
     User,
@@ -26,10 +24,13 @@ from tests.support import (
     create_device,
     create_group,
     create_rfid_card,
+    create_score_field,
+    create_segment,
     create_team,
     create_user,
     login_as,
     set_group_route,
+    set_group_scoring,
 )
 
 
@@ -52,8 +53,9 @@ class SeededState:
     device_dev_num: int
     card_id: int
     checkin_id: int
-    score_rule_id: int
-    global_rule_id: int
+    path_id: int
+    score_field_id: int
+    segment_id: int
 
 
 @pytest.fixture
@@ -78,7 +80,7 @@ def seeded_state(app):
     second_checkpoint = create_checkpoint(competition, name="Second CP")
     third_checkpoint = create_checkpoint(competition, name="Delete CP")
 
-    set_group_route(first_group, [checkpoint, second_checkpoint])
+    first_path = set_group_route(first_group, [checkpoint, second_checkpoint])
     set_group_route(second_group, [second_checkpoint])
 
     team = create_team(competition, name="Matrix Team", number=10, organization="Org A")
@@ -118,20 +120,13 @@ def seeded_state(app):
             },
         )
     )
-    score_rule = ScoreRule(
-        competition_id=competition.id,
-        checkpoint_id=checkpoint.id,
-        group_id=first_group.id,
-        rules={"field_rules": {"accuracy": {"type": "multiplier", "factor": 2}}, "total_fields": ["accuracy"]},
-    )
-    global_rule = GlobalScoreRule(
-        competition_id=competition.id,
-        group_id=first_group.id,
-        rules={"found": {"points_per": 5}},
-    )
-    db.session.add(score_rule)
-    db.session.add(global_rule)
     db.session.commit()
+    # Phase-2 scoring model: structured rows instead of JSON-blob rules.
+    score_field = create_score_field(
+        checkpoint, "accuracy", rule_type="multiplier", rule_params={"factor": 2}
+    )
+    set_group_scoring(first_group, found_points_per=5)
+    segment = create_segment(first_path, checkpoint, second_checkpoint, max_points=50)
 
     return SeededState(
         competition_id=competition.id,
@@ -151,8 +146,9 @@ def seeded_state(app):
         device_dev_num=device.dev_num,
         card_id=card.id,
         checkin_id=checkin.id,
-        score_rule_id=score_rule.id,
-        global_rule_id=global_rule.id,
+        path_id=first_path.id,
+        score_field_id=score_field.id,
+        segment_id=segment.id,
     )
 
 
@@ -178,7 +174,10 @@ def _login(client, state: SeededState, role: str) -> None:
         ("GET", "/users/", 403),
         ("GET", "/messages/", 403),
         ("GET", "/audit/", 403),
-        ("GET", "/scores/rules", 403),
+        ("GET", "/scores/setup", 403),
+        ("POST", "/scores/setup/fields", 403),
+        ("POST", "/scores/setup/segments", 403),
+        ("POST", "/scores/setup/group-scoring", 403),
         ("GET", "/sheets/", 403),
         ("GET", "/competition/settings", 403),
         ("GET", "/lora/", 403),
@@ -196,7 +195,10 @@ def _login(client, state: SeededState, role: str) -> None:
         ("GET", "/api/map/checkpoints", 403),
         ("GET", "/api/map/lora-points", 403),
         ("GET", "/api/devices/messages", 403),
-        ("GET", "/api/score-rules", 403),
+        ("GET", "/api/score-fields", 403),
+        ("GET", "/api/score-fields/resolved", 403),
+        ("POST", "/api/score-fields", 403),
+        ("DELETE", "/api/score-fields/999999", 403),
     ],
 )
 def test_viewer_endpoint_matrix(client, app, seeded_state, method, path, expected):
@@ -221,7 +223,10 @@ def test_viewer_endpoint_matrix(client, app, seeded_state, method, path, expecte
         ("GET", "/users/", 403),
         ("GET", "/messages/", 403),
         ("GET", "/audit/", 403),
-        ("GET", "/scores/rules", 403),
+        ("GET", "/scores/setup", 403),
+        ("POST", "/scores/setup/fields", 403),
+        ("POST", "/scores/setup/segments", 403),
+        ("POST", "/scores/setup/group-scoring", 403),
         ("GET", "/sheets/", 403),
         ("GET", "/competition/settings", 403),
         ("GET", "/api/auth/me", 200),
@@ -235,7 +240,10 @@ def test_viewer_endpoint_matrix(client, app, seeded_state, method, path, expecte
         ("GET", "/api/map/lora-points", 200),
         ("GET", "/api/users", 403),
         ("GET", "/api/devices/messages", 403),
-        ("GET", "/api/score-rules", 403),
+        ("GET", "/api/score-fields", 403),
+        ("GET", "/api/score-fields/resolved", 403),
+        ("POST", "/api/score-fields", 403),
+        ("DELETE", "/api/score-fields/999999", 403),
     ],
 )
 def test_judge_endpoint_matrix(client, app, seeded_state, method, path, expected):
@@ -502,7 +510,7 @@ def test_checkin_delete_requires_admin(client, app, seeded_state):
     assert response.status_code == 403
 
 
-def test_score_api_and_rule_endpoints(client, app, seeded_state):
+def test_score_api_and_field_endpoints(client, app, seeded_state):
     _login(client, seeded_state, "admin")
 
     resolved = client.post(
@@ -517,26 +525,28 @@ def test_score_api_and_rule_endpoints(client, app, seeded_state):
             "fields": {"accuracy": 3, "dead_time": 1},
         },
     )
-    listed = client.get("/api/score-rules")
+    listed = client.get("/api/score-fields")
     fields = client.get(
-        f"/api/score-rules/fields?checkpoint_id={seeded_state.checkpoint_id}&group_id={seeded_state.group_id}"
+        f"/api/score-fields/resolved?checkpoint_id={seeded_state.checkpoint_id}&group_id={seeded_state.group_id}"
     )
-    updated_rule = client.post(
-        "/api/score-rules",
+    updated_field = client.post(
+        "/api/score-fields",
         json={
             "checkpoint_id": seeded_state.checkpoint_id,
-            "group_id": seeded_state.group_id,
-            "rules": {"field_rules": {"accuracy": {"type": "multiplier", "factor": 3}}},
+            "key": "accuracy",
+            "rule_type": "multiplier",
+            "rule_params": {"factor": 3},
         },
     )
-    delete_rule = client.delete(f"/api/score-rules/{seeded_state.score_rule_id}")
+    delete_field = client.delete(f"/api/score-fields/{seeded_state.score_field_id}")
 
     assert resolved.status_code == 200
     assert submitted.status_code == 201
     assert listed.status_code == 200
     assert fields.status_code == 200
-    assert updated_rule.status_code == 200
-    assert delete_rule.status_code == 200
+    # Upsert on an existing checkpoint+key updates in place (200, not 201).
+    assert updated_field.status_code == 200
+    assert delete_field.status_code == 200
     assert ScoreEntry.query.count() >= 1
 
 
@@ -551,7 +561,7 @@ def test_score_api_and_rule_endpoints(client, app, seeded_state):
         "/map/",
         "/map/devices",
         "/scores/judge",
-        "/scores/rules",
+        "/scores/setup",
         "/scores/view",
         "/scores/submissions",
         "/scores/stats",
@@ -596,12 +606,26 @@ def test_admin_remaining_html_post_endpoints(client, app, seeded_state):
     build_score = client.post("/sheets/build-score", data={"spreadsheet_id": "local:matrix", "tab_name": "Score"})
     wizard = client.post("/sheets/wizard/checkpoints", data={"spreadsheet_id": "local:matrix"})
     add_tab = client.post("/sheets/add-tab", data={"spreadsheet_id": "local:matrix", "tab_title": "CP Sheet"})
-    global_rules = client.post(
-        "/scores/global-rules",
-        data={"global_group_id": str(seeded_state.group_id), "global_found_enabled": "on", "global_found_points": "3"},
+    # Phase-2 scoring admin forms (replace /scores/rules and /scores/global-rules).
+    setup_fields = client.post(
+        "/scores/setup/fields",
+        data={"checkpoint_id": str(seeded_state.checkpoint_id), "new_key": "bonus", "new_rule_type": "none"},
     )
-    delete_global_rule = client.post(f"/scores/global-rules/{seeded_state.global_rule_id}/delete")
-    delete_score_rule = client.post(f"/scores/rules/{seeded_state.score_rule_id}/delete")
+    setup_segment = client.post(
+        "/scores/setup/segments",
+        data={
+            "path_id": str(seeded_state.path_id),
+            "start_checkpoint_id": str(seeded_state.checkpoint_id),
+            "end_checkpoint_id": str(seeded_state.second_checkpoint_id),
+            "max_points": "50",
+            "min_points": "0",
+        },
+    )
+    group_scoring = client.post(
+        "/scores/setup/group-scoring",
+        data={"group_id": str(seeded_state.group_id), "found_points_per": "3"},
+    )
+    delete_segment = client.post(f"/scores/setup/segments/{seeded_state.segment_id}/delete")
 
     for response in (
         attach,
@@ -616,8 +640,9 @@ def test_admin_remaining_html_post_endpoints(client, app, seeded_state):
         build_score,
         wizard,
         add_tab,
-        global_rules,
-        delete_global_rule,
-        delete_score_rule,
+        setup_fields,
+        setup_segment,
+        group_scoring,
+        delete_segment,
     ):
         assert response.status_code in (200, 302)

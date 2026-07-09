@@ -947,7 +947,7 @@ class TestApiErrorEnvelopes:
         add_membership(viewer, competition, role="viewer")
         login_as(client, viewer, competition)
 
-        response = client.get("/api/score-rules")
+        response = client.get("/api/score-fields")
         body = response.get_json()
 
         assert response.status_code == 403

@@ -10,13 +10,17 @@ from app.models import (
     CheckpointGroup,
     Competition,
     CompetitionMember,
+    GroupScoring,
     JudgeCheckpoint,
     LoRaDevice,
     Path,
     PathStop,
     RFIDCard,
+    ScoreField,
+    ScoreFieldGroup,
     Team,
     TeamGroup,
+    TimedSegment,
     User,
 )
 from app.utils.time import utcnow_naive
@@ -113,6 +117,93 @@ def assign_team_group(team: Team, group: CheckpointGroup, *, active: bool = True
     db.session.add(link)
     db.session.commit()
     return link
+
+
+def create_score_field(
+    checkpoint: Checkpoint,
+    key: str,
+    *,
+    label: str | None = None,
+    hint: str | None = None,
+    position: int | None = None,
+    rule_type: str = "none",
+    rule_params: dict | None = None,
+    max_input: float | None = None,
+    counts_in_total: bool = True,
+) -> ScoreField:
+    if position is None:
+        position = (
+            db.session.query(db.func.max(ScoreField.position))
+            .filter(ScoreField.checkpoint_id == checkpoint.id)
+            .scalar()
+        )
+        position = (position if position is not None else -1) + 1
+    field = ScoreField(
+        competition_id=checkpoint.competition_id,
+        checkpoint_id=checkpoint.id,
+        key=key,
+        label=label,
+        hint=hint,
+        position=position,
+        rule_type=rule_type,
+        rule_params=rule_params,
+        max_input=max_input,
+        counts_in_total=counts_in_total,
+    )
+    db.session.add(field)
+    db.session.commit()
+    return field
+
+
+def set_field_group(
+    field: ScoreField,
+    group: CheckpointGroup,
+    *,
+    enabled: bool = True,
+    rule_override: dict | None = None,
+) -> ScoreFieldGroup:
+    row = ScoreFieldGroup.query.filter_by(score_field_id=field.id, group_id=group.id).first()
+    if row is None:
+        row = ScoreFieldGroup(score_field_id=field.id, group_id=group.id)
+        db.session.add(row)
+    row.enabled = enabled
+    row.rule_override = rule_override
+    db.session.commit()
+    return row
+
+
+def create_segment(
+    path: Path,
+    start_checkpoint: Checkpoint,
+    end_checkpoint: Checkpoint,
+    *,
+    name: str | None = None,
+    max_points: float = 100.0,
+    min_points: float = 0.0,
+) -> TimedSegment:
+    segment = TimedSegment(
+        competition_id=path.competition_id,
+        path_id=path.id,
+        start_checkpoint_id=start_checkpoint.id,
+        end_checkpoint_id=end_checkpoint.id,
+        name=name,
+        max_points=max_points,
+        min_points=min_points,
+    )
+    db.session.add(segment)
+    db.session.commit()
+    return segment
+
+
+def set_group_scoring(group: CheckpointGroup, **values) -> GroupScoring:
+    row = GroupScoring.query.filter_by(group_id=group.id).first()
+    if row is None:
+        row = GroupScoring(group_id=group.id, competition_id=group.competition_id)
+        db.session.add(row)
+    for key, value in values.items():
+        setattr(row, key, value)
+    db.session.commit()
+    return row
 
 
 def set_group_route(
