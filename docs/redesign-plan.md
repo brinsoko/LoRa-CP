@@ -458,6 +458,20 @@ scan+checkin+score flow, expected/ETA view (with missed/DNF/finished
 exclusions), score corrections from the arrived list, bulk-entry grid for
 `bulk_entry_enabled` checkpoints, toasts. Judges land here after login.
 
+Phase 3 implementation notes:
+
+- The scan flow records the arrival at scan time (resolve with
+  create_checkin), not at score submit: an arrival must exist even if the
+  judge never submits a score. Submit still auto-creates as a fallback.
+- A team that skipped the checkpoint all the way to the finish appears in
+  the "missed you" bucket AND counts as finished in the summary line.
+- expected_leg_minutes is editable per stop on the path edit page (the
+  ETA fallback); the minutes value rides in each list row so drag/reverse
+  reorder keeps the pairs aligned.
+- The bulk grid renders one section per category (fields differ per
+  group), writes only changed rows, and records an arrival for teams
+  scored on paper without a scan.
+
 **Phase 4, sheets:** outbox table + single worker process + coalescing +
 backoff + dirty-flag reconciliation + keyed row writes + health panel.
 Delete the in-memory queue.
