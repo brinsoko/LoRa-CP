@@ -91,23 +91,31 @@ def group_ids_containing_checkpoint(comp_id: int, checkpoint_id: int) -> set[int
     return {row[0] for row in rows}
 
 
-def replace_path_stops(path: Path, ordered_checkpoint_ids: list[int]) -> None:
+def replace_path_stops(
+    path: Path,
+    ordered_checkpoint_ids: list[int],
+    expected_minutes: list[float | None] | None = None,
+) -> None:
     """Rewrite a path's stops to the given checkpoint order.
 
-    Positions are reassigned densely from 0. Existing expected_leg_minutes
-    values are kept for positions whose checkpoint did not change, since a
-    pure reorder of later stops shouldn't wipe earlier leg estimates.
+    Positions are reassigned densely from 0. expected_minutes, when given,
+    is aligned with the checkpoint list (ETA fallback per leg); otherwise
+    existing values are kept for positions whose checkpoint did not
+    change, so a pure reorder of later stops doesn't wipe leg estimates.
     """
     previous = {stop.position: stop for stop in path.stops}
     path.stops = []
     db.session.flush()
     for position, checkpoint_id in enumerate(ordered_checkpoint_ids):
-        old = previous.get(position)
-        keep_minutes = old.expected_leg_minutes if (old and old.checkpoint_id == checkpoint_id) else None
+        if expected_minutes is not None:
+            minutes = expected_minutes[position] if position < len(expected_minutes) else None
+        else:
+            old = previous.get(position)
+            minutes = old.expected_leg_minutes if (old and old.checkpoint_id == checkpoint_id) else None
         path.stops.append(
             PathStop(
                 checkpoint_id=checkpoint_id,
                 position=position,
-                expected_leg_minutes=keep_minutes,
+                expected_leg_minutes=minutes,
             )
         )

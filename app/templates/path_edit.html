@@ -44,10 +44,16 @@
                   <li class="list-group-item d-flex align-items-center gap-2" data-cp-id="{{ cp.id }}" data-cp-name="{{ cp.name }}">
                     <span class="drag-handle text-muted">::</span>
                     <span class="flex-grow-1">{{ cp.name }}</span>
+                    <input type="hidden" name="checkpoint_ids" value="{{ cp.id }}">
+                    <input type="number" step="any" min="0" class="form-control form-control-sm leg-minutes"
+                           style="width: 90px;" name="expected_leg_minutes"
+                           title="{{ _('Expected minutes from the previous stop (ETA fallback)') }}"
+                           placeholder="{{ _('min') }}" value="{{ cp.expected_leg_minutes if cp.expected_leg_minutes is not none else '' }}">
                     <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove">{{ _('Remove') }}</button>
                   </li>
                 {% endfor %}
               </ul>
+              <div class="form-text">{{ _('The minutes box is the expected duration of the leg arriving at that stop; used as the ETA fallback until enough live data exists.') }}</div>
               <div id="selectedEmptyNotice" class="text-muted small {% if selected_items %}d-none{% endif %} mt-2">{{ _('No checkpoints selected yet.') }}</div>
             </div>
           </div>
@@ -69,8 +75,6 @@
         </div>
       </div>
 
-      <div id="checkpointHiddenInputs"></div>
-
       <div class="d-flex gap-2">
         <button class="btn btn-primary" type="submit">{{ _('Save') }}</button>
         <a class="btn btn-secondary" href="{{ url_for('paths.list_paths') }}">{{ _('Cancel') }}</a>
@@ -88,7 +92,6 @@ document.addEventListener("DOMContentLoaded", function() {
   const availableSelect = document.getElementById("availableCheckpoints");
   const addButton = document.getElementById("addCheckpointBtn");
   const reverseButton = document.getElementById("reverseOrderBtn");
-  const hiddenContainer = document.getElementById("checkpointHiddenInputs");
   const emptyNotice = document.getElementById("selectedEmptyNotice");
 
   function updateEmptyState() {
@@ -97,28 +100,18 @@ document.addEventListener("DOMContentLoaded", function() {
     emptyNotice.classList.toggle("d-none", hasItems);
   }
 
-  function refreshHiddenInputs() {
-    if (!hiddenContainer || !selectedList) return;
-    hiddenContainer.innerHTML = "";
-    selectedList.querySelectorAll("[data-cp-id]").forEach((item) => {
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = "checkpoint_ids";
-      input.value = item.dataset.cpId;
-      hiddenContainer.appendChild(input);
-    });
-  }
-
   function attachRemoveHandler(item) {
     const removeBtn = item.querySelector("[data-action='remove']");
     if (!removeBtn) return;
     removeBtn.addEventListener("click", () => {
       item.remove();
-      refreshHiddenInputs();
       updateEmptyState();
     });
   }
 
+  // Each li carries its own checkpoint_ids hidden input and the
+  // expected_leg_minutes box, so the submitted parallel lists follow the
+  // DOM order after any drag/reverse without a rebuild step.
   function createSelectedItem(cpId, cpName) {
     const li = document.createElement("li");
     li.className = "list-group-item d-flex align-items-center gap-2";
@@ -133,6 +126,20 @@ document.addEventListener("DOMContentLoaded", function() {
     label.className = "flex-grow-1";
     label.textContent = cpName;
 
+    const hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = "checkpoint_ids";
+    hidden.value = cpId;
+
+    const minutes = document.createElement("input");
+    minutes.type = "number";
+    minutes.step = "any";
+    minutes.min = "0";
+    minutes.name = "expected_leg_minutes";
+    minutes.className = "form-control form-control-sm leg-minutes";
+    minutes.style.width = "90px";
+    minutes.placeholder = "{{ _('min') }}";
+
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className = "btn btn-sm btn-outline-danger";
@@ -141,6 +148,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
     li.appendChild(handle);
     li.appendChild(label);
+    li.appendChild(hidden);
+    li.appendChild(minutes);
     li.appendChild(removeBtn);
 
     attachRemoveHandler(li);
@@ -154,7 +163,6 @@ document.addEventListener("DOMContentLoaded", function() {
     // Options stay in the list; a checkpoint may appear on the path twice.
     const item = createSelectedItem(option.value, option.textContent);
     selectedList.appendChild(item);
-    refreshHiddenInputs();
     updateEmptyState();
   });
 
@@ -162,20 +170,16 @@ document.addEventListener("DOMContentLoaded", function() {
     if (!selectedList) return;
     const items = Array.from(selectedList.querySelectorAll("[data-cp-id]"));
     items.reverse().forEach((item) => selectedList.appendChild(item));
-    refreshHiddenInputs();
   });
 
   if (selectedList) {
     Sortable.create(selectedList, {
       handle: ".drag-handle",
       animation: 150,
-      onSort: refreshHiddenInputs,
-      onEnd: refreshHiddenInputs,
     });
   }
 
   selectedList?.querySelectorAll("[data-cp-id]").forEach(attachRemoveHandler);
-  refreshHiddenInputs();
   updateEmptyState();
 });
 </script>

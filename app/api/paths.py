@@ -43,6 +43,23 @@ def _serialize_path(path: Path, include_stops: bool = True) -> dict:
     return data
 
 
+def _parse_minutes_list(values) -> list[float | None] | None:
+    """Parse an expected_leg_minutes list aligned with checkpoint_ids."""
+    if not isinstance(values, list):
+        return None
+    minutes: list[float | None] = []
+    for value in values:
+        if value in (None, ""):
+            minutes.append(None)
+            continue
+        try:
+            number = float(value)
+            minutes.append(number if number >= 0 else None)
+        except (TypeError, ValueError):
+            minutes.append(None)
+    return minutes
+
+
 def _parse_checkpoint_ids(values: Iterable) -> list[int] | None:
     """Parse an ordered checkpoint-id list; None when input is not a list."""
     if not isinstance(values, list):
@@ -142,7 +159,7 @@ def path_create():
     path = Path(competition_id=comp_id, name=name, notes=notes or None)
     db.session.add(path)
     db.session.flush()
-    replace_path_stops(path, checkpoint_ids)
+    replace_path_stops(path, checkpoint_ids, _parse_minutes_list(payload.get("expected_leg_minutes")))
     db.session.flush()
     record_audit_event(
         competition_id=comp_id,
@@ -195,7 +212,7 @@ def _update_path(path_id: int, partial: bool):
         invalid = _validate_checkpoints(comp_id, checkpoint_ids)
         if invalid:
             return jsonify({"error": "validation_error", "detail": invalid}), 400
-        replace_path_stops(path, checkpoint_ids)
+        replace_path_stops(path, checkpoint_ids, _parse_minutes_list(payload.get("expected_leg_minutes")))
 
     db.session.flush()
     record_audit_event(

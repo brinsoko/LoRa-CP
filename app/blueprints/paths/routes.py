@@ -34,16 +34,28 @@ def _fetch_checkpoints() -> list[dict]:
     return payload.get("checkpoints", [])
 
 
-def _partition_checkpoints(all_checkpoints: list[dict], ordered_ids: list[int]) -> tuple[list[dict], list[dict]]:
+def _partition_checkpoints(
+    all_checkpoints: list[dict],
+    ordered_ids: list[int],
+    minutes: list | None = None,
+) -> tuple[list[dict], list[dict]]:
     """Split into (selected in order, available). A checkpoint may appear
     more than once in ordered_ids (revisit paths), so 'available' keeps
-    every checkpoint; re-adding an already-used one is legal."""
+    every checkpoint; re-adding an already-used one is legal. minutes is
+    the aligned expected_leg_minutes list for redisplay."""
     lookup = {}
     for cp in all_checkpoints:
         cp_id = _parse_int(cp.get("id"))
         if cp_id is not None:
             lookup[cp_id] = cp
-    selected = [lookup[cid] for cid in ordered_ids if cid in lookup]
+    selected = []
+    for idx, cid in enumerate(ordered_ids):
+        if cid not in lookup:
+            continue
+        item = dict(lookup[cid])
+        value = minutes[idx] if minutes and idx < len(minutes) else None
+        item["expected_leg_minutes"] = value if value not in ("", None) else None
+        selected.append(item)
     return selected, list(all_checkpoints)
 
 
@@ -74,7 +86,8 @@ def _render_form(mode: str, path: dict | None, selected: list[dict], available: 
 def add_path():
     checkpoints = _fetch_checkpoints()
     selected_ids = _parse_checkpoint_ids(request.form.getlist("checkpoint_ids")) if request.method == "POST" else []
-    selected_items, available_items = _partition_checkpoints(checkpoints, selected_ids)
+    form_minutes = request.form.getlist("expected_leg_minutes") if request.method == "POST" else None
+    selected_items, available_items = _partition_checkpoints(checkpoints, selected_ids, form_minutes)
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
@@ -86,7 +99,12 @@ def add_path():
         resp, payload = api_json(
             "POST",
             "/api/paths",
-            json={"name": name, "notes": notes, "checkpoint_ids": selected_ids},
+            json={
+                "name": name,
+                "notes": notes,
+                "checkpoint_ids": selected_ids,
+                "expected_leg_minutes": request.form.getlist("expected_leg_minutes"),
+            },
         )
         if resp.status_code == 201:
             flash(_("Path created."), "success")
@@ -106,10 +124,14 @@ def edit_path(path_id: int):
 
     checkpoints = _fetch_checkpoints()
     existing_ids = [s.get("checkpoint_id") for s in path.get("stops", [])]
-    selected_ids = (
-        _parse_checkpoint_ids(request.form.getlist("checkpoint_ids")) if request.method == "POST" else existing_ids
-    )
-    selected_items, available_items = _partition_checkpoints(checkpoints, selected_ids)
+    existing_minutes = [s.get("expected_leg_minutes") for s in path.get("stops", [])]
+    if request.method == "POST":
+        selected_ids = _parse_checkpoint_ids(request.form.getlist("checkpoint_ids"))
+        minutes = request.form.getlist("expected_leg_minutes")
+    else:
+        selected_ids = existing_ids
+        minutes = existing_minutes
+    selected_items, available_items = _partition_checkpoints(checkpoints, selected_ids, minutes)
 
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
@@ -121,7 +143,12 @@ def edit_path(path_id: int):
         resp, payload = api_json(
             "PATCH",
             f"/api/paths/{path_id}",
-            json={"name": name, "notes": notes, "checkpoint_ids": selected_ids},
+            json={
+                "name": name,
+                "notes": notes,
+                "checkpoint_ids": selected_ids,
+                "expected_leg_minutes": request.form.getlist("expected_leg_minutes"),
+            },
         )
         if resp.status_code == 200:
             flash(_("Path updated."), "success")
