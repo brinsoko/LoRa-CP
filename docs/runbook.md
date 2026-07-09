@@ -6,6 +6,9 @@ race.
 
 > **Where stuff lives**
 > - App container: `web` in `deploy/docker-compose.prod.yml`
+> - Sheets writer: `sheets-worker` in the same compose file (exactly ONE
+>   replica; it drains the sheets_sync_jobs outbox, web only enqueues).
+>   Restart it together with `web` after a deploy.
 > - Reverse proxy: `caddy` (HTTPS termination)
 > - Database: `instance/app.db` (SQLite)
 > - Logs: `docker logs lora-kt-web` (or whatever you named the
@@ -21,7 +24,7 @@ race.
 
 ```bash
 cd deploy
-docker compose -f docker-compose.prod.yml restart web
+docker compose -f docker-compose.prod.yml restart web sheets-worker
 ```
 
 The Caddy container can stay up. If you also need to restart Caddy:
