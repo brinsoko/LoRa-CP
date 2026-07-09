@@ -17,39 +17,23 @@ def _parse_int(value) -> int | None:
         return None
 
 
-def _parse_checkpoint_ids(values) -> list[int]:
-    ids: list[int] = []
-    for value in values or []:
-        num = _parse_int(value)
-        if num and num > 0:
-            ids.append(num)
-    return ids
-
-
-def _partition_checkpoints(all_checkpoints: list[dict], ordered_ids: list[int]) -> tuple[list[dict], list[dict]]:
-    lookup = {}
-    for cp in all_checkpoints:
-        cp_id = _parse_int(cp.get("id"))
-        if cp_id is not None:
-            lookup[cp_id] = cp
-    selected: list[dict] = []
-    for cid in ordered_ids:
-        cp = lookup.get(cid)
-        if cp:
-            selected.append(cp)
-    selected_ids = {cp_id for cp in selected if (cp_id := _parse_int(cp.get("id"))) is not None}
-    available = [
-        cp for cp in all_checkpoints if (cp_id := _parse_int(cp.get("id"))) is not None and cp_id not in selected_ids
-    ]
-    return selected, available
-
-
-def _fetch_checkpoints() -> list[dict]:
-    resp, payload = api_json("GET", "/api/checkpoints")
+def _fetch_paths() -> list[dict]:
+    resp, payload = api_json("GET", "/api/paths")
     if resp.status_code != 200:
-        flash(_("Could not load checkpoints."), "warning")
+        flash(_("Could not load paths."), "warning")
         return []
-    return payload.get("checkpoints", [])
+    return payload.get("paths", [])
+
+
+def _form_values() -> dict:
+    direction = (request.form.get("direction") or "forward").strip().lower()
+    return {
+        "name": (request.form.get("name") or "").strip(),
+        "prefix": (request.form.get("prefix") or "").strip() or None,
+        "description": (request.form.get("description") or "").strip() or None,
+        "path_id": _parse_int(request.form.get("path_id")),
+        "direction": direction if direction in ("forward", "reverse") else "forward",
+    }
 
 
 @groups_bp.route("/", methods=["GET"])
@@ -67,134 +51,49 @@ def list_groups():
 @groups_bp.route("/add", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def add_group():
-    checkpoints = _fetch_checkpoints()
-
-    selected_ids = _parse_checkpoint_ids(request.form.getlist("checkpoint_ids")) if request.method == "POST" else []
-    selected_items, available_items = _partition_checkpoints(checkpoints, selected_ids)
+    paths = _fetch_paths()
 
     if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        prefix = (request.form.get("prefix") or "").strip() or None
-        desc = (request.form.get("description") or "").strip() or None
-        reverse = request.form.get("reverse") in ("on", "1", "true", "True")
-
-        if not name:
+        values = _form_values()
+        if not values["name"]:
             flash(_("Group name is required."), "warning")
-            return render_template(
-                "group_edit.html",
-                mode="add",
-                g={"reverse": reverse},
-                selected_ids=selected_ids,
-                selected_checkpoints=selected_items,
-                available_checkpoints=available_items,
-            )
+            return render_template("group_edit.html", mode="add", g=values, paths=paths)
 
-        resp, payload = api_json(
-            "POST",
-            "/api/groups",
-            json={
-                "name": name,
-                "prefix": prefix,
-                "description": desc,
-                "checkpoint_ids": selected_ids,
-                "reverse": reverse,
-            },
-        )
-
+        resp, payload = api_json("POST", "/api/groups", json=values)
         if resp.status_code == 201:
             flash(_("Group created."), "success")
             return redirect(url_for("groups.list_groups"))
+        flash(payload.get("detail") or payload.get("error") or _("Could not create group."), "warning")
+        return render_template("group_edit.html", mode="add", g=values, paths=paths)
 
-        flash(payload.get("error") or payload.get("detail") or _("Could not create group."), "warning")
-
-    return render_template(
-        "group_edit.html",
-        mode="add",
-        g=None,
-        selected_ids=selected_ids,
-        selected_checkpoints=selected_items,
-        available_checkpoints=available_items,
-    )
+    return render_template("group_edit.html", mode="add", g=None, paths=paths)
 
 
 @groups_bp.route("/<int:group_id>/edit", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def edit_group(group_id: int):
-    group_resp, group_payload = api_json("GET", f"/api/groups/{group_id}")
+    group_resp, group = api_json("GET", f"/api/groups/{group_id}")
     if group_resp.status_code != 200:
         flash(_("Group not found."), "warning")
         return redirect(url_for("groups.list_groups"))
 
-    group = group_payload
-    checkpoints = _fetch_checkpoints()
-
-    existing_ids = [cp.get("id") for cp in group.get("checkpoints", [])]
-    selected_ids = (
-        _parse_checkpoint_ids(request.form.getlist("checkpoint_ids")) if request.method == "POST" else existing_ids
-    )
-    selected_items, available_items = _partition_checkpoints(checkpoints, selected_ids)
+    paths = _fetch_paths()
 
     if request.method == "POST":
-        name = (request.form.get("name") or "").strip()
-        prefix = (request.form.get("prefix") or "").strip() or None
-        desc = (request.form.get("description") or "").strip() or None
-        reverse = request.form.get("reverse") in ("on", "1", "true", "True")
-
-        if not name:
+        values = _form_values()
+        if not values["name"]:
             flash(_("Group name is required."), "warning")
-            group["name"] = name
-            group["description"] = desc
-            group["reverse"] = reverse
-            group["checkpoints"] = [
-                {"id": cp.get("id"), "name": cp.get("name"), "position": idx} for idx, cp in enumerate(selected_items)
-            ]
-            return render_template(
-                "group_edit.html",
-                mode="edit",
-                g=group,
-                selected_ids=selected_ids,
-                selected_checkpoints=selected_items,
-                available_checkpoints=available_items,
-            )
+            group.update(values)
+            return render_template("group_edit.html", mode="edit", g=group, paths=paths)
 
-        resp, payload = api_json(
-            "PATCH",
-            f"/api/groups/{group_id}",
-            json={
-                "name": name,
-                "prefix": prefix,
-                "description": desc,
-                "checkpoint_ids": selected_ids,
-                "reverse": reverse,
-            },
-        )
-
+        resp, payload = api_json("PATCH", f"/api/groups/{group_id}", json=values)
         if resp.status_code == 200:
             flash(_("Group updated."), "success")
             return redirect(url_for("groups.list_groups"))
+        flash(payload.get("detail") or payload.get("error") or _("Could not update group."), "warning")
+        group.update(values)
 
-        flash(payload.get("error") or payload.get("detail") or _("Could not update group."), "warning")
-        group["name"] = name
-        group["prefix"] = prefix
-        group["description"] = desc
-        group["reverse"] = reverse
-        group["checkpoints"] = [
-            {"id": cp.get("id"), "name": cp.get("name"), "position": idx} for idx, cp in enumerate(selected_items)
-        ]
-
-    else:
-        group["checkpoints"] = [
-            {"id": cp.get("id"), "name": cp.get("name"), "position": idx} for idx, cp in enumerate(selected_items)
-        ]
-
-    return render_template(
-        "group_edit.html",
-        mode="edit",
-        g=group,
-        selected_ids=selected_ids,
-        selected_checkpoints=selected_items,
-        available_checkpoints=available_items,
-    )
+    return render_template("group_edit.html", mode="edit", g=group, paths=paths)
 
 
 @groups_bp.route("/<int:group_id>/delete", methods=["POST"])

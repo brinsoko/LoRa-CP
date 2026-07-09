@@ -31,7 +31,7 @@
               <th style="width:60px;" class="text-center">#</th>
               <th>{{ _('Name') }}</th>
               <th>{{ _('Description') }}</th>
-              <th class="text-center" style="width:140px;">{{ _('Checkpoints') }}</th>
+              <th style="width:220px;">{{ _('Path') }}</th>
               <th class="text-end" style="width: 180px;">{{ _('Actions') }}</th>
             </tr>
           </thead>
@@ -46,8 +46,16 @@
               <td class="text-center order-index">{{ loop.index }}</td>
               <td>{{ g.name }}</td>
               <td class="text-break" style="max-width: 420px;">{{ g.description or '—' }}</td>
-              <td class="text-center">
-                <span class="badge bg-secondary">{{ g.checkpoints|length }}</span>
+              <td>
+                {% if g.path_name %}
+                  {{ g.path_name }}
+                  {% if g.direction == 'reverse' %}
+                    <span class="badge text-bg-warning" title="{{ _('Reverse (opposite direction)') }}">⟲ {{ _('reverse') }}</span>
+                  {% endif %}
+                  <span class="badge bg-secondary">{{ g.checkpoints|length }}</span>
+                {% else %}
+                  <span class="text-muted">{{ _('No path') }}</span>
+                {% endif %}
               </td>
               <td class="text-end">
                 <a class="btn btn-sm btn-outline-primary"

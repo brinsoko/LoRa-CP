@@ -16,6 +16,7 @@ from .api.auth import auth_api_bp
 from .api.checkpoints import checkpoints_api_bp
 from .api.groups import groups_api_bp
 from .api.helpers import json_error
+from .api.paths import paths_api_bp
 from .api.teams import teams_api_bp
 from .api.transfer import transfer_api_bp
 from .extensions import babel, db, limiter, login_manager
@@ -87,6 +88,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.register_blueprint(auth_api_bp)
     app.register_blueprint(checkpoints_api_bp)
     app.register_blueprint(groups_api_bp)
+    app.register_blueprint(paths_api_bp)
     app.register_blueprint(teams_api_bp)
     app.register_blueprint(checkins_api_bp)
     app.register_blueprint(docs_api_bp)
@@ -174,6 +176,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     from .blueprints.lora.routes import lora_bp
     from .blueprints.main.routes import main_bp
     from .blueprints.map.routes import maps_bp
+    from .blueprints.paths.routes import paths_bp
     from .blueprints.rfid.routes import rfid_bp
     from .blueprints.teams.routes import teams_bp
 
@@ -185,6 +188,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.register_blueprint(messages_bp, url_prefix="/messages")
     app.register_blueprint(lora_bp, url_prefix="/lora")
     app.register_blueprint(groups_bp, url_prefix="/groups")
+    app.register_blueprint(paths_bp, url_prefix="/paths")
     app.register_blueprint(maps_bp, url_prefix="/map")
     app.register_blueprint(superadmin_bp, url_prefix="/superadmin")
     app.register_blueprint(auth_bp)

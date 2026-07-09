@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Paths') }}{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="card-title mb-0">{{ _('Paths') }}</h5>
+      <a href="{{ url_for('paths.add_path') }}" class="btn btn-success">{{ _('Add Path') }}</a>
+    </div>
+    <p class="text-body-secondary small">
+      {{ _('A path is the ordered course through checkpoints. Groups reference a path plus a direction, so two groups can share one path and run it opposite ways.') }}
+    </p>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>{{ _('Name') }}</th>
+            <th>{{ _('Route') }}</th>
+            <th>{{ _('Used by groups') }}</th>
+            <th class="text-end">{{ _('Actions') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in paths %}
+            <tr>
+              <td class="fw-semibold">{{ p.name }}</td>
+              <td>
+                <span class="text-body-secondary small">
+                  {{ p.stops | map(attribute='name') | select | join(' → ') }}
+                </span>
+              </td>
+              <td>
+                {% for g in p.groups %}
+                  <span class="badge text-bg-light border">
+                    {{ g.name }}
+                    {% if g.direction == 'reverse' %}<span title="{{ _('reverse direction') }}">⟲</span>{% endif %}
+                  </span>
+                {% else %}
+                  <span class="text-body-secondary small">{{ _('Not used yet') }}</span>
+                {% endfor %}
+              </td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-1">
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('paths.edit_path', path_id=p.id) }}">{{ _('Edit') }}</a>
+                  <form method="post" action="{{ url_for('paths.duplicate_path', path_id=p.id) }}" class="d-inline">
+                    {{ csrf_input() }}
+                    <button class="btn btn-sm btn-outline-secondary" type="submit">{{ _('Duplicate') }}</button>
+                  </form>
+                  <form method="post" action="{{ url_for('paths.duplicate_path', path_id=p.id) }}" class="d-inline">
+                    {{ csrf_input() }}
+                    <input type="hidden" name="reversed" value="1">
+                    <button class="btn btn-sm btn-outline-secondary" type="submit">{{ _('Duplicate reversed') }}</button>
+                  </form>
+                  {% if current_competition_role == 'admin' %}
+                    <form method="post" action="{{ url_for('paths.delete_path', path_id=p.id) }}" class="d-inline"
+                          onsubmit="return confirm('{{ _('Delete this path?') }}');">
+                      {{ csrf_input() }}
+                      <button class="btn btn-sm btn-outline-danger" type="submit" {% if p.group_count %}disabled title="{{ _('Assigned to groups') }}"{% endif %}>{{ _('Delete') }}</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="4" class="text-muted text-center py-4">{{ _('No paths yet. Create one, then assign it to groups.') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
