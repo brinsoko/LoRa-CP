@@ -43,6 +43,10 @@ scores_bp = Blueprint("scores", __name__, template_folder="../../templates")
 @scores_bp.route("/judge", methods=["GET"])
 @roles_required("judge", "admin")
 def judge_score():
+    # Superseded for judges by the /judge shell (phase 3); kept for
+    # admins until the phase-5 cleanup removes it entirely.
+    if get_current_competition_role() == "judge":
+        return redirect(url_for("judge.home"))
     comp_id = get_current_competition_id()
     checkpoints = []
     default_checkpoint_id = None

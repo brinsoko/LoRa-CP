@@ -10,6 +10,23 @@ services:
       - app
     restart: unless-stopped
 
+  # The one and only Sheets writer: drains the sheets_sync_jobs outbox
+  # (web workers only enqueue). Exactly one replica, ever - a second
+  # instance would split the API throttle window and race writes.
+  sheets-worker:
+    image: ghcr.io/brinsoko/lora-cp/lora-kt-web:latest
+    command: ["flask", "--app", "wsgi:app", "sheets-worker"]
+    env_file:
+      - .env
+    volumes:
+      - ../instance:/app/instance
+      - ../data:/app/data
+    networks:
+      - app
+    depends_on:
+      - web
+    restart: unless-stopped
+
 
   caddy:
     image: caddy:2-alpine
