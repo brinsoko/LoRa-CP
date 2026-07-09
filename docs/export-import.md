@@ -47,6 +47,9 @@ curl -b cookies.txt \
 | `rfid_cards` | UID, team name, number |
 | `team_groups` | Team-to-group assignments with active flag |
 | `paths` | Ordered courses: name, notes, stops (checkpoint name, position, expected leg minutes) |
+| `score_fields` | Judged inputs per checkpoint: key, label, hint, rule type/params, max input, counts-in-total, per-group enable/override |
+| `timed_segments` | Time trials per path: endpoints (checkpoint names), name, max/min points |
+| `group_scoring` | Category rules: found points per checkpoint, race time rule (threshold + stepped penalty) |
 | `group_checkpoint_links` | Legacy derived view of each group's resolved route (kept for old tooling; import prefers `paths`) |
 
 **What is NOT exported:**
@@ -55,13 +58,13 @@ curl -b cookies.txt \
 - Audit events
 - Google Sheets configuration
 - Firmware files
-- Score rules (only score entries are exported)
+
 
 ### JSON structure
 
 ```json
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "exported_at": "2025-10-17T14:30:00Z",
   "competition": {
     "name": "Fall Rally 2025",
@@ -203,7 +206,7 @@ curl -b cookies.txt -X POST \
   http://localhost:5001/api/competition/1/merge \
   -H "Content-Type: application/json" \
   -d '{
-    "schema_version": "1.1.0",
+    "schema_version": "1.2.0",
     "competition": {"name": "Fall Rally 2025", "settings": {}},
     "teams": [
       {"name": "Alpha", "number": 102, "organization": "Troop 1", "dnf": false},

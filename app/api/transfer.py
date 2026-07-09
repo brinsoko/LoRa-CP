@@ -17,21 +17,24 @@ from app.models import (
     CheckpointGroup,
     Competition,
     CompetitionMember,
-    GlobalScoreRule,
+    GroupScoring,
     LoRaDevice,
     Path,
     PathStop,
     RFIDCard,
     ScoreEntry,
-    ScoreRule,
+    ScoreField,
+    ScoreFieldGroup,
     SheetConfig,
     Team,
     TeamGroup,
     TeamMember,
+    TimedSegment,
     User,
 )
 from app.utils.paths import resolve_route_ids
 from app.utils.rest_auth import json_roles_required
+from app.utils.scoring_backfill import convert_legacy_scoring
 from app.utils.serial_helpers import normalize_uid
 from app.utils.time import utcnow_naive
 
@@ -41,7 +44,11 @@ transfer_api_bp = Blueprint("api_transfer", __name__)
 # direction. group_checkpoint_links is still exported as a derived legacy
 # view (per-group resolved route) and still accepted on import for old
 # files, where it is converted into paths.
-SCHEMA_VERSION = "1.1.0"
+# 1.2.0: scoring becomes first-class (score_fields / timed_segments /
+# group_scoring, checkpoint counts_for_found + dead_time_enabled).
+# Legacy score_rules / global_score_rules sections are still accepted on
+# import and converted (app/utils/scoring_backfill.py).
+SCHEMA_VERSION = "1.2.0"
 
 
 def _get_or_create_path_for_sequence(
@@ -91,11 +98,24 @@ def _export_competition(comp: Competition) -> dict:
     devices = LoRaDevice.query.filter_by(competition_id=comp.id).all()
     scores = ScoreEntry.query.filter_by(competition_id=comp.id).all()
     sheet_configs = SheetConfig.query.filter_by(competition_id=comp.id).all()
-    score_rules = ScoreRule.query.filter_by(competition_id=comp.id).all()
-    global_score_rules = GlobalScoreRule.query.filter_by(competition_id=comp.id).all()
+    score_fields = ScoreField.query.filter_by(competition_id=comp.id).order_by(
+        ScoreField.checkpoint_id.asc(), ScoreField.position.asc()
+    ).all()
+    field_group_rows = (
+        ScoreFieldGroup.query.join(ScoreField, ScoreFieldGroup.score_field_id == ScoreField.id)
+        .filter(ScoreField.competition_id == comp.id)
+        .all()
+    )
+    field_groups_by_field: dict[int, list] = {}
+    for row in field_group_rows:
+        field_groups_by_field.setdefault(row.score_field_id, []).append(row)
+    timed_segments = TimedSegment.query.filter_by(competition_id=comp.id).all()
+    group_scoring_rows = GroupScoring.query.filter_by(competition_id=comp.id).all()
+    group_name_by_id = {g.id: g.name for g in groups}
     rfid_cards = RFIDCard.query.join(Team, RFIDCard.team_id == Team.id).filter(Team.competition_id == comp.id).all()
     team_groups = TeamGroup.query.join(Team, TeamGroup.team_id == Team.id).filter(Team.competition_id == comp.id).all()
     paths = Path.query.filter_by(competition_id=comp.id).all()
+    path_name_by_id = {path.id: path.name for path in paths}
     cp_name_by_id = {cp.id: cp.name for cp in checkpoints}
 
     # Derived legacy view of each group's resolved directed route, kept so
@@ -180,6 +200,8 @@ def _export_competition(comp: Competition) -> dict:
                 "easting": cp.easting,
                 "northing": cp.northing,
                 "is_virtual": bool(cp.is_virtual),
+                "counts_for_found": bool(cp.counts_for_found),
+                "dead_time_enabled": bool(cp.dead_time_enabled),
             }
             for cp in checkpoints
         ],
@@ -217,23 +239,53 @@ def _export_competition(comp: Competition) -> dict:
             }
             for s in scores
         ],
-        # Scoring rules — without these the destination has scoring
-        # layouts (SheetConfig) but no way to compute totals from raw
-        # fields, and judge submissions can't be re-scored.
-        "score_rules": [
+        # Scoring configuration: fields per checkpoint (with per-group
+        # enable/override), timed segments per path, category rules.
+        "score_fields": [
             {
-                "checkpoint_name": r.checkpoint.name if r.checkpoint else None,
-                "group_name": r.group.name if r.group else None,
-                "rules": r.rules,
+                "checkpoint_name": cp_name_by_id.get(f.checkpoint_id),
+                "key": f.key,
+                "label": f.label,
+                "hint": f.hint,
+                "position": f.position,
+                "rule_type": f.rule_type,
+                "rule_params": f.rule_params,
+                "max_input": f.max_input,
+                "counts_in_total": bool(f.counts_in_total),
+                "groups": [
+                    {
+                        "group_name": group_name_by_id.get(row.group_id),
+                        "enabled": bool(row.enabled),
+                        "rule_override": row.rule_override,
+                    }
+                    for row in field_groups_by_field.get(f.id, [])
+                ],
             }
-            for r in score_rules
+            for f in score_fields
         ],
-        "global_score_rules": [
+        "timed_segments": [
             {
-                "group_name": r.group.name if r.group else None,
-                "rules": r.rules,
+                "path_name": path_name_by_id.get(s.path_id),
+                "start_checkpoint_name": cp_name_by_id.get(s.start_checkpoint_id),
+                "end_checkpoint_name": cp_name_by_id.get(s.end_checkpoint_id),
+                "name": s.name,
+                "max_points": s.max_points,
+                "min_points": s.min_points,
             }
-            for r in global_score_rules
+            for s in timed_segments
+        ],
+        "group_scoring": [
+            {
+                "group_name": group_name_by_id.get(row.group_id),
+                "found_points_per": row.found_points_per,
+                "race_max_points": row.race_max_points,
+                "race_threshold_minutes": row.race_threshold_minutes,
+                "race_penalty_minutes": row.race_penalty_minutes,
+                "race_penalty_points": row.race_penalty_points,
+                "race_min_points": row.race_min_points,
+                "race_dq_multiplier": row.race_dq_multiplier,
+            }
+            for row in group_scoring_rows
         ],
         # SheetConfig holds the per-checkpoint scoring layout (which fields
         # the judge UI exposes, dead-time / time toggles, headers, per-group
@@ -459,6 +511,8 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
             easting=cp_data.get("easting"),
             northing=cp_data.get("northing"),
             is_virtual=bool(cp_data.get("is_virtual", False)),
+            counts_for_found=bool(cp_data.get("counts_for_found", True)),
+            dead_time_enabled=bool(cp_data.get("dead_time_enabled", False)),
         )
         db.session.add(cp)
         db.session.flush()
@@ -680,34 +734,73 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                 score_kwargs["created_at"] = created_at
             db.session.add(ScoreEntry(**score_kwargs))
 
-    # Score rules (per checkpoint+group). Without these the destination
-    # has scoring layouts but no logic to turn raw_fields into a total.
-    # Name-based checkpoint references inside the rule blob (e.g.
-    # time_race.start_checkpoint_name) are resolved to local IDs here.
-    for sr_data in data.get("score_rules", []):
-        cp = cp_map.get(sr_data.get("checkpoint_name"))
-        group = group_map.get(sr_data.get("group_name"))
-        if not (cp and group):
+    # Scoring configuration. New-format sections are created directly;
+    # legacy files (score_rules / global_score_rules / config field lists)
+    # are converted after sheet_configs land, see below.
+    for f_data in data.get("score_fields", []):
+        cp = cp_map.get(f_data.get("checkpoint_name"))
+        if not cp:
+            continue
+        field = ScoreField(
+            competition_id=comp.id,
+            checkpoint_id=cp.id,
+            key=(f_data.get("key") or "")[:80],
+            label=f_data.get("label"),
+            hint=f_data.get("hint"),
+            position=f_data.get("position", 0),
+            rule_type=(f_data.get("rule_type") or "none"),
+            rule_params=f_data.get("rule_params"),
+            max_input=f_data.get("max_input"),
+            counts_in_total=bool(f_data.get("counts_in_total", True)),
+        )
+        db.session.add(field)
+        db.session.flush()
+        for g_data in f_data.get("groups") or []:
+            group = group_map.get(g_data.get("group_name"))
+            if not group:
+                continue
+            db.session.add(
+                ScoreFieldGroup(
+                    score_field_id=field.id,
+                    group_id=group.id,
+                    enabled=bool(g_data.get("enabled", True)),
+                    rule_override=g_data.get("rule_override"),
+                )
+            )
+
+    for s_data in data.get("timed_segments", []):
+        seg_path = path_map.get(s_data.get("path_name"))
+        start_cp = cp_map.get(s_data.get("start_checkpoint_name"))
+        end_cp = cp_map.get(s_data.get("end_checkpoint_name"))
+        if not (seg_path and start_cp and end_cp):
             continue
         db.session.add(
-            ScoreRule(
+            TimedSegment(
                 competition_id=comp.id,
-                checkpoint_id=cp.id,
-                group_id=group.id,
-                rules=_remap_score_rule_blob(sr_data.get("rules"), cp_map) or {},
+                path_id=seg_path.id,
+                start_checkpoint_id=start_cp.id,
+                end_checkpoint_id=end_cp.id,
+                name=s_data.get("name"),
+                max_points=s_data.get("max_points") or 100.0,
+                min_points=s_data.get("min_points") or 0.0,
             )
         )
 
-    # Global score rules (per group: found-points, time race, etc.).
-    for gr_data in data.get("global_score_rules", []):
-        group = group_map.get(gr_data.get("group_name"))
+    for gs_data in data.get("group_scoring", []):
+        group = group_map.get(gs_data.get("group_name"))
         if not group:
             continue
         db.session.add(
-            GlobalScoreRule(
-                competition_id=comp.id,
+            GroupScoring(
                 group_id=group.id,
-                rules=_remap_score_rule_blob(gr_data.get("rules"), cp_map) or {},
+                competition_id=comp.id,
+                found_points_per=gs_data.get("found_points_per"),
+                race_max_points=gs_data.get("race_max_points"),
+                race_threshold_minutes=gs_data.get("race_threshold_minutes"),
+                race_penalty_minutes=gs_data.get("race_penalty_minutes"),
+                race_penalty_points=gs_data.get("race_penalty_points"),
+                race_min_points=gs_data.get("race_min_points"),
+                race_dq_multiplier=gs_data.get("race_dq_multiplier"),
             )
         )
 
@@ -729,6 +822,31 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                 checkpoint_id=target_cp.id if target_cp else None,
                 config=_remap_sheet_config(sc_data.get("config"), group_map),
             )
+        )
+
+    # Legacy scoring (pre-1.2.0 files): convert score_rules /
+    # global_score_rules / config field lists into the phase-2 tables.
+    if not data.get("score_fields") and (
+        data.get("score_rules") or data.get("global_score_rules") or data.get("sheet_configs")
+    ):
+        legacy_rules = [
+            {
+                "checkpoint_name": sr.get("checkpoint_name"),
+                "group_name": sr.get("group_name"),
+                "rules": _remap_score_rule_blob(sr.get("rules"), cp_map) or {},
+            }
+            for sr in data.get("score_rules", [])
+        ]
+        legacy_globals = [
+            {
+                "group_name": gr.get("group_name"),
+                "rules": _remap_score_rule_blob(gr.get("rules"), cp_map) or {},
+            }
+            for gr in data.get("global_score_rules", [])
+        ]
+        db.session.flush()
+        convert_legacy_scoring(
+            comp.id, cp_map, group_map, data.get("sheet_configs", []), legacy_rules, legacy_globals
         )
 
     db.session.flush()
@@ -827,6 +945,9 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
         "group_checkpoint_links": 0,
         "score_rules": 0,
         "global_score_rules": 0,
+        "score_fields": 0,
+        "timed_segments": 0,
+        "group_scoring": 0,
         "devices": 0,
         "rfid_cards": 0,
     }
@@ -880,6 +1001,9 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                 cp.description = cp_data.get("description")
                 cp.scoring_text = cp_data.get("scoring_text")
                 cp.judges_note = cp_data.get("judges_note")
+                cp.is_virtual = bool(cp_data.get("is_virtual", cp.is_virtual))
+                cp.counts_for_found = bool(cp_data.get("counts_for_found", cp.counts_for_found))
+                cp.dead_time_enabled = bool(cp_data.get("dead_time_enabled", cp.dead_time_enabled))
                 updated["checkpoints"] += 1
             elif action == "skip":
                 skipped += 1
@@ -893,6 +1017,9 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                 judges_note=cp_data.get("judges_note"),
                 easting=cp_data.get("easting"),
                 northing=cp_data.get("northing"),
+                is_virtual=bool(cp_data.get("is_virtual", False)),
+                counts_for_found=bool(cp_data.get("counts_for_found", True)),
+                dead_time_enabled=bool(cp_data.get("dead_time_enabled", False)),
             )
             db.session.add(cp)
             db.session.flush()
@@ -1158,47 +1285,126 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
         existing_configs.add((tab_type, tab_name))
         added["sheet_configs"] += 1
 
-    # Score rules (per checkpoint+group). Add only rules whose
-    # (checkpoint_name, group_name) pair has no local rule yet — admins
-    # often hand-tune these so a merge must not clobber existing logic.
-    existing_score_rules = {
-        (r.checkpoint_id, r.group_id) for r in ScoreRule.query.filter_by(competition_id=comp.id).all()
+    # Scoring configuration. Add-new-only, matched by structure: fields
+    # by (checkpoint, key), segments by (path, endpoints), group scoring
+    # by group; admins hand-tune these, a merge must not clobber them.
+    existing_fields = {
+        (f.checkpoint_id, f.key)
+        for f in ScoreField.query.filter_by(competition_id=comp.id).all()
     }
-    for sr_data in data.get("score_rules", []):
-        cp = cp_map.get(sr_data.get("checkpoint_name"))
-        group = group_map.get(sr_data.get("group_name"))
-        if not (cp and group):
+    for f_data in data.get("score_fields", []):
+        cp = cp_map.get(f_data.get("checkpoint_name"))
+        key = (f_data.get("key") or "")[:80]
+        if not cp or not key or (cp.id, key) in existing_fields:
             continue
-        if (cp.id, group.id) in existing_score_rules:
-            continue
-        db.session.add(
-            ScoreRule(
-                competition_id=comp.id,
-                checkpoint_id=cp.id,
-                group_id=group.id,
-                rules=_remap_score_rule_blob(sr_data.get("rules"), cp_map) or {},
-            )
+        field = ScoreField(
+            competition_id=comp.id,
+            checkpoint_id=cp.id,
+            key=key,
+            label=f_data.get("label"),
+            hint=f_data.get("hint"),
+            position=f_data.get("position", 0),
+            rule_type=(f_data.get("rule_type") or "none"),
+            rule_params=f_data.get("rule_params"),
+            max_input=f_data.get("max_input"),
+            counts_in_total=bool(f_data.get("counts_in_total", True)),
         )
-        existing_score_rules.add((cp.id, group.id))
-        added["score_rules"] += 1
+        db.session.add(field)
+        db.session.flush()
+        for g_data in f_data.get("groups") or []:
+            group = group_map.get(g_data.get("group_name"))
+            if not group:
+                continue
+            db.session.add(
+                ScoreFieldGroup(
+                    score_field_id=field.id,
+                    group_id=group.id,
+                    enabled=bool(g_data.get("enabled", True)),
+                    rule_override=g_data.get("rule_override"),
+                )
+            )
+        existing_fields.add((cp.id, key))
+        added["score_fields"] += 1
 
-    # Global score rules (per group). Same add-new-only semantics.
-    existing_global_rules = {r.group_id for r in GlobalScoreRule.query.filter_by(competition_id=comp.id).all()}
-    for gr_data in data.get("global_score_rules", []):
-        group = group_map.get(gr_data.get("group_name"))
-        if not group:
+    existing_segments = {
+        (s.path_id, s.start_checkpoint_id, s.end_checkpoint_id)
+        for s in TimedSegment.query.filter_by(competition_id=comp.id).all()
+    }
+    local_paths = {p.name: p for p in Path.query.filter_by(competition_id=comp.id).all()}
+    for s_data in data.get("timed_segments", []):
+        seg_path = local_paths.get(s_data.get("path_name"))
+        start_cp = cp_map.get(s_data.get("start_checkpoint_name"))
+        end_cp = cp_map.get(s_data.get("end_checkpoint_name"))
+        if not (seg_path and start_cp and end_cp):
             continue
-        if group.id in existing_global_rules:
+        key = (seg_path.id, start_cp.id, end_cp.id)
+        if key in existing_segments or (seg_path.id, end_cp.id, start_cp.id) in existing_segments:
             continue
         db.session.add(
-            GlobalScoreRule(
+            TimedSegment(
                 competition_id=comp.id,
-                group_id=group.id,
-                rules=_remap_score_rule_blob(gr_data.get("rules"), cp_map) or {},
+                path_id=seg_path.id,
+                start_checkpoint_id=start_cp.id,
+                end_checkpoint_id=end_cp.id,
+                name=s_data.get("name"),
+                max_points=s_data.get("max_points") or 100.0,
+                min_points=s_data.get("min_points") or 0.0,
             )
         )
-        existing_global_rules.add(group.id)
-        added["global_score_rules"] += 1
+        existing_segments.add(key)
+        added["timed_segments"] += 1
+
+    existing_group_scoring = {
+        row.group_id for row in GroupScoring.query.filter_by(competition_id=comp.id).all()
+    }
+    for gs_data in data.get("group_scoring", []):
+        group = group_map.get(gs_data.get("group_name"))
+        if not group or group.id in existing_group_scoring:
+            continue
+        db.session.add(
+            GroupScoring(
+                group_id=group.id,
+                competition_id=comp.id,
+                found_points_per=gs_data.get("found_points_per"),
+                race_max_points=gs_data.get("race_max_points"),
+                race_threshold_minutes=gs_data.get("race_threshold_minutes"),
+                race_penalty_minutes=gs_data.get("race_penalty_minutes"),
+                race_penalty_points=gs_data.get("race_penalty_points"),
+                race_min_points=gs_data.get("race_min_points"),
+                race_dq_multiplier=gs_data.get("race_dq_multiplier"),
+            )
+        )
+        existing_group_scoring.add(group.id)
+        added["group_scoring"] += 1
+
+    # Legacy scoring sections (pre-1.2.0 files): converted add-new-only.
+    if not data.get("score_fields") and (data.get("score_rules") or data.get("global_score_rules")):
+        legacy_rules = [
+            {
+                "checkpoint_name": sr.get("checkpoint_name"),
+                "group_name": sr.get("group_name"),
+                "rules": _remap_score_rule_blob(sr.get("rules"), cp_map) or {},
+            }
+            for sr in data.get("score_rules", [])
+        ]
+        legacy_globals = [
+            {
+                "group_name": gr.get("group_name"),
+                "rules": _remap_score_rule_blob(gr.get("rules"), cp_map) or {},
+            }
+            for gr in data.get("global_score_rules", [])
+        ]
+        before_fields = ScoreField.query.filter_by(competition_id=comp.id).count()
+        before_globals = GroupScoring.query.filter_by(competition_id=comp.id).count()
+        db.session.flush()
+        convert_legacy_scoring(
+            comp.id, cp_map, group_map, data.get("sheet_configs", []), legacy_rules, legacy_globals
+        )
+        db.session.flush()
+        added["score_rules"] += ScoreField.query.filter_by(competition_id=comp.id).count() - before_fields
+        added["global_score_rules"] += (
+            GroupScoring.query.filter_by(competition_id=comp.id).count() - before_globals
+        )
 
     # LoRa devices (matched by dev_num within the competition).
     existing_dev_nums = {d.dev_num for d in LoRaDevice.query.filter_by(competition_id=comp.id).all()}

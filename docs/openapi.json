@@ -3212,6 +3212,132 @@
         "operationId": "get_api_map_lora_points"
       }
     },
+    "/api/paths": {
+      "get": {
+        "parameters": [],
+        "operationId": "get_api_paths",
+        "summary": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      },
+      "post": {
+        "parameters": [],
+        "operationId": "post_api_paths",
+        "summary": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/paths/{path_id}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "path_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "get_api_paths_path_id",
+        "summary": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      },
+      "patch": {
+        "parameters": [
+          {
+            "name": "path_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "patch_api_paths_path_id",
+        "summary": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      },
+      "put": {
+        "parameters": [
+          {
+            "name": "path_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "put_api_paths_path_id",
+        "summary": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      },
+      "delete": {
+        "parameters": [
+          {
+            "name": "path_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "delete_api_paths_path_id",
+        "summary": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/paths/{path_id}/duplicate": {
+      "post": {
+        "parameters": [
+          {
+            "name": "path_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "operationId": "post_api_paths_path_id_duplicate",
+        "summary": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      }
+    },
     "/api/rfid/cards": {
       "get": {
         "tags": [
@@ -3646,185 +3772,45 @@
         "operationId": "post_api_rfid_verify"
       }
     },
-    "/api/score-rules": {
+    "/api/score-fields": {
       "get": {
-        "tags": [
-          "scores"
-        ],
-        "summary": "List score rules",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "checkpoint_id",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "group_id",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Rules"
-          }
-        },
-        "operationId": "get_api_score_rules"
-      },
-      "post": {
-        "tags": [
-          "scores"
-        ],
-        "summary": "Create or update a score rule",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "checkpoint_id",
-                  "group_id",
-                  "rules"
-                ],
-                "properties": {
-                  "checkpoint_id": {
-                    "type": "integer"
-                  },
-                  "group_id": {
-                    "type": "integer"
-                  },
-                  "rules": {
-                    "type": "object",
-                    "description": "Rule object with optional field_rules and time_race. field_rules maps field keys to a rule or list of rules: mapping {type:'mapping', map:{input:output}}, interpolate {type:'interpolate', points:[[x,y],...]}, multiplier {type:'multiplier', factor}, found {type:'found', checkpoint_ids:[int], points_per:number}, deviation {type:'deviation', target, max_points, penalty_points, penalty_distance, min_points}. time_race uses checkin times between checkpoints: {start_checkpoint_id, end_checkpoint_id, min_points, max_points}.",
-                    "example": {
-                      "field_rules": {
-                        "Distance": [
-                          {
-                            "type": "deviation",
-                            "target": 0,
-                            "max_points": 100,
-                            "penalty_points": 1,
-                            "penalty_distance": 1,
-                            "min_points": 0
-                          }
-                        ],
-                        "Found": {
-                          "type": "found",
-                          "checkpoint_ids": [
-                            12,
-                            14
-                          ],
-                          "points_per": 5
-                        }
-                      },
-                      "total_fields": [
-                        "Distance",
-                        "Found"
-                      ],
-                      "time_race": {
-                        "start_checkpoint_id": 3,
-                        "end_checkpoint_id": 7,
-                        "min_points": 10,
-                        "max_points": 100
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated rule"
-          },
-          "201": {
-            "description": "Created rule"
-          }
-        },
         "parameters": [],
-        "operationId": "post_api_score_rules"
-      }
-    },
-    "/api/score-rules/fields": {
-      "get": {
-        "tags": [
-          "scores"
-        ],
-        "summary": "Get score rule fields",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "checkpoint_id",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "group_id",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
+        "operationId": "get_api_score_fields",
+        "summary": "",
         "responses": {
-          "200": {
-            "description": "Available scoring fields"
-          }
-        },
-        "operationId": "get_api_score_rules_fields"
-      }
-    },
-    "/api/score-rules/{rule_id}": {
-      "parameters": [
-        {
-          "name": "rule_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "integer"
+          "default": {
+            "description": ""
           }
         }
-      ],
-      "delete": {
-        "tags": [
-          "scores"
-        ],
-        "summary": "Delete a score rule",
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ],
+      },
+      "post": {
+        "parameters": [],
+        "operationId": "post_api_score_fields",
+        "summary": "",
         "responses": {
-          "200": {
-            "description": "Deleted"
+          "default": {
+            "description": ""
           }
-        },
+        }
+      }
+    },
+    "/api/score-fields/resolved": {
+      "get": {
+        "parameters": [],
+        "operationId": "get_api_score_fields_resolved",
+        "summary": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/score-fields/{field_id}": {
+      "delete": {
         "parameters": [
           {
-            "name": "rule_id",
+            "name": "field_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -3833,7 +3819,13 @@
             }
           }
         ],
-        "operationId": "delete_api_score_rules_rule_id"
+        "operationId": "delete_api_score_fields_field_id",
+        "summary": "",
+        "responses": {
+          "default": {
+            "description": ""
+          }
+        }
       }
     },
     "/api/scores/resolve": {

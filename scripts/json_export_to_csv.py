@@ -172,6 +172,33 @@ def main() -> None:
     ]
     _w(os.path.join(args.out_dir, "11_global_score_rules.csv"), ["group", "rules_json"], rows)
 
+    # 12-14. phase-2 scoring sections (schema >= 1.2.0); empty for old files
+    rows = [
+        [f.get("checkpoint_name"), f.get("key"), f.get("label"), f.get("rule_type"),
+         json.dumps(f.get("rule_params") or {}, ensure_ascii=False), f.get("counts_in_total")]
+        for f in data.get("score_fields", []) or []
+    ]
+    _w(os.path.join(args.out_dir, "12_score_fields.csv"),
+       ["checkpoint", "key", "label", "rule_type", "rule_params_json", "counts_in_total"], rows)
+
+    rows = [
+        [s.get("path_name"), s.get("start_checkpoint_name"), s.get("end_checkpoint_name"),
+         s.get("max_points"), s.get("min_points")]
+        for s in data.get("timed_segments", []) or []
+    ]
+    _w(os.path.join(args.out_dir, "13_timed_segments.csv"),
+       ["path", "from", "to", "max_points", "min_points"], rows)
+
+    rows = [
+        [g.get("group_name"), g.get("found_points_per"), g.get("race_max_points"),
+         g.get("race_threshold_minutes"), g.get("race_penalty_minutes"),
+         g.get("race_penalty_points"), g.get("race_min_points"), g.get("race_dq_multiplier")]
+        for g in data.get("group_scoring", []) or []
+    ]
+    _w(os.path.join(args.out_dir, "14_group_scoring.csv"),
+       ["group", "found_points_per", "race_max_points", "race_threshold_minutes",
+        "race_penalty_minutes", "race_penalty_points", "race_min_points", "race_dq_multiplier"], rows)
+
     # 12. sheet configs (templates the Google Sheets sync uses)
     rows = [
         [

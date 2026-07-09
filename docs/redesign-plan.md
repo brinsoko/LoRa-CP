@@ -436,6 +436,23 @@ rewired; one segment computation path; the four-cell time-trial display in
 all surfaces (app, CSV, Sheets with in-sheet diff formula). Drop `ScoreRule`,
 `GlobalScoreRule`, SheetConfig field blobs.
 
+Phase 2 implementation notes (deviations from the letter of the plan,
+same spirit):
+
+- `SheetConfig.config` keeps its `groups[].fields` / `dead_time_enabled`
+  keys: they describe the column layout of tabs already published to a
+  spreadsheet and per-cell writes compute offsets from them. They are now
+  a derived layout cache (publishes regenerate them from ScoreField), not
+  a scoring source; the plan's "strip field definitions" would have
+  broken existing tabs' geometry.
+- In Sheets, the segment A/B arrival cells are INDEX/MATCH formulas over
+  the CP tabs' Time cells (not system-written values), and diff/points
+  are formulas over those. This is strictly better for the hand-patch
+  requirement: fixing a missed scan on the CP tab flows through A, B,
+  diff, points and the total with no sync involved.
+- The race time formula in Sheets uses FLOOR (stepped) and always the
+  directed route endpoints, matching the engine.
+
 **Phase 3, judge shell:** new `/judge` blueprint, three tabs, merged
 scan+checkin+score flow, expected/ETA view (with missed/DNF/finished
 exclusions), score corrections from the arrived list, bulk-entry grid for
