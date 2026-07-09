@@ -159,6 +159,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     from app.blueprints.audit.routes import audit_bp
     from app.blueprints.docs.routes import docs_bp
     from app.blueprints.firmware.routes import firmware_bp
+    from app.blueprints.judge.routes import judge_bp
     from app.blueprints.judges.routes import judges_bp
     from app.blueprints.messages.routes import messages_bp
     from app.blueprints.scores.routes import scores_bp
@@ -182,6 +183,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
 
     app.register_blueprint(users_bp, url_prefix="/users")
     app.register_blueprint(judges_bp, url_prefix="/judges")
+    app.register_blueprint(judge_bp, url_prefix="/judge")
     app.register_blueprint(scores_bp, url_prefix="/scores")
     app.register_blueprint(audit_bp, url_prefix="/audit")
     app.register_blueprint(docs_bp, url_prefix="/docs")

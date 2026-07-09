@@ -118,7 +118,7 @@ def set_competition(competition_id: int):
     # may be doing setup work; superadmins likewise.
     role = (get_current_competition_role() or "").strip().lower()
     if role == "judge":
-        return redirect(url_for("scores.judge_score"))
+        return redirect(url_for("judge.home"))
     return redirect(url_for("teams.list_teams"))
 
 

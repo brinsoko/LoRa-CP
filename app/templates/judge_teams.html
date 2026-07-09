@@ -1,0 +1,69 @@
+{% extends "judge_base.html" %}
+{% block title %}{{ _('Teams') }} · {{ checkpoint.name }}{% endblock %}
+{% block judge_content %}
+
+<div class="text-body-secondary small mb-3">
+  {{ _('%(arrived)s of %(total)s teams arrived, waiting for %(waiting)s.',
+       arrived=view.arrived_count, total=view.expected_total, waiting=view.waiting_count) }}
+  {% if view.finished_count %} · {{ _('%(count)s already finished', count=view.finished_count) }}{% endif %}
+  {% if view.dnf_count %} · {{ _('%(count)s DNF', count=view.dnf_count) }}{% endif %}
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h6 class="card-title">{{ _('Still coming') }}
+      <span class="badge bg-secondary">{{ view.waiting|length }}</span>
+    </h6>
+    <div class="list-group list-group-flush">
+      {% for row in view.waiting %}
+        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+          <span>
+            {% if row.team.number is not none %}<span class="fw-semibold">{{ row.team.number }}</span> · {% endif %}
+            {{ row.team.name }}
+            <span class="text-body-secondary small">({{ row.group_name }})</span>
+            {% if row.last_seen_name %}
+              <div class="text-body-secondary small">
+                {{ _('last seen at %(cp)s, %(min)s min ago', cp=row.last_seen_name, min=(row.last_seen_minutes_ago or 0)|round(0)|int) }}
+              </div>
+            {% endif %}
+          </span>
+          <span class="text-nowrap">
+            {% if row.eta_state == 'eta' %}
+              <span class="badge text-bg-success">{{ _('in ~%(min)s min', min=row.eta_minutes|round(0)|int) }}</span>
+            {% elif row.eta_state == 'overdue' %}
+              <span class="badge text-bg-danger">{{ _('overdue %(min)s min', min=(-row.eta_minutes)|round(0)|int) }}</span>
+            {% elif row.eta_state == 'on_course' %}
+              <span class="badge text-bg-info">{{ _('on course') }}</span>
+            {% else %}
+              <span class="badge text-bg-secondary">{{ _('not started') }}</span>
+            {% endif %}
+          </span>
+        </div>
+      {% else %}
+        <div class="text-body-secondary small py-2">{{ _('Nobody left to wait for.') }}</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% if view.missed %}
+<div class="card mb-3">
+  <div class="card-body">
+    <h6 class="card-title">{{ _('Missed this checkpoint') }}
+      <span class="badge text-bg-warning">{{ view.missed|length }}</span>
+    </h6>
+    <div class="form-text mb-2">{{ _('These teams already checked in further along their route without visiting you.') }}</div>
+    <ul class="list-unstyled mb-0">
+      {% for row in view.missed %}
+        <li>
+          {% if row.team.number is not none %}<span class="fw-semibold">{{ row.team.number }}</span> · {% endif %}
+          {{ row.team.name }} <span class="text-body-secondary small">({{ row.group_name }})</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endif %}
+
+<script>setTimeout(() => window.location.reload(), 30000);</script>
+{% endblock %}

@@ -307,10 +307,56 @@ def score_resolve():
         .first()
     )
 
-    checkin_exists = (
-        Checkin.query.filter_by(competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id).first()
-        is not None
-    )
+    checkin = Checkin.query.filter_by(
+        competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id
+    ).first()
+    checkin_created = False
+    # The judge shell records the arrival at scan time (scan = the team is
+    # standing in front of the judge), not at score submit. Same savepoint
+    # pattern as submit for the concurrent-judges race.
+    if checkin is None and payload.get("create_checkin") and not checkpoint.is_virtual:
+        new_checkin = Checkin(
+            competition_id=comp_id,
+            team_id=team.id,
+            checkpoint_id=checkpoint_id,
+            timestamp=utcnow_naive(),
+            created_by_user_id=current_user.id,
+        )
+        try:
+            with db.session.begin_nested():
+                db.session.add(new_checkin)
+        except IntegrityError:
+            checkin = Checkin.query.filter_by(
+                competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id
+            ).first()
+        else:
+            checkin = new_checkin
+            checkin_created = True
+            record_audit_event(
+                competition_id=comp_id,
+                event_type="checkin_created",
+                entity_type="checkin",
+                entity_id=checkin.id,
+                actor_user=current_user,
+                summary=f"Check-in recorded at scan for team {team.name} at {checkpoint.name}.",
+                details={
+                    "id": checkin.id,
+                    "team_id": team.id,
+                    "team_name": team.name,
+                    "checkpoint_id": checkpoint.id,
+                    "checkpoint_name": checkpoint.name,
+                    "timestamp": checkin.timestamp.isoformat() if checkin.timestamp else None,
+                },
+                created_at=checkin.timestamp,
+            )
+        db.session.commit()
+        if checkin_created:
+            try:
+                mark_arrival_checkbox(team.id, checkpoint_id, checkin.timestamp)
+            except Exception:
+                pass
+
+    checkin_exists = checkin is not None
 
     # Checkpoint scoring_text: curated admin override wins; otherwise
     # auto-generate from the rule so the judge always sees something
@@ -334,7 +380,7 @@ def score_resolve():
         "fields": field_defs,
         "latest_score": existing.raw_fields if existing else None,
         "latest_total": existing.total if existing else None,
-        "checkin_created": False,
+        "checkin_created": checkin_created,
         "checkin_exists": checkin_exists,
     }, 200
 

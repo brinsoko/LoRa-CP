@@ -144,11 +144,12 @@
   </nav>
 
   <!-- ACTION BAR -->
+  {% block actionbar %}
   <div class="mb-3 d-flex flex-wrap gap-2">
     {% if current_competition and current_user.is_authenticated and current_competition_role == 'judge' %}
-      {# Judges get a minimal bar: the three screens used during a race.
-         Everything else is admin tooling and only clutters a phone. #}
-      <a href="{{ url_for('scores.judge_score') }}" class="btn btn-primary">{{ _('Score') }}</a>
+      {# Judges get a minimal bar; their real home is the /judge shell
+         with its own bottom navigation. #}
+      <a href="{{ url_for('judge.home') }}" class="btn btn-primary">{{ _('Judge') }}</a>
       <a href="{{ url_for('checkins.live_arrivals') }}" class="btn btn-outline-info">{{ _('Live Arrivals') }}</a>
       <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-outline-info">{{ _('View Check-ins') }}</a>
     {% elif current_competition %}
@@ -214,6 +215,7 @@
     {% endif %}
 
   </div>
+  {% endblock %}
 
   <!-- FLASH MESSAGES -->
   {% with messages = get_flashed_messages(with_categories=true) %}
