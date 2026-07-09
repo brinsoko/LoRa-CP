@@ -171,7 +171,7 @@
             {% for cp in checkpoints %}
               <th class="text-end">{{ cp.name }}</th>
             {% endfor %}
-            <th class="text-end">{{ _('Time-trial leg') }}</th>
+            <th class="text-end">{{ _('Time trials') }}</th>
             <th class="text-end">{{ _('Time points') }}</th>
             <th class="text-end">{{ _('Found points') }}</th>
             <th class="text-end">{{ _('Dead time (sum)') }}</th>
@@ -210,13 +210,6 @@
                 <td class="text-end">
                   {% if row.dnf %}
                     {{ _('DNF') }}
-                  {% elif cp.id in (row.leg_cp_ids or []) %}
-                    {# leg endpoint CPs are consolidated into the Time-trial
-                       leg column below; render empty here so they don't
-                       confuse with "0 points" #}
-                    <span class="text-muted small">—</span>
-                  {% elif cp.id in (row.excluded_checkpoints or []) %}
-                    —
                   {% elif val is not none %}
                     {{ (val|round(0))|int }}
                   {% elif cp.id in (row.allowed_checkpoints or []) %}
@@ -224,25 +217,23 @@
                   {% endif %}
                 </td>
               {% endfor %}
-              {# Time-trial leg cell: the LEG label (e.g. "B→C") + the LEG
-                 points (rank-based, 100→10 by default) + the time it took
-                 the team to traverse the leg. Independent of the whole-race
-                 time block above — these are points awarded specifically
-                 for the chosen leg between two intermediate CPs. #}
+              {# Timed segments: four values each (start arrival, end
+                 arrival, diff, points) per the redesign plan 3.3 contract.
+                 A dash marks an endpoint the team has not reached yet. #}
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}
-                {% elif row.leg_label %}
-                  <span class="text-muted small me-1">{{ row.leg_label }}:</span>
-                  {{ '%.2f'|format(row.leg_points or 0) }}
-                  {% if row.leg_minutes is not none %}
-                    <span class="text-muted small">({{ '%.1f'|format(row.leg_minutes) }} {{ _('min') }})</span>
-                  {% endif %}
-                  {% if row.leg_start_hms or row.leg_end_hms %}
-                    {# Arrival clock times at the two leg endpoints; a dash
-                       marks the endpoint the team has not reached yet. #}
-                    <div class="text-muted small">{{ row.leg_start_hms or '—' }} → {{ row.leg_end_hms or '—' }}</div>
-                  {% endif %}
+                {% elif row.segments %}
+                  {% for s in row.segments %}
+                    <div>
+                      <span class="text-muted small me-1">{{ s.label }}:</span>
+                      {{ '%.2f'|format(s.points or 0) }}
+                      {% if s.minutes is not none %}
+                        <span class="text-muted small">({{ '%.1f'|format(s.minutes) }} {{ _('min') }})</span>
+                      {% endif %}
+                      <div class="text-muted small">{{ s.start_hms or '—' }} → {{ s.end_hms or '—' }}</div>
+                    </div>
+                  {% endfor %}
                 {% else %}
                   —
                 {% endif %}

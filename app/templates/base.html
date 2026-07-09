@@ -200,7 +200,7 @@
         </button>
         <ul class="dropdown-menu">
           <li><a class="dropdown-item" href="{{ url_for('sheets_admin.list_sheets') }}">{{ _('Sheets') }}</a></li>
-          <li><a class="dropdown-item" href="{{ url_for('scores.score_rules') }}">{{ _('Score Rules') }}</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('scores.scoring_setup') }}">{{ _('Scoring setup') }}</a></li>
           {% if not current_competition.hide_audit_messages %}
           <li><a class="dropdown-item" href="{{ url_for('audit.list_audit_events') }}">{{ _('Audit') }}</a></li>
           {% endif %}
