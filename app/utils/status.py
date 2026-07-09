@@ -23,12 +23,21 @@ def get_active_group_for_team(team_id: int, competition_id: int) -> CheckpointGr
 
 
 def get_group_checkpoints(group: CheckpointGroup) -> list[Checkpoint]:
+    """Return the group's checkpoints in directed route order.
+
+    Uses the path resolver, so a reversed group gets its map "next
+    checkpoint" from the direction it actually travels.
     """
-    Return checkpoints for a group. With your many-to-many, this comes
-    from group.checkpoints (SQLAlchemy relationship).
-    """
-    # You can order here if you want a specific order (e.g., by name)
-    return list(group.checkpoints)
+    from app.utils.paths import resolve_route_ids
+
+    route = resolve_route_ids(group)
+    if not route:
+        return []
+    by_id = {
+        cp.id: cp
+        for cp in db.session.query(Checkpoint).filter(Checkpoint.id.in_(set(route))).all()
+    }
+    return [by_id[cp_id] for cp_id in route if cp_id in by_id]
 
 
 def get_found_checkpoint_ids(team_id: int, competition_id: int) -> list[int]:
@@ -98,7 +107,7 @@ def compute_team_statuses(team_id: int, competition_id: int) -> dict:
 def all_checkpoints_for_map(competition_id: int) -> list[dict]:
     """Return all checkpoints with coords for the public map layer.
 
-    Virtual checkpoints are excluded — they have no physical location.
+    Virtual checkpoints are excluded; they have no physical location.
     """
     cps = (
         db.session.query(Checkpoint)

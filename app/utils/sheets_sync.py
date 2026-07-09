@@ -11,7 +11,6 @@ from app.models import (
     Checkin,
     Checkpoint,
     CheckpointGroup,
-    CheckpointGroupLink,
     ScoreEntry,
     SheetConfig,
     Team,
@@ -20,6 +19,7 @@ from app.models import (
 from app.utils.competition import get_competition_group_order
 from app.utils.export_safety import escape_formula_cell
 from app.utils.lang_store import load_lang
+from app.utils.paths import resolve_route_ids
 from app.utils.sheets_client import get_sheets_client
 from app.utils.sheets_settings import sheets_sync_enabled
 
@@ -84,15 +84,17 @@ def _get_default_group_order(spreadsheet_id: str | None, competition_id: int | N
 
 
 def _get_group_checkpoint_order_from_db() -> dict[str, list[str]]:
-    """Return default checkpoint order per group based on CheckpointGroupLink positions."""
+    """Return directed checkpoint-name order per group from its path.
+
+    Honors the group's traversal direction: reversed groups get their
+    sheet columns in the order they actually run the course.
+    """
     orders: dict[str, list[str]] = {}
-    groups = CheckpointGroup.query.options(
-        db.joinedload(CheckpointGroup.checkpoint_links).joinedload(CheckpointGroupLink.checkpoint)
-    ).all()
+    groups = CheckpointGroup.query.all()
+    name_by_id = {cp.id: cp.name for cp in Checkpoint.query.all()}
     for g in groups:
-        # order by position asc
-        ordered = sorted(g.checkpoint_links, key=lambda cl: cl.position if cl.position is not None else 0)
-        orders[g.name] = [cl.checkpoint.name for cl in ordered if cl.checkpoint]
+        route = resolve_route_ids(g)
+        orders[g.name] = [name_by_id[cid] for cid in route if cid in name_by_id]
     return orders
 
 

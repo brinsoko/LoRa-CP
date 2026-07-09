@@ -71,23 +71,17 @@
               <small class="text-muted">{{ _('Drag to reorder; uncheck to exclude a checkpoint for this group.') }}</small>
             </div>
             <ul class="list-group list-group-sm per-group-list" data-group="{{ g.name }}">
-              {% set ordered_links = g.checkpoint_links|sort(attribute='position') %}
-              {% set linked_cp_names = ordered_links
-                | selectattr('checkpoint', 'ne', None)
-                | map(attribute='checkpoint.name')
-                | list %}
-              {% for link in ordered_links %}
-                {% if link.checkpoint %}
-                  <li class="list-group-item d-flex align-items-center justify-content-between py-1 drag-handle">
-                    <div class="d-flex align-items-center gap-2">
-                      <span class="fw-semibold">::</span>
-                      <span class="flex-grow-1">{{ link.checkpoint.name }}</span>
-                    </div>
-                    <div class="form-check m-0">
-                      <input class="form-check-input cp-include" type="checkbox" value="{{ link.checkpoint.name }}" checked>
-                    </div>
-                  </li>
-                {% endif %}
+              {% set linked_cp_names = group_route_names.get(g.id, []) %}
+              {% for cp_name in linked_cp_names %}
+                <li class="list-group-item d-flex align-items-center justify-content-between py-1 drag-handle">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="fw-semibold">::</span>
+                    <span class="flex-grow-1">{{ cp_name }}</span>
+                  </div>
+                  <div class="form-check m-0">
+                    <input class="form-check-input cp-include" type="checkbox" value="{{ cp_name }}" checked>
+                  </div>
+                </li>
               {% endfor %}
               {% for cp in checkpoints %}
                 {% if cp.name not in linked_cp_names %}

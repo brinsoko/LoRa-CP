@@ -275,12 +275,13 @@ def _compute_global_contrib(
     found_rule = global_rule.get("found") or {}
     points_per = _to_number(found_rule.get("points_per"))
     if points_per is not None:
-        from app.models import CheckpointGroupLink
+        from app.models import CheckpointGroup
+        from app.utils.paths import resolve_route_ids
 
-        cp_ids = (
-            db.session.query(CheckpointGroupLink.checkpoint_id).filter(CheckpointGroupLink.group_id == group_id).all()
-        )
-        checkpoint_ids = [row[0] for row in cp_ids]
+        group = db.session.get(CheckpointGroup, group_id)
+        # Distinct ids: a path may visit a checkpoint twice, but "found"
+        # counts distinct visited checkpoints.
+        checkpoint_ids = list(dict.fromkeys(resolve_route_ids(group)))
         time_rule = global_rule.get("time") or {}
         if found_rule.get("exclude_start_checkpoint") and time_rule.get("start_checkpoint_id"):
             try:

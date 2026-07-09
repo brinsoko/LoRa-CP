@@ -7,9 +7,10 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from flask_babel import gettext as _
 
 from app.extensions import db
-from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, SheetConfig, Team, TeamGroup
+from app.models import Checkpoint, CheckpointGroup, SheetConfig, Team, TeamGroup
 from app.utils.competition import get_current_competition_id
 from app.utils.lang_store import load_lang, save_lang
+from app.utils.paths import resolve_route_ids
 from app.utils.perms import roles_required
 from app.utils.sheets_client import SheetsClient, get_sheets_client
 from app.utils.sheets_settings import (
@@ -110,18 +111,21 @@ def list_sheets():
         .all()
     )
     groups = (
-        CheckpointGroup.query.options(
-            db.joinedload(CheckpointGroup.checkpoint_links).joinedload(CheckpointGroupLink.checkpoint)
-        )
-        .filter(CheckpointGroup.competition_id == comp_id)
+        CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
         .all()
     )
+    # Directed route names per group for the per-group column preview.
+    cp_name_by_id = {cp.id: cp.name for cp in checkpoints}
+    group_route_names = {
+        g.id: [cp_name_by_id[cid] for cid in resolve_route_ids(g) if cid in cp_name_by_id] for g in groups
+    }
     return render_template(
         "sheets_admin.html",
         configs=configs,
         checkpoints=checkpoints,
         groups=groups,
+        group_route_names=group_route_names,
         lang=lang,
         sheets_settings=sheets_settings,
         remembered_spreadsheet_id=session.get(SESSION_KEY_SPREADSHEET_ID, ""),

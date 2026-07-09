@@ -16,7 +16,6 @@ from app.models import (
     Checkin,
     Checkpoint,
     CheckpointGroup,
-    CheckpointGroupLink,
     Competition,
     GlobalScoreRule,
     JudgeCheckpoint,
@@ -31,6 +30,11 @@ from app.resources.scores import (
     recompute_scores_for_rule,
 )
 from app.utils.competition import get_current_competition_id, get_current_competition_role
+from app.utils.paths import (
+    group_ids_containing_checkpoint,
+    resolve_route_ids,
+    resolve_route_ids_bulk,
+)
 from app.utils.perms import roles_required
 from app.utils.time import format_datetime_display, format_time_display
 
@@ -140,19 +144,10 @@ def score_rules():
                 return redirect(url_for("scores.score_rules"))
 
         if apply_all:
-            # Fan out the rule to every group linked to this checkpoint via
-            # CheckpointGroupLink. Groups that don't participate at this
-            # checkpoint are skipped so we don't leave dead rule rows behind.
-            linked_group_ids = [
-                row[0]
-                for row in db.session.query(CheckpointGroupLink.group_id)
-                .join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
-                .filter(
-                    CheckpointGroupLink.checkpoint_id == checkpoint_id,
-                    CheckpointGroup.competition_id == comp_id,
-                )
-                .all()
-            ]
+            # Fan out the rule to every group whose path visits this
+            # checkpoint. Groups that don't participate at this checkpoint
+            # are skipped so we don't leave dead rule rows behind.
+            linked_group_ids = sorted(group_ids_containing_checkpoint(comp_id, checkpoint_id))
             if not linked_group_ids:
                 flash(
                     _("No groups are linked to this checkpoint, nothing to apply."),
@@ -391,23 +386,19 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     group_final_checkpoint = {}
     group_start_checkpoint = {}
     if team_group_ids:
+        # Directed routes from the path resolver: start/finish now follow
+        # the group's traversal direction (the old link-order derivation
+        # ignored reversed groups and computed elapsed time backwards).
+        routes = resolve_route_ids_bulk(comp_id)
         unique_group_ids = sorted({gid for gid in team_group_ids.values() if gid})
-        group_links = (
-            CheckpointGroupLink.query.filter(CheckpointGroupLink.group_id.in_(unique_group_ids))
-            .order_by(
-                CheckpointGroupLink.group_id.asc(),
-                CheckpointGroupLink.position.asc().nulls_last(),
-                CheckpointGroupLink.checkpoint_id.asc(),
-            )
-            .all()
-        )
-        for link in group_links:
-            group_checkpoint_ids.setdefault(link.group_id, set()).add(link.checkpoint_id)
-            group_checkpoint_order.setdefault(link.group_id, []).append(link.checkpoint_id)
-            if link.checkpoint_id:
-                group_final_checkpoint[link.group_id] = link.checkpoint_id
-                if link.group_id not in group_start_checkpoint:
-                    group_start_checkpoint[link.group_id] = link.checkpoint_id
+        for gid in unique_group_ids:
+            route = routes.get(gid) or []
+            if not route:
+                continue
+            group_checkpoint_order[gid] = route
+            group_checkpoint_ids[gid] = set(route)
+            group_start_checkpoint[gid] = route[0]
+            group_final_checkpoint[gid] = route[-1]
 
     # Load global rules early so the per-group start/end CP overrides apply
     # to time_minutes too — mirroring live_arrivals.py:78-85. Without this
@@ -576,7 +567,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     leg_minutes_by_team: dict[int, float] = {}
     # Raw arrival timestamps at the leg endpoints, kept even when only one
     # endpoint has a check-in so the display can show a partial leg
-    # ("A 10:03; B —") while the team is still on course.
+    # ("A 10:03; B -") while the team is still on course.
     leg_times_by_team: dict[int, tuple[datetime | None, datetime | None]] = {}
     if group_leg_info:
         leg_cp_ids_query = {
@@ -740,10 +731,8 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
 
     checkpoints_query = Checkpoint.query.filter(Checkpoint.competition_id == comp_id)
     if group_id:
-        group_cp_ids = (
-            db.session.query(CheckpointGroupLink.checkpoint_id).filter(CheckpointGroupLink.group_id == group_id).all()
-        )
-        cp_ids = [row[0] for row in group_cp_ids]
+        selected_group = db.session.get(CheckpointGroup, group_id)
+        cp_ids = resolve_route_ids(selected_group)
         if cp_ids:
             checkpoints_query = checkpoints_query.filter(Checkpoint.id.in_(cp_ids))
     checkpoints = checkpoints_query.order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc()).all()
@@ -970,14 +959,15 @@ def _build_stats_context(comp_id: int) -> dict:
         .all()
     }
 
-    links = (
-        CheckpointGroupLink.query.filter(CheckpointGroupLink.group_id.in_([g.id for g in groups]))
-        .order_by(CheckpointGroupLink.group_id.asc(), CheckpointGroupLink.position.asc().nulls_last())
+    # Directed per-group routes; stats segments now follow the traversal
+    # direction instead of raw link order.
+    checkpoint_order_by_group = resolve_route_ids_bulk(comp_id)
+    checkpoint_names = {
+        cp_id: name
+        for (cp_id, name) in db.session.query(Checkpoint.id, Checkpoint.name)
+        .filter(Checkpoint.competition_id == comp_id)
         .all()
-    )
-    checkpoint_order_by_group = {}
-    for link in links:
-        checkpoint_order_by_group.setdefault(link.group_id, []).append(link.checkpoint_id)
+    }
 
     overall_durations: list[tuple[int, str, str | None, float]] = []
     overall_checkpoint_counts: list[int] = []
@@ -1092,19 +1082,17 @@ def _build_stats_context(comp_id: int) -> dict:
                 avg_segment = None
                 if segment_durations:
                     avg_segment = sum(segment_durations) / len(segment_durations)
-                from_cp = next((cp for cp in group.checkpoint_links if cp.checkpoint_id == from_id), None)
-                to_cp = next((cp for cp in group.checkpoint_links if cp.checkpoint_id == to_id), None)
                 if from_count > 0:
                     rate = max(0.0, (from_count - to_count) / from_count)
                     if dropoff_rate is None or rate > dropoff_rate:
                         dropoff_rate = rate
-                        dropoff_checkpoint = to_cp.checkpoint.name if to_cp and to_cp.checkpoint else ""
+                        dropoff_checkpoint = checkpoint_names.get(to_id, "")
                 segments.append(
                     {
                         "from_id": from_id,
                         "to_id": to_id,
-                        "from_name": from_cp.checkpoint.name if from_cp and from_cp.checkpoint else "",
-                        "to_name": to_cp.checkpoint.name if to_cp and to_cp.checkpoint else "",
+                        "from_name": checkpoint_names.get(from_id, ""),
+                        "to_name": checkpoint_names.get(to_id, ""),
                         "avg_minutes": avg_segment,
                         "sample_count": len(segment_durations),
                     }

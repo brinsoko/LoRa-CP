@@ -4,16 +4,15 @@ from datetime import datetime
 
 from sqlalchemy.orm import joinedload
 
-from app.extensions import db
 from app.models import (
     Checkin,
     Checkpoint,
     CheckpointGroup,
-    CheckpointGroupLink,
     GlobalScoreRule,
     Team,
     TeamGroup,
 )
+from app.utils.paths import resolve_route_ids_bulk
 from app.utils.time import format_datetime_display, utcnow_naive
 
 VALID_TEAM_SORTS = {"number_asc", "number_desc", "name_asc", "name_desc", "status", "latest"}
@@ -54,32 +53,11 @@ def _minutes_label(minutes: float | None) -> str:
 
 
 def _build_group_routes(comp_id: int) -> tuple[dict[int, list[int]], dict[int, int], dict[int, int]]:
-    links = (
-        CheckpointGroupLink.query.join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
-        .filter(CheckpointGroup.competition_id == comp_id)
-        .order_by(
-            CheckpointGroupLink.group_id.asc(),
-            CheckpointGroupLink.position.asc().nulls_last(),
-            CheckpointGroupLink.checkpoint_id.asc(),
-        )
-        .all()
-    )
-    group_checkpoint_order: dict[int, list[int]] = {}
-    for link in links:
-        group_checkpoint_order.setdefault(link.group_id, []).append(link.checkpoint_id)
-
-    # Some groups walk the same set of checkpoints in the opposite direction.
-    # Reverse their order list here so downstream consumers (group_start /
-    # group_finish derivation, missed-CP detection, template rendering) all
-    # see the route in the direction the group actually traverses it.
-    reverse_flags = dict(
-        db.session.query(CheckpointGroup.id, CheckpointGroup.reverse)
-        .filter(CheckpointGroup.competition_id == comp_id)
-        .all()
-    )
-    for group_id, checkpoint_ids in list(group_checkpoint_order.items()):
-        if reverse_flags.get(group_id) and checkpoint_ids:
-            group_checkpoint_order[group_id] = list(reversed(checkpoint_ids))
+    # Directed routes come from the path resolver (the single direction
+    # authority); groups without a path resolve to an empty route.
+    group_checkpoint_order = {
+        group_id: route for group_id, route in resolve_route_ids_bulk(comp_id).items() if route
+    }
 
     group_start: dict[int, int] = {}
     group_finish: dict[int, int] = {}
