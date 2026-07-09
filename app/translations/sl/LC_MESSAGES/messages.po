@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LoRa KT\n"
 "Report-Msgid-Bugs-To: brin.soko@gmail.com\n"
-"POT-Creation-Date: 2026-07-09 20:06+0200\n"
+"POT-Creation-Date: 2026-07-09 23:35+0200\n"
 "PO-Revision-Date: 2025-12-04 00:00+0100\n"
 "Last-Translator: Brin Soko <brin.soko@gmail.com>\n"
 "Language: sl\n"
@@ -40,7 +40,7 @@ msgid "Group name already exists."
 msgstr "Ime skupine že obstaja."
 
 #: app/api/paths.py:89
-#, fuzzy, python-format
+#, python-format
 msgid "Unknown checkpoint ids: %(ids)s"
 msgstr "Neznane kontrolne točke: %(ids)s"
 
@@ -226,7 +226,6 @@ msgid "New password must be at least 8 characters."
 msgstr "Novo geslo mora imeti vsaj 8 znakov."
 
 #: app/blueprints/auth/routes.py:30
-#, fuzzy
 msgid "Password should not contain your username."
 msgstr "Geslo ne sme vsebovati uporabniškega imena."
 
@@ -276,9 +275,8 @@ msgid "Google account did not provide an email."
 msgstr "Google račun ni posredoval e-poštnega naslova."
 
 #: app/blueprints/auth/routes.py:208
-#, fuzzy
 msgid "Account created via Google."
-msgstr "Skupine ni bilo mogoče ustvariti."
+msgstr "Račun je bil ustvarjen prek Googla."
 
 #: app/blueprints/auth/routes.py:232
 msgid "Signed out."
@@ -295,7 +293,7 @@ msgstr "Uporabnik '%(username)s' ustvarjen z vlogo '%(role)s'."
 
 #: app/blueprints/auth/routes.py:259
 msgid "Could not create user."
-msgstr "Ekipe ni bilo mogoče ustvariti."
+msgstr "Uporabnika ni bilo mogoče ustvariti."
 
 #: app/blueprints/auth/routes.py:268
 msgid "Password changes are disabled for Google accounts."
@@ -311,7 +309,7 @@ msgstr "Spremeni geslo"
 
 #: app/blueprints/auth/routes.py:309
 msgid "Username and password are required."
-msgstr "Veljaven e-poštni naslov je obvezen."
+msgstr "Uporabniško ime in geslo sta obvezna."
 
 #: app/blueprints/auth/routes.py:319
 #, python-format
@@ -320,7 +318,7 @@ msgstr "Skrbnik '%(username)s' ustvarjen."
 
 #: app/blueprints/auth/routes.py:322
 msgid "Could not create admin user."
-msgstr "Ekipe ni bilo mogoče ustvariti."
+msgstr "Skrbniškega računa ni bilo mogoče ustvariti."
 
 #: app/blueprints/checkins/routes.py:26 app/blueprints/rfid/routes.py:27
 #: app/blueprints/teams/routes.py:97
@@ -333,9 +331,8 @@ msgid "Could not load checkpoints."
 msgstr "Ni bilo mogoče naložiti kontrolnih točk."
 
 #: app/blueprints/checkins/routes.py:135
-#, fuzzy
 msgid "Could not load check-ins."
-msgstr "Ni bilo mogoče naložiti kontrolnih točk."
+msgstr "Prihodov ni bilo mogoče naložiti."
 
 #: app/blueprints/checkins/routes.py:182 app/blueprints/groups/routes.py:77
 #: app/blueprints/scores/routes.py:390
@@ -410,9 +407,8 @@ msgid "Checkpoint not found."
 msgstr "Kontrolna točka ni najdena."
 
 #: app/blueprints/checkpoints/routes.py:227
-#, fuzzy
 msgid "Checkpoint judges updated."
-msgstr "Kontrolna točka posodobljena."
+msgstr "Sodniki kontrolne točke so bili posodobljeni."
 
 #: app/blueprints/checkpoints/routes.py:250
 #: app/blueprints/checkpoints/routes.py:311
@@ -443,13 +439,12 @@ msgid "Invalid JSON: %(error)s"
 msgstr "Neveljaven JSON: %(error)s"
 
 #: app/blueprints/checkpoints/routes.py:433
-#, fuzzy
 msgid ""
 "JSON must be an array of checkpoints, an object with 'items', or an "
 "object with 'cps' list."
 msgstr ""
-"Prilepi JSON ali naloži datoteko. Sprejemljivo: seznam točk, objekt z "
-"items ali mapa s cps (e/n/name) kot pri izvozu zemljevida."
+"JSON mora biti seznam kontrolnih točk, objekt s poljem 'items' ali objekt"
+" s seznamom 'cps'."
 
 #: app/blueprints/checkpoints/routes.py:440
 #: app/templates/competition_transfer.html:88
@@ -462,14 +457,13 @@ msgid "Import failed: %(detail)s"
 msgstr "Uvoz ni uspel: %(detail)s"
 
 #: app/blueprints/checkpoints/routes.py:448
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "Imported checkpoints: created %(created)s, updated %(updated)s, skipped "
 "%(skipped)s."
 msgstr ""
-"Čarovnik končan. Ustvarjenih zavihkov: %(created)s, preskočenih "
-"obstoječih: %(skipped)s.Carovnik koncan. Ustvarjenih %(created)s "
-"zavihkov, preskocenih %(skipped)s obstoječih."
+"Uvožene kontrolne točke: ustvarjenih %(created)s, posodobljenih "
+"%(updated)s, preskočenih %(skipped)s."
 
 #: app/blueprints/checkpoints/routes.py:456
 #, python-format
@@ -493,9 +487,8 @@ msgid "Offsets must be valid integers (e.g. 0x9000 or 36864)."
 msgstr "Odmiki morajo biti veljavna cela števila (npr. 0x9000 ali 36864)."
 
 #: app/blueprints/firmware/routes.py:114
-#, fuzzy
 msgid "NVS keys offset must be less than NVS offset."
-msgstr "NVS odmik mora biti manjši od odmika aplikacije."
+msgstr "Odmik NVS ključev mora biti manjši od odmika NVS."
 
 #: app/blueprints/firmware/routes.py:116
 msgid "NVS offset must be less than app offset."
@@ -506,9 +499,8 @@ msgid "NVS size must be a positive multiple of 4096 (e.g. 0x3000)."
 msgstr "Velikost NVS mora biti pozitiven večkratnik 4096 (npr. 0x3000)."
 
 #: app/blueprints/firmware/routes.py:120
-#, fuzzy
 msgid "NVS partition must fit before the app partition offset."
-msgstr "NVS odmik mora biti manjši od odmika aplikacije."
+msgstr "NVS particija mora biti v celoti pred odmikom particije aplikacije."
 
 #: app/blueprints/firmware/routes.py:122
 msgid "NVS keys partition (0x1000) must fit before NVS offset."
@@ -591,7 +583,7 @@ msgid "Bulk entry is not enabled for this checkpoint."
 msgstr "Skupinski vnos za to kontrolno točko ni omogočen."
 
 #: app/blueprints/judge/routes.py:270
-#, fuzzy, python-format
+#, python-format
 msgid "Invalid value for %(team)s / %(field)s."
 msgstr "Neveljavna vrednost za %(team)s / %(field)s."
 
@@ -618,39 +610,32 @@ msgid "Judge checkpoints updated."
 msgstr "Dodelitve sodnika posodobljene."
 
 #: app/blueprints/lora/routes.py:70 app/blueprints/lora/routes.py:112
-#, fuzzy
 msgid "Device number is required."
-msgstr "Ime ekipe je obvezno."
+msgstr "Številka naprave je obvezna."
 
 #: app/blueprints/lora/routes.py:86
-#, fuzzy
 msgid "Device added."
-msgstr "Naprava je bila posodobljena."
+msgstr "Naprava je bila dodana."
 
 #: app/blueprints/lora/routes.py:89
-#, fuzzy
 msgid "Could not add device."
-msgstr "Ni bilo mogoče naložiti naprav."
+msgstr "Naprave ni bilo mogoče dodati."
 
 #: app/blueprints/lora/routes.py:99
-#, fuzzy
 msgid "Device not found."
-msgstr "Povabilo ni bilo najdeno."
+msgstr "Naprava ni bila najdena."
 
 #: app/blueprints/lora/routes.py:140
-#, fuzzy
 msgid "Could not update device."
-msgstr "Ekipe ni bilo mogoče posodobiti."
+msgstr "Naprave ni bilo mogoče posodobiti."
 
 #: app/blueprints/lora/routes.py:161
-#, fuzzy
 msgid "Device deleted."
-msgstr "Naprava je bila posodobljena."
+msgstr "Naprava je bila izbrisana."
 
 #: app/blueprints/lora/routes.py:163
-#, fuzzy
 msgid "Could not delete device."
-msgstr "Ekipe ni bilo mogoče izbrisati."
+msgstr "Naprave ni bilo mogoče izbrisati."
 
 #: app/blueprints/main/routes.py:64 app/blueprints/main/routes.py:346
 msgid "A competition with that name already exists."
@@ -706,9 +691,8 @@ msgid "Could not delete competition."
 msgstr "Tekmovanja ni bilo mogoče izbrisati."
 
 #: app/blueprints/messages/routes.py:73
-#, fuzzy
 msgid "Could not load messages."
-msgstr "Ekip ni bilo mogoče naložiti."
+msgstr "Sporočil ni bilo mogoče naložiti."
 
 #: app/blueprints/paths/routes.py:96 app/blueprints/paths/routes.py:140
 msgid "Path name is required."
@@ -755,47 +739,39 @@ msgid "Could not delete path."
 msgstr "Poti ni bilo mogoče izbrisati."
 
 #: app/blueprints/rfid/routes.py:19
-#, fuzzy
 msgid "Could not load RFID mappings."
-msgstr "Ni bilo mogoče naložiti naprav."
+msgstr "RFID preslikav ni bilo mogoče naložiti."
 
 #: app/blueprints/rfid/routes.py:92
-#, fuzzy
 msgid "RFID mapping created."
-msgstr "Ni še povezav RFID."
+msgstr "RFID preslikava je bila ustvarjena."
 
 #: app/blueprints/rfid/routes.py:95
-#, fuzzy
 msgid "Could not create RFID mapping."
-msgstr "Ekipe ni bilo mogoče ustvariti."
+msgstr "RFID preslikave ni bilo mogoče ustvariti."
 
 #: app/blueprints/rfid/routes.py:111
-#, fuzzy
 msgid "RFID card not found."
-msgstr "Nastavitev ni bila najdena."
+msgstr "RFID kartica ni bila najdena."
 
 #: app/blueprints/rfid/routes.py:129
-#, fuzzy
 msgid "RFID mapping updated."
-msgstr "Ni še povezav RFID."
+msgstr "RFID preslikava je bila posodobljena."
 
 #: app/blueprints/rfid/routes.py:132
-#, fuzzy
 msgid "Could not update RFID mapping."
-msgstr "Ekipe ni bilo mogoče posodobiti."
+msgstr "RFID preslikave ni bilo mogoče posodobiti."
 
 #: app/blueprints/rfid/routes.py:205
-#, fuzzy
 msgid "RFID mapping deleted."
-msgstr "Ni še povezav RFID."
+msgstr "RFID preslikava je bila izbrisana."
 
 #: app/blueprints/rfid/routes.py:207
-#, fuzzy
 msgid "Could not delete RFID mapping."
-msgstr "Tekmovanja ni bilo mogoče izbrisati."
+msgstr "RFID preslikave ni bilo mogoče izbrisati."
 
 #: app/blueprints/scores/routes.py:225 app/blueprints/scores/routes.py:236
-#, fuzzy, python-format
+#, python-format
 msgid "Invalid rule params for %(key)s: %(error)s"
 msgstr "Neveljavni parametri pravila za %(key)s: %(error)s"
 
@@ -848,9 +824,8 @@ msgid "Language pack saved."
 msgstr "Jezikovni paket shranjen."
 
 #: app/blueprints/sheets/routes.py:200
-#, fuzzy
 msgid "Sheets settings saved."
-msgstr "Sinhronizacija Sheets je izkljucena."
+msgstr "Nastavitve preglednic so bile shranjene."
 
 #: app/blueprints/sheets/routes.py:232
 msgid "Spreadsheet ID is required to build arrivals."
@@ -870,6 +845,8 @@ msgstr "Zavihek prihodov '%(tab)s' je posodobljen."
 #, python-format
 msgid "Arrivals tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
+"Zavihek prihodov '%(tab)s' je v čakalni vrsti - preglednico osveži čez "
+"nekaj sekund."
 
 #: app/blueprints/sheets/routes.py:298 app/blueprints/sheets/routes.py:358
 #: app/blueprints/sheets/routes.py:558 app/blueprints/sheets/routes.py:867
@@ -890,6 +867,8 @@ msgstr "Zavihek ekip '%(tab)s' je posodobljen."
 #, python-format
 msgid "Teams tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
+"Zavihek ekip '%(tab)s' je v čakalni vrsti - preglednico osveži čez nekaj "
+"sekund."
 
 #: app/blueprints/sheets/routes.py:384
 #, python-format
@@ -905,6 +884,8 @@ msgstr "Zavihek rezultatov '%(tab)s' je posodobljen."
 #, python-format
 msgid "Score tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
 msgstr ""
+"Zavihek s točkami '%(tab)s' je v čakalni vrsti - preglednico osveži čez "
+"nekaj sekund."
 
 #: app/blueprints/sheets/routes.py:422
 msgid "No configs to prune."
@@ -967,28 +948,33 @@ msgstr "Sinhronizacija stevilk ekip ni uspela: %(error)s"
 #, python-format
 msgid "Synced checkpoint tabs but some summary rebuilds reported errors: %(errs)s"
 msgstr ""
+"Zavihki kontrolnih točk so sinhronizirani, a nekatere obnove povzetkov so"
+" javile napake: %(errs)s"
 
 #: app/blueprints/sheets/routes.py:703
 msgid "Synced team numbers and rebuilt Ekipe, Prihodi, and Skupni seštevek."
 msgstr ""
+"Številke ekip so sinhronizirane, zavihki Ekipe, Prihodi in Skupni "
+"seštevek pa obnovljeni."
 
 #: app/blueprints/sheets/routes.py:733
 msgid "Team-number sync queued — refresh the spreadsheet in a few seconds."
 msgstr ""
+"Sinhronizacija številk ekip je v čakalni vrsti - preglednico osveži čez "
+"nekaj sekund."
 
 #: app/blueprints/sheets/routes.py:757
-#, fuzzy
 msgid "Target spreadsheet ID is required."
-msgstr "ID preglednice je obvezen."
+msgstr "ID ciljne preglednice je obvezen."
 
 #: app/blueprints/sheets/routes.py:761
 msgid "Target spreadsheet must be a real Google Sheets ID, not a local: sentinel."
-msgstr ""
+msgstr "Ciljna preglednica mora biti pravi Google Sheets ID, ne oznaka local:."
 
 #: app/blueprints/sheets/routes.py:771
-#, fuzzy, python-format
+#, python-format
 msgid "Publish failed: %(error)s"
-msgstr "Carovnik ni uspel: %(error)s"
+msgstr "Objava ni uspela: %(error)s"
 
 #: app/blueprints/sheets/routes.py:777
 #, python-format
@@ -996,6 +982,8 @@ msgid ""
 "Published %(count)s checkpoint tab(s), skipped %(skip)s. Summary tabs "
 "built: %(s)s."
 msgstr ""
+"Objavljenih %(count)s zavihkov kontrolnih točk, preskočenih %(skip)s. "
+"Zgrajeni povzetki: %(s)s."
 
 #: app/blueprints/sheets/routes.py:797
 #, python-format
@@ -1004,6 +992,9 @@ msgid ""
 "competition; check the spreadsheet shortly. Errors land in the server "
 "log."
 msgstr ""
+"Objava v %(sid)s je v čakalni vrsti. Za tekmovanje s 15 KT traja "
+"približno 30 sekund; preglednico preveri čez nekaj časa. Napake se "
+"zapišejo v strežniški dnevnik."
 
 #: app/blueprints/sheets/routes.py:830
 #, python-format
@@ -1016,9 +1007,8 @@ msgid "Config '%(tab)s' deleted."
 msgstr "Konfiguracija '%(tab)s' je bila izbrisana."
 
 #: app/blueprints/sheets/routes.py:862
-#, fuzzy
 msgid "Tab title is required."
-msgstr "Ime je obvezno."
+msgstr "Naslov zavihka je obvezen."
 
 #: app/blueprints/sheets/routes.py:872
 msgid "At least one group line is required."
@@ -1053,9 +1043,9 @@ msgid "Tab '%(tab)s' overwritten."
 msgstr "Zavihek '%(tab)s' je bil prepisan."
 
 #: app/blueprints/sheets/routes.py:975
-#, fuzzy, python-format
+#, python-format
 msgid "Added local tab '%(tab)s'."
-msgstr "Zavihek '%(tab)s' je dodan v preglednico."
+msgstr "Dodan lokalni zavihek '%(tab)s'."
 
 #: app/blueprints/sheets/routes.py:977
 #, python-format
@@ -1071,45 +1061,41 @@ msgid "Sync job deleted."
 msgstr "Opravilo izbrisano."
 
 #: app/blueprints/superadmin/routes.py:154
-#, fuzzy
 msgid "Invalid role."
-msgstr "Neveljavna datoteka JSON."
+msgstr "Neveljavna vloga."
 
 #: app/blueprints/superadmin/routes.py:163
-#, fuzzy
 msgid "Pick a competition to attach the new users to."
-msgstr "Tekmovanje s tem imenom že obstaja."
+msgstr "Izberi tekmovanje, ki mu bodo dodani novi uporabniki."
 
 #: app/blueprints/superadmin/routes.py:185
-#, fuzzy, python-format
+#, python-format
 msgid "Invalid usernames (skipped): %(list)s"
-msgstr "Nepravilno uporabniško ime ali geslo."
+msgstr "Neveljavna uporabniška imena (preskočena): %(list)s"
 
 #: app/blueprints/superadmin/routes.py:190
 #, python-format
 msgid "Duplicate usernames in input (skipped): %(list)s"
-msgstr ""
+msgstr "Podvojena uporabniška imena v vnosu (preskočena): %(list)s"
 
 #: app/blueprints/superadmin/routes.py:195
-#, fuzzy
 msgid "Provide at least one valid username."
-msgstr "Izberi vsaj eno globalno pravilo."
+msgstr "Vnesi vsaj eno veljavno uporabniško ime."
 
 #: app/blueprints/superadmin/routes.py:247
 #, python-format
 msgid "Already in %(comp)s (skipped): %(list)s"
-msgstr ""
+msgstr "Že v %(comp)s (preskočeni): %(list)s"
 
 #: app/blueprints/superadmin/routes.py:256
 #, python-format
 msgid "Existing user(s) attached to %(comp)s as %(role)s: %(list)s"
-msgstr ""
+msgstr "Obstoječi uporabniki dodani v %(comp)s kot %(role)s: %(list)s"
 
 #: app/blueprints/superadmin/routes.py:291
 #: app/templates/superadmin_index.html:100
-#, fuzzy
 msgid "You cannot delete your own account."
-msgstr "Kontrolne točke ni bilo mogoče izbrisati."
+msgstr "Svojega računa ne moreš izbrisati."
 
 #: app/blueprints/superadmin/routes.py:296 app/blueprints/users/routes.py:231
 #: app/blueprints/users/routes.py:311
@@ -1117,9 +1103,9 @@ msgid "User not found."
 msgstr "Uporabnik ni najden."
 
 #: app/blueprints/superadmin/routes.py:311
-#, fuzzy, python-format
+#, python-format
 msgid "Deleted user '%(user)s'."
-msgstr "Uporabnik '%(user)s' je ustvarjen."
+msgstr "Uporabnik '%(user)s' je bil izbrisan."
 
 #: app/blueprints/teams/routes.py:142 app/blueprints/teams/routes.py:259
 msgid "Team name is required."
@@ -1182,9 +1168,8 @@ msgid "%(group)s: invalid or missing prefix."
 msgstr "%(group)s: neveljavna ali manjkajoča predpona."
 
 #: app/blueprints/users/routes.py:25
-#, fuzzy
 msgid "Username or email is required."
-msgstr "Veljaven e-poštni naslov je obvezen."
+msgstr "Uporabniško ime ali e-pošta je obvezna."
 
 #: app/blueprints/users/routes.py:30
 msgid "Enter a valid email address."
@@ -1199,24 +1184,22 @@ msgstr ""
 "vezaje."
 
 #: app/blueprints/users/routes.py:109
-#, fuzzy
 msgid "No existing user matches that username or email."
-msgstr "Uporabi obstoječe globalno uporabniško ime ali e-poštni naslov."
+msgstr "Noben obstoječi uporabnik ne ustreza temu uporabniškemu imenu ali e-pošti."
 
 #: app/blueprints/users/routes.py:117
-#, fuzzy
 msgid "That user is already in this competition."
-msgstr "Uporabnik %(user)s je bil dodan tekmovanju."
+msgstr "Ta uporabnik je že v tem tekmovanju."
 
 #: app/blueprints/users/routes.py:123
-#, fuzzy, python-format
+#, python-format
 msgid "User '%(user)s' re-added to this competition."
-msgstr "Uporabnik %(user)s je bil dodan tekmovanju."
+msgstr "Uporabnik '%(user)s' je bil znova dodan v to tekmovanje."
 
 #: app/blueprints/users/routes.py:132
-#, fuzzy, python-format
+#, python-format
 msgid "User '%(user)s' added to this competition."
-msgstr "Uporabnik %(user)s je bil dodan tekmovanju."
+msgstr "Uporabnik '%(user)s' je bil dodan v to tekmovanje."
 
 #: app/blueprints/users/routes.py:161
 msgid "Please fill all fields. Role must be viewer/judge/admin."
@@ -1244,9 +1227,8 @@ msgid "User updated."
 msgstr "Uporabnik posodobljen."
 
 #: app/blueprints/users/routes.py:338
-#, fuzzy
 msgid "User removed from this competition."
-msgstr "Uporabnik %(user)s je bil odstranjen iz tekmovanja."
+msgstr "Uporabnik je bil odstranjen iz tega tekmovanja."
 
 #: app/resources/rfid.py:46
 msgid "uid is required"
@@ -1306,9 +1288,8 @@ msgstr "Ekipa"
 
 #: app/templates/add_checkin.html:27 app/templates/judge_home.html:27
 #: app/templates/score_judge.html:56
-#, fuzzy
 msgid "Type number or name"
-msgstr "Številke ekip so bile naključno dodeljene."
+msgstr "Vpiši številko ali ime"
 
 #: app/templates/add_checkin.html:39 app/templates/checkin_edit.html:24
 #: app/templates/judge_assign.html:49 app/templates/live_arrivals.html:130
@@ -1330,7 +1311,6 @@ msgid "Time (optional)"
 msgstr "Čas (neobvezno)"
 
 #: app/templates/add_checkin.html:60
-#, fuzzy
 msgid "Leave blank to use the current time."
 msgstr "Pusti prazno za trenutni čas."
 
@@ -1495,17 +1475,16 @@ msgid "Group"
 msgstr "Skupina"
 
 #: app/templates/add_team.html:40 app/templates/team_edit.html:50
-#, fuzzy
 msgid "Team members"
-msgstr "Ekipa (ime, številka)"
+msgstr "Člani ekipe"
 
 #: app/templates/add_team.html:42 app/templates/team_edit.html:52
 msgid "One name per line"
-msgstr ""
+msgstr "Eno ime na vrstico"
 
 #: app/templates/add_team.html:43 app/templates/team_edit.html:54
 msgid "One scout per line. Order is preserved."
-msgstr ""
+msgstr "En tabornik na vrstico. Vrstni red se ohrani."
 
 #: app/templates/add_team.html:47 app/templates/path_edit.html:26
 #: app/templates/team_edit.html:58
@@ -1519,9 +1498,8 @@ msgstr ""
 "vedeti."
 
 #: app/templates/add_team.html:51 app/templates/team_edit.html:62
-#, fuzzy
 msgid "Optional. Visible to judges and admins on the team list."
-msgstr "Neobvezno; ustvari RFID povezavo za to ekipo."
+msgstr "Neobvezno. Vidno sodnikom in skrbnikom na seznamu ekip."
 
 #: app/templates/add_team.html:56 app/templates/team_edit.html:67
 msgid "Team-level dead time (minutes)"
@@ -1532,6 +1510,9 @@ msgid ""
 "For delays the team had no control over (organizer-caused, etc.). Added "
 "to the per-CP dead-time sum before time-trial scoring."
 msgstr ""
+"Za zamude, na katere ekipa ni imela vpliva (kriv organizator ipd.). "
+"Prišteje se k vsoti mrtvega časa po kontrolnih točkah pred točkovanjem "
+"časovnih odsekov."
 
 #: app/templates/add_team.html:66 app/templates/rfid_add.html:11
 #: app/templates/rfid_edit.html:10 app/templates/team_edit.html:77
@@ -1702,14 +1683,12 @@ msgid "First"
 msgstr "Prva"
 
 #: app/templates/audit_list.html:109 app/templates/view_checkins.html:148
-#, fuzzy
 msgid "Previous"
-msgstr "Predogled"
+msgstr "Prejšnja"
 
 #: app/templates/audit_list.html:115 app/templates/view_checkins.html:153
-#, fuzzy
 msgid "Next"
-msgstr "naslednja"
+msgstr "Naslednja"
 
 #: app/templates/audit_list.html:119
 msgid "Last"
@@ -1720,9 +1699,8 @@ msgid "RFID Checkpoint System"
 msgstr "RFID nadzorni sistem"
 
 #: app/templates/base.html:53
-#, fuzzy
 msgid "Toggle navigation"
-msgstr "Organizacija"
+msgstr "Preklopi navigacijo"
 
 #: app/templates/base.html:62 app/templates/competition_select.html:3
 msgid "Select Competition"
@@ -1880,13 +1858,12 @@ msgid "Settings"
 msgstr "Nastavitve"
 
 #: app/templates/base.html:214
-#, fuzzy
 msgid "Superadmin"
-msgstr "admin"
+msgstr "Superadmin"
 
 #: app/templates/base.html:240 app/templates/checkpoints_list.html:103
 msgid "Close"
-msgstr ""
+msgstr "Zapri"
 
 #: app/templates/change_password.html:9
 msgid "Current password"
@@ -1913,7 +1890,6 @@ msgid "Time"
 msgstr "Čas"
 
 #: app/templates/checkin_edit.html:44
-#, fuzzy
 msgid "Enter time with seconds in local time."
 msgstr "Vnesi čas s sekundami v lokalnem času."
 
@@ -1939,44 +1915,47 @@ msgstr "Uredi kontrolno točko"
 
 #: app/templates/checkpoint_edit.html:26 app/templates/judge_home.html:12
 msgid "Scoring rules (for judges)"
-msgstr ""
+msgstr "Pravila točkovanja (za sodnike)"
 
 #: app/templates/checkpoint_edit.html:28
 msgid "Leave blank to auto-generate from score rules."
-msgstr ""
+msgstr "Pusti prazno za samodejno tvorbo iz pravil točkovanja."
 
 #: app/templates/checkpoint_edit.html:29
 msgid ""
 "Shown on the judge scoring form. If blank, an auto-generated summary from"
 " the score rules is used."
 msgstr ""
+"Prikazano na sodniškem obrazcu za točkovanje. Če je prazno, se uporabi "
+"samodejno ustvarjen povzetek iz pravil točkovanja."
 
 #: app/templates/checkpoint_edit.html:33
-#, fuzzy
 msgid "Judges / notes at this checkpoint"
-msgstr "Izbrišem to kontrolno točko?"
+msgstr "Sodniki / zapiski na tej kontrolni točki"
 
 #: app/templates/checkpoint_edit.html:36
-#, fuzzy
 msgid "App-assigned judges:"
-msgstr "Dodeljena ekipa"
+msgstr "Sodniki, dodeljeni v aplikaciji:"
 
 #: app/templates/checkpoint_edit.html:43
-#, fuzzy
 msgid "No app-assigned judges yet."
-msgstr "Ni še povezav RFID."
+msgstr "V aplikaciji še ni dodeljenih sodnikov."
 
 #: app/templates/checkpoint_edit.html:47
 msgid ""
 "Free-text list of judges, sub-judges, helpers. People without app logins "
 "go here."
 msgstr ""
+"Prostobesedilni seznam sodnikov, pomožnih sodnikov in pomočnikov. Sem "
+"sodijo ljudje brez prijave v aplikacijo."
 
 #: app/templates/checkpoint_edit.html:48
 msgid ""
 "Use this for planning who will staff the checkpoint - it is informational"
 " only, not enforced."
 msgstr ""
+"Uporabi za načrtovanje, kdo bo na kontrolni točki - polje je zgolj "
+"informativno."
 
 #: app/templates/checkpoints_import_json.html:2
 #: app/templates/checkpoints_import_json.html:7
@@ -2061,9 +2040,9 @@ msgid "Delete"
 msgstr "Izbriši"
 
 #: app/templates/checkpoints_list.html:102
-#, fuzzy, python-format
+#, python-format
 msgid "Judges for %(name)s"
-msgstr "Izbrišem skupino %(name)s?"
+msgstr "Sodniki za %(name)s"
 
 #: app/templates/checkpoints_list.html:118
 msgid "Search judges…"
@@ -2074,9 +2053,8 @@ msgid "Selected only"
 msgstr "Samo izbrane"
 
 #: app/templates/checkpoints_list.html:152
-#, fuzzy
 msgid "No competition members to assign."
-msgstr "Ni tekmovanj"
+msgstr "Ni članov tekmovanja za dodelitev."
 
 #: app/templates/checkpoints_list.html:166
 msgid "No checkpoints yet."
@@ -2099,9 +2077,8 @@ msgid "Current"
 msgstr "Trenutno"
 
 #: app/templates/competition_select.html:28
-#, fuzzy
 msgid "Select"
-msgstr "Preglednice"
+msgstr "Izberi"
 
 #: app/templates/competition_select.html:36
 msgid ""
@@ -2140,9 +2117,8 @@ msgid "Competition Settings"
 msgstr "Nastavitve tekmovanja"
 
 #: app/templates/competition_settings.html:17
-#, fuzzy
 msgid "Competition ID"
-msgstr "Tekmovanje"
+msgstr "ID tekmovanja"
 
 #: app/templates/competition_settings.html:20
 #: app/templates/competition_settings.html:90
@@ -2183,34 +2159,33 @@ msgstr "Omogoči ogled rezultatov vsem z povezavo."
 
 #: app/templates/competition_settings.html:46
 msgid "Visible features"
-msgstr ""
+msgstr "Vidne funkcije"
 
 #: app/templates/competition_settings.html:50
-#, fuzzy
 msgid "Hide from navigation"
-msgstr "Organizacija"
+msgstr "Skrij iz navigacije"
 
 #: app/templates/competition_settings.html:57
 msgid "Hide GPS map"
 msgstr "Skrij GPS zemljevid"
 
 #: app/templates/competition_settings.html:64
-#, fuzzy
 msgid "Hide device map"
-msgstr "Zemljevid naprav"
+msgstr "Skrij zemljevid naprav"
 
 #: app/templates/competition_settings.html:71
 msgid "Hide audit + messages"
-msgstr ""
+msgstr "Skrij revizijo + sporočila"
 
 #: app/templates/competition_settings.html:78
-#, fuzzy
 msgid "Hide score submissions log"
-msgstr "Oddaje točk"
+msgstr "Skrij dnevnik oddaj točk"
 
 #: app/templates/competition_settings.html:83
 msgid "Pick which navigation links are hidden to reduce clutter on race day."
 msgstr ""
+"Izberi, katere navigacijske povezave so skrite, da bo na dan tekmovanja "
+"manj navlake."
 
 #: app/templates/competition_settings.html:87
 msgid "Public results link"
@@ -2250,9 +2225,8 @@ msgid "Save invite"
 msgstr "Shrani povabilo"
 
 #: app/templates/competition_settings.html:125
-#, fuzzy
 msgid "Invites"
-msgstr "Povabilo shranjeno."
+msgstr "Povabila"
 
 #: app/templates/competition_settings.html:133
 #: app/templates/live_arrivals.html:60 app/templates/live_arrivals.html:188
@@ -2374,9 +2348,8 @@ msgid "Apply merge"
 msgstr "Uporabi združitev"
 
 #: app/templates/competition_transfer.html:68
-#, fuzzy
 msgid "Importing..."
-msgstr "Uvozi"
+msgstr "Uvažanje ..."
 
 #: app/templates/competition_transfer.html:79
 msgid "Competition imported successfully."
@@ -2441,29 +2414,24 @@ msgid "Merge complete."
 msgstr "Združitev končana."
 
 #: app/templates/competition_transfer.html:195
-#, fuzzy
 msgid "Added:"
-msgstr "Dodaj"
+msgstr "Dodano:"
 
 #: app/templates/competition_transfer.html:196
-#, fuzzy
 msgid "Updated:"
-msgstr "Posodobljeno"
+msgstr "Posodobljeno:"
 
 #: app/templates/competition_transfer.html:197
-#, fuzzy
 msgid "Skipped:"
-msgstr "preskoči"
+msgstr "Preskočeno:"
 
 #: app/templates/create_admin.html:2 app/templates/create_admin.html:16
-#, fuzzy
 msgid "Create Admin"
-msgstr "Ustvarjeno"
+msgstr "Ustvari skrbnika"
 
 #: app/templates/create_admin.html:5
-#, fuzzy
 msgid "Create Admin Account"
-msgstr "Ustvari tekmovanje"
+msgstr "Ustvari skrbniški račun"
 
 #: app/templates/create_admin.html:9 app/templates/register.html:9
 #: app/templates/superadmin_bulk_results.html:38
@@ -2527,38 +2495,32 @@ msgid "Upload one"
 msgstr "Naloži enega"
 
 #: app/templates/firmware_flash.html:75
-#, fuzzy
 msgid "3 — WiFi configuration"
-msgstr "Ustvari tekmovanje"
+msgstr "3 - Nastavitev WiFi"
 
 #: app/templates/firmware_flash.html:76
-#, fuzzy
 msgid "receiver"
-msgstr "npr. Receiver v1.0"
+msgstr "sprejemnik"
 
 #: app/templates/firmware_flash.html:80
 msgid "WiFi SSID"
 msgstr "WiFi SSID"
 
 #: app/templates/firmware_flash.html:84
-#, fuzzy
 msgid "WiFi Password"
-msgstr "Novo geslo"
+msgstr "WiFi geslo"
 
 #: app/templates/firmware_flash.html:88
-#, fuzzy
 msgid "Ingest URL"
-msgstr "Prebrani digesti"
+msgstr "URL za sprejem podatkov"
 
 #: app/templates/firmware_flash.html:90
-#, fuzzy
 msgid "Defaults to this server."
-msgstr "Izbrišem to napravo?"
+msgstr "Privzeto ta strežnik."
 
 #: app/templates/firmware_flash.html:101
-#, fuzzy
 msgid "4 — NVS config preview"
-msgstr "3 — Predogled NVS konfiguracije"
+msgstr "4 - Predogled NVS nastavitev"
 
 #: app/templates/firmware_flash.html:102
 msgid "Loading config…"
@@ -2585,9 +2547,8 @@ msgid "Select a device and firmware above to preview."
 msgstr "Izberi napravo in firmware zgoraj za predogled."
 
 #: app/templates/firmware_flash.html:127
-#, fuzzy
 msgid "5 — Flash"
-msgstr "4 — Nalaganje"
+msgstr "5 - Flash"
 
 #: app/templates/firmware_flash.html:129
 msgid "Connect & Flash"
@@ -2611,9 +2572,8 @@ msgid "NVS offset"
 msgstr "NVS odmik"
 
 #: app/templates/firmware_list.html:21
-#, fuzzy
 msgid "NVS size"
-msgstr "NVS odmik"
+msgstr "Velikost NVS"
 
 #: app/templates/firmware_list.html:22
 msgid "App offset"
@@ -2665,28 +2625,24 @@ msgid "optional"
 msgstr "neobvezno"
 
 #: app/templates/firmware_upload.html:36
-#, fuzzy
 msgid "NVS keys offset"
-msgstr "NVS odmik"
+msgstr "Odmik NVS ključev"
 
 #: app/templates/firmware_upload.html:38
 msgid "nvs_keys partition (0x1000)"
 msgstr "nvs_keys particija (0x1000)"
 
 #: app/templates/firmware_upload.html:41
-#, fuzzy
 msgid "Encrypted NVS offset"
-msgstr "NVS odmik"
+msgstr "Odmik šifriranega NVS"
 
 #: app/templates/firmware_upload.html:43
-#, fuzzy
 msgid "sec_nvs partition start"
-msgstr "Odmik NVS particije"
+msgstr "Začetek particije sec_nvs"
 
 #: app/templates/firmware_upload.html:46
-#, fuzzy
 msgid "NVS partition size"
-msgstr "Odmik NVS particije"
+msgstr "Velikost NVS particije"
 
 #: app/templates/firmware_upload.html:48
 msgid "sec_nvs size (min 0x3000)"
@@ -2697,9 +2653,8 @@ msgid "App partition offset"
 msgstr "Odmik particije aplikacije"
 
 #: app/templates/firmware_upload.html:53
-#, fuzzy
 msgid "Where the app binary starts"
-msgstr "Kje se binarna datoteka aplikacije začne (privzeto 0x10000)"
+msgstr "Kje se začne binarna datoteka aplikacije"
 
 #: app/templates/firmware_upload.html:58
 msgid "Upload"
@@ -2994,7 +2949,7 @@ msgid "%(count)s already finished"
 msgstr "%(count)s jih je že v cilju"
 
 #: app/templates/judge_teams.html:9
-#, fuzzy, python-format
+#, python-format
 msgid "%(count)s DNF"
 msgstr "%(count)s DNF"
 
@@ -3242,9 +3197,8 @@ msgid "Checkpoint Description"
 msgstr "Opis kontrolne točke"
 
 #: app/templates/lora_list.html:13
-#, fuzzy
 msgid "Last Seen"
-msgstr "Zadnjič viden"
+msgstr "Nazadnje viden"
 
 #: app/templates/lora_list.html:21 app/templates/scores_view.html:87
 #: app/templates/scores_view.html:194
@@ -3515,6 +3469,8 @@ msgid ""
 "UID is case-insensitive; colons/dashes are OK. Web NFC works on Android "
 "Chrome."
 msgstr ""
+"UID ne razlikuje velikih in malih črk; dvopičja/vezaji so v redu. Web NFC"
+" deluje v Chromu za Android."
 
 #: app/templates/rfid_add.html:24 app/templates/rfid_edit.html:21
 msgid "Card Number (optional)"
@@ -3553,9 +3509,8 @@ msgid "Assigned Team"
 msgstr "Dodeljena ekipa"
 
 #: app/templates/rfid_edit.html:37
-#, fuzzy
 msgid "Save Changes"
-msgstr "Shrani povabilo"
+msgstr "Shrani spremembe"
 
 #: app/templates/rfid_finish.html:9
 msgid "Finish-line Check"
@@ -3947,22 +3902,19 @@ msgstr "Še ni oddaj."
 
 #: app/templates/scores_view.html:11
 msgid "Live results. The page auto-refreshes every 30 seconds."
-msgstr ""
+msgstr "Rezultati v živo. Stran se samodejno osveži vsakih 30 sekund."
 
 #: app/templates/scores_view.html:12
-#, fuzzy
 msgid "Next refresh"
-msgstr "Samodejna osvežitev"
+msgstr "Naslednja osvežitev"
 
 #: app/templates/scores_view.html:19
-#, fuzzy
 msgid "QR code to public results"
-msgstr "Javni rezultati"
+msgstr "QR koda do javnih rezultatov"
 
 #: app/templates/scores_view.html:22
-#, fuzzy
 msgid "Scan to view"
-msgstr "Skeniraj UID"
+msgstr "Skeniraj za ogled"
 
 #: app/templates/scores_view.html:38 app/templates/scores_view.html:286
 msgid "Show per-checkpoint"
@@ -4048,13 +4000,12 @@ msgid "Key"
 msgstr "Ključ"
 
 #: app/templates/scoring_setup.html:36
-#, fuzzy
 msgid "Label"
-msgstr "Mesto"
+msgstr "Oznaka"
 
 #: app/templates/scoring_setup.html:37
 msgid "Hint"
-msgstr ""
+msgstr "Namig"
 
 #: app/templates/scoring_setup.html:38
 msgid "Rule type"
@@ -4314,6 +4265,13 @@ msgid ""
 "is a self-contained backup. Re-publishing to the same target is a safe "
 "no-op."
 msgstr ""
+"Objavi tekmovanje v ciljno Google preglednico. Deluje tako za prvo objavo"
+" (samo lokalne konfiguracije) kot za preklop na drugo preglednico (vse "
+"konfiguracije se prevežejo na novi ID). Ustvari en zavihek na kontrolno "
+"točko z glavami, številkami ekip in obstoječimi točkami, nato zgradi "
+"povzetke Ekipe / Prihodi / Skupni seštevek, tako da je preglednica "
+"samostojna varnostna kopija. Ponovna objava v isti cilj je varna in ne "
+"spremeni ničesar."
 
 #: app/templates/sheets_admin.html:236
 msgid "Target spreadsheet ID"
@@ -4321,7 +4279,7 @@ msgstr "ID ciljne preglednice"
 
 #: app/templates/sheets_admin.html:242
 msgid "e.g. 1aBcD…XyZ"
-msgstr ""
+msgstr "npr. 1aBcD…XyZ"
 
 #: app/templates/sheets_admin.html:245
 msgid "Paste the new sheet ID here to publish/repoint all per-CP tabs to it."
@@ -4335,6 +4293,9 @@ msgid ""
 "every SheetConfig (including any currently bound to another sheet). "
 "Continue?"
 msgstr ""
+"To bo ustvarilo ali prepisalo zavihke v ciljni preglednici in prevezalo "
+"vse konfiguracije (tudi tiste, ki so trenutno vezane na drugo "
+"preglednico). Nadaljujem?"
 
 #: app/templates/sheets_admin.html:251
 msgid "Publish / repoint to sheet"
@@ -4568,97 +4529,96 @@ msgstr "Shrani jezikovni paket"
 #: app/templates/superadmin_bulk_add.html:2
 #: app/templates/superadmin_bulk_add.html:6
 #: app/templates/superadmin_index.html:8
-#, fuzzy
 msgid "Bulk add users"
-msgstr "Dodaj uporabnika"
+msgstr "Množično dodajanje uporabnikov"
 
 #: app/templates/superadmin_bulk_add.html:7
 #: app/templates/superadmin_bulk_results.html:9
-#, fuzzy
 msgid "Back to console"
-msgstr "Nazaj na uporabnike"
+msgstr "Nazaj na konzolo"
 
 #: app/templates/superadmin_bulk_add.html:13
 msgid ""
 "One username per line. Passwords are generated automatically and shown "
 "once after submit — save them before leaving the next page."
 msgstr ""
+"Eno uporabniško ime na vrstico. Gesla se ustvarijo samodejno in se po "
+"oddaji prikažejo samo enkrat - shrani jih, preden zapustiš naslednjo "
+"stran."
 
 #: app/templates/superadmin_bulk_add.html:18
-#, fuzzy
 msgid "Usernames"
-msgstr "Uporabniško ime"
+msgstr "Uporabniška imena"
 
 #: app/templates/superadmin_bulk_add.html:22
 msgid ""
 "Allowed characters: letters, numbers, dot, underscore, hyphen. Max 50 "
 "characters per username."
 msgstr ""
+"Dovoljeni znaki: črke, številke, pika, podčrtaj, vezaj. Največ 50 znakov "
+"na uporabniško ime."
 
 #: app/templates/superadmin_bulk_add.html:27
-#, fuzzy
 msgid "Competition"
 msgstr "Tekmovanje"
 
 #: app/templates/superadmin_bulk_add.html:29
-#, fuzzy
 msgid "Choose a competition…"
-msgstr "Ustvari tekmovanje"
+msgstr "Izberi tekmovanje …"
 
 #: app/templates/superadmin_bulk_add.html:33
-#, fuzzy
 msgid "No competitions exist yet."
-msgstr "Ni tekmovanj"
+msgstr "Ni še nobenega tekmovanja."
 
 #: app/templates/superadmin_bulk_add.html:37
 msgid "Every user gets a membership row in this competition with the chosen role."
-msgstr ""
+msgstr "Vsak uporabnik dobi članstvo v tem tekmovanju z izbrano vlogo."
 
 #: app/templates/superadmin_bulk_add.html:41
-#, fuzzy
 msgid "Role in the competition"
-msgstr "Izbriši tekmovanje"
+msgstr "Vloga v tekmovanju"
 
 #: app/templates/superadmin_bulk_add.html:48
 msgid ""
 "System-level role stays 'public'; only the per-competition membership "
 "role is set here."
 msgstr ""
+"Sistemska vloga ostane 'public'; tukaj se nastavi samo vloga članstva v "
+"tekmovanju."
 
 #: app/templates/superadmin_bulk_add.html:52
-#, fuzzy
 msgid "Create users"
-msgstr "Ustvari uporabnika"
+msgstr "Ustvari uporabnike"
 
 #: app/templates/superadmin_bulk_results.html:2
 msgid "Bulk add users — results"
-msgstr ""
+msgstr "Množično dodajanje uporabnikov - rezultati"
 
 #: app/templates/superadmin_bulk_results.html:6
-#, fuzzy, python-format
+#, python-format
 msgid "Created %(n)d user(s)"
-msgstr "Ustvari uporabnika"
+msgstr "Ustvarjenih %(n)d uporabnikov"
 
 #: app/templates/superadmin_bulk_results.html:8
-#, fuzzy
 msgid "Create more"
-msgstr "Ustvari uporabnika"
+msgstr "Ustvari še več"
 
 #: app/templates/superadmin_bulk_results.html:14
-#, fuzzy
 msgid "Save these passwords now."
-msgstr "Onemogoči geslo za ingest"
+msgstr "Ta gesla shrani zdaj."
 
 #: app/templates/superadmin_bulk_results.html:15
 msgid ""
 "They are shown once and are not stored in plaintext anywhere. Leaving or "
 "refreshing this page loses them."
 msgstr ""
+"Prikazana so samo enkrat in niso nikjer shranjena v čistopisu. Če stran "
+"zapustiš ali osvežiš, jih izgubiš."
 
 #: app/templates/superadmin_bulk_results.html:23
 #, python-format
 msgid "Competition: %(comp)s · membership role: %(role)s"
-msgstr ""
+msgstr "Tekmovanje: %(comp)s · vloga članstva: %(role)s"
 
 #: app/templates/superadmin_bulk_results.html:25
 #, python-format
@@ -4668,80 +4628,74 @@ msgstr "Vloga: %(role)s"
 #: app/templates/superadmin_bulk_results.html:28
 #: app/templates/superadmin_bulk_results.html:64
 msgid "Copy as CSV"
-msgstr ""
+msgstr "Kopiraj kot CSV"
 
 #: app/templates/superadmin_bulk_results.html:63
-#, fuzzy
 msgid "Copied!"
-msgstr "Kopirano"
+msgstr "Kopirano!"
 
 #: app/templates/superadmin_bulk_results.html:66
-#, fuzzy
 msgid "Copy failed"
-msgstr "Napaka"
+msgstr "Kopiranje ni uspelo"
 
 #: app/templates/superadmin_index.html:2 app/templates/superadmin_index.html:6
-#, fuzzy
 msgid "Superadmin console"
-msgstr "Konzola sodnika RFID"
+msgstr "Superadmin konzola"
 
 #: app/templates/superadmin_index.html:9
-#, fuzzy
 msgid "Cross-competition"
-msgstr "Ustvari tekmovanje"
+msgstr "Med tekmovanji"
 
 #: app/templates/superadmin_index.html:17
-#, fuzzy
 msgid "Sheets API quota"
-msgstr "Jezik preglednic"
+msgstr "Kvota Sheets API"
 
 #: app/templates/superadmin_index.html:19
 msgid ""
 "Calls used in the rolling 40-per-60-second throttle window. Updates every"
 " 2 seconds."
 msgstr ""
+"Porabljeni klici v drsečem oknu omejitve 40 na 60 sekund. Posodobi se "
+"vsaki 2 sekundi."
 
 #: app/templates/superadmin_index.html:30
-#, fuzzy
 msgid "this minute"
-msgstr "Preklicem to povabilo?"
+msgstr "v tej minuti"
 
 #: app/templates/superadmin_index.html:33
-#, fuzzy
 msgid "Awaiting first sample..."
-msgstr "Čakam na skeniranje…"
+msgstr "Čakanje na prvi vzorec ..."
 
 #: app/templates/superadmin_index.html:43
 msgid "All registered users"
-msgstr ""
+msgstr "Vsi registrirani uporabniki"
 
 #: app/templates/superadmin_index.html:94
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "Permanently delete user %(user)s? This removes them from every "
 "competition."
-msgstr "Uporabnik %(user)s je bil odstranjen iz tekmovanja."
+msgstr "Trajno izbrišem uporabnika %(user)s? To ga odstrani iz vseh tekmovanj."
 
 #: app/templates/superadmin_index.html:105
-#, fuzzy
 msgid "No users."
-msgstr "Še ni uporabnikov."
+msgstr "Ni uporabnikov."
 
 #: app/templates/superadmin_index.html:149
 msgid "client not initialised yet"
-msgstr ""
+msgstr "odjemalec še ni inicializiran"
 
 #: app/templates/superadmin_index.html:153
 msgid "throttling — waiting for window reset"
-msgstr ""
+msgstr "omejevanje - čakanje na ponastavitev okna"
 
 #: app/templates/superadmin_index.html:156
 msgid "window resets in"
-msgstr ""
+msgstr "okno se ponastavi čez"
 
 #: app/templates/superadmin_index.html:160
 msgid "Status fetch failed."
-msgstr ""
+msgstr "Poizvedba stanja ni uspela."
 
 #: app/templates/team_edit.html:5
 msgid "Edit Team"
@@ -4772,9 +4726,8 @@ msgid "Sort"
 msgstr "Razvrsti"
 
 #: app/templates/teams_list.html:50
-#, fuzzy
 msgid "Randomise team numbers for the selected group?"
-msgstr "Nakljucno dodeli stevilke ekip"
+msgstr "Naključno dodelim številke ekip za izbrano skupino?"
 
 #: app/templates/teams_list.html:51
 msgid "Randomise Team Numbers"
@@ -4786,18 +4739,16 @@ msgid "Total: %(count)s"
 msgstr "Skupaj: %(count)s"
 
 #: app/templates/teams_list.html:66
-#, fuzzy
 msgid "Search teams (number or name)"
-msgstr "Številke ekip so bile naključno dodeljene."
+msgstr "Išči ekipe (številka ali ime)"
 
 #: app/templates/teams_list.html:77
 msgid "No teams found."
 msgstr "Ni najdenih ekip."
 
 #: app/templates/teams_list.html:108
-#, fuzzy
 msgid "Team has notes"
-msgstr "Zavihek ekip"
+msgstr "Ekipa ima zapiske"
 
 #: app/templates/teams_list.html:210
 msgid "Delete this team?"
@@ -4833,18 +4784,16 @@ msgid "Add Existing User To This Competition"
 msgstr "Dodaj obstoječega uporabnika v to tekmovanje"
 
 #: app/templates/users_list.html:21
-#, fuzzy
 msgid "Select an existing user..."
-msgstr "Dodaj obstoječega uporabnika"
+msgstr "Izberi obstoječega uporabnika ..."
 
 #: app/templates/users_list.html:27
 msgid "No users available to attach."
-msgstr ""
+msgstr "Ni razpoložljivih uporabnikov za dodajanje."
 
 #: app/templates/users_list.html:30
-#, fuzzy
 msgid "Superadmin view: every existing user not already in this competition."
-msgstr "Dodaj obstoječega uporabnika v to tekmovanje"
+msgstr "Superadmin pogled: vsi obstoječi uporabniki, ki še niso v tem tekmovanju."
 
 #: app/templates/users_list.html:39
 msgid "Use an existing global username or email address."
@@ -4864,9 +4813,8 @@ msgstr ""
 "tekmovanja."
 
 #: app/templates/users_list.html:83
-#, fuzzy
 msgid "Cannot remove yourself"
-msgstr "Sebe ne moreš izbrisati"
+msgstr "Sebe ne moreš odstraniti"
 
 #: app/templates/users_list.html:92
 msgid "No users yet."
@@ -4874,7 +4822,7 @@ msgstr "Še ni uporabnikov."
 
 #: app/templates/view_checkins.html:24
 msgid "All teams (type to filter)"
-msgstr ""
+msgstr "Vse ekipe (tipkaj za filtriranje)"
 
 #: app/templates/view_checkins.html:62
 msgid "Newest first"
