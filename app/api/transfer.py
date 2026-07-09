@@ -15,11 +15,12 @@ from app.models import (
     Checkin,
     Checkpoint,
     CheckpointGroup,
-    CheckpointGroupLink,
     Competition,
     CompetitionMember,
     GlobalScoreRule,
     LoRaDevice,
+    Path,
+    PathStop,
     RFIDCard,
     ScoreEntry,
     ScoreRule,
@@ -29,13 +30,53 @@ from app.models import (
     TeamMember,
     User,
 )
+from app.utils.paths import resolve_route_ids
 from app.utils.rest_auth import json_roles_required
 from app.utils.serial_helpers import normalize_uid
 from app.utils.time import utcnow_naive
 
 transfer_api_bp = Blueprint("api_transfer", __name__)
 
-SCHEMA_VERSION = "1.0.0"
+# 1.1.0: paths/path_stops become first-class; groups carry path_name +
+# direction. group_checkpoint_links is still exported as a derived legacy
+# view (per-group resolved route) and still accepted on import for old
+# files, where it is converted into paths.
+SCHEMA_VERSION = "1.1.0"
+
+
+def _get_or_create_path_for_sequence(
+    comp_id: int,
+    preferred_name: str,
+    checkpoint_ids: list[int],
+    cache: dict[tuple[int, ...], Path],
+) -> tuple[Path | None, str]:
+    """Return (path, direction) for a checkpoint sequence, creating if new.
+
+    Same merge rule as the phase-1 migration backfill: an existing path
+    with the identical sequence is shared forward; one with the exact
+    reversed sequence is shared with direction='reverse'.
+    """
+    if not checkpoint_ids:
+        return None, "forward"
+    seq = tuple(checkpoint_ids)
+    if seq in cache:
+        return cache[seq], "forward"
+    if tuple(reversed(seq)) in cache:
+        return cache[tuple(reversed(seq))], "reverse"
+
+    name = preferred_name
+    existing_names = {p.name for p in cache.values()}
+    counter = 2
+    while name in existing_names:
+        name = f"{preferred_name} ({counter})"
+        counter += 1
+    path = Path(competition_id=comp_id, name=name)
+    db.session.add(path)
+    db.session.flush()
+    for position, checkpoint_id in enumerate(checkpoint_ids):
+        db.session.add(PathStop(path_id=path.id, checkpoint_id=checkpoint_id, position=position))
+    cache[seq] = path
+    return path, "forward"
 
 
 # ---- serialisation helpers ----
@@ -54,11 +95,28 @@ def _export_competition(comp: Competition) -> dict:
     global_score_rules = GlobalScoreRule.query.filter_by(competition_id=comp.id).all()
     rfid_cards = RFIDCard.query.join(Team, RFIDCard.team_id == Team.id).filter(Team.competition_id == comp.id).all()
     team_groups = TeamGroup.query.join(Team, TeamGroup.team_id == Team.id).filter(Team.competition_id == comp.id).all()
-    group_links = (
-        CheckpointGroupLink.query.join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
-        .filter(CheckpointGroup.competition_id == comp.id)
-        .all()
-    )
+    paths = Path.query.filter_by(competition_id=comp.id).all()
+    cp_name_by_id = {cp.id: cp.name for cp in checkpoints}
+
+    # Derived legacy view of each group's resolved directed route, kept so
+    # older importers and scripts/json_export_to_csv.py keep working. The
+    # authoritative data is the "paths" section; import prefers it.
+    legacy_links = []
+    for g in groups:
+        seen: set[int] = set()
+        position = 0
+        for cp_id in resolve_route_ids(g):
+            if cp_id in seen:
+                continue
+            seen.add(cp_id)
+            legacy_links.append(
+                {
+                    "group_name": g.name,
+                    "checkpoint_name": cp_name_by_id.get(cp_id),
+                    "position": position,
+                }
+            )
+            position += 1
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -92,8 +150,25 @@ def _export_competition(comp: Competition) -> dict:
                 "prefix": g.prefix,
                 "description": g.description,
                 "position": g.position,
+                "path_name": g.path.name if g.path else None,
+                "direction": g.direction,
             }
             for g in groups
+        ],
+        "paths": [
+            {
+                "name": p.name,
+                "notes": p.notes,
+                "stops": [
+                    {
+                        "checkpoint_name": cp_name_by_id.get(stop.checkpoint_id),
+                        "position": stop.position,
+                        "expected_leg_minutes": stop.expected_leg_minutes,
+                    }
+                    for stop in p.stops
+                ],
+            }
+            for p in paths
         ],
         "checkpoints": [
             {
@@ -191,14 +266,7 @@ def _export_competition(comp: Competition) -> dict:
             }
             for tg in team_groups
         ],
-        "group_checkpoint_links": [
-            {
-                "group_name": gl.group.name if gl.group else None,
-                "checkpoint_name": gl.checkpoint.name if gl.checkpoint else None,
-                "position": gl.position,
-            }
-            for gl in group_links
-        ],
+        "group_checkpoint_links": legacy_links,
     }
 
 
@@ -366,7 +434,7 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
             )
         )
 
-    # Groups
+    # Groups (path wiring happens after checkpoints + paths exist)
     group_map = {}  # name → CheckpointGroup
     for g_data in data.get("groups", []):
         g = CheckpointGroup(
@@ -441,18 +509,62 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
         )
         db.session.add(d)
 
-    # Group ↔ checkpoint links
-    for gl_data in data.get("group_checkpoint_links", []):
-        group = group_map.get(gl_data.get("group_name"))
-        cp = cp_map.get(gl_data.get("checkpoint_name"))
-        if group and cp:
-            db.session.add(
-                CheckpointGroupLink(
-                    group_id=group.id,
-                    checkpoint_id=cp.id,
-                    position=gl_data.get("position", 0),
+    # Paths. New-format files carry a "paths" section plus per-group
+    # path_name/direction; legacy files only have group_checkpoint_links,
+    # which we convert into paths with the same forward/reverse merge rule
+    # as the schema migration.
+    path_map: dict[str, Path] = {}  # name → Path
+    if data.get("paths"):
+        for p_data in data.get("paths", []):
+            p = Path(competition_id=comp.id, name=p_data["name"], notes=p_data.get("notes"))
+            db.session.add(p)
+            db.session.flush()
+            stops = sorted(p_data.get("stops") or [], key=lambda s: s.get("position", 0))
+            position = 0
+            for s_data in stops:
+                cp = cp_map.get(s_data.get("checkpoint_name"))
+                if not cp:
+                    warnings.append(
+                        f"Path '{p.name}': unknown checkpoint '{s_data.get('checkpoint_name')}' skipped."
+                    )
+                    continue
+                db.session.add(
+                    PathStop(
+                        path_id=p.id,
+                        checkpoint_id=cp.id,
+                        position=position,
+                        expected_leg_minutes=s_data.get("expected_leg_minutes"),
+                    )
                 )
+                position += 1
+            path_map[p.name] = p
+        for g_data in data.get("groups", []):
+            group = group_map.get(g_data.get("name"))
+            if not group:
+                continue
+            path_name = g_data.get("path_name")
+            if path_name:
+                group.path = path_map.get(path_name)
+                if group.path is None:
+                    warnings.append(f"Group '{group.name}': unknown path '{path_name}'.")
+            direction = (g_data.get("direction") or "forward").strip().lower()
+            group.direction = direction if direction in ("forward", "reverse") else "forward"
+    else:
+        links_by_group: dict[str, list[tuple[int, int]]] = {}
+        for gl_data in data.get("group_checkpoint_links", []):
+            group = group_map.get(gl_data.get("group_name"))
+            cp = cp_map.get(gl_data.get("checkpoint_name"))
+            if group and cp:
+                links_by_group.setdefault(group.name, []).append((gl_data.get("position", 0), cp.id))
+        sequence_cache: dict[tuple[int, ...], Path] = {}
+        for group_name, entries in links_by_group.items():
+            group = group_map[group_name]
+            ordered_ids = [cp_id for (_pos, cp_id) in sorted(entries, key=lambda e: e[0])]
+            path, direction = _get_or_create_path_for_sequence(
+                comp.id, group_name, ordered_ids, sequence_cache
             )
+            group.path = path
+            group.direction = direction
 
     # Team ↔ group assignments
     for tg_data in data.get("team_groups", []):
@@ -711,6 +823,7 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
         "scores": 0,
         "sheet_configs": 0,
         "team_groups": 0,
+        "paths": 0,
         "group_checkpoint_links": 0,
         "score_rules": 0,
         "global_score_rules": 0,
@@ -860,31 +973,85 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
         existing_team_groups.add((team.id, group.id))
         added["team_groups"] += 1
 
-    # Group -> checkpoint links. Same shape: without this, newly merged
-    # groups or checkpoints have no link rows, so they don't appear in
-    # arrivals/score builds that gate on CheckpointGroupLink.
-    existing_group_links = {
-        (gl.group_id, gl.checkpoint_id)
-        for gl in CheckpointGroupLink.query.join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
-        .filter(CheckpointGroup.competition_id == comp.id)
-        .all()
-    }
-    for gl_data in data.get("group_checkpoint_links", []):
-        group = group_map.get(gl_data.get("group_name"))
-        cp = cp_map.get(gl_data.get("checkpoint_name"))
-        if not (group and cp):
-            continue
-        if (group.id, cp.id) in existing_group_links:
-            continue
-        db.session.add(
-            CheckpointGroupLink(
-                group_id=group.id,
-                checkpoint_id=cp.id,
-                position=gl_data.get("position", 0),
-            )
-        )
-        existing_group_links.add((group.id, cp.id))
-        added["group_checkpoint_links"] += 1
+    # Routes. Without this, newly merged groups or checkpoints have no
+    # route, so they don't appear in arrivals/score builds that gate on
+    # the resolved path. New-format files merge the "paths" section
+    # (add-new-only by name) and wire groups; legacy files carry only
+    # group_checkpoint_links, which are converted/appended per group.
+    existing_paths = {p.name: p for p in Path.query.filter_by(competition_id=comp.id).all()}
+    if data.get("paths"):
+        for p_data in data.get("paths", []):
+            name = p_data.get("name")
+            if not name or name in existing_paths:
+                continue
+            p = Path(competition_id=comp.id, name=name, notes=p_data.get("notes"))
+            db.session.add(p)
+            db.session.flush()
+            stops = sorted(p_data.get("stops") or [], key=lambda s: s.get("position", 0))
+            position = 0
+            for s_data in stops:
+                cp = cp_map.get(s_data.get("checkpoint_name"))
+                if not cp:
+                    continue
+                db.session.add(
+                    PathStop(
+                        path_id=p.id,
+                        checkpoint_id=cp.id,
+                        position=position,
+                        expected_leg_minutes=s_data.get("expected_leg_minutes"),
+                    )
+                )
+                position += 1
+            existing_paths[name] = p
+            added["paths"] += 1
+        for g_data in data.get("groups", []):
+            group = group_map.get(g_data.get("name"))
+            if not group or group.path_id:
+                continue
+            path_name = g_data.get("path_name")
+            if path_name and path_name in existing_paths:
+                group.path = existing_paths[path_name]
+                direction = (g_data.get("direction") or "forward").strip().lower()
+                group.direction = direction if direction in ("forward", "reverse") else "forward"
+    else:
+        links_by_group: dict[str, list[tuple[int, int]]] = {}
+        for gl_data in data.get("group_checkpoint_links", []):
+            group = group_map.get(gl_data.get("group_name"))
+            cp = cp_map.get(gl_data.get("checkpoint_name"))
+            if group and cp:
+                links_by_group.setdefault(group.name, []).append((gl_data.get("position", 0), cp.id))
+        sequence_cache = {
+            tuple(stop.checkpoint_id for stop in p.stops): p for p in existing_paths.values()
+        }
+        for group_name, entries in links_by_group.items():
+            group = group_map[group_name]
+            ordered_ids = [cp_id for (_pos, cp_id) in sorted(entries, key=lambda e: e[0])]
+            if group.path_id is None:
+                path, direction = _get_or_create_path_for_sequence(
+                    comp.id, group_name, ordered_ids, sequence_cache
+                )
+                if path is not None:
+                    group.path = path
+                    group.direction = direction
+                    added["group_checkpoint_links"] += len(ordered_ids)
+                continue
+            # Existing route: preserve the legacy add-new-only semantics by
+            # appending checkpoints the route doesn't have yet. This edits
+            # the shared path, matching how a legacy merge extended the
+            # group's own link list.
+            path = group.path
+            current_ids = {stop.checkpoint_id for stop in path.stops}
+            next_position = max((stop.position for stop in path.stops), default=-1) + 1
+            for cp_id in ordered_ids:
+                if cp_id in current_ids:
+                    continue
+                db.session.add(
+                    PathStop(path_id=path.id, checkpoint_id=cp_id, position=next_position)
+                )
+                current_ids.add(cp_id)
+                next_position += 1
+                added["group_checkpoint_links"] += 1
+        db.session.flush()
 
     # Check-ins (add only new ones, matched by team+checkpoint)
     for ci_data in data.get("checkins", []):
