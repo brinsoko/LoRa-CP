@@ -954,6 +954,44 @@ class GroupScoring(db.Model):
 
 
 # =========================
+# SheetsSyncJob (durable outbox for Google Sheets writes)
+# =========================
+class SheetsSyncJob(db.Model):
+    """One pending/processed Sheets write, inserted in the same DB
+    transaction as the domain change it mirrors (redesign plan 3.4).
+
+    Replaces the per-process in-memory queue: nothing is lost to a
+    restart, an overflow, or a swallowed exception, and a single
+    dedicated worker process (flask sheets-worker) drains the table with
+    an accurate global throttle. dedup_key coalesces bursts: an enqueue
+    for a key with a pending job just refreshes that job's payload.
+    """
+
+    __tablename__ = "sheets_sync_jobs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind = db.Column(db.String(40), nullable=False, index=True)
+    payload = db.Column(db.JSON, nullable=True)
+    dedup_key = db.Column(db.String(200), nullable=False, index=True)
+    status = db.Column(db.String(10), nullable=False, default="pending", server_default="pending", index=True)
+    attempts = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    next_attempt_at = db.Column(db.DateTime, nullable=True)
+    last_error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('pending','running','done','failed')", name="ck_sheets_job_status"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<SheetsSyncJob id={self.id} kind={self.kind!r} status={self.status!r}>"
+
+
+# =========================
 # AuditEvent (append-only audit trail)
 # =========================
 class AuditEvent(db.Model):

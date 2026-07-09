@@ -308,6 +308,14 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     def _set_competition_on_g():
         g.current_competition = get_current_competition()
 
+    @app.cli.command("sheets-worker")
+    def sheets_worker_command():
+        """Drain the sheets_sync_jobs outbox. Run exactly ONE instance
+        (the dedicated compose service); web workers only enqueue."""
+        from app.utils.sheets_outbox import worker_loop
+
+        worker_loop()
+
     @app.context_processor
     def inject_current_app():
         return dict(
