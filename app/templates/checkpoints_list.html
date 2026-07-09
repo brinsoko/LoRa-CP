@@ -22,7 +22,7 @@
               <th>{{ _('Name') }}</th>
               <th>{{ _('Location') }}</th>
               <th>{{ _('Description') }}</th>
-              <th>{{ _('Groups') }}</th>
+              <th>{{ _('Paths') }}</th>
               <th>{{ _('Judges') }}</th>
               {% if has_role('judge','admin') %}
                 <th class="text-end" style="width: 220px;">{{ _('Actions') }}</th>
@@ -37,9 +37,9 @@
               <td>{{ cp.location or '—' }}</td>
               <td class="text-break" style="max-width: 360px;">{{ cp.description or '—' }}</td>
               <td>
-                {% if cp.groups %}
-                  {% for g in cp.groups %}
-                    <span class="badge bg-secondary">{{ g.name }}</span>
+                {% if cp.paths %}
+                  {% for p in cp.paths %}
+                    <span class="badge bg-secondary">{{ p.name }}</span>
                   {% endfor %}
                 {% else %}
                   <span class="text-muted">—</span>

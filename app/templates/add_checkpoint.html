@@ -56,23 +56,23 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label">{{ _('Groups') }}</label>
+        <label class="form-label">{{ _('Paths') }}</label>
         <div class="row row-cols-1 row-cols-md-2 g-2">
-          {% for g in groups %}
+          {% for p in paths %}
             <div class="col">
               <div class="form-check">
                 <input class="form-check-input"
                        type="checkbox"
-                       id="gcp_{{ g.id }}"
-                       name="group_ids"
-                       value="{{ g.id }}"
-                       {% if g.id in (selected_group_ids or []) %}checked{% endif %}>
-                <label class="form-check-label" for="gcp_{{ g.id }}">{{ g.name }}</label>
+                       id="pcp_{{ p.id }}"
+                       name="path_ids"
+                       value="{{ p.id }}"
+                       {% if p.id in (selected_path_ids or []) %}checked{% endif %}>
+                <label class="form-check-label" for="pcp_{{ p.id }}">{{ p.name }}</label>
               </div>
             </div>
           {% endfor %}
         </div>
-        <div class="form-text">{{ _('A checkpoint can belong to many groups.') }}</div>
+        <div class="form-text">{{ _('Ticking a path appends this checkpoint as its last stop; adjust the order on the path edit page. Paths shared by several groups change for all of them.') }}</div>
       </div>
 
       <div class="d-flex gap-2">
