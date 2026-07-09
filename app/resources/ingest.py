@@ -437,30 +437,11 @@ def ingest_post():
                     # do not fail ingest if Sheets update fails
                     pass
 
-                # If this check-in lands on the END checkpoint of a
-                # ScoreRule.time_race rule, the team's leg time just
-                # crystallized — and every other finished team's rank
-                # may have shifted because the spread changed. Push an
-                # async recompute so the leaderboard + sheet update
-                # without waiting for a judge form submission. No-op
-                # for non-leg CPs or when sheets sync is disabled.
-                try:
-                    from app.models import ScoreRule as _SR
-                    from app.utils.sheets_sync_worker import enqueue_recompute_time_race_push as _enqueue
-
-                    rules = _SR.query.filter(_SR.competition_id == competition_id).all()
-                    for _r in rules:
-                        tr = (_r.rules or {}).get("time_race") or {}
-                        if str(tr.get("end_checkpoint_id") or "") != str(cp.id):
-                            continue
-                        _enqueue(
-                            current_app._get_current_object(),
-                            competition_id,
-                            _r.checkpoint_id,
-                            _r.group_id,
-                        )
-                except Exception:
-                    pass
+                # Timed segments are computed at read time from checkins
+                # and rendered in Sheets as formulas over the CP tabs'
+                # Time cells, so an arrival needs no extra recompute push
+                # here; the mark_arrival_checkbox write above already
+                # feeds every downstream surface.
 
         # Skip writeback for non-UID payloads (GPS frames, comma-list data)
         # AND for inputs whose shape doesn't match a real card UID. The old

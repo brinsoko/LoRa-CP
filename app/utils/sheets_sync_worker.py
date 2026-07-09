@@ -240,19 +240,3 @@ def enqueue_build_score_tab(
         per_group_checkpoint_order=per_group_checkpoint_order,
         competition_id=competition_id,
     )
-
-
-def enqueue_recompute_time_race_push(app, competition_id: int, checkpoint_id: int, group_id: int) -> None:
-    """Triggered from ingest when a Checkin lands on the END checkpoint
-    of a ScoreRule.time_race rule. Recomputes the per-team rank scores
-    for that (checkpoint, group) rule via the existing offline
-    recompute_scores_for_rule path — which both writes ScoreEntry rows
-    and pushes them to the per-CP sheet tab. Scoped to one rule so the
-    cost is small even for big competitions."""
-
-    def _job(comp_id: int, cp_id: int, gid: int) -> None:
-        from app.resources.scores import recompute_scores_for_rule
-
-        recompute_scores_for_rule(comp_id, cp_id, gid)
-
-    _submit(app, _job, competition_id, checkpoint_id, group_id)

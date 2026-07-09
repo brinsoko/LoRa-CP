@@ -8,7 +8,6 @@ from app.models import (
     Checkin,
     Checkpoint,
     CheckpointGroup,
-    GlobalScoreRule,
     Team,
     TeamGroup,
 )
@@ -59,22 +58,15 @@ def _build_group_routes(comp_id: int) -> tuple[dict[int, list[int]], dict[int, i
         group_id: route for group_id, route in resolve_route_ids_bulk(comp_id).items() if route
     }
 
+    # Start/finish are the first/last stop of the directed route; the old
+    # GlobalScoreRule time override is gone; the race time rule always
+    # uses route endpoints now (redesign plan 3.3).
     group_start: dict[int, int] = {}
     group_finish: dict[int, int] = {}
     for group_id, checkpoint_ids in group_checkpoint_order.items():
         if checkpoint_ids:
             group_start[group_id] = checkpoint_ids[0]
             group_finish[group_id] = checkpoint_ids[-1]
-
-    rules = GlobalScoreRule.query.filter(GlobalScoreRule.competition_id == comp_id).all()
-    for rule in rules:
-        time_rule = (rule.rules or {}).get("time") or {}
-        start_id = _safe_int(time_rule.get("start_checkpoint_id"))
-        finish_id = _safe_int(time_rule.get("end_checkpoint_id"))
-        if start_id:
-            group_start[rule.group_id] = start_id
-        if finish_id:
-            group_finish[rule.group_id] = finish_id
 
     return group_checkpoint_order, group_start, group_finish
 
