@@ -16,13 +16,14 @@ A full-featured **RFID & LoRa-based checkpoint management platform** built with 
 - **Finish-line verifier:** Web NFC page reads tag digests, recomputes HMACs for known devices, and highlights mismatches vs the team's recorded check-ins  
 - **Checkpoints:**  
   - Import from JSON files  
-  - Assign to multiple groups  
   - View and edit coordinates (Easting/Northing)  
+- **Paths:** First-class ordered courses through checkpoints (`/paths`); groups pick a path plus a direction, so two categories can run the same course opposite ways  
 - **Groups:**  
-  - Manage checkpoint groups  
-  - Assign checkpoints and teams to multiple groups  
-  - Display relationships dynamically  
+  - Manage team categories (checkpoint groups)  
+  - Assign a path + direction and teams per group  
   - Randomize team numbers by group prefix  
+- **Judge shell:** Mobile-first `/judge` UI per checkpoint (scan-first scoring, expected teams with ETAs, live results, bulk-entry table)  
+- **Scoring setup:** Admin UI at `/scores/setup` for score fields, timed segments, and category-level rules  
 - **Check-ins:**  
   - Record RFID-based or manual check-ins  
   - Export to CSV for analysis  
@@ -293,7 +294,8 @@ curl -X POST /api/rfid/verify \
 ```
 
 ### Judge/Finish Web NFC flows
-- `/rfid/judge-console`: tap a tag with Android Chrome Web NFC; reads UID, calls ingest for the selected device, and appends the truncated HMAC to the tag as text.
+- `/judge`: the judge shell. The My CP tab scans a team card with Android Chrome Web NFC (or finds the team by number/name), records the arrival, and opens the scoring form for the judge's checkpoint.
+- `/rfid/judge-console`: superseded admin-only legacy console; judges opening it are redirected to `/judge` (full removal planned in the phase-5 cleanup).
 - `/rfid/finish`: tap a tag; reads UID + all text records (digests), recomputes truncated HMACs for known devices, shows matches, collisions, and warns if a digest refers to a checkpoint the team hasn't checked in at.
 
 ### Admin: judge checkpoint assignment
@@ -320,6 +322,8 @@ curl "/api/checkins?sort=new&page=1&per_page=100"
 - [docs/architecture.md](docs/architecture.md) -- System architecture and data model
 - [docs/export-import.md](docs/export-import.md) -- Export/Import/Merge guide
 - [docs/deploy.md](docs/deploy.md) -- Production deployment
+- [docs/runbook.md](docs/runbook.md) -- Operations runbook (race-day triage)
+- [docs/navodila-sodnikom.md](docs/navodila-sodnikom.md) -- Navodila za sodnike (judge instructions, Slovenian)
 - [docs/test-spreadsheet-setup.md](docs/test-spreadsheet-setup.md) -- Google Sheets test setup
 
 ---

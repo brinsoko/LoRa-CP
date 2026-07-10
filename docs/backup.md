@@ -80,8 +80,8 @@ e.g. `age -p` or `gpg -c`.
 Run this **before race day** so you know it works:
 
 ```bash
-# 1. Stop the app
-docker compose -f deploy/docker-compose.prod.yml stop web
+# 1. Stop everything that writes to the DB (web AND the sheets worker)
+docker compose -f deploy/docker-compose.prod.yml stop web sheets-worker
 
 # 2. Move the live DB out of the way (don't delete!)
 mv instance/app.db instance/app.db.broken
@@ -91,7 +91,7 @@ gunzip -k backups/app-YYYYMMDDTHHMMSSZ.db.gz
 mv backups/app-YYYYMMDDTHHMMSSZ.db instance/app.db
 
 # 4. Restart and verify
-docker compose -f deploy/docker-compose.prod.yml start web
+docker compose -f deploy/docker-compose.prod.yml start web sheets-worker
 curl -fsS http://localhost/ready
 ```
 

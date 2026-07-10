@@ -1,5 +1,15 @@
 # Post-race overhaul — what shipped
 
+> **Historical document.** This is the changelog of the
+> `post-race-improvements` branch as it landed. The July 2026 redesign
+> (see `docs/redesign-plan.md`) has since replaced several things
+> described below: the JSON-blob score rules became first-class tables
+> (`ScoreField`/`TimedSegment`/`GroupScoring`), group `reverse` became
+> Path + direction, the in-process Sheets worker became a durable
+> outbox drained by a separate `sheets-worker` service, judges now work
+> in the `/judge` shell, and `scripts/migrate_to_rank_scoring.py` was
+> removed. Consult `docs/architecture.md` for the current state.
+
 Branch: `post-race-improvements` (off `master @ 04f2c70`). Not pushed.
 
 20 items requested. **19 shipped, 1 deferred** (per the agreed scope from

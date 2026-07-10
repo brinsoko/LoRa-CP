@@ -19,8 +19,8 @@ events. Check-ins can arrive through:
 1. **Manual entry** -- judges use the web UI or API.
 2. **LoRa device ingest** -- hardware devices send RFID card UIDs over LoRa to
    the `/api/ingest` endpoint.
-3. **Web NFC** -- Android Chrome reads NFC tags and calls ingest directly from
-   the judge console page.
+3. **Web NFC** -- Android Chrome reads NFC tags in the judge shell
+   (`/judge`, My CP tab) and records the arrival via the scores API.
 
 ---
 
@@ -44,7 +44,7 @@ lora-kt/
       ingest.py          #   device message ingest
       lora.py            #   LoRa device management
       scores.py          #   scoring entries
-      score_rules.py     #   scoring rule config
+      score_rules.py     #   ScoreField REST API
       rfid.py            #   RFID card management, verify
       map.py             #   map data endpoints
       messages.py        #   raw LoRa messages
@@ -57,7 +57,7 @@ lora-kt/
       checkins/          #   check-in list and forms
       groups/            #   group management UI
       map/               #   Google Maps view
-      rfid/              #   NFC judge console, finish verifier
+      rfid/              #   RFID cards, finish verifier, legacy console (admin-only)
       sheets/            #   Google Sheets admin
       audit/             #   audit log viewer
       scores/            #   scoring UI + /scores/setup admin

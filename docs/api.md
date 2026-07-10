@@ -153,10 +153,12 @@ curl -b cookies.txt -X POST http://localhost:5001/api/checkpoints \
     "name": "Forest Gate",
     "location": "North entrance",
     "easting": 14.5,
-    "northing": 46.1,
-    "group_ids": [1, 2]
+    "northing": 46.1
   }'
 ```
+
+Checkpoints are placed on courses via Paths (see below), not assigned
+to groups directly.
 
 ### Update a checkpoint
 
@@ -208,19 +210,24 @@ curl -b cookies.txt -X POST http://localhost:5001/api/groups \
     "name": "Category A",
     "prefix": "1xx",
     "description": "Senior scouts",
-    "checkpoint_ids": [1, 2, 3]
+    "path_id": 1,
+    "direction": "forward"
   }'
 ```
 
 The `prefix` field uses a digits+x pattern (e.g., `1xx` means numbers
 100-199, `3xxx` means 3000-3999). This is used for team number randomization.
 
+A group's course is its Path (see below) traversed in `direction`
+(`forward` or `reverse`); groups no longer carry a checkpoint list of
+their own.
+
 ### Update a group
 
 ```bash
 curl -b cookies.txt -X PATCH http://localhost:5001/api/groups/1 \
   -H "Content-Type: application/json" \
-  -d '{"name": "Category A - Updated", "checkpoint_ids": [1, 2, 3, 4]}'
+  -d '{"name": "Category A - Updated", "path_id": 2, "direction": "reverse"}'
 ```
 
 ### Delete a group
@@ -240,6 +247,54 @@ curl -b cookies.txt -X POST http://localhost:5001/api/groups/order \
 ```
 
 Must include all group IDs for the current competition.
+
+---
+
+## Paths
+
+An ordered course through checkpoints, shared between groups. Groups
+reference a path via `path_id` + `direction`.
+
+### List / get paths
+
+```bash
+curl -b cookies.txt "http://localhost:5001/api/paths"
+curl -b cookies.txt "http://localhost:5001/api/paths/1"
+```
+
+### Create a path
+
+```bash
+curl -b cookies.txt -X POST http://localhost:5001/api/paths \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Blue course",
+    "notes": "Long loop over the ridge",
+    "checkpoint_ids": [1, 2, 3, 4],
+    "expected_leg_minutes": [null, 20, 15, 30]
+  }'
+```
+
+`checkpoint_ids` is the stop order; a checkpoint may appear more than
+once. `expected_leg_minutes` (optional, aligned with the stops) is the
+manual ETA fallback the judge shell uses for "team expected in ~N min".
+
+### Update / duplicate / delete a path
+
+```bash
+curl -b cookies.txt -X PATCH http://localhost:5001/api/paths/1 \
+  -H "Content-Type: application/json" \
+  -d '{"checkpoint_ids": [1, 3, 2, 4]}'
+
+# Duplicate, optionally with the stop order reversed
+curl -b cookies.txt -X POST http://localhost:5001/api/paths/1/duplicate \
+  -H "Content-Type: application/json" \
+  -d '{"reversed": true}'
+
+curl -b cookies.txt -X DELETE http://localhost:5001/api/paths/1   # admin only
+```
+
+Delete fails with 409 while any group still references the path.
 
 ---
 
@@ -330,10 +385,11 @@ curl -b cookies.txt -X POST http://localhost:5001/api/competition/1/merge \
 curl -b cookies.txt -X POST http://localhost:5001/api/competition/1/merge \
   -H "Content-Type: application/json" \
   -d '{
-    "schema_version": "1.0.0",
+    "schema_version": "1.2.0",
     "competition": {"name": "..."},
     "teams": [...],
     "groups": [...],
+    "paths": [...],
     "checkpoints": [...],
     "resolutions": {
       "team:Alpha Patrol": "use_imported",

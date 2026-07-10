@@ -74,11 +74,11 @@ deploy/backup.sh
 **Restore from a backup:**
 ```bash
 cd deploy
-docker compose -f docker-compose.prod.yml stop web
+docker compose -f docker-compose.prod.yml stop web sheets-worker
 mv ../instance/app.db ../instance/app.db.broken
 gunzip -k ../backups/app-<TIMESTAMP>.db.gz
 mv ../backups/app-<TIMESTAMP>.db ../instance/app.db
-docker compose -f docker-compose.prod.yml start web
+docker compose -f docker-compose.prod.yml start web sheets-worker
 curl -fsS http://localhost/ready
 ```
 
@@ -144,9 +144,10 @@ on a checkpoint that's now closed and audit log won't help):
    ```bash
    deploy/backup.sh
    ```
-2. **Stop writes** while you work — easiest by stopping the app:
+2. **Stop writes** while you work; both the app and the sheets worker
+   hold the DB open:
    ```bash
-   docker compose -f deploy/docker-compose.prod.yml stop web
+   docker compose -f deploy/docker-compose.prod.yml stop web sheets-worker
    ```
 3. **Open the DB** with sqlite3:
    ```bash
@@ -158,7 +159,7 @@ on a checkpoint that's now closed and audit log won't help):
    ```
 4. **Restart**:
    ```bash
-   docker compose -f deploy/docker-compose.prod.yml start web
+   docker compose -f deploy/docker-compose.prod.yml start web sheets-worker
    ```
 5. **Add an audit note** through the app once it's back up so future-you
    knows what changed.
@@ -188,20 +189,32 @@ backup.sh script already uses `.backup` which handles this correctly).
 
 ### Sheets API quotas
 
-Each check-in fires a Google Sheets write. Free quota is 60 writes per
-minute per user. If logs show `429 Too Many Requests` from gspread:
+Each check-in and score enqueues a Google Sheets write. Free quota is
+60 writes per minute per user. If logs show `429 Too Many Requests`
+from gspread:
 
 - Confirm `SHEETS_SYNC_ENABLED=1` is wanted; setting it to `0` disables
   Sheets entirely (all data still hits the DB).
-- The new background worker (commit `3e16763`) deduplicates work by
-  dropping queued jobs on overflow — quota errors won't wedge the app,
-  but Sheets will be inconsistent until quota resets.
+- Writes go through the durable outbox (`sheets_sync_jobs` table), so
+  quota errors never wedge the app or lose data. The `sheets-worker`
+  process retries with exponential backoff and coalesces repeat writes
+  for the same row via dedup keys; Sheets catches up once quota resets.
 
-### Container memory growing
+### Sheets lagging or stuck jobs
 
-The Sheets worker queue is bounded to 1024 jobs. If memory still grows,
-restart `web`. Suspect a connection leak in gspread; that's a known
-issue under heavy quota throttling.
+The sheets admin page (`/sheets/`) has a health panel showing the
+pending-job count and a table of failed (dead-lettered) jobs with
+per-job retry and delete buttons. If jobs pile up:
+
+- Check the worker is running:
+  `docker compose -f docker-compose.prod.yml ps sheets-worker`.
+- Tail its logs: `docker logs -f <sheets-worker-container-name>`.
+- Jobs that exhaust their retries land in status `failed` with the
+  last error attached; fix the cause (usually credentials or a deleted
+  tab), then retry them from the panel.
+
+Exactly ONE `sheets-worker` replica must run; a second replica would
+race the first on job claims and double-write rows.
 
 ---
 
@@ -216,7 +229,7 @@ deferred. Listed here so they don't get lost.
 | Sentry / error reporting | Single-user laptop op, manual log review fine | Low |
 | Multiple gunicorn workers | Single laptop, blocking Sheets call now async | Low |
 | Postgres migration | SQLite + WAL handles current scale | Low |
-| Alembic migration cleanup | App still uses db.create_all() + ALTER TABLEs at boot | Medium tech debt |
+| Postgres-grade migrations review | Schema changes go through Alembic now (create_all only seeds fresh installs); older revisions never rehearsed on Postgres | Low |
 | Subresource Integrity on dynamic ESM imports (firmware flasher) | Admin-only tool | Low |
 | `google_sa.json` mount in deploy compose | Sheets sync defaults to enabled but file isn't mounted; sync silently no-ops | Medium — flip `SHEETS_SYNC_ENABLED=0` in `.env` if not using Sheets |
 

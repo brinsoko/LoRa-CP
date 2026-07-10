@@ -53,6 +53,14 @@ docker compose -f docker-compose.prod.yml up -d
 Caddy will request/renew certificates automatically for `DOMAIN` and reverse-proxy to `web`.
 Static assets (including the favicon) are served by the app through the proxy.
 
+The stack has three services: `caddy`, `web`, and `sheets-worker`. The
+worker shares the `web` image, runs `flask sheets-worker`, and drains
+the Google Sheets outbox (`sheets_sync_jobs` table). Exactly one
+replica must run - without it, Sheets writes queue up in the DB and
+the spreadsheet never updates. Restart it together with `web` after a
+deploy; check both with
+`docker compose -f docker-compose.prod.yml ps`.
+
 ## 5) CI: publish images to GHCR
 - The workflow `.github/workflows/publish.yml` builds the `lora-kt-web` image and pushes to GHCR on every push to `master` (images: `ghcr.io/brinsoko/lora-cp/...`).
 - Make the repo public **or** create a `GHCR_TOKEN` with `packages:read` on the server and log in once:  

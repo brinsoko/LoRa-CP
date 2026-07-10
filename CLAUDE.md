@@ -6,7 +6,7 @@ planned for late May 2026.
 
 ## Working environment
 
-- **Python interpreter:** `venv/bin/python` (3.13). Single venv at the
+- **Python interpreter:** `venv/bin/python` (3.12). Single venv at the
   project root.
 - **Lint:** `venv/bin/ruff check .` (config in `pyproject.toml`,
   rules `F, I, UP, B, E, W`).

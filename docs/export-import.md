@@ -2,7 +2,7 @@
 
 > **Experimental.** This feature is functional but still maturing. Back up
 > your database before importing or merging. The JSON schema (currently
-> version `1.0.0`) may change in future releases.
+> version `1.2.0`) may change in future releases.
 
 ---
 
