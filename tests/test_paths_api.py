@@ -132,6 +132,28 @@ def test_group_api_wires_path_and_direction(client, app):
     assert route_finish(rev_group) == cps[0].id
 
 
+def test_group_create_enforces_dead_time_segment_invariant(client, app):
+    """Creating a group must run the same dead-time-vs-segment-end check
+    as updating one: a reverse group flips the segment end onto a
+    dead-time checkpoint, which update rejected but create let through."""
+    from tests.support import create_segment
+
+    comp, cps = _seed(client)
+    path_id = client.post(
+        "/api/paths", json={"name": "SegPath", "checkpoint_ids": [cps[0].id, cps[1].id]}
+    ).get_json()["path"]["id"]
+    create_segment(db.session.get(Path, path_id), cps[0], cps[1])
+    cps[0].dead_time_enabled = True
+    db.session.commit()
+
+    # Reverse direction makes cps[0] (dead-time enabled) the directed end.
+    rev = client.post(
+        "/api/groups", json={"name": "RevSeg", "path_id": path_id, "direction": "reverse"}
+    )
+    assert rev.status_code == 400, rev.data
+    assert CheckpointGroup.query.filter_by(competition_id=comp.id, name="RevSeg").count() == 0
+
+
 def test_group_api_rejects_bad_direction_and_foreign_path(client, app):
     comp, cps = _seed(client)
     other_comp = create_competition(name="Other Comp")

@@ -10,7 +10,7 @@ Lays down:
   * one checkpoint group containing all those checkpoints
   * a handful of teams, all assigned to that group
 
-Cards/UIDs are NOT created here — register them as you scan, either
+Cards/UIDs are NOT created here - register them as you scan, either
 via the team edit page in the web UI or whichever workflow you use.
 
 Idempotent: re-running with the same args won't create duplicates.
@@ -190,16 +190,16 @@ def main() -> None:
             print(f"  team: {name!r} #{number} -> id={team.id} (group={group.name!r})")
 
         db.session.commit()
-        # Capture before the session closes — bare ORM attribute access on
+        # Capture before the session closes - bare ORM attribute access on
         # `competition` after the `with` block detaches the instance.
         comp_id = competition.id
 
     print()
     print("Done. Next steps for live hardware testing:")
     print(f"  1. POST to /api/ingest with competition_id={comp_id} (or set COMPETITION_ID in the reader).")
-    print("  2. Scan a card — the message logs and `uid_seen` will be False the first time.")
+    print("  2. Scan a card - the message logs and `uid_seen` will be False the first time.")
     print("  3. Open the team's edit page, paste the UID from the response into the RFID UID field, save.")
-    print("  4. Scan again — `checkin_created: True` and the team shows up on the checkpoint.")
+    print("  4. Scan again - `checkin_created: True` and the team shows up on the checkpoint.")
 
 
 if __name__ == "__main__":

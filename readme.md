@@ -86,7 +86,7 @@ make run              # starts on http://127.0.0.1:5001
 
 Default admin credentials after seeding (dev only): `admin` / `admin123`
 (change immediately). In production the seed scripts refuse the
-default — you must set `ADMIN_PASS` / `SEED_ADMIN_PASS` explicitly
+default - you must set `ADMIN_PASS` / `SEED_ADMIN_PASS` explicitly
 when `FLASK_ENV=production`.
 
 See [docs/setup.md](docs/setup.md) for the full installation guide and

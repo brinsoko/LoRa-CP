@@ -53,17 +53,16 @@ def enqueue_job(kind: str, competition_id: int, payload: dict | None, dedup_key:
     # already-running/done job, so the new payload never executes. The
     # conditional UPDATE instead matches 0 rows once the worker has
     # claimed it, and we fall through to insert a fresh pending job.
-    # Reset the retry budget too: a fresh write coalesced onto a job that
-    # was backing off (attempts>0, next_attempt_at in the future) should
-    # be sent promptly with a full budget, not inherit the old job's
-    # delay and shrunken attempt count.
+    # Clear next_attempt_at so the fresh payload is sent promptly instead
+    # of inheriting a backoff delay, but keep attempts/last_error: they
+    # measure the target sheet's health, and resetting them on every
+    # coalesce would let a hot dedup_key with a permanently broken sheet
+    # retry forever without ever dead-lettering or surfacing its error.
     updated = SheetsSyncJob.query.filter_by(dedup_key=dedup_key, status="pending").update(
         {
             "payload": payload,
             "updated_at": utcnow_naive(),
-            "attempts": 0,
             "next_attempt_at": None,
-            "last_error": None,
         },
         synchronize_session=False,
     )
@@ -154,9 +153,14 @@ def _execute(job: SheetsSyncJob) -> None:
         except (TypeError, ValueError):
             return None
 
+    # raise_errors=True: the _sync helpers swallow Google API failures by
+    # design when called inline from a web request (a sheets outage must
+    # not 500 the judge's submit), but the worker needs the exception so
+    # the job retries / dead-letters instead of being marked done while
+    # the write never reached the spreadsheet.
     if job.kind == "arrival":
         sheets_sync.mark_arrival_checkbox_sync(
-            payload["team_id"], payload["checkpoint_id"], _ts("arrived_at")
+            payload["team_id"], payload["checkpoint_id"], _ts("arrived_at"), raise_errors=True
         )
     elif job.kind == "scores":
         sheets_sync.update_checkpoint_scores_sync(
@@ -165,9 +169,12 @@ def _execute(job: SheetsSyncJob) -> None:
             payload.get("group_name") or "",
             payload.get("values") or {},
             _ts("scored_at"),
+            raise_errors=True,
         )
     elif job.kind == "sync_team_numbers":
-        sheets_sync.sync_all_checkpoint_tabs(competition_id=payload.get("competition_id"))
+        sheets_sync.sync_all_checkpoint_tabs(
+            competition_id=payload.get("competition_id"), raise_errors=True
+        )
     elif job.kind == "rebuild_teams":
         # build_*_tab return a soft-error string instead of raising; turn
         # it into a raise so the job retries / dead-letters and shows up
@@ -219,6 +226,13 @@ def _execute(job: SheetsSyncJob) -> None:
 
 def run_due_jobs(limit: int = 25) -> dict:
     """Claim and execute due pending jobs (oldest first). Returns counts."""
+    stats = {"done": 0, "retried": 0, "failed": 0}
+    # While sync is disabled, leave pending jobs queued instead of
+    # draining them as no-ops (every _sync helper early-returns when
+    # disabled, which would mark them done and lose the writes for good
+    # once sync is re-enabled).
+    if not sheets_sync_enabled():
+        return stats
     now = utcnow_naive()
     jobs = (
         SheetsSyncJob.query.filter(
@@ -229,7 +243,6 @@ def run_due_jobs(limit: int = 25) -> dict:
         .limit(limit)
         .all()
     )
-    stats = {"done": 0, "retried": 0, "failed": 0}
     for job in jobs:
         job.status = "running"
         db.session.commit()
@@ -243,6 +256,23 @@ def run_due_jobs(limit: int = 25) -> dict:
             # would stay 'running', attempts would never increment, and it
             # would never dead-letter. job is re-loaded on next access.
             db.session.rollback()
+            # While this job was running, an enqueue for the same
+            # dedup_key inserts a fresh pending row (the coalescing UPDATE
+            # only matches pending rows). Requeueing this job would replay
+            # its stale payload AFTER the newer one executes, overwriting
+            # newer data in the sheet, so drop it as superseded instead -
+            # the same rule _recover_stuck_running applies to orphans.
+            newer = SheetsSyncJob.query.filter(
+                SheetsSyncJob.dedup_key == job.dedup_key,
+                SheetsSyncJob.status == "pending",
+                SheetsSyncJob.id > job.id,
+            ).first()
+            if newer is not None:
+                job.status = "done"
+                job.last_error = "superseded by a newer write for the same target"
+                db.session.commit()
+                stats["done"] += 1
+                continue
             job.attempts += 1
             job.last_error = str(exc)[:2000]
             if job.attempts >= MAX_ATTEMPTS:

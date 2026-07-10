@@ -55,7 +55,7 @@ def test_score_submissions_renders_emoji_in_team_name_and_fields(client, app):
     # escape sequences.
     assert "Limwnce\U0001f380\U0001f34b\U0001f378" in body
     assert "\\u" not in body or "\\ud83" not in body, (
-        "Found JSON \\uXXXX escapes in the rendered HTML — pretty_json "
+        "Found JSON \\uXXXX escapes in the rendered HTML - pretty_json "
         "filter regressed to tojson"
     )
     # raw_fields with an emoji also round-trips into the rendered <pre>.

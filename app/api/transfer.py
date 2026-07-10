@@ -655,7 +655,7 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
     for card_data in data.get("rfid_cards", []):
         team = team_map.get(card_data.get("team_name"))
         if team:
-            # Normalize on import — older exports may carry colon-separated
+            # Normalize on import - older exports may carry colon-separated
             # UIDs that wouldn't match the canonical /api/ingest lookup form.
             uid = normalize_uid(card_data.get("uid", ""))
             if not uid:
@@ -1558,7 +1558,7 @@ def merge_competition(comp_id: int):
     resolutions = data.get("resolutions")
 
     if resolutions is None:
-        # Step 1: Dry run — detect conflicts
+        # Step 1: Dry run - detect conflicts
         conflicts = _find_conflicts(data, comp)
         return json_ok(
             {

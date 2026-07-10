@@ -330,7 +330,7 @@
           <div class="mb-3">
             <label class="form-label">{{ _('Checkpoint (optional)') }}</label>
             <select class="form-select" name="checkpoint_id">
-              <option value="">{{ _('— none —') }}</option>
+              <option value="">{{ _('- none -') }}</option>
               {% for cp in checkpoints %}
                 <option value="{{ cp.id }}">{{ cp.name }}</option>
               {% endfor %}
@@ -410,7 +410,7 @@
                 <td><code>{{ c.spreadsheet_name }}</code><br><small class="text-muted">{{ c.spreadsheet_id }}</small></td>
                 <td>{{ c.tab_name }}</td>
                 <td>{{ c.tab_type }}</td>
-                <td>{{ c.checkpoint.name if c.checkpoint else "—" }}</td>
+                <td>{{ c.checkpoint.name if c.checkpoint else "-" }}</td>
                 <td>
                   <div class="d-flex gap-1 flex-wrap">
                   {% if c.config and c.config.get("groups") %}

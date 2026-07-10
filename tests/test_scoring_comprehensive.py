@@ -143,7 +143,7 @@ def _rule(rule_dict, value, context=None):
 
 
 # ===========================================================================
-# DEVIATION TESTS (CP4 — Minefield)
+# DEVIATION TESTS (CP4 - Minefield)
 # ===========================================================================
 
 
@@ -197,7 +197,7 @@ class TestDeviation:
 
 
 # ===========================================================================
-# MULTIPLIER TESTS (CP5 — Bonus task)
+# MULTIPLIER TESTS (CP5 - Bonus task)
 # ===========================================================================
 
 
@@ -227,7 +227,7 @@ class TestMultiplier:
 
 
 # ===========================================================================
-# MAPPING TESTS (Virtual CP — Topo test)
+# MAPPING TESTS (Virtual CP - Topo test)
 # ===========================================================================
 
 
@@ -250,7 +250,7 @@ class TestMapping:
 
 
 # ===========================================================================
-# NO-RULE / CONSTRAINT TESTS (CP3 — Looks + Effect)
+# NO-RULE / CONSTRAINT TESTS (CP3 - Looks + Effect)
 # ===========================================================================
 
 
@@ -398,7 +398,7 @@ class TestTimeTrial:
         # mGG-2: 90 min
         _checkin(comp, teams["mGG-2"], s["cp1"], 5)
         _checkin(comp, teams["mGG-2"], s["cp2"], 95)
-        # mGG-3: 120 min (but has 30 min dead time — segment times use raw)
+        # mGG-3: 120 min (but has 30 min dead time - segment times use raw)
         _checkin(comp, teams["mGG-3"], s["cp1"], 10)
         _checkin(comp, teams["mGG-3"], s["cp2"], 130)
         # mGG-4: 150 min
@@ -499,7 +499,7 @@ class TestTimeTrial:
         segment = resolve_group_segments(s["cat3"])[0]
         results = compute_segment_results(comp.id, [teams["RR-5"].id], segment)
         # Phase 2: the partial start timestamp is surfaced for display
-        # ('A 10:03; B —'), but no minutes/points without the end checkin.
+        # ('A 10:03; B -'), but no minutes/points without the end checkin.
         row = results[teams["RR-5"].id]
         assert row["start_at"] is not None
         assert row["end_at"] is None
@@ -828,47 +828,59 @@ class TestVirtualCheckpoint:
 
 
 class TestOrgScoring:
-    def test_org_total_sum_logic(self):
-        """Org total = sum of non-DNF member teams."""
-        rows = [
-            {"organization": "Rod A", "dnf": False, "total": 100},
-            {"organization": "Rod A", "dnf": False, "total": 80},
-            {"organization": "Rod B", "dnf": False, "total": 50},
-        ]
-        org_totals = {}
-        for row in rows:
-            org = row.get("organization", "").strip()
-            if not org or row.get("dnf"):
-                continue
-            org_totals[org] = org_totals.get(org, 0.0) + float(row.get("total") or 0.0)
-        assert org_totals["Rod A"] == 180.0
-        assert org_totals["Rod B"] == 50.0
+    """Runs the REAL aggregation in _build_scores_context (the previous
+    version re-implemented the loop inside the test body and asserted on
+    its own dict, so it passed regardless of the production code)."""
 
-    def test_org_dnf_excluded(self):
-        rows = [
-            {"organization": "Rod A", "dnf": False, "total": 100},
-            {"organization": "Rod A", "dnf": True, "total": 200},
-        ]
-        org_totals = {}
-        for row in rows:
-            org = row.get("organization", "").strip()
-            if not org or row.get("dnf"):
-                continue
-            org_totals[org] = org_totals.get(org, 0.0) + float(row.get("total") or 0.0)
-        assert org_totals["Rod A"] == 100.0
+    def _seed_orgs(self):
+        user = create_user(username="org-admin", role="admin")
+        comp = create_competition(name="Org Cup")
+        add_membership(user, comp, role="admin")
+        group = create_group(comp, name="Alpha", prefix="1xx")
+        cp = create_checkpoint(comp, name="CP-Org")
+        set_group_route(group, [cp])
+        teams = []
+        for i, org in enumerate(["Rod A", "Rod A", "Rod B", "", None], start=1):
+            team = create_team(comp, name=f"Org-T{i}", number=100 + i, organization=org)
+            assign_team_group(team, group)
+            teams.append(team)
+        totals = [100, 80, 50, 30, 20]
+        for team, total in zip(teams, totals, strict=True):
+            db.session.add(
+                ScoreEntry(
+                    competition_id=comp.id,
+                    team_id=team.id,
+                    checkpoint_id=cp.id,
+                    raw_fields={"points": total},
+                    total=float(total),
+                    created_at=T0,
+                )
+            )
+        db.session.commit()
+        return comp, teams
 
-    def test_org_unaffiliated_not_counted(self):
-        rows = [
-            {"organization": "", "dnf": False, "total": 100},
-            {"organization": None, "dnf": False, "total": 50},
-        ]
-        org_totals = {}
-        for row in rows:
-            org = (row.get("organization") or "").strip()
-            if not org or row.get("dnf"):
-                continue
-            org_totals[org] = org_totals.get(org, 0.0) + float(row.get("total") or 0.0)
-        assert len(org_totals) == 0
+    def _org_totals(self, comp_id):
+        from app.blueprints.scores.routes import _build_scores_context
+
+        context = _build_scores_context(comp_id, None)
+        return {o["name"]: o for o in context["org_totals"]}
+
+    def test_org_total_sum_and_unaffiliated_excluded(self, app):
+        """Org total = sum of member teams; blank/None orgs don't appear."""
+        comp, _teams = self._seed_orgs()
+        orgs = self._org_totals(comp.id)
+        assert set(orgs) == {"Rod A", "Rod B"}
+        assert orgs["Rod A"]["total"] == 180.0
+        assert orgs["Rod A"]["team_count"] == 2
+        assert orgs["Rod B"]["total"] == 50.0
+
+    def test_org_dnf_excluded(self, app):
+        comp, teams = self._seed_orgs()
+        teams[1].dnf = True  # the 80-point Rod A team
+        db.session.commit()
+        orgs = self._org_totals(comp.id)
+        assert orgs["Rod A"]["total"] == 100.0
+        assert orgs["Rod A"]["team_count"] == 1
 
 
 # ===========================================================================
@@ -1005,7 +1017,7 @@ class TestNoNegativePoints:
 
 
 # ===========================================================================
-# SIGNALING (Multiplier ×5) — Regression
+# SIGNALING (Multiplier ×5) - Regression
 # ===========================================================================
 
 
@@ -1017,3 +1029,157 @@ class TestSignaling:
     def test_signaling_0_correct_gets_0(self):
         rule = {"type": "multiplier", "factor": 5}
         assert _rule(rule, 0) == 0.0
+
+
+# ===========================================================================
+# PASS-3 REGRESSIONS: points-key bypass, race-rule edges, CSV parity
+# ===========================================================================
+
+
+class TestConfiguredPointsField:
+    """An explicit 'points' value must only act as the synthetic
+    points-only override when NO 'points' ScoreField is configured;
+    a configured one goes through its rule and counts_in_total flag."""
+
+    def test_points_field_counts_in_total_false_yields_none(self, app, seeded):
+        s = seeded
+        create_score_field(s["cp3"], "points", counts_in_total=False)
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        assert compute_entry_total({"points": 5}, fields, {}) is None
+
+    def test_points_field_rule_applies(self, app, seeded):
+        s = seeded
+        create_score_field(s["cp3"], "points", rule_type="multiplier", rule_params={"factor": 2})
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        assert compute_entry_total({"points": 5}, fields, {}) == 10.0
+
+    def test_unconfigured_points_key_still_overrides(self, app, seeded):
+        s = seeded
+        create_score_field(s["cp3"], "task", rule_type="multiplier", rule_params={"factor": 1})
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        # The quick points-only flow keeps working when 'points' is not a
+        # configured field.
+        assert compute_entry_total({"task": 3, "points": 7}, fields, {}) == 7.0
+
+
+class TestRaceRuleEdges:
+    def _race_comp(self):
+        user = create_user(username="race-admin", role="admin")
+        comp = create_competition(name="Race Edges")
+        add_membership(user, comp, role="admin")
+        group = create_group(comp, name="Alpha", prefix="1xx")
+        start = create_checkpoint(comp, name="Start-R")
+        mid = create_checkpoint(comp, name="Mid-R")
+        finish = create_checkpoint(comp, name="Finish-R")
+        off_route = create_checkpoint(comp, name="Off-Route")
+        set_group_route(group, [start, mid, finish])
+        set_group_scoring(
+            group,
+            race_max_points=100,
+            race_threshold_minutes=60,
+            race_penalty_minutes=5,
+            race_penalty_points=10,
+            race_min_points=0,
+        )
+        team = create_team(comp, name="Racer", number=101)
+        assign_team_group(team, group)
+        return comp, group, team, start, mid, finish, off_route
+
+    def test_finish_before_start_scores_no_time_points(self, app):
+        """A stray early finish check-in used to clamp to a 0-minute run
+        and win full max points; it is an invalid pair, like segments."""
+        comp, group, team, start, mid, finish, _off = self._race_comp()
+        create_checkin(comp, team, finish, timestamp=T0)
+        create_checkin(comp, team, start, timestamp=T0 + timedelta(minutes=30))
+        contrib = compute_group_contrib(comp.id, team.id, group)
+        assert contrib["time_points"] is None
+        assert contrib["auto_dnf"] is False
+
+    def test_off_route_dead_time_does_not_shrink_race_time(self, app):
+        """Dead time left on an off-route checkpoint must not reduce the
+        race elapsed time (the leaderboard column already ignored it)."""
+        comp, group, team, start, mid, finish, off_route = self._race_comp()
+        create_checkin(comp, team, start, timestamp=T0)
+        create_checkin(comp, team, finish, timestamp=T0 + timedelta(minutes=70))
+        db.session.add(
+            ScoreEntry(
+                competition_id=comp.id,
+                team_id=team.id,
+                checkpoint_id=off_route.id,
+                raw_fields={"dead_time": 30},
+                total=None,
+                created_at=T0,
+            )
+        )
+        db.session.commit()
+        contrib = compute_group_contrib(comp.id, team.id, group)
+        # 70 min elapsed, 10 over threshold -> 2 full 5-min blocks -> -20.
+        # With the off-route 30 min wrongly subtracted it would be 100.
+        assert contrib["time_points"] == 80.0
+
+    def test_on_route_dead_time_still_counts(self, app):
+        comp, group, team, start, mid, finish, _off = self._race_comp()
+        create_checkin(comp, team, start, timestamp=T0)
+        create_checkin(comp, team, finish, timestamp=T0 + timedelta(minutes=70))
+        db.session.add(
+            ScoreEntry(
+                competition_id=comp.id,
+                team_id=team.id,
+                checkpoint_id=mid.id,
+                raw_fields={"dead_time": 30},
+                total=None,
+                created_at=T0,
+            )
+        )
+        db.session.commit()
+        contrib = compute_group_contrib(comp.id, team.id, group)
+        # 70 - 30 dead = 40 min, inside the 60 min threshold -> max.
+        assert contrib["time_points"] == 100.0
+
+
+class TestCsvMirrorsPage:
+    """/scores/view/export.csv documents 'same data as /scores/view'."""
+
+    def _seed_two_groups(self, client):
+        user = create_user(username="csv-admin", role="admin")
+        comp = create_competition(name="CSV Cup")
+        add_membership(user, comp, role="admin")
+        cp = create_checkpoint(comp, name="CP-CSV")
+        rows = []
+        for g_idx, gname in enumerate(["Alpha", "Beta"], start=1):
+            group = create_group(comp, name=gname, prefix=f"{g_idx}xx")
+            set_group_route(group, [cp])
+            for t_idx in range(2):
+                team = create_team(
+                    comp, name=f"{gname}-T{t_idx}", number=g_idx * 100 + t_idx + 1
+                )
+                assign_team_group(team, group)
+                db.session.add(
+                    ScoreEntry(
+                        competition_id=comp.id,
+                        team_id=team.id,
+                        checkpoint_id=cp.id,
+                        raw_fields={"points": 10 - t_idx},
+                        total=float(10 - t_idx),
+                        created_at=T0,
+                    )
+                )
+                rows.append(team)
+        rows[0].bonus_dead_time = 7
+        db.session.commit()
+        login_as(client, user, comp)
+        return comp, rows
+
+    def test_rank_resets_per_group_and_dead_time_includes_bonus(self, app, client):
+        comp, teams = self._seed_two_groups(client)
+        resp = client.get("/scores/view/export.csv")
+        assert resp.status_code == 200
+        lines = resp.get_data(as_text=True).strip().splitlines()
+        header = lines[0].split(",")
+        rank_i = header.index("rank")
+        dead_i = header.index("dead_time")
+        data = [ln.split(",") for ln in lines[1:]]
+        # Per-group place exactly as the page shows: resets to 1 for Beta.
+        assert [row[rank_i] for row in data] == ["1", "2", "1", "2"]
+        # bonus_dead_time joins the dead_time column like the page cell.
+        assert data[0][dead_i] == "7"

@@ -166,7 +166,7 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
 
     # Name lookup used for the per-team "missed" badge list. Tracks both
     # the display name AND whether the CP is virtual so we can exclude
-    # virtual ones from the missed list — virtual CPs are scoring slots
+    # virtual ones from the missed list - virtual CPs are scoring slots
     # judges fill in at admin time, not physical points teams visit, so
     # they should never appear in a team's "missed" list.
     checkpoint_meta_lookup: dict[int, tuple[str, bool]] = {
@@ -310,7 +310,7 @@ def build_live_arrivals(comp_id: int, group_id: int | None = None, sort: str = "
         # Skipped-CP detection: expected route (already direction-flipped by
         # _build_group_routes) minus actual arrivals, preserving route order
         # so operators see the visit sequence rather than an id-sorted set.
-        # Virtual CPs are excluded — judges fill them in at admin time, no
+        # Virtual CPs are excluded - judges fill them in at admin time, no
         # team "visits" them.
         missed_checkpoints: list[dict] = []
         if route_group_id:

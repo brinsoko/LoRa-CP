@@ -288,7 +288,12 @@ def scoring_setup_fields():
         try:
             recompute_entry_totals(comp_id, checkpoint_id, group.id)
         except Exception:
-            pass
+            # recompute commits internally; a failure (e.g. SQLite lock
+            # contention with the sheets-worker) leaves the session in
+            # pending-rollback state and would poison every later group's
+            # recompute in this loop. Same fix as the API sibling
+            # (score_field_upsert).
+            db.session.rollback()
     flash(_("Score fields saved."), "success")
     return redirect(url_for("scores.scoring_setup"))
 
@@ -777,11 +782,11 @@ def view_scores_export_csv():
     buf = io.StringIO()
     w = csv.writer(buf)
     header = ["rank", "group", "number", "team", "organization", "finished", "dnf", "time_minutes"]
-    # Per-CP header: "<name> — <description>" if a description exists,
-    # else just the name. Was "cp.<name>" before — operators wanted the
+    # Per-CP header: "<name> - <description>" if a description exists,
+    # else just the name. Was "cp.<name>" before; operators wanted the
     # raw CP name plus context, without a synthetic prefix muddying it.
     header += [
-        f"{cp.name} — {cp.description.strip()}" if (cp.description and cp.description.strip()) else cp.name
+        f"{cp.name} - {cp.description.strip()}" if (cp.description and cp.description.strip()) else cp.name
         for cp in checkpoints
     ]
     # Four values per timed segment (redesign plan 3.3); rows carry as
@@ -799,7 +804,7 @@ def view_scores_export_csv():
     header += ["time_points", "found_points", "dead_time", "total"]
     w.writerow(header)
 
-    for i, r in enumerate(rows, 1):
+    for r in rows:
         team_id = r.get("id")
         team_cp_points = per_team_points.get(team_id, {}) if team_id else {}
         allowed = r.get("allowed_checkpoints") or set()
@@ -826,7 +831,9 @@ def view_scores_export_csv():
         segment_cells += [""] * (5 * max_segments - len(segment_cells))
         w.writerow(
             [
-                i,
+                # Per-group place exactly as shown on the page (resets at
+                # each group boundary), not a running index over the file.
+                r.get("place", ""),
                 r.get("group", ""),
                 r.get("number", "") if r.get("number") is not None else "",
                 r.get("name", ""),
@@ -838,7 +845,10 @@ def view_scores_export_csv():
                 *segment_cells,
                 fmt(r.get("global_time"), ".2f"),
                 fmt(r.get("global_found"), ".2f"),
-                fmt(r.get("dead_time"), ".0f"),
+                # Same sum the on-screen Dead time column shows: per-CP
+                # dead time plus the team-level bonus the race rule
+                # already subtracts from elapsed time.
+                fmt((r.get("dead_time") or 0) + (r.get("bonus_dead_time") or 0), ".0f"),
                 fmt(r.get("total"), ".2f"),
             ]
         )

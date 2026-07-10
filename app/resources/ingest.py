@@ -133,7 +133,7 @@ def _parse_ingest_payload() -> dict:
         "password": payload.get("password"),
         "gps_lat": _optional_float(payload, "gps_lat", minimum=-90.0, maximum=90.0),
         "gps_lon": _optional_float(payload, "gps_lon", minimum=-180.0, maximum=180.0),
-        # Altitude in metres — Mt. Everest is 8848, the deepest mine ~4000 below
+        # Altitude in metres - Mt. Everest is 8848, the deepest mine ~4000 below
         # sea level. ±20000 is generous and rejects garbage like 1e308.
         "gps_alt": _optional_float(payload, "gps_alt", minimum=-20000.0, maximum=20000.0),
         "gps_age_ms": _optional_int(payload, "gps_age_ms"),
@@ -228,7 +228,7 @@ def ingest_post():
 
     # The competition-level ingest password gates non-webhook callers.
     # An authenticated user may skip it only if they are an active
-    # admin/judge of *this* competition — same rule as the webhook secret
+    # admin/judge of *this* competition - same rule as the webhook secret
     # bypass above. Previously any authenticated user (including a viewer
     # from another competition) could bypass.
     if competition.ingest_password_hash and not (

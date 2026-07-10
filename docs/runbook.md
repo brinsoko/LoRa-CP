@@ -12,7 +12,7 @@ race.
 > - Reverse proxy: `caddy` (HTTPS termination)
 > - Database: `instance/app.db` (SQLite)
 > - Logs: `docker logs lora-kt-web` (or whatever you named the
->   container — see compose file)
+>   container - see compose file)
 > - Health: `http://localhost/health` (cheap), `http://localhost/ready`
 >   (touches DB)
 
@@ -56,7 +56,7 @@ docker compose -f docker-compose.prod.yml ps   # all containers should be 'runni
 docker logs -f --tail 200 <web-container-name>
 ```
 
-Production logs at INFO level — every request is in werkzeug's access
+Production logs at INFO level - every request is in werkzeug's access
 log. For DEBUG, set `FLASK_DEBUG=1` in `deploy/.env` and restart;
 remember to switch off afterwards.
 
@@ -108,7 +108,7 @@ the proxy if needed (custom Caddy rule).
 
 ### SECRET_KEY (Flask session)
 
-Rotating this **invalidates every active session** — every user has to
+Rotating this **invalidates every active session** - every user has to
 log in again. Don't do this mid-race.
 
 ```bash
@@ -170,22 +170,22 @@ on a checkpoint that's now closed and audit log won't help):
 
 ### "Database is locked" errors
 
-SQLite's default `journal_mode=DELETE` serializes readers and writers.
-Under race-day load (LoRa ingest + judges + Sheets sync) you may see
-this. Enabling WAL mode is the single biggest improvement; it's a
-one-time DB-level setting.
+The app enables WAL mode, a 15 s `busy_timeout`, and
+`synchronous=NORMAL` on every SQLite connection it opens
+(`app/extensions.py`), so readers proceed during writes and
+writer-writer contention queues instead of failing. Three permanent
+writers share the file in prod (2 gunicorn workers + the
+sheets-worker), which is exactly the load shape these pragmas exist
+for. Nothing to configure manually; `journal_mode=WAL` also persists in
+the DB file header after the first connection.
 
-```bash
-sqlite3 instance/app.db
-sqlite> PRAGMA journal_mode=WAL;
-sqlite> PRAGMA wal_autocheckpoint=1000;
-sqlite> .quit
-```
-
-WAL persists in the DB file header, so you only need to do this once.
-After enabling, you'll see `instance/app.db-wal` and `instance/app.db-shm`
-files alongside the main DB — make sure backups capture all three (the
+You'll see `instance/app.db-wal` and `instance/app.db-shm` files
+alongside the main DB - make sure backups capture all three (the
 backup.sh script already uses `.backup` which handles this correctly).
+
+If "database is locked" still appears in logs, something held a write
+transaction longer than 15 s - check for a wedged sheets-worker cycle
+or a bulk import, rather than raising the timeout further.
 
 ### Sheets API quotas
 
@@ -231,7 +231,7 @@ deferred. Listed here so they don't get lost.
 | Postgres migration | SQLite + WAL handles current scale | Low |
 | Postgres-grade migrations review | Schema changes go through Alembic now (create_all only seeds fresh installs); older revisions never rehearsed on Postgres | Low |
 | Subresource Integrity on dynamic ESM imports (firmware flasher) | Admin-only tool | Low |
-| `google_sa.json` mount in deploy compose | Sheets sync defaults to enabled but file isn't mounted; sync silently no-ops | Medium — flip `SHEETS_SYNC_ENABLED=0` in `.env` if not using Sheets |
+| `google_sa.json` mount in deploy compose | Sheets sync defaults to enabled but file isn't mounted; sync silently no-ops | Medium - flip `SHEETS_SYNC_ENABLED=0` in `.env` if not using Sheets |
 
 See [security.md](security.md) for the threat-model context behind a few
 of these.

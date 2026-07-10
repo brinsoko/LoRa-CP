@@ -1,4 +1,4 @@
-# LoRa KT — Claude Code project notes
+# LoRa KT - Claude Code project notes
 
 Flask + SQLite + Alembic + Babel app for tracking scout-orienteering
 ("Taborniki") competitions over LoRa radio + RFID. Production launch
@@ -17,7 +17,7 @@ planned for late May 2026.
 - **Translations:** `venv/bin/pybabel extract -F babel.cfg -o messages.pot app scripts`,
   then `venv/bin/pybabel update -d app/translations -l sl`, then
   `venv/bin/pybabel compile -d app/translations`. **Always pass
-  `app scripts` explicitly to `extract`** — the bare `babel.cfg` glob
+  `app scripts` explicitly to `extract`** - the bare `babel.cfg` glob
   slurps in venv contents.
 - **Migrations:** Alembic, batch mode for SQLite. Two-step deploy:
   fresh installs use `db.create_all()` + `alembic stamp head`;
@@ -42,7 +42,7 @@ the Edit/Write tools. Use them freely during long-running work.
   for `superadmin` (system bypass) and `public`. Never write per-comp
   roles into `User.role`.
 - **i18n:** wrap user-facing strings with `_()` from `flask_babel`.
-  Use named placeholders (`_("Hi %(name)s", name=x)`) — never f-strings
+  Use named placeholders (`_("Hi %(name)s", name=x)`) - never f-strings
   or `_(variable)`, which Babel can't extract.
 - **Schema changes** go through Alembic. Don't add boot-time
   `ALTER TABLE` blocks to `app/__init__.py`.

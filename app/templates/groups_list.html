@@ -45,7 +45,7 @@
               {% endif %}
               <td class="text-center order-index">{{ loop.index }}</td>
               <td>{{ g.name }}</td>
-              <td class="text-break" style="max-width: 420px;">{{ g.description or '—' }}</td>
+              <td class="text-break" style="max-width: 420px;">{{ g.description or '-' }}</td>
               <td>
                 {% if g.path_name %}
                   {{ g.path_name }}

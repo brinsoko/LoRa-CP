@@ -295,7 +295,7 @@ class TestWebhookSecurity:
             target = create_competition(name="Closed Race")
             other = create_competition(name="Other Race")
             user = create_user(username="non-member-poster")
-            # Member of `other` only — NOT of the competition we're posting into.
+            # Member of `other` only - NOT of the competition we're posting into.
             add_membership(user, other, role="admin")
             target_id = target.id
             user_id = user.id

@@ -92,16 +92,42 @@ def test_publish_local_route_enqueues_job(async_sheets_app):
 
 def test_sync_team_numbers_route_enqueues_jobs(async_sheets_app):
     s = _seed_minimal("Numbers Race")
+    # Summary rebuilds come from the RECORDED summary SheetConfig rows
+    # (created at publish time), carrying the admin's tab name and layout
+    # overrides; the route must not re-derive lang-default names with a
+    # bare payload (that used to reset custom layouts).
+    for tab_type, tab_name, layout in (
+        ("teams", "Moje ekipe", {"headers": ["Skupina", "Ekipa"]}),
+        ("arrivals", "Prihodi", None),
+        ("total", "Rezultati", {"include_dead_time_sum": False}),
+    ):
+        db.session.add(
+            SheetConfig(
+                competition_id=s["comp"].id,
+                spreadsheet_id="REAL-SHEET",
+                spreadsheet_name="Sheet",
+                tab_name=tab_name,
+                tab_type=tab_type,
+                config=layout,
+            )
+        )
+    db.session.commit()
     client = async_sheets_app.test_client()
     login_as(client, s["user"], s["comp"])
     resp = client.post(f"/sheets/sync-team-numbers/{s['cfg'].id}")
     assert resp.status_code == 302
     assert len(_jobs("sync_team_numbers")) == 1
-    # Summary tabs are dirty-flagged for the real spreadsheet too.
-    for kind in ("rebuild_teams", "rebuild_arrivals", "rebuild_score"):
+    for kind, tab_name in (
+        ("rebuild_teams", "Moje ekipe"),
+        ("rebuild_arrivals", "Prihodi"),
+        ("rebuild_score", "Rezultati"),
+    ):
         jobs = _jobs(kind)
         assert len(jobs) == 1, kind
         assert jobs[0].payload["spreadsheet_id"] == "REAL-SHEET"
+        assert jobs[0].payload["tab_name"] == tab_name
+    assert _jobs("rebuild_teams")[0].payload["headers"] == ["Skupina", "Ekipa"]
+    assert _jobs("rebuild_score")[0].payload["include_dead_time_sum"] is False
 
 
 def test_build_arrivals_route_enqueues_job(async_sheets_app):

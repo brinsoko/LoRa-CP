@@ -22,6 +22,7 @@ from app.utils.lang_store import load_lang
 from app.utils.paths import resolve_route_ids
 from app.utils.sheets_client import get_sheets_client
 from app.utils.sheets_settings import sheets_sync_enabled
+from app.utils.time import utcnow_naive
 
 
 def _norm_name(value: str | None) -> str:
@@ -269,6 +270,11 @@ def _persist_row_maps(cfg: SheetConfig, row_maps_by_index: dict[int, dict[str, i
     at the moment the tab's team column physically gets that order."""
     if not row_maps_by_index:
         return
+    # Re-read config from the DB first: the ORM-cached value may predate
+    # long throttled network calls, and writing the whole blob back from
+    # a stale copy would silently drop concurrent admin edits (layout
+    # overrides, points_formula flags) made in the web process meanwhile.
+    db.session.refresh(cfg, ["config"])
     config = dict(cfg.config or {})
     groups_blob = [dict(g) if isinstance(g, dict) else g for g in config.get("groups") or []]
     changed = False
@@ -302,18 +308,36 @@ def upsert_summary_config(
     config, when given, stores the admin's layout overrides (group order,
     checkpoint order, headers, include_dead_time_sum) so the roster-change
     auto-rebuild reproduces the arrangement instead of resetting it to
-    defaults. Only non-None keys are merged, so a publish (which passes no
-    overrides) never wipes a layout the admin set via the build buttons."""
+    defaults. A build route passes the complete layout each time, so the
+    layout keys are REPLACED as a set: a key passed as None means the
+    admin cleared that override and it is removed. config=None (the
+    publish path, which carries no layout form) leaves the stored layout
+    untouched."""
     if (spreadsheet_id or "").startswith("local:"):
         return
-    merged = {k: v for k, v in (config or {}).items() if v is not None}
+    layout_keys = (
+        "headers",
+        "group_order_override",
+        "checkpoint_order_override",
+        "per_group_checkpoint_order",
+        "include_dead_time_sum",
+    )
+
+    def _apply_layout(base: dict) -> dict:
+        for key, value in config.items():
+            if key in layout_keys and value is None:
+                base.pop(key, None)
+            elif value is not None:
+                base[key] = value
+        return base
+
     existing = SheetConfig.query.filter_by(competition_id=competition_id, tab_type=tab_type).first()
     if existing is not None:
         existing.spreadsheet_id = spreadsheet_id
         existing.spreadsheet_name = spreadsheet_name or existing.spreadsheet_name
         existing.tab_name = tab_name
-        if merged:
-            existing.config = {**(existing.config or {}), **merged}
+        if config is not None:
+            existing.config = _apply_layout(dict(existing.config or {})) or None
     else:
         db.session.add(
             SheetConfig(
@@ -322,7 +346,7 @@ def upsert_summary_config(
                 spreadsheet_name=spreadsheet_name or "Google Sheet",
                 tab_name=tab_name,
                 tab_type=tab_type,
-                config=merged or None,
+                config=(_apply_layout({}) or None) if config is not None else None,
             )
         )
     db.session.commit()
@@ -358,15 +382,19 @@ def _team_row_for_group(grp_def: dict, db_group, comp_id: int, team_id: int) -> 
         return None
 
 
-def sync_all_checkpoint_tabs(competition_id: int | None = None):
+def sync_all_checkpoint_tabs(competition_id: int | None = None, raise_errors: bool = False):
     """Refresh team numbers across every checkpoint-type tab.
+
+    raise_errors=True (the outbox worker) still processes every tab (one
+    bad tab must not starve the rest) but raises a combined error at the
+    end so the job retries / dead-letters instead of being marked done.
 
     Batches all column writes per CP into one Sheets API call (one
     ws.batch_update per tab) so a large competition can finish well
     inside the gunicorn worker timeout. The earlier implementation did
     one update_column per (CP × group), which on a 15-CP × 5-group
     competition hit the 40-calls/60s throttle and forced a 60-second
-    sleep mid-request — the worker then timed out at 30 s and returned
+    sleep mid-request - the worker then timed out at 30 s and returned
     500. Batched, the same work is ~15 API calls total and finishes in
     a few seconds.
     """
@@ -382,9 +410,12 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
     try:
         client = get_sheets_client(current_app)
     except Exception as exc:
+        if raise_errors:
+            raise
         current_app.logger.warning("Sheets sync skipped: %s", exc)
         return
 
+    errors: list[str] = []
     group_cache: dict[int, list[CheckpointGroup]] = {}
     for cfg in configs:
         comp_id = cfg.competition_id
@@ -418,7 +449,7 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
             except Exception as exc:
                 if _is_missing_worksheet(exc):
                     # The Sheets tab this SheetConfig binds to doesn't exist
-                    # on the remote spreadsheet anymore — either it was
+                    # on the remote spreadsheet anymore - either it was
                     # never created, the operator deleted it, or a prior
                     # half-finished publish left an orphan binding.
                     # Recreate it inline (the moral equivalent of a
@@ -432,6 +463,7 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
                         )
                         continue
                     except Exception as heal_exc:
+                        errors.append(f"{cfg.tab_name}: auto-heal failed: {heal_exc}")
                         try:
                             current_app.logger.warning(
                                 "sync_all_checkpoint_tabs: auto-heal of %r failed: %s",
@@ -443,10 +475,13 @@ def sync_all_checkpoint_tabs(competition_id: int | None = None):
                         continue
                 # Non-404 failures: log + skip as before. A single bad tab
                 # shouldn't abort the whole sync.
+                errors.append(f"{cfg.tab_name}: {exc}")
                 try:
                     current_app.logger.warning("sync_all_checkpoint_tabs: %s failed: %s", cfg.tab_name, exc)
                 except Exception:
                     pass
+    if errors and raise_errors:
+        raise RuntimeError("; ".join(errors))
 
 
 def _is_missing_worksheet(exc: Exception) -> bool:
@@ -475,7 +510,7 @@ def _is_missing_worksheet(exc: Exception) -> bool:
 class TabAlreadyPresent(Exception):
     """Heal aborted: the tab is reported as missing on read but present
     on write. The operator likely points cfg.spreadsheet_id at the wrong
-    spreadsheet, or the tab has subtly different content from the DB —
+    spreadsheet, or the tab has subtly different content from the DB -
     either way, blindly overwriting the live cells is the wrong action."""
 
 
@@ -485,7 +520,7 @@ def _heal_missing_checkpoint_tab(client, cfg: SheetConfig, competition_id: int) 
     Refuses to overwrite if the tab turns out to exist after all. That
     case shouldn't happen in normal use (the caller only enters here on
     a verified 404), but in the wild we've seen it when the DB's
-    cfg.spreadsheet_id pointed at the wrong spreadsheet — gspread's
+    cfg.spreadsheet_id pointed at the wrong spreadsheet - gspread's
     metadata-lookup 404s for the tab name we asked, but add_tab against
     that same spreadsheet succeeds-or-collides depending on which side
     of the mismatch the operator put their real tabs. Bailing out
@@ -493,7 +528,7 @@ def _heal_missing_checkpoint_tab(client, cfg: SheetConfig, competition_id: int) 
     """
     grid, group_has_formula, row_maps_by_index = _build_local_cp_grid(cfg, competition_id)
     if not grid or not grid[0]:
-        raise RuntimeError(f"empty grid for tab {cfg.tab_name!r} — nothing to write")
+        raise RuntimeError(f"empty grid for tab {cfg.tab_name!r} - nothing to write")
     n_rows = max(len(grid) + 10, 50)
     n_cols = max(len(grid[0]) + 5, 26)
 
@@ -505,12 +540,12 @@ def _heal_missing_checkpoint_tab(client, cfg: SheetConfig, competition_id: int) 
             # The tab IS there. Don't clobber.
             raise TabAlreadyPresent(
                 f"tab {cfg.tab_name!r} already exists on spreadsheet "
-                f"{cfg.spreadsheet_id!r} — refusing to overwrite. "
+                f"{cfg.spreadsheet_id!r} - refusing to overwrite. "
                 "Run scripts/diagnose_sheet_configs.py to inspect the binding."
             ) from add_exc
         raise
 
-    # add_tab created the tab fresh, so we know A1 is empty — safe to
+    # add_tab created the tab fresh, so we know A1 is empty - safe to
     # write the full grid (headers + team rows + existing scores).
     ss = client._call(client.gc.open_by_key, cfg.spreadsheet_id)
     ws = client._call(ss.worksheet, cfg.tab_name)
@@ -573,14 +608,24 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime
     )
 
 
-def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: datetime | None = None):
+def mark_arrival_checkbox_sync(
+    team_id: int,
+    checkpoint_id: int,
+    arrived_at: datetime | None = None,
+    raise_errors: bool = False,
+):
     """Write the arrival timestamp into every linked CP tab in one batch per config.
+
+    raise_errors=True (the outbox worker) re-raises Google API failures so
+    the job retries / dead-letters; the default swallows them with a
+    warning so an inline call from a web request never 500s on a sheets
+    outage.
 
     Batching strategy
     -----------------
     A team can belong to multiple groups, and a single SheetConfig can carry
     several group blocks. Pre-batching we issued one ``client.update_cell``
-    per (cfg, group) — up to N calls per arrival on a multi-group CP tab.
+    per (cfg, group) - up to N calls per arrival on a multi-group CP tab.
 
     We now accumulate every (column, row, timestamp) write per config into a
     list of single-cell column specs and fire ONE ``batch_update_columns``
@@ -610,10 +655,14 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
     try:
         client = get_sheets_client(current_app)
     except Exception as exc:
+        if raise_errors:
+            raise
         current_app.logger.warning("Sheets arrival sync skipped: %s", exc)
         return
 
-    ts = arrived_at or datetime.now()
+    # Checkins store naive UTC; fall back to the same clock (not the
+    # server's local time) so cells stay comparable.
+    ts = arrived_at or utcnow_naive()
     ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
 
     # Team may belong to multiple groups; mark in each matching block.
@@ -623,7 +672,7 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
         group_cols = _group_start_cols_from_config(cfg.config or {})
         time_enabled = bool((cfg.config or {}).get("time_enabled"))
         if not time_enabled:
-            # Nothing to write on this cfg — arrivals are recorded as a
+            # Nothing to write on this cfg - arrivals are recorded as a
             # timestamp in the time column. Skip without queueing a batch.
             continue
         dead_time_enabled = bool((cfg.config or {}).get("dead_time_enabled"))
@@ -647,6 +696,8 @@ def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: dat
         try:
             client.batch_update_columns(cfg.spreadsheet_id, cfg.tab_name, column_writes)
         except Exception as exc:
+            if raise_errors:
+                raise
             current_app.logger.warning("Could not update arrival checkbox: %s", exc)
 
 
@@ -685,14 +736,24 @@ def update_checkpoint_scores(
 
 
 def update_checkpoint_scores_sync(
-    team_id: int, checkpoint_id: int, group_name: str, values: dict, scored_at: datetime | None = None
+    team_id: int,
+    checkpoint_id: int,
+    group_name: str,
+    values: dict,
+    scored_at: datetime | None = None,
+    raise_errors: bool = False,
 ):
     """Update score-related fields for a team in a checkpoint tab based on config layout.
+
+    raise_errors=True (the outbox worker) re-raises Google API failures so
+    the job retries / dead-letters instead of being marked done while the
+    score never reached the spreadsheet; the default swallows them with a
+    warning so an inline call from a web request never 500s.
 
     Batching strategy
     -----------------
     Pre-batching, each (cfg, group) match issued one ``update_cell`` per
-    enabled field — dead_time, time, each per-group ``fields`` entry, and
+    enabled field - dead_time, time, each per-group ``fields`` entry, and
     points. On a 100-team × 15-CP × 2-group race this added up to ~6000
     Sheets API calls and tripped the 40/60s throttle (the worker queue
     grew to ~9 minutes of backlog).
@@ -732,6 +793,8 @@ def update_checkpoint_scores_sync(
     try:
         client = get_sheets_client(current_app)
     except Exception as exc:
+        if raise_errors:
+            raise
         current_app.logger.warning("Sheets score sync skipped: %s", exc)
         return
 
@@ -815,6 +878,8 @@ def update_checkpoint_scores_sync(
         try:
             client.batch_update_columns(cfg.spreadsheet_id, cfg.tab_name, column_writes)
         except Exception as exc:
+            if raise_errors:
+                raise
             current_app.logger.warning("Could not update checkpoint scores: %s", exc)
 
 
@@ -840,7 +905,7 @@ def build_arrivals_tab(
         .order_by(SheetConfig.tab_name.asc())
         .all()
     )
-    # Exclude virtual checkpoints from arrivals — they have no check-in concept.
+    # Exclude virtual checkpoints from arrivals - they have no check-in concept.
     from app.models import Checkpoint as _CP
 
     virtual_cp_ids = {row[0] for row in db.session.query(_CP.id).filter(_CP.is_virtual.is_(True)).all()}
@@ -1373,8 +1438,13 @@ def build_score_tab(
                 minp = _fmt_num(spec["segment"]["min_points"])
                 row.append(a_lookup)
                 row.append(b_lookup)
+                # B<A guards a hand-patched or stray early end time: the
+                # engine (compute_segment_results) excludes such pairs,
+                # and a negative diff entering the MIN() below would make
+                # the invalid team the "fastest" and shrink everyone
+                # else's spread-based points.
                 row.append(
-                    f'=IF(OR({a_cell}=""; {b_cell}=""); ""; ({b_cell}-{a_cell})*1440)'
+                    f'=IF(OR({a_cell}=""; {b_cell}=""; {b_cell}<{a_cell}); ""; ({b_cell}-{a_cell})*1440)'
                 )
                 row.append(
                     f'=IF({diff_cell}=""; 0; IF(MAX({rng})=MIN({rng}); {maxp}; '
@@ -1534,7 +1604,7 @@ def build_public_summary_tab(
     ``_build_scores_context(competition_id, None)`` so the rows include
     the live time_race recomputations + global rule contributions, then
     sort by group order (already established in the context) and then
-    by total points descending. Final values only — no formulas — so
+    by total points descending. Final values only - no formulas - so
     spectators see exactly what we see and we don't leak intermediate
     columns by accident.
 
@@ -1910,7 +1980,7 @@ def _field_rule_to_formula(rule, cell_ref: str) -> str | None:
     point contribution.
 
     Returns None when the rule cannot be expressed as a static formula
-    (time_race, found across other tabs, interpolate — handled
+    (time_race, found across other tabs, interpolate - handled
     elsewhere or system-dependent). Callers fall back to a system-
     written raw value for those.
     """
@@ -1975,7 +2045,7 @@ def _field_rule_to_formula(rule, cell_ref: str) -> str | None:
         return f'IF({cell_ref}=""; 0; {deviation_expr})'
 
     # Unknown / unsupported rule type (interpolate, found, time_race
-    # when nested inside field_rules) — bail out so the caller falls
+    # when nested inside field_rules) - bail out so the caller falls
     # back to system-written raw values.
     return None
 
@@ -2004,7 +2074,7 @@ def _points_formula_from_rule(
 
     field_rules = rule_blob.get("field_rules") or {}
     total_fields = rule_blob.get("total_fields") or list(field_rules.keys())
-    # Skip dead_time from the total — matches _compute_total's behavior
+    # Skip dead_time from the total - matches _compute_total's behavior
     # which excludes "dead_time" from total_fields.
     total_fields = [f for f in total_fields if f != "dead_time"]
     if not total_fields:
@@ -2024,7 +2094,7 @@ def _points_formula_from_rule(
         rule = field_rules.get(f)
         piece = _field_rule_to_formula(rule, cell_ref)
         if piece is None:
-            # One unsupported rule type drops the whole formula — falls
+            # One unsupported rule type drops the whole formula - falls
             # back to system-written value at this Points cell.
             return None
         pieces.append(piece)
@@ -2296,8 +2366,12 @@ def publish_local_configs_to_spreadsheet(
         .all()
     )
     if not configs:
-        result["errors"].append("No SheetConfigs need publishing (all already point at the target).")
-        return result
+        # Not an error: a retry after a partial failure (or a repeat
+        # click) lands here once every CP tab already points at the
+        # target. Fall through so the summary tabs still get rebuilt,
+        # which is exactly what such a retry needs to finish the job;
+        # treating this as an error made publish retries dead-letter.
+        result["note"] = "All checkpoint tabs already point at the target."
 
     try:
         client = get_sheets_client(current_app)
@@ -2406,7 +2480,7 @@ def publish_local_configs_to_spreadsheet(
             except Exception:
                 pass
 
-    if build_summary_tabs and result["published"] > 0:
+    if build_summary_tabs and (result["published"] > 0 or not configs):
         lang = load_lang()
         # "Javno" (public) is the spectator-facing tab: group, number,
         # team, organization, total. Same try/except shape as the other

@@ -146,7 +146,11 @@ def compute_entry_total(values: dict, fields: list[dict], context: dict) -> floa
             used = True
         base_total = total if used else None
 
-    if "points" in values:
+    # The synthetic points-only flow (a judge typing a total directly)
+    # only applies when 'points' is NOT a configured field: a configured
+    # 'points' field already went through the loop above with its rule
+    # and counts_in_total flag, and this override would bypass both.
+    if "points" in values and all(f["key"] != "points" for f in scored):
         base_total = _to_number(values.get("points"))
     # Raw-sum fallback is only for legacy entries with NO configured
     # fields. When fields are configured, a counts_in_total=False field
@@ -279,8 +283,15 @@ def compute_segment_results(comp_id: int, team_ids: list[int], segment: dict) ->
 # ---------------------------------------------------------------------------
 
 
-def get_team_dead_time_total(comp_id: int, team_id: int) -> float:
-    """Latest per-CP dead_time entries plus Team.bonus_dead_time, minutes."""
+def get_team_dead_time_total(
+    comp_id: int, team_id: int, allowed_checkpoint_ids: set[int] | None = None
+) -> float:
+    """Latest per-CP dead_time entries plus Team.bonus_dead_time, minutes.
+
+    allowed_checkpoint_ids restricts the sum to on-route checkpoints
+    (compute_group_contrib passes the group's route), matching the
+    leaderboard's Dead time column: an entry left on an off-route
+    checkpoint must not shrink the team's race elapsed time."""
     entries = (
         ScoreEntry.query.filter(
             ScoreEntry.competition_id == comp_id,
@@ -291,6 +302,8 @@ def get_team_dead_time_total(comp_id: int, team_id: int) -> float:
     )
     latest_by_cp: dict[int, ScoreEntry] = {}
     for entry in entries:
+        if allowed_checkpoint_ids is not None and entry.checkpoint_id not in allowed_checkpoint_ids:
+            continue
         if entry.checkpoint_id not in latest_by_cp:
             latest_by_cp[entry.checkpoint_id] = entry
     total_dead = 0.0
@@ -371,9 +384,16 @@ def compute_group_contrib(comp_id: int, team_id: int, group: CheckpointGroup | N
         end_map = _first_checkin_times(comp_id, [team_id], route[-1])
         start_ts = start_map.get(team_id)
         end_ts = end_map.get(team_id)
-        if start_ts and end_ts:
+        # end >= start mirrors compute_segment_results: a finish check-in
+        # BEFORE the start (a stray early scan at the finish station) is
+        # an invalid pair, not a 0-minute run - clamping it to 0 would
+        # award full max points for walking past the finish at the start.
+        if start_ts and end_ts and end_ts >= start_ts:
             raw_duration = (end_ts - start_ts).total_seconds() / 60.0
-            duration = max(0.0, raw_duration - get_team_dead_time_total(comp_id, team_id))
+            dead_total = get_team_dead_time_total(
+                comp_id, team_id, allowed_checkpoint_ids=set(route)
+            )
+            duration = max(0.0, raw_duration - dead_total)
             if dq_multiplier is not None and dq_multiplier > 0 and duration > threshold * dq_multiplier:
                 auto_dnf = True
             if duration <= threshold:

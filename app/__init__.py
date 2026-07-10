@@ -67,7 +67,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     # Trust X-Forwarded-* headers from a single reverse proxy hop (Caddy in
     # prod). Without this, OAuth redirect_uri uses the internal scheme/host
     # (`http://web:5000/...`) which Google rejects as a redirect mismatch.
-    # Gated behind TRUST_PROXY_HEADERS — defaults to on in production, off
+    # Gated behind TRUST_PROXY_HEADERS - defaults to on in production, off
     # otherwise. ProxyFix without an actual proxy in front lets clients
     # spoof X-Forwarded-Host / X-Forwarded-Proto, so it must NOT be enabled
     # when the Flask container is reachable directly.
@@ -101,7 +101,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.register_blueprint(scores_api_bp)
     app.register_blueprint(transfer_api_bp)
 
-    # logging — DEBUG only when the app is in debug/testing mode, INFO otherwise.
+    # logging - DEBUG only when the app is in debug/testing mode, INFO otherwise.
     # Production logs every request at INFO via werkzeug; the per-request DEBUG
     # line below would otherwise log header/role info on every hit.
     log_level = logging.DEBUG if (app.debug or app.config.get("TESTING")) else logging.INFO
@@ -277,12 +277,12 @@ def create_app(config_overrides: dict | None = None) -> Flask:
 
     @app.get("/health")
     def health():
-        # Cheap liveness probe — if the process responds, it's up.
+        # Cheap liveness probe - if the process responds, it's up.
         return {"ok": True}, 200
 
     @app.get("/ready")
     def ready():
-        # Readiness probe — also exercises the DB so a locked or missing
+        # Readiness probe - also exercises the DB so a locked or missing
         # SQLite file shows up as 503 instead of pretending to be healthy.
         try:
             db.session.execute(text("SELECT 1"))

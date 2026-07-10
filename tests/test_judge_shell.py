@@ -233,3 +233,76 @@ class TestBulkEntry:
         db.session.commit()
         client.post("/judge/table", data={f"team_{teams[0].id}_pts": "-3"}, follow_redirects=True)
         assert ScoreEntry.query.filter_by(team_id=teams[0].id, checkpoint_id=cps[1].id).count() == 0
+
+    def test_clearing_a_prefilled_value_removes_it(self, client, app):
+        """The grid pre-fills stored values, so an emptied cell is an
+        explicit clear: a new latest entry without the field must land
+        (it used to be silently ignored, keeping mistyped points)."""
+        _user, comp, _group, _path, cps, teams = _seed(client)
+        cps[1].bulk_entry_enabled = True
+        create_score_field(cps[1], "pts")
+        db.session.commit()
+        client.post("/judge/table", data={f"team_{teams[0].id}_pts": "8"}, follow_redirects=True)
+        client.post("/judge/table", data={f"team_{teams[0].id}_pts": ""}, follow_redirects=True)
+        entries = (
+            ScoreEntry.query.filter_by(team_id=teams[0].id, checkpoint_id=cps[1].id)
+            .order_by(ScoreEntry.created_at.desc(), ScoreEntry.id.desc())
+            .all()
+        )
+        assert len(entries) == 2
+        assert "pts" not in (entries[0].raw_fields or {})
+
+
+class TestButterflyRoutes:
+    """Routes that visit the same checkpoint twice (A-B-C-B-D). Check-ins
+    record only the FIRST visit per checkpoint, so classification must not
+    treat an id-level 'seen' as proof of having passed a later position."""
+
+    def _seed_butterfly(self):
+        user = create_user(username="butterfly-judge", role="public")
+        comp = create_competition(name="Butterfly Cup")
+        add_membership(user, comp, role="judge")
+        group = create_group(comp, name="Alpha")
+        a, b, c, d = [create_checkpoint(comp, name=f"B-CP{i}") for i in range(4)]
+        set_group_route(group, [a, b, c, b, d])
+        teams = [create_team(comp, name=f"BT{i}", number=200 + i) for i in range(1, 4)]
+        for team in teams:
+            assign_team_group(team, group)
+        db.session.commit()
+        return comp, group, (a, b, c, d), teams
+
+    def test_loop_team_is_waiting_not_missed_at_interior_cp(self, app):
+        """A team between B (first visit) and C satisfies 'B in times',
+        and B also appears AFTER C on the route; that must not count as
+        evidence the team passed C."""
+        comp, _group, (a, b, c, _d), teams = self._seed_butterfly()
+        _checkin(comp, teams[0], a, 30)
+        _checkin(comp, teams[0], b, 15)
+
+        view = build_judge_checkpoint_view(comp.id, c.id)
+        waiting_names = {row["team"].name for row in view["waiting"]}
+        missed_names = {row["team"].name for row in view["missed"]}
+        assert teams[0].name in waiting_names
+        assert teams[0].name not in missed_names
+
+    def test_team_that_skipped_to_finish_is_missed(self, app):
+        """D occurs only after C, so a D check-in still proves the pass."""
+        comp, _group, (a, b, c, d), teams = self._seed_butterfly()
+        _checkin(comp, teams[1], a, 40)
+        _checkin(comp, teams[1], b, 30)
+        _checkin(comp, teams[1], d, 5)
+
+        view = build_judge_checkpoint_view(comp.id, c.id)
+        missed_names = {row["team"].name for row in view["missed"]}
+        assert teams[1].name in missed_names
+
+    def test_finished_count_includes_teams_that_visited_here(self, app):
+        """The label reads 'already finished': a team that passed this
+        checkpoint AND finished must be counted, not only teams that
+        skipped it (the old count lived inside the missed branch)."""
+        comp, _group, (a, b, c, d), teams = self._seed_butterfly()
+        for cp, minutes in ((a, 60), (b, 50), (c, 40), (d, 10)):
+            _checkin(comp, teams[2], cp, minutes)
+
+        view = build_judge_checkpoint_view(comp.id, c.id)
+        assert view["finished_count"] == 1

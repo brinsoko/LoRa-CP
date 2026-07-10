@@ -28,7 +28,7 @@ def _parse_date_range(date_from_str: str | None, date_to_str: str | None) -> tup
     """Build an inclusive range for YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS inputs.
 
     Raises ValueError for malformed inputs. Callers must catch this and
-    return a 400 — silently ignoring a typo would expand the result set
+    return a 400 - silently ignoring a typo would expand the result set
     (e.g. exporting *all* check-ins instead of one day's)."""
     start = end = None
     if date_from_str:

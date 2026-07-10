@@ -27,7 +27,9 @@ def _checkpoint_error_message(payload: dict, default_msg: str) -> str:
         return _("Checkpoint name already exists.")
     if payload.get("detail"):
         return payload.get("detail")
-    return _(default_msg)
+    # default_msg arrives already translated: callers wrap their literal
+    # in _() so Babel can extract it (_(variable) is invisible to it).
+    return default_msg
 
 
 def _fetch_paths():
@@ -263,7 +265,7 @@ def add_checkpoint():
             flash(_("Checkpoint added."), "success")
             return redirect(url_for("checkpoints.list_checkpoints"))
 
-        flash(_checkpoint_error_message(payload, "Could not add checkpoint."), "warning")
+        flash(_checkpoint_error_message(payload, _("Could not add checkpoint.")), "warning")
 
     return render_template(
         "add_checkpoint.html",
@@ -330,7 +332,7 @@ def edit_checkpoint(cp_id: int):
             flash(_("Checkpoint updated."), "success")
             return redirect(url_for("checkpoints.list_checkpoints"))
 
-        flash(_checkpoint_error_message(payload, "Could not update checkpoint."), "warning")
+        flash(_checkpoint_error_message(payload, _("Could not update checkpoint.")), "warning")
         checkpoint.update({k: v for k, v in form_data.items() if k != "path_ids"})
         checkpoint["paths"] = [
             next((p for p in paths if p.get("id") == gid), {"id": gid, "name": "Unknown"})

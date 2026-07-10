@@ -268,6 +268,12 @@ def table_submit():
                     continue
                 raw = (request.form.get(form_key) or "").strip()
                 if raw == "":
+                    # The grid pre-fills stored values, so an emptied cell
+                    # is an explicit clear: mark the row changed and leave
+                    # the key out of the new latest entry. Ignoring it
+                    # silently kept e.g. points entered for the wrong team.
+                    if str(row["raw_values"].get(field["key"], "")).strip() != "":
+                        changed = True
                     continue
                 try:
                     number = float(raw)
@@ -287,7 +293,10 @@ def table_submit():
                 values[field["key"]] = raw
                 if str(row["raw_values"].get(field["key"], "")) != raw:
                     changed = True
-            if not values or not changed:
+            # changed alone gates the save: values may be empty when the
+            # judge cleared a row's only value, which still needs a new
+            # (empty) latest entry to supersede the old one.
+            if not changed:
                 continue
 
             # Paper stations may have no scanned arrival; record one so the

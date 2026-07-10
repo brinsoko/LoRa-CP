@@ -318,7 +318,7 @@ def test_publish_emits_formula_in_points_cell_for_simple_rule(sheets_app, monkey
         assert result["published"] == 1, result
 
         ws = fake.spreadsheet.worksheet("CP-One")
-        # Pick the A1 write (the grid one — there's also a separate
+        # Pick the A1 write (the grid one - there's also a separate
         # set_header_row write but the A1 one carries the full grid).
         full_writes = [u for u in ws.updates if u["range_name"] == "A1"]
         grid = full_writes[-1]["values"]
@@ -388,7 +388,7 @@ def test_publish_formula_honors_group_rule_override(sheets_app, monkeypatch):
 
 
 def test_publish_leaves_points_raw_when_rule_not_expressible(sheets_app, monkeypatch):
-    """Behavior change note: time_race ScoreRules are gone — timed
+    """Behavior change note: time_race ScoreRules are gone - timed
     segments now live on the Score tab as formula columns. The CP-tab
     equivalent of "system-dependent Points" is a ScoreField whose
     rule_type has no formula translation (interpolate): the Points cell
@@ -472,7 +472,7 @@ def test_update_checkpoint_scores_sync_skips_points_when_flag_set(sheets_app, mo
         # Points column. update_checkpoint_scores_sync now batches per
         # cfg via batch_update_columns, so the mock unpacks the column
         # spec list into the same (row, col, value) tuples the original
-        # update_cell path emitted — keeps the assertions API-shape
+        # update_cell path emitted - keeps the assertions API-shape
         # agnostic.
         written_cells: list[tuple[int, int, object]] = []
 
@@ -633,7 +633,7 @@ def test_score_tab_found_formula_excludes_non_counting_checkpoints(sheets_app, m
         start = create_checkpoint(comp, name="Start")
         cilj = create_checkpoint(comp, name="Cilj")
         mid = create_checkpoint(comp, name="CP-Mid")
-        # Virtual CPs — same shape as the real race's Topo&Vrisovanje
+        # Virtual CPs - same shape as the real race's Topo&Vrisovanje
         # and Lokostrelstvo.
         topo = create_checkpoint(comp, name="Topo&Vrisovanje")
         topo.is_virtual = True
@@ -691,7 +691,7 @@ def test_score_tab_has_casovnica_and_found_columns(sheets_app, monkeypatch):
     """build_score_tab emits Časovnica + Found-points columns whose
     formulas reach into the per-CP tabs' Time columns. Časovnica comes
     from GroupScoring race_* columns: endpoints are the group's directed
-    route start/finish and the deduction is STEPPED — FLOOR(minutes over
+    route start/finish and the deduction is STEPPED - FLOOR(minutes over
     threshold / penalty_minutes) * penalty_points (behavior change from
     the old proportional GlobalScoreRule formula)."""
     with sheets_app.app_context():
@@ -810,7 +810,7 @@ def test_score_tab_casovnica_uses_directed_route_endpoints(sheets_app, monkeypat
 
 
 def test_score_tab_emits_segment_formula_columns(sheets_app, monkeypatch):
-    """New in phase 2: each TimedSegment adds four Score-tab columns —
+    """New in phase 2: each TimedSegment adds four Score-tab columns -
     A/B arrival lookups, diff = (B-A)*1440 minutes over the A/B cells,
     and rank-spread points via MIN/MAX over the group's diff range. The
     segment points cell joins the Total SUM (segments are no longer part
@@ -850,16 +850,18 @@ def test_score_tab_emits_segment_formula_columns(sheets_app, monkeypatch):
         assert row2[7] == f'=IFERROR({_lookup("Start", "B", 2)}; "")'
         assert row2[8] == f'=IFERROR({_lookup("CP-Mid", "B", 2)}; "")'
         # diff recomputes from the A/B cells so a hand-patched arrival
-        # flows through; blank endpoints yield a blank diff.
-        assert row2[9] == '=IF(OR(H2=""; I2=""); ""; (I2-H2)*1440)'
-        # points: rank spread over the group's diff range J2:J3 — fastest
+        # flows through; blank endpoints or end-before-start (a stray
+        # early check-in would otherwise win the MIN rank spread) yield
+        # a blank diff, matching compute_segment_results.
+        assert row2[9] == '=IF(OR(H2=""; I2=""; I2<H2); ""; (I2-H2)*1440)'
+        # points: rank spread over the group's diff range J2:J3 - fastest
         # gets max (100), slowest min (10), all-equal gets max.
         assert row2[10] == (
             "=IF(J2=\"\"; 0; IF(MAX(J2:J3)=MIN(J2:J3); 100; "
             "MAX(100-(J2-MIN(J2:J3))/(MAX(J2:J3)-MIN(J2:J3))*(100-(10)); 10)))"
         ), row2[10]
         # Second team: same shared range, own cells.
-        assert row3[9] == '=IF(OR(H3=""; I3=""); ""; (I3-H3)*1440)'
+        assert row3[9] == '=IF(OR(H3=""; I3=""; I3<H3); ""; (I3-H3)*1440)'
         assert "J2:J3" in row3[10] and "J3" in row3[10]
 
         # The segment points cell (K2) joins the Total SUM; no GroupScoring

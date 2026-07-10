@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Convert a competition export JSON (from /api/transfer/export) into one CSV
-per logical table — drop the folder into Google Drive, open each CSV as a
+per logical table - drop the folder into Google Drive, open each CSV as a
 sheet/tab, and you have a working manual replacement for sheets sync.
 
 Usage:
@@ -132,7 +132,7 @@ def main() -> None:
         rows,
     )
 
-    # 9. scores — raw_fields varies per CP, so expand all unique keys as columns
+    # 9. scores - raw_fields varies per CP, so expand all unique keys as columns
     scores = data.get("scores", []) or []
     field_keys: list[str] = []
     seen: set[str] = set()
@@ -158,7 +158,7 @@ def main() -> None:
     )
     _w(os.path.join(args.out_dir, "09_scores.csv"), header, rows)
 
-    # 10. score rules — JSON blob per (checkpoint, group), one row each
+    # 10. score rules - JSON blob per (checkpoint, group), one row each
     rows = [
         [sr.get("checkpoint_name", ""), sr.get("group_name", ""), json.dumps(sr.get("rules") or {}, ensure_ascii=False)]
         for sr in data.get("score_rules", []) or []
@@ -191,7 +191,7 @@ def main() -> None:
     ]
     _w(os.path.join(args.out_dir, "13_devices.csv"), ["dev_num", "name", "active", "note"], rows)
 
-    # 14. paths (schema >= 1.1.0) — the authoritative course definition;
+    # 14. paths (schema >= 1.1.0) - the authoritative course definition;
     # one row per stop in traversal order, with the leg-minutes estimate.
     rows = []
     for p in data.get("paths", []) or []:
@@ -236,7 +236,7 @@ def main() -> None:
         "race_penalty_minutes", "race_penalty_points", "race_min_points", "race_dq_multiplier"], rows)
 
     print()
-    print(f"done — {len(os.listdir(args.out_dir))} files in {args.out_dir}/")
+    print(f"done - {len(os.listdir(args.out_dir))} files in {args.out_dir}/")
     print("Next: upload the whole folder to Google Drive, then in Sheets:")
     print("  - either open each CSV individually (one Sheet per file), or")
     print("  - create one Sheet and use File > Import > Upload (one tab at a time)")

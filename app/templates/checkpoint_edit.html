@@ -64,11 +64,11 @@
       <div class="mb-3 mt-3">
         <label class="form-label">{{ _('Device (optional)') }}</label>
         <select name="lora_device_id" class="form-select">
-          <option value="">— {{ _('none') }} —</option>
+          <option value="">- {{ _('none') }} -</option>
           {% for d in devices %}
             <option value="{{ d.id }}"
               {% if selected_device_id == d.id %}selected{% endif %}>
-              {{ d.name or _('Device') }} — #{{ d.dev_num }}
+              {{ d.name or _('Device') }} - #{{ d.dev_num }}
             </option>
           {% endfor %}
         </select>

@@ -343,7 +343,7 @@ class RFIDCard(db.Model):
         nullable=False,
         index=True,
     )
-    # UID is unique only within a competition — the same physical card
+    # UID is unique only within a competition - the same physical card
     # can be reused across years/events. Globally-unique UID would have
     # blocked re-issuance of the same scout card to a new team.
     uid = db.Column(db.String(100), nullable=False)
@@ -503,7 +503,7 @@ class Checkpoint(db.Model):
     position = db.Column(db.Integer, nullable=True)
     # When True, this CP is excluded from per-CP scoreboard columns and
     # from per-CP Google Sheet output. Check-ins are still recorded so
-    # arrival tracking + time-trial leg end detection still work — the
+    # arrival tracking + time-trial leg end detection still work - the
     # CP just doesn't get its own column on every team row. Typical use:
     # a finish line that's also a time-trial leg's end_cp; we don't want
     # it cluttering the leaderboard as "Cilj: 0" since the leg cell
@@ -823,7 +823,7 @@ class ScoreField(db.Model):
     key = db.Column(db.String(80), nullable=False)
     label = db.Column(db.String(160), nullable=True)
     hint = db.Column(db.String(255), nullable=True)
-    position = db.Column(db.Integer, nullable=False, default=0)
+    position = db.Column(db.Integer, nullable=False, default=0, server_default="0")
     # 'none' means the raw numeric input is the score. rule_params holds
     # the per-type parameters (map / points / factor / deviation params);
     # this is the one deliberately-polymorphic JSON left in scoring.
@@ -867,7 +867,7 @@ class ScoreFieldGroup(db.Model):
     group_id = db.Column(
         db.Integer, db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    enabled = db.Column(db.Boolean, nullable=False, default=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=True, server_default="1")
     rule_override = db.Column(db.JSON, nullable=True)
 
     field = db.relationship("ScoreField", back_populates="group_overrides")
@@ -904,8 +904,8 @@ class TimedSegment(db.Model):
         db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False
     )
     name = db.Column(db.String(120), nullable=True)
-    max_points = db.Column(db.Float, nullable=False, default=100.0)
-    min_points = db.Column(db.Float, nullable=False, default=0.0)
+    max_points = db.Column(db.Float, nullable=False, default=100.0, server_default="100")
+    min_points = db.Column(db.Float, nullable=False, default=0.0, server_default="0")
 
     path = db.relationship("Path", backref=db.backref("segments", cascade="all, delete-orphan"))
     start_checkpoint = db.relationship("Checkpoint", foreign_keys=[start_checkpoint_id])

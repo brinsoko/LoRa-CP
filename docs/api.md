@@ -31,7 +31,7 @@ Roles are scoped per competition (stored in `competition_members`):
 
 The global `User.role` field is reserved for `superadmin` (system-wide
 bypass) and `public` (no special privileges; per-competition role
-applies). It does **not** grant per-competition rights — promoting a
+applies). It does **not** grant per-competition rights - promoting a
 user to `admin` in one competition does not affect their role in
 another.
 

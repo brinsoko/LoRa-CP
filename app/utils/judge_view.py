@@ -26,19 +26,26 @@ from app.utils.time import format_datetime_display, format_time_display, utcnow_
 MIN_ETA_SAMPLES = 3
 
 
-def _expected_leg_minutes(group: CheckpointGroup, prev_cp_id: int, cp_id: int) -> float | None:
-    """Manual expected duration for the leg between two adjacent stops.
+def _route_leg_minutes(group: CheckpointGroup) -> list[float | None]:
+    """Manual expected minutes per ROUTE POSITION: index i is the leg
+    into route[i]; index 0 is None (no leg into the start).
 
-    Stored undirected on the later (higher forward position) stop of the
-    pair, so both traversal directions read the same value.
+    Stored undirected on the later (higher forward position) stop of each
+    adjacent pair, so both traversal directions read the same value. The
+    position-aware lookup matters on butterfly routes, where matching an
+    undirected checkpoint pair would return the wrong visit's leg.
     """
     if not group.path:
-        return None
+        return []
     stops = list(group.path.stops)
-    for earlier, later in zip(stops, stops[1:], strict=False):
-        if {earlier.checkpoint_id, later.checkpoint_id} == {prev_cp_id, cp_id}:
-            return later.expected_leg_minutes
-    return None
+    n = len(stops)
+    if n == 0:
+        return []
+    if group.direction == "reverse":
+        # route[i] = stops[n-1-i]; the leg into it pairs forward
+        # positions (n-1-i, n-i), stored on the later one: stops[n-i].
+        return [None] + [stops[n - i].expected_leg_minutes for i in range(1, n)]
+    return [None] + [stops[i].expected_leg_minutes for i in range(1, n)]
 
 
 def build_judge_checkpoint_view(comp_id: int, checkpoint_id: int) -> dict:
@@ -53,12 +60,14 @@ def build_judge_checkpoint_view(comp_id: int, checkpoint_id: int) -> dict:
     # twice (butterfly loop), and route.index() alone would always resolve
     # to the first visit, misclassifying a team heading to a later visit.
     cp_occurrences_by_group: dict[int, list[int]] = {}
+    leg_minutes_by_group: dict[int, list[float | None]] = {}
     for group in groups:
         route = resolve_route_ids(group)
         if checkpoint_id in route:
             group_routes[group.id] = route
             cp_index_by_group[group.id] = route.index(checkpoint_id)
             cp_occurrences_by_group[group.id] = [i for i, cid in enumerate(route) if cid == checkpoint_id]
+            leg_minutes_by_group[group.id] = _route_leg_minutes(group)
     group_by_id = {g.id: g for g in groups}
 
     assignments = (
@@ -155,6 +164,15 @@ def build_judge_checkpoint_view(comp_id: int, checkpoint_id: int) -> dict:
         )
     arrived.sort(key=lambda row: row["arrived_at"], reverse=True)
 
+    # "Already finished" counts every expected team seen at its route's
+    # finish, whether or not it passed this checkpoint (the template
+    # label reads as the total, and a judge deciding whether to pack up
+    # cares about exactly that number).
+    for tid in expected_team_ids:
+        route = group_routes[team_group[tid]]
+        if route and route[-1] in team_cp_times.get(tid, {}):
+            finished_count += 1
+
     for tid in expected_team_ids:
         if tid in arrived_ids:
             continue
@@ -183,11 +201,17 @@ def build_judge_checkpoint_view(comp_id: int, checkpoint_id: int) -> dict:
         # ever visiting (includes the finish, the strongest stop-waiting
         # signal). Using the last occurrence, not idx, so a team between
         # the first and second visit is still "waiting", not "missed".
+        # Only checkpoints whose EVERY occurrence lies past last_idx are
+        # evidence: times records first visits only, so a checkpoint that
+        # also appears earlier on the route (butterfly loop) may have
+        # been recorded on that earlier pass and proves nothing.
         last_idx = occurrences[-1]
-        later_hit = next((cid for cid in route[last_idx + 1 :] if cid in times), None)
+        earlier_ids = set(route[: last_idx + 1])
+        later_hit = next(
+            (cid for cid in route[last_idx + 1 :] if cid in times and cid not in earlier_ids),
+            None,
+        )
         if later_hit is not None:
-            if route and route[-1] in times:
-                finished_count += 1
             missed.append({"team": team, "group_name": group.name})
             continue
 
@@ -200,10 +224,20 @@ def build_judge_checkpoint_view(comp_id: int, checkpoint_id: int) -> dict:
         eta_state = "not_started"
         eta_minutes = None
         if prev_ts is not None:
+            # Observed means are built from first check-ins, i.e. the leg
+            # into the FIRST occurrence; when the team is heading to a
+            # later visit of a butterfly checkpoint, that mean describes
+            # the wrong leg, so fall back to the manual estimate for the
+            # resolved position instead.
             samples, mean = leg_stats.get(gid, (0, None))
-            estimate = mean if samples >= MIN_ETA_SAMPLES else None
+            estimate = (
+                mean
+                if samples >= MIN_ETA_SAMPLES and idx == cp_index_by_group[gid]
+                else None
+            )
             if estimate is None:
-                estimate = _expected_leg_minutes(group, prev_id, checkpoint_id)
+                leg_minutes = leg_minutes_by_group.get(gid) or []
+                estimate = leg_minutes[idx] if idx < len(leg_minutes) else None
             elapsed = (now - prev_ts).total_seconds() / 60.0
             if estimate is not None:
                 eta_minutes = estimate - elapsed

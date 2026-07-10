@@ -23,9 +23,15 @@ from app.utils.validators import validate_finite_float, validate_text
 
 def _dispatch_sync_all(comp_id: int) -> None:
     """Hand off the roster-change refresh. Inline in tests so existing
-    assertions hold; otherwise a durable outbox row marks the team-number
+    assertions hold; otherwise durable outbox rows mark the team-number
     columns AND the summary tabs dirty, so a roster change reaches the
-    spreadsheet within one worker cycle (redesign plan 3.4)."""
+    spreadsheet within one worker cycle (redesign plan 3.4).
+
+    Call BEFORE the caller's commit: the outbox rows must ride the same
+    transaction as the roster change (the pattern every other enqueue
+    site uses). A post-commit enqueue in its own transaction could be
+    lost while the roster change persisted, or 500 a request whose
+    domain work already committed."""
     if current_app.config.get("SHEETS_SYNC_INLINE"):
         try:
             sync_all_checkpoint_tabs(competition_id=comp_id)
@@ -35,7 +41,6 @@ def _dispatch_sync_all(comp_id: int) -> None:
     from app.utils.sheets_outbox import enqueue_summary_rebuilds
 
     enqueue_summary_rebuilds(comp_id)
-    db.session.commit()
 
 
 teams_api_bp = Blueprint("api_teams", __name__)
@@ -304,11 +309,11 @@ def team_create():
             summary=f"Team {team.name} created.",
             details=_team_snapshot(team),
         )
+        _dispatch_sync_all(comp_id)
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
-    _dispatch_sync_all(comp_id)
     return json_ok({"ok": True, "team": _serialize_team(team)}, status=201)
 
 
@@ -452,11 +457,11 @@ def _update_team(team_id: int, partial: bool):
             summary=f"Team {team.name} updated.",
             details={"before": before, "after": _team_snapshot(team)},
         )
+        _dispatch_sync_all(comp_id)
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
         return jsonify({"error": "validation_error", "detail": _("Team number must be a positive integer.")}), 400
-    _dispatch_sync_all(comp_id)
     return json_ok({"ok": True, "team": _serialize_team(team)})
 
 
@@ -501,6 +506,10 @@ def team_delete(team_id: int):
         details=snapshot,
     )
     db.session.delete(team)
+    # A delete changes the roster exactly like a create does: without the
+    # dirty-flag the team's row lingers on every sheet tab until an admin
+    # presses the sync button.
+    _dispatch_sync_all(comp_id)
     db.session.commit()
     return json_ok({"ok": True})
 
@@ -536,6 +545,9 @@ def team_active_group(team_id: int):
         summary=f"Active group changed for team {team.name}.",
         details=_team_snapshot(team),
     )
+    # Moving a team between groups moves it between group blocks on the
+    # sheet tabs; refresh them like any other roster change.
+    _dispatch_sync_all(comp_id)
     db.session.commit()
     return json_ok({"ok": True})
 
@@ -689,5 +701,7 @@ def team_randomize_numbers():
             summary="Team numbers randomized.",
             details={"assigned_total": assigned_total, "results": results},
         )
+        # Numbers are exactly what the sheet team columns display.
+        _dispatch_sync_all(comp_id)
         db.session.commit()
     return json_ok({"ok": True, "assigned_total": assigned_total, "results": results})

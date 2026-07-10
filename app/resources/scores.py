@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
+from flask_babel import gettext as _
 from flask_login import current_user
 from sqlalchemy.exc import IntegrityError
 
@@ -224,7 +225,7 @@ def score_resolve():
 
     payload = request.get_json(silent=True) or {}
     # Same normalization as /api/ingest: drop any "|HMAC" suffix from v2
-    # LoRa-format clients, strip ':'/'-', uppercase — so Web NFC scans
+    # LoRa-format clients, strip ':'/'-', uppercase - so Web NFC scans
     # (colon-separated UIDs) match the canonical form stored on rfid_cards.
     uid = normalize_uid((payload.get("uid") or "").split("|", 1)[0])
     team_id = payload.get("team_id")
@@ -232,14 +233,14 @@ def score_resolve():
     try:
         checkpoint_id = int(checkpoint_id)
     except Exception:
-        return jsonify({"error": "invalid_request", "detail": "checkpoint_id is required."}), 400
+        return jsonify({"error": "invalid_request", "detail": _("checkpoint_id is required.")}), 400
 
     checkpoint = Checkpoint.query.filter(
         Checkpoint.competition_id == comp_id,
         Checkpoint.id == checkpoint_id,
     ).first()
     if not checkpoint:
-        return jsonify({"error": "not_found", "detail": "Checkpoint not found."}), 404
+        return jsonify({"error": "not_found", "detail": _("Checkpoint not found.")}), 404
 
     # Enforce judge assignment
     if CompetitionMember.query.filter(
@@ -253,27 +254,27 @@ def score_resolve():
             JudgeCheckpoint.checkpoint_id == checkpoint_id,
         ).first()
         if not assigned:
-            return jsonify({"error": "forbidden", "detail": "Checkpoint not assigned."}), 403
+            return jsonify({"error": "forbidden", "detail": _("Checkpoint not assigned.")}), 403
 
     team = None
     if uid:
         card = RFIDCard.query.filter_by(competition_id=comp_id, uid=uid).first()
         if not card:
-            return jsonify({"error": "not_found", "detail": "Card not mapped to a team."}), 404
+            return jsonify({"error": "not_found", "detail": _("Card not mapped to a team.")}), 404
         team = Team.query.filter(Team.competition_id == comp_id, Team.id == card.team_id).first()
     else:
         try:
             team_id = int(team_id)
         except Exception:
-            return jsonify({"error": "invalid_request", "detail": "uid or team_id is required."}), 400
+            return jsonify({"error": "invalid_request", "detail": _("uid or team_id is required.")}), 400
         team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
     if not team:
-        return jsonify({"error": "not_found", "detail": "Team not found."}), 404
+        return jsonify({"error": "not_found", "detail": _("Team not found.")}), 404
 
     group_link = _get_active_group(team.id)
     group_name = group_link.group.name if group_link and group_link.group else ""
     if not group_name:
-        return jsonify({"error": "invalid_request", "detail": "Team has no active group."}), 400
+        return jsonify({"error": "invalid_request", "detail": _("Team has no active group.")}), 400
     group_id = group_link.group_id if group_link else None
 
     # Fields come from ScoreField + per-group overrides. Scoring no longer
@@ -395,7 +396,7 @@ def score_submit():
     team_id = payload.get("team_id")
     checkpoint_id = payload.get("checkpoint_id")
     fields = payload.get("fields") or {}
-    # Same normalization as /api/ingest — see note in score_resolve.
+    # Same normalization as /api/ingest - see note in score_resolve.
     uid = normalize_uid((payload.get("uid") or "").split("|", 1)[0])
 
     # Validate no negative numeric inputs, dead_time included: it is
@@ -406,20 +407,18 @@ def score_submit():
     for val in fields.values():
         num = _to_number(val)
         if num is not None and num < 0:
-            from flask_babel import gettext as _
-
             return jsonify({"error": "validation_error", "detail": _("Score cannot be negative.")}), 400
 
     try:
         team_id = int(team_id)
         checkpoint_id = int(checkpoint_id)
     except Exception:
-        return jsonify({"error": "invalid_request", "detail": "team_id and checkpoint_id are required."}), 400
+        return jsonify({"error": "invalid_request", "detail": _("team_id and checkpoint_id are required.")}), 400
 
     team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
     checkpoint = Checkpoint.query.filter(Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id).first()
     if not team or not checkpoint:
-        return jsonify({"error": "invalid_request", "detail": "Invalid team or checkpoint."}), 400
+        return jsonify({"error": "invalid_request", "detail": _("Invalid team or checkpoint.")}), 400
 
     if CompetitionMember.query.filter(
         CompetitionMember.competition_id == comp_id,
@@ -432,12 +431,12 @@ def score_submit():
             JudgeCheckpoint.checkpoint_id == checkpoint_id,
         ).first()
         if not assigned:
-            return jsonify({"error": "forbidden", "detail": "Checkpoint not assigned."}), 403
+            return jsonify({"error": "forbidden", "detail": _("Checkpoint not assigned.")}), 403
 
     group_link = _get_active_group(team.id)
     group_name = group_link.group.name if group_link and group_link.group else ""
     if not group_name:
-        return jsonify({"error": "invalid_request", "detail": "Team has no active group."}), 400
+        return jsonify({"error": "invalid_request", "detail": _("Team has no active group.")}), 400
     group_id = group_link.group_id if group_link else None
     resolved = resolve_fields(checkpoint_id, group_id)
 
@@ -531,7 +530,7 @@ def score_submit():
     card_writeback = None
     writeback_error = None
     # Only produce a writeback for inputs that actually look like a scanned
-    # card UID — see looks_like_card_uid for the heuristic. Manual judge
+    # card UID - see looks_like_card_uid for the heuristic. Manual judge
     # entries (selected via team dropdown) used to trigger a writeback
     # attempt that always failed and flashed "Card write-back failed" in
     # the UI, which was confusing.

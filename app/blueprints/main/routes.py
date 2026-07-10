@@ -136,7 +136,7 @@ def set_language(lang_code: str):
 
 
 def _parse_date_range(date_from_str, date_to_str):
-    """Parse YYYY-MM-DD bounds. Raises ValueError on malformed input —
+    """Parse YYYY-MM-DD bounds. Raises ValueError on malformed input -
     callers must catch and either flash a warning or return 400. Silently
     falling back to no filter could expand exports unexpectedly."""
     start = end = None

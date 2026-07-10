@@ -95,7 +95,7 @@
                 {% elif row.time_minutes is not none %}
                   {{ '%.1f'|format(row.time_minutes) }}
                 {% else %}
-                  —
+                  -
                 {% endif %}
               </td>
               <td class="text-end">{{ ((row.dead_time or 0) + (row.bonus_dead_time or 0))|round(0)|int }}</td>
@@ -202,7 +202,7 @@
                 {% elif row.time_minutes is not none %}
                   {{ '%.1f'|format(row.time_minutes) }}
                 {% else %}
-                  —
+                  -
                 {% endif %}
               </td>
               {% for cp in checkpoints %}
@@ -235,7 +235,7 @@
                     </div>
                   {% endfor %}
                 {% else %}
-                  —
+                  -
                 {% endif %}
               </td>
               <td class="text-end">
@@ -293,7 +293,7 @@
 {% if public_competition %}
 <script>
   // Auto-refresh the public results page every 30 seconds. Spectator
-  // page only — admin /scores/view stays untouched. A countdown is
+  // page only - admin /scores/view stays untouched. A countdown is
   // shown in the header so it's clear the page is live.
   (function () {
     const REFRESH_SECONDS = 30;

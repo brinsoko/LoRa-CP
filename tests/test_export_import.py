@@ -640,7 +640,7 @@ class TestMerge:
         assert resp.status_code == 200
         summary = resp.get_json()["summary"]
         # At least the new team's link must land. The two existing teams
-        # may also be present in the payload — those re-add as no-ops.
+        # may also be present in the payload - those re-add as no-ops.
         assert summary["added"]["team_groups"] >= 1
 
         new_team = Team.query.filter_by(competition_id=comp.id, name="Team-Imported").first()
@@ -830,7 +830,7 @@ class TestMerge:
 
     def test_merge_scoring_sections_do_not_clobber_local(self, client, _seeded):
         """Hand-tuned local scoring rows (ScoreField / TimedSegment /
-        GroupScoring) must survive a re-merge — admins customize these
+        GroupScoring) must survive a re-merge - admins customize these
         locally and a merge that overwrites would silently lose their
         tuning. Add-new-only semantics."""
         comp, _, group, cp, _, _ = _seeded

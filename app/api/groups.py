@@ -213,6 +213,31 @@ def group_create():
     )
     db.session.add(group)
     db.session.flush()
+
+    # Same invariant _update_group enforces: attaching this group's
+    # (path, direction) must not make a dead-time checkpoint a timed
+    # segment's directed end (a reverse group swaps the endpoints).
+    if path is not None:
+        from app.models import Checkpoint
+        from app.utils.scoring import segment_end_checkpoint_ids
+
+        blocked = segment_end_checkpoint_ids(comp_id)
+        if blocked and Checkpoint.query.filter(
+            Checkpoint.competition_id == comp_id,
+            Checkpoint.id.in_(blocked),
+            Checkpoint.dead_time_enabled.is_(True),
+        ).first():
+            db.session.rollback()
+            return jsonify(
+                {
+                    "error": "validation_error",
+                    "detail": _(
+                        "This path/direction would put a dead-time checkpoint at a timed "
+                        "segment's end. Disable dead time there or adjust the segment first."
+                    ),
+                }
+            ), 400
+
     record_audit_event(
         competition_id=comp_id,
         event_type="group_created",

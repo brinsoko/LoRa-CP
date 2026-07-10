@@ -271,7 +271,7 @@ def build_arrivals():
             f"rebuild_arrivals:{spreadsheet_id}:{tab_name}",
         )
         flash(
-            _("Arrivals tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
+            _("Arrivals tab '%(tab)s' queued - refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
     upsert_summary_config(
@@ -343,7 +343,7 @@ def build_teams():
             f"rebuild_teams:{spreadsheet_id}:{tab_name}",
         )
         flash(
-            _("Teams tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
+            _("Teams tab '%(tab)s' queued - refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
     upsert_summary_config(
@@ -423,7 +423,7 @@ def build_score():
             f"rebuild_score:{spreadsheet_id}:{tab_name}",
         )
         flash(
-            _("Score tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
+            _("Score tab '%(tab)s' queued - refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
     upsert_summary_config(
@@ -681,30 +681,14 @@ def sync_team_numbers(config_id: int):
         return redirect(url_for("sheets_admin.list_sheets"))
 
     # "Sync team numbers" is the operator's blanket refresh button.
-    # Beyond pushing team numbers to each per-CP tab, it must also rebuild
-    # the three summary tabs — Ekipe (roster + Člani), Prihodi (arrivals
-    # matrix), and Skupni seštevek (rankings) — so the visible state of
-    # the spreadsheet stays consistent with the DB after roster, group,
-    # or check-in changes. Mirrors the publish-flow's summary-rebuild
-    # loop ([sheets_sync.py: build_summary_tabs path]).
-    lang = load_lang()
-    summary_builders = [
-        ("Ekipe", lang.get("teams_tab") or "Ekipe", build_teams_tab),
-        ("Prihodi", lang.get("arrivals_tab") or "Prihodi", build_arrivals_tab),
-        ("Skupni seštevek", lang.get("score_tab") or "Skupni seštevek", build_score_tab),
-    ]
-    real_sheet_ids = sorted(
-        {
-            sid
-            for (sid,) in db.session.query(SheetConfig.spreadsheet_id)
-            .filter(SheetConfig.competition_id == comp_id)
-            .filter(SheetConfig.tab_type == "checkpoint")
-            .filter(~SheetConfig.spreadsheet_id.like("local:%"))
-            .distinct()
-            .all()
-        }
-    )
-
+    # Beyond pushing team numbers to each per-CP tab, it rebuilds the
+    # recorded summary tabs (SheetConfig rows with tab_type teams /
+    # arrivals / total) so the visible state of the spreadsheet stays
+    # consistent with the DB after roster, group, or check-in changes.
+    # Both branches rebuild from the RECORDED SheetConfig rows, carrying
+    # the admin's stored tab name and layout overrides; rebuilding from
+    # lang-default names with a bare payload used to reset custom layouts
+    # (and could create duplicate default-named tabs).
     if current_app.config.get("SHEETS_SYNC_INLINE"):
         try:
             sync_all_checkpoint_tabs(competition_id=comp_id)
@@ -713,16 +697,43 @@ def sync_team_numbers(config_id: int):
             flash(_("Failed to sync team numbers: %(error)s", error=exc), "warning")
             return redirect(url_for("sheets_admin.list_sheets"))
 
+        build_by_tab_type = {
+            "teams": build_teams_tab,
+            "arrivals": build_arrivals_tab,
+            "total": build_score_tab,
+        }
+        summary_cfgs = (
+            SheetConfig.query.filter(SheetConfig.competition_id == comp_id)
+            .filter(SheetConfig.tab_type.in_(list(build_by_tab_type)))
+            .filter(~SheetConfig.spreadsheet_id.like("local:%"))
+            .all()
+        )
         summary_errors: list[str] = []
-        for label, tab_name, build_fn in summary_builders:
-            for sid in real_sheet_ids:
-                try:
-                    err = build_fn(sid, tab_name, competition_id=comp_id)
-                    if err:
-                        summary_errors.append(f"{label} on {sid}: {err}")
-                except Exception as exc:
-                    current_app.logger.exception("Failed to rebuild %s on %s during sync_team_numbers", label, sid)
-                    summary_errors.append(f"{label} on {sid}: {exc}")
+        for cfg in summary_cfgs:
+            layout = cfg.config or {}
+            build_fn = build_by_tab_type[cfg.tab_type]
+            kwargs = {
+                "competition_id": comp_id,
+                "group_order_override": layout.get("group_order_override"),
+            }
+            if cfg.tab_type == "teams":
+                kwargs["headers"] = layout.get("headers")
+            else:
+                kwargs["checkpoint_order_override"] = layout.get("checkpoint_order_override")
+                kwargs["per_group_checkpoint_order"] = layout.get("per_group_checkpoint_order")
+            if cfg.tab_type == "total":
+                kwargs["include_dead_time_sum"] = layout.get("include_dead_time_sum", True)
+            try:
+                err = build_fn(cfg.spreadsheet_id, cfg.tab_name, **kwargs)
+                if err:
+                    summary_errors.append(f"{cfg.tab_name} on {cfg.spreadsheet_id}: {err}")
+            except Exception as exc:
+                current_app.logger.exception(
+                    "Failed to rebuild %s on %s during sync_team_numbers",
+                    cfg.tab_name,
+                    cfg.spreadsheet_id,
+                )
+                summary_errors.append(f"{cfg.tab_name} on {cfg.spreadsheet_id}: {exc}")
 
         if summary_errors:
             flash(
@@ -733,38 +744,14 @@ def sync_team_numbers(config_id: int):
                 "warning",
             )
         else:
-            flash(
-                _("Synced team numbers and rebuilt Ekipe, Prihodi, and Skupni seštevek."),
-                "success",
-            )
+            flash(_("Synced team numbers and rebuilt the summary tabs."), "success")
     else:
-        from app.utils.sheets_outbox import enqueue_job
+        from app.utils.sheets_outbox import enqueue_summary_rebuilds
 
-        enqueue_job(
-            "sync_team_numbers",
-            comp_id,
-            {"competition_id": comp_id},
-            f"sync_team_numbers:{comp_id}",
-        )
-        kind_by_label = {
-            "Ekipe": "rebuild_teams",
-            "Prihodi": "rebuild_arrivals",
-            "Skupni seštevek": "rebuild_score",
-        }
-        for label, tab_name, _build_fn in summary_builders:
-            kind = kind_by_label.get(label)
-            if kind is None:
-                continue
-            for sid in real_sheet_ids:
-                enqueue_job(
-                    kind,
-                    comp_id,
-                    {"spreadsheet_id": sid, "tab_name": tab_name, "competition_id": comp_id},
-                    f"{kind}:{sid}:{tab_name}",
-                )
+        enqueue_summary_rebuilds(comp_id)
         db.session.commit()
         flash(
-            _("Team-number sync queued — refresh the spreadsheet in a few seconds."),
+            _("Team-number sync queued - refresh the spreadsheet in a few seconds."),
             "info",
         )
     return redirect(url_for("sheets_admin.list_sheets"))
@@ -815,6 +802,11 @@ def publish_local():
             ),
             "success",
         )
+        if result.get("note"):
+            flash(
+                _("Nothing new to publish: all checkpoint tabs already point at the target."),
+                "info",
+            )
         for err in result.get("errors") or []:
             flash(err, "warning")
     else:
@@ -965,7 +957,31 @@ def add_tab():
             return redirect(url_for("sheets_admin.list_sheets"))
 
     overwrite = bool(request.form.get("overwrite"))
-    existing = SheetConfig.query.filter_by(spreadsheet_id=spreadsheet_id, tab_name=tab_title).first()
+    # Scope to the caller's competition: spreadsheet_id/tab_title come
+    # straight from the form, and an unscoped lookup would let an admin
+    # of competition A overwrite competition B's config by guessing its
+    # identifiers. A foreign-competition claim on the same (spreadsheet,
+    # tab) is refused outright; the UNIQUE(spreadsheet_id, tab_name)
+    # constraint would reject the insert anyway.
+    existing = SheetConfig.query.filter_by(
+        competition_id=comp_id, spreadsheet_id=spreadsheet_id, tab_name=tab_title
+    ).first()
+    if existing is None:
+        foreign = (
+            SheetConfig.query.filter(SheetConfig.spreadsheet_id == spreadsheet_id)
+            .filter(SheetConfig.tab_name == tab_title)
+            .filter(SheetConfig.competition_id != comp_id)
+            .first()
+        )
+        if foreign is not None:
+            flash(
+                _(
+                    "Tab '%(tab)s' on that spreadsheet already belongs to another competition.",
+                    tab=tab_title,
+                ),
+                "warning",
+            )
+            return redirect(url_for("sheets_admin.list_sheets"))
     if existing and not overwrite:
         flash(
             _(

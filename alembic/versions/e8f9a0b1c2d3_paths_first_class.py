@@ -97,10 +97,13 @@ def upgrade() -> None:
             "REFERENCES paths (id) ON DELETE SET NULL"
         )
     if "direction" not in group_columns:
+        # Name the CHECK like the model does (ck_group_direction), so a
+        # future batch-mode migration can reference/drop it on upgraded
+        # DBs the same way as on fresh installs.
         op.execute(
             "ALTER TABLE checkpoint_groups ADD COLUMN direction VARCHAR(10) "
             "NOT NULL DEFAULT 'forward' "
-            "CHECK (direction IN ('forward','reverse'))"
+            "CONSTRAINT ck_group_direction CHECK (direction IN ('forward','reverse'))"
         )
     op.execute(
         "CREATE INDEX IF NOT EXISTS ix_checkpoint_groups_path_id ON checkpoint_groups (path_id)"

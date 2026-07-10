@@ -54,7 +54,7 @@ class _RecordingClient:
 
 @pytest.fixture
 def sheets_app(app_factory):
-    """App with sheets sync enabled — required because the builders early
+    """App with sheets sync enabled - required because the builders early
     out with the disabled-sync warning before reaching the empty-values
     guard we want to exercise."""
     application = app_factory(SHEETS_SYNC_ENABLED=True)
@@ -79,7 +79,7 @@ def _seed_with_unmatched_group_name(app):
     assign_team_group(team, group)
     set_group_route(group, [cp])
     # The SheetConfig references a group name that doesn't exist in the
-    # current competition — every iteration of the values-building loop
+    # current competition - every iteration of the values-building loop
     # finds no matching cp_configs and skips the group.
     db.session.add(
         SheetConfig(
@@ -113,7 +113,7 @@ def _seed_with_teams_missing_numbers(app):
     add_membership(user, comp, role="admin")
     group = create_group(comp, name="Alpha", prefix="1xx")
     cp = create_checkpoint(comp, name="CP-One")
-    # Team exists but has no number — the arrivals build filters
+    # Team exists but has no number - the arrivals build filters
     # Team.number.isnot(None), so this group ends up with no teams.
     team = create_team(comp, name="NumberlessTeam", number=None)
     assign_team_group(team, group)

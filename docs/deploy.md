@@ -33,14 +33,14 @@ Edit `deploy/.env`:
 - `DOMAIN` (e.g., `lora.example.com`) and `ACME_EMAIL` (for Let’s Encrypt notices)
 - `FLASK_ENV=production` (auto-enables `TRUST_PROXY_HEADERS`, secure
   cookies, and the production password guard for the seed scripts).
-- `ADMIN_PASS` and `SEED_ADMIN_PASS` — required in production; the
+- `ADMIN_PASS` and `SEED_ADMIN_PASS` - required in production; the
   scripts refuse to seed with the dev default `admin123` when
   `FLASK_ENV=production`. Pick a strong unique value.
 - Optional serial/Google Sheets settings.
 
 `TRUST_PROXY_HEADERS` defaults to `true` when `FLASK_ENV=production`,
 which is the right setting behind Caddy. **Only override to `false`**
-if you're exposing Flask directly without a reverse proxy in front —
+if you're exposing Flask directly without a reverse proxy in front -
 otherwise clients can spoof `X-Forwarded-Host` / `X-Forwarded-Proto`
 and manipulate any external URL the app emits.
 

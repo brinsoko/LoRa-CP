@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: LoRa KT\n"
 "Report-Msgid-Bugs-To: brin.soko@gmail.com\n"
-"POT-Creation-Date: 2026-07-09 23:35+0200\n"
+"POT-Creation-Date: 2026-07-10 14:48+0200\n"
 "PO-Revision-Date: 2025-12-04 00:00+0100\n"
 "Last-Translator: Brin Soko <brin.soko@gmail.com>\n"
 "Language: sl\n"
@@ -14,6 +14,12 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
+
+#: app/api/checkpoints.py:378
+msgid "Dead time cannot be enabled on a timed segment's end checkpoint."
+msgstr ""
+"Mrtvega časa ni mogoče vklopiti na končni kontrolni točki časovnega "
+"odseka."
 
 #: app/api/groups.py:30
 msgid ""
@@ -39,29 +45,37 @@ msgstr "Neznana pot."
 msgid "Group name already exists."
 msgstr "Ime skupine že obstaja."
 
+#: app/api/groups.py:235 app/api/groups.py:350
+msgid ""
+"This path/direction would put a dead-time checkpoint at a timed segment's"
+" end. Disable dead time there or adjust the segment first."
+msgstr ""
+"Ta pot/smer bi postavila kontrolno točko z mrtvim časom na konec "
+"časovnega odseka. Najprej tam izklopi mrtvi čas ali prilagodi odsek."
+
 #: app/api/paths.py:89
 #, python-format
 msgid "Unknown checkpoint ids: %(ids)s"
 msgstr "Neznane kontrolne točke: %(ids)s"
 
-#: app/api/paths.py:152 app/api/paths.py:197 app/api/paths.py:267
+#: app/api/paths.py:152 app/api/paths.py:197 app/api/paths.py:279
 msgid "Path name already exists."
 msgstr "Ime poti že obstaja."
 
-#: app/api/paths.py:269
+#: app/api/paths.py:281
 msgid "(reversed)"
 msgstr "(obratno)"
 
-#: app/api/paths.py:269
+#: app/api/paths.py:281
 msgid "(copy)"
 msgstr "(kopija)"
 
-#: app/api/paths.py:317
+#: app/api/paths.py:341
 msgid "Cannot delete a path that is assigned to one or more groups."
 msgstr "Poti, ki je dodeljena eni ali več skupinam, ni mogoče izbrisati."
 
-#: app/api/teams.py:258 app/api/teams.py:260 app/api/teams.py:310
-#: app/api/teams.py:360 app/api/teams.py:364 app/api/teams.py:458
+#: app/api/teams.py:263 app/api/teams.py:265 app/api/teams.py:316
+#: app/api/teams.py:365 app/api/teams.py:369 app/api/teams.py:464
 msgid "Team number must be a positive integer."
 msgstr "Številka ekipe mora biti pozitivno celo število."
 
@@ -151,7 +165,7 @@ msgstr "Številke ekip so bile naključno dodeljene."
 msgid "Checkpoint %(name)s created."
 msgstr "Kontrolna točka %(name)s je bila ustvarjena."
 
-#: app/blueprints/audit/routes.py:90 app/blueprints/checkpoints/routes.py:328
+#: app/blueprints/audit/routes.py:90 app/blueprints/checkpoints/routes.py:332
 msgid "Checkpoint updated."
 msgstr "Kontrolna točka posodobljena."
 
@@ -193,16 +207,16 @@ msgid "Device %(name)s deleted."
 msgstr "Naprava %(name)s je bila izbrisana."
 
 #: app/blueprints/audit/routes.py:115 app/blueprints/checkins/routes.py:171
-#: app/blueprints/checkpoints/routes.py:170
-#: app/blueprints/firmware/routes.py:41 app/blueprints/judge/routes.py:81
+#: app/blueprints/checkpoints/routes.py:174
+#: app/blueprints/firmware/routes.py:41 app/blueprints/judge/routes.py:83
 #: app/blueprints/judges/routes.py:18 app/blueprints/main/routes.py:172
 #: app/blueprints/main/routes.py:236 app/blueprints/main/routes.py:421
 #: app/blueprints/main/routes.py:458 app/blueprints/main/routes.py:486
 #: app/blueprints/scores/routes.py:98 app/blueprints/scores/routes.py:180
-#: app/blueprints/scores/routes.py:298 app/blueprints/scores/routes.py:364
-#: app/blueprints/scores/routes.py:382 app/blueprints/scores/routes.py:720
-#: app/blueprints/scores/routes.py:741 app/blueprints/scores/routes.py:886
-#: app/blueprints/scores/routes.py:1159 app/blueprints/sheets/routes.py:56
+#: app/blueprints/scores/routes.py:307 app/blueprints/scores/routes.py:377
+#: app/blueprints/scores/routes.py:395 app/blueprints/scores/routes.py:748
+#: app/blueprints/scores/routes.py:770 app/blueprints/scores/routes.py:920
+#: app/blueprints/scores/routes.py:1193 app/blueprints/sheets/routes.py:57
 #: app/blueprints/users/routes.py:43 app/blueprints/users/routes.py:87
 #: app/blueprints/users/routes.py:154 app/blueprints/users/routes.py:217
 #: app/blueprints/users/routes.py:304
@@ -325,7 +339,7 @@ msgstr "Skrbniškega računa ni bilo mogoče ustvariti."
 msgid "Could not load teams."
 msgstr "Ekip ni bilo mogoče naložiti."
 
-#: app/blueprints/checkins/routes.py:34 app/blueprints/checkpoints/routes.py:52
+#: app/blueprints/checkins/routes.py:34 app/blueprints/checkpoints/routes.py:54
 #: app/blueprints/paths/routes.py:32
 msgid "Could not load checkpoints."
 msgstr "Ni bilo mogoče naložiti kontrolnih točk."
@@ -335,7 +349,7 @@ msgid "Could not load check-ins."
 msgstr "Prihodov ni bilo mogoče naložiti."
 
 #: app/blueprints/checkins/routes.py:182 app/blueprints/groups/routes.py:77
-#: app/blueprints/scores/routes.py:390
+#: app/blueprints/scores/routes.py:403
 msgid "Group not found."
 msgstr "Skupina ni najdena."
 
@@ -391,54 +405,76 @@ msgstr "Izbrana naprava ni na voljo za to tekmovanje."
 msgid "Checkpoint name already exists."
 msgstr "Ime kontrolne točke že obstaja."
 
-#: app/blueprints/checkpoints/routes.py:36 app/blueprints/groups/routes.py:23
+#: app/blueprints/checkpoints/routes.py:38 app/blueprints/groups/routes.py:23
 #: app/blueprints/paths/routes.py:67
 msgid "Could not load paths."
 msgstr "Poti ni bilo mogoče naložiti."
 
-#: app/blueprints/checkpoints/routes.py:44 app/blueprints/lora/routes.py:47
+#: app/blueprints/checkpoints/routes.py:46 app/blueprints/lora/routes.py:47
 #: app/blueprints/rfid/routes.py:35
 msgid "Could not load devices."
 msgstr "Ni bilo mogoče naložiti naprav."
 
-#: app/blueprints/checkpoints/routes.py:175
-#: app/blueprints/checkpoints/routes.py:280 app/blueprints/scores/routes.py:188
+#: app/blueprints/checkpoints/routes.py:67
+#, python-format
+msgid "%(field)s must be an integer."
+msgstr "%(field)s mora biti celo število."
+
+#: app/blueprints/checkpoints/routes.py:91
+msgid "Device ID"
+msgstr "ID naprave"
+
+#: app/blueprints/checkpoints/routes.py:92
+msgid "Path ID"
+msgstr "ID poti"
+
+#: app/blueprints/checkpoints/routes.py:179
+#: app/blueprints/checkpoints/routes.py:284 app/blueprints/scores/routes.py:188
+#: app/resources/scores.py:243
 msgid "Checkpoint not found."
 msgstr "Kontrolna točka ni najdena."
 
-#: app/blueprints/checkpoints/routes.py:227
+#: app/blueprints/checkpoints/routes.py:231
 msgid "Checkpoint judges updated."
 msgstr "Sodniki kontrolne točke so bili posodobljeni."
 
-#: app/blueprints/checkpoints/routes.py:250
-#: app/blueprints/checkpoints/routes.py:311
+#: app/blueprints/checkpoints/routes.py:254
+#: app/blueprints/checkpoints/routes.py:315
 #: app/blueprints/firmware/routes.py:101
 msgid "Name is required."
 msgstr "Ime je obvezno."
 
-#: app/blueprints/checkpoints/routes.py:261
+#: app/blueprints/checkpoints/routes.py:265
 msgid "Checkpoint added."
 msgstr "Kontrolna točka dodana."
 
-#: app/blueprints/checkpoints/routes.py:362
+#: app/blueprints/checkpoints/routes.py:268
+msgid "Could not add checkpoint."
+msgstr "Kontrolne točke ni bilo mogoče dodati."
+
+#: app/blueprints/checkpoints/routes.py:335
+msgid "Could not update checkpoint."
+msgstr "Kontrolne točke ni bilo mogoče posodobiti."
+
+#: app/blueprints/checkpoints/routes.py:366
 msgid "Checkpoint deleted."
 msgstr "Kontrolna točka izbrisana."
 
-#: app/blueprints/checkpoints/routes.py:364
 #: app/blueprints/checkpoints/routes.py:368
+#: app/blueprints/checkpoints/routes.py:372
 msgid "Could not delete checkpoint."
 msgstr "Kontrolne točke ni bilo mogoče izbrisati."
 
-#: app/blueprints/checkpoints/routes.py:403
+#: app/blueprints/checkpoints/routes.py:407
 msgid "Paste JSON payload to import."
 msgstr "Prilepite vsebino JSON za uvoz."
 
-#: app/blueprints/checkpoints/routes.py:409
+#: app/blueprints/checkpoints/routes.py:413
 #, python-format
 msgid "Invalid JSON: %(error)s"
 msgstr "Neveljaven JSON: %(error)s"
 
-#: app/blueprints/checkpoints/routes.py:433
+#: app/blueprints/checkpoints/routes.py:437
 msgid ""
 "JSON must be an array of checkpoints, an object with 'items', or an "
 "object with 'cps' list."
@@ -446,17 +482,17 @@ msgstr ""
 "JSON mora biti seznam kontrolnih točk, objekt s poljem 'items' ali objekt"
 " s seznamom 'cps'."
 
-#: app/blueprints/checkpoints/routes.py:440
+#: app/blueprints/checkpoints/routes.py:444
 #: app/templates/competition_transfer.html:88
 msgid "Import failed."
 msgstr "Uvoz ni uspel."
 
-#: app/blueprints/checkpoints/routes.py:441
+#: app/blueprints/checkpoints/routes.py:445
 #, , python-format
 msgid "Import failed: %(detail)s"
 msgstr "Uvoz ni uspel: %(detail)s"
 
-#: app/blueprints/checkpoints/routes.py:448
+#: app/blueprints/checkpoints/routes.py:452
 #, python-format
 msgid ""
 "Imported checkpoints: created %(created)s, updated %(updated)s, skipped "
@@ -465,7 +501,7 @@ msgstr ""
 "Uvožene kontrolne točke: ustvarjenih %(created)s, posodobljenih "
 "%(updated)s, preskočenih %(skipped)s."
 
-#: app/blueprints/checkpoints/routes.py:456
+#: app/blueprints/checkpoints/routes.py:460
 #, python-format
 msgid "%(count)s row(s) reported errors; see logs."
 msgstr "%(count)s vrstic je prijavilo napake; glej dnevnik."
@@ -560,39 +596,39 @@ msgstr "Aktivna skupina posodobljena."
 msgid "Could not set active group."
 msgstr "Aktivne skupine ni bilo mogoče nastaviti."
 
-#: app/blueprints/judge/routes.py:85
+#: app/blueprints/judge/routes.py:87
 msgid "No checkpoints assigned yet. Ask an admin to assign you a checkpoint."
 msgstr "Ni še dodeljenih kontrolnih točk. Prosi skrbnika, da ti jo dodeli."
 
-#: app/blueprints/judge/routes.py:152 app/templates/add_team.html:32
+#: app/blueprints/judge/routes.py:156 app/templates/add_team.html:32
 #: app/templates/team_edit.html:33 app/templates/teams_list.html:119
 msgid "No group"
 msgstr "Brez skupine"
 
-#: app/blueprints/judge/routes.py:190
+#: app/blueprints/judge/routes.py:194
 msgid "Dead time (min)"
 msgstr "Mrtvi čas (min)"
 
-#: app/blueprints/judge/routes.py:192 app/templates/base.html:166
+#: app/blueprints/judge/routes.py:196 app/templates/base.html:166
 #: app/templates/score_judge.html:185
 msgid "Score"
 msgstr "Točkovanje"
 
-#: app/blueprints/judge/routes.py:227 app/blueprints/judge/routes.py:246
+#: app/blueprints/judge/routes.py:231 app/blueprints/judge/routes.py:250
 msgid "Bulk entry is not enabled for this checkpoint."
 msgstr "Skupinski vnos za to kontrolno točko ni omogočen."
 
-#: app/blueprints/judge/routes.py:270
+#: app/blueprints/judge/routes.py:283
 #, python-format
 msgid "Invalid value for %(team)s / %(field)s."
 msgstr "Neveljavna vrednost za %(team)s / %(field)s."
 
 # Score validation
-#: app/blueprints/judge/routes.py:278 app/resources/scores.py:407
+#: app/blueprints/judge/routes.py:291 app/resources/scores.py:410
 msgid "Score cannot be negative."
 msgstr "Rezultat ne more biti negativen."
 
-#: app/blueprints/judge/routes.py:344
+#: app/blueprints/judge/routes.py:370
 #, python-format
 msgid "Saved %(count)s team scores."
 msgstr "Shranjenih %(count)s ocen ekip."
@@ -706,7 +742,7 @@ msgstr "Pot ustvarjena."
 msgid "Could not create path."
 msgstr "Poti ni bilo mogoče ustvariti."
 
-#: app/blueprints/paths/routes.py:122 app/blueprints/scores/routes.py:304
+#: app/blueprints/paths/routes.py:122 app/blueprints/scores/routes.py:313
 msgid "Path not found."
 msgstr "Pot ne obstaja."
 
@@ -775,27 +811,27 @@ msgstr "RFID preslikave ni bilo mogoče izbrisati."
 msgid "Invalid rule params for %(key)s: %(error)s"
 msgstr "Neveljavni parametri pravila za %(key)s: %(error)s"
 
-#: app/blueprints/scores/routes.py:288
+#: app/blueprints/scores/routes.py:297
 msgid "Score fields saved."
 msgstr "Ocenjevalna polja shranjena."
 
-#: app/blueprints/scores/routes.py:311
+#: app/blueprints/scores/routes.py:320
 msgid "Segment endpoints must be two different checkpoints on the path."
 msgstr "Krajišči odseka morata biti dve različni kontrolni točki na poti."
 
-#: app/blueprints/scores/routes.py:331
+#: app/blueprints/scores/routes.py:340
 msgid "A segment cannot end at a checkpoint with dead time enabled."
 msgstr "Odsek se ne sme končati na kontrolni točki z vklopljenim mrtvim časom."
 
-#: app/blueprints/scores/routes.py:355
+#: app/blueprints/scores/routes.py:368
 msgid "Timed segment added."
 msgstr "Časovni odsek dodan."
 
-#: app/blueprints/scores/routes.py:372
+#: app/blueprints/scores/routes.py:385
 msgid "Timed segment deleted."
 msgstr "Časovni odsek izbrisan."
 
-#: app/blueprints/scores/routes.py:410
+#: app/blueprints/scores/routes.py:423
 msgid ""
 "The race time rule needs max points, threshold, penalty minutes and "
 "penalty points."
@@ -803,118 +839,118 @@ msgstr ""
 "Pravilo časovnice potrebuje največ točk, prag, kazenske minute in "
 "kazenske točke."
 
-#: app/blueprints/scores/routes.py:435
+#: app/blueprints/scores/routes.py:448
 msgid "Category scoring saved."
 msgstr "Točkovanje kategorije shranjeno."
 
-#: app/blueprints/scores/routes.py:837 app/blueprints/scores/routes.py:1147
+#: app/blueprints/scores/routes.py:871 app/blueprints/scores/routes.py:1181
 msgid "Public results are not enabled for this competition."
 msgstr "Javni rezultati za to tekmovanje niso omogočeni."
 
-#: app/blueprints/scores/routes.py:1225
+#: app/blueprints/scores/routes.py:1259
 msgid "Legacy or unknown"
 msgstr "Staro ali neznano"
 
-#: app/blueprints/sheets/routes.py:63
+#: app/blueprints/sheets/routes.py:64
 msgid "Sheets sync is disabled."
 msgstr "Sinhronizacija Sheets je izkljucena."
 
-#: app/blueprints/sheets/routes.py:191
+#: app/blueprints/sheets/routes.py:192
 msgid "Language pack saved."
 msgstr "Jezikovni paket shranjen."
 
-#: app/blueprints/sheets/routes.py:200
+#: app/blueprints/sheets/routes.py:201
 msgid "Sheets settings saved."
 msgstr "Nastavitve preglednic so bile shranjene."
 
-#: app/blueprints/sheets/routes.py:232
+#: app/blueprints/sheets/routes.py:233
 msgid "Spreadsheet ID is required to build arrivals."
 msgstr "Za izdelavo prihodov je potreben ID preglednice."
 
-#: app/blueprints/sheets/routes.py:250
+#: app/blueprints/sheets/routes.py:251
 #, python-format
 msgid "Failed to build arrivals tab: %(error)s"
 msgstr "Ni uspelo izdelati zavihka prihodov: %(error)s"
 
-#: app/blueprints/sheets/routes.py:252
+#: app/blueprints/sheets/routes.py:253
 #, python-format
 msgid "Arrivals tab '%(tab)s' updated."
 msgstr "Zavihek prihodov '%(tab)s' je posodobljen."
 
-#: app/blueprints/sheets/routes.py:273
+#: app/blueprints/sheets/routes.py:274
 #, python-format
-msgid "Arrivals tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
+msgid "Arrivals tab '%(tab)s' queued - refresh the spreadsheet in a few seconds."
 msgstr ""
 "Zavihek prihodov '%(tab)s' je v čakalni vrsti - preglednico osveži čez "
 "nekaj sekund."
 
-#: app/blueprints/sheets/routes.py:298 app/blueprints/sheets/routes.py:358
-#: app/blueprints/sheets/routes.py:558 app/blueprints/sheets/routes.py:867
+#: app/blueprints/sheets/routes.py:311 app/blueprints/sheets/routes.py:379
+#: app/blueprints/sheets/routes.py:592 app/blueprints/sheets/routes.py:893
 msgid "Spreadsheet ID is required."
 msgstr "ID preglednice je obvezen."
 
-#: app/blueprints/sheets/routes.py:314
+#: app/blueprints/sheets/routes.py:327
 #, python-format
 msgid "Failed to build teams tab: %(error)s"
 msgstr "Ni uspelo izdelati zavihka ekip: %(error)s"
 
-#: app/blueprints/sheets/routes.py:316
+#: app/blueprints/sheets/routes.py:329
 #, python-format
 msgid "Teams tab '%(tab)s' updated."
 msgstr "Zavihek ekip '%(tab)s' je posodobljen."
 
-#: app/blueprints/sheets/routes.py:333
+#: app/blueprints/sheets/routes.py:346
 #, python-format
-msgid "Teams tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
+msgid "Teams tab '%(tab)s' queued - refresh the spreadsheet in a few seconds."
 msgstr ""
 "Zavihek ekip '%(tab)s' je v čakalni vrsti - preglednico osveži čez nekaj "
 "sekund."
 
-#: app/blueprints/sheets/routes.py:384
+#: app/blueprints/sheets/routes.py:405
 #, python-format
 msgid "Failed to build score tab: %(error)s"
 msgstr "Ni uspelo izdelati zavihka rezultatov: %(error)s"
 
-#: app/blueprints/sheets/routes.py:386
+#: app/blueprints/sheets/routes.py:407
 #, python-format
 msgid "Score tab '%(tab)s' updated."
 msgstr "Zavihek rezultatov '%(tab)s' je posodobljen."
 
-#: app/blueprints/sheets/routes.py:405
+#: app/blueprints/sheets/routes.py:426
 #, python-format
-msgid "Score tab '%(tab)s' queued — refresh the spreadsheet in a few seconds."
+msgid "Score tab '%(tab)s' queued - refresh the spreadsheet in a few seconds."
 msgstr ""
 "Zavihek s točkami '%(tab)s' je v čakalni vrsti - preglednico osveži čez "
 "nekaj sekund."
 
-#: app/blueprints/sheets/routes.py:422
+#: app/blueprints/sheets/routes.py:456
 msgid "No configs to prune."
 msgstr "Ni nastavitev za ciscenje."
 
-#: app/blueprints/sheets/routes.py:430
+#: app/blueprints/sheets/routes.py:464
 #, python-format
 msgid "Could not init Sheets client: %(error)s"
 msgstr "Ni bilo mogoce inicializirati Sheets odjemalca: %(error)s"
 
-#: app/blueprints/sheets/routes.py:451
+#: app/blueprints/sheets/routes.py:485
 #, python-format
 msgid "Pruned %(count)s stale config(s) (tabs no longer exist)."
 msgstr "Pociscenih %(count)s zastarelih nastavitev (zavihki ne obstajajo)."
 
-#: app/blueprints/sheets/routes.py:453
+#: app/blueprints/sheets/routes.py:487
 msgid "No stale configs found."
 msgstr "Ni bilo najdenih zastarelih nastavitev."
 
-#: app/blueprints/sheets/routes.py:563
+#: app/blueprints/sheets/routes.py:597
 msgid "Select at least one checkpoint to create."
 msgstr "Izberite vsaj en checkpoint za ustvarjanje."
 
-#: app/blueprints/sheets/routes.py:608
+#: app/blueprints/sheets/routes.py:642
 #, python-format
 msgid "Wizard failed: %(error)s"
 msgstr "Carovnik ni uspel: %(error)s"
 
-#: app/blueprints/sheets/routes.py:614
+#: app/blueprints/sheets/routes.py:648
 #, python-format
 msgid ""
 "Wizard completed. Created %(created)s local configs, skipped %(skipped)s "
@@ -923,7 +959,7 @@ msgstr ""
 "Carovnik koncan. Ustvarjenih %(created)s lokalnih nastavitev, preskocenih"
 " %(skipped)s obstoječih."
 
-#: app/blueprints/sheets/routes.py:623
+#: app/blueprints/sheets/routes.py:657
 #, python-format
 msgid "Wizard completed. Created %(created)s tabs, skipped %(skipped)s existing."
 msgstr ""
@@ -931,52 +967,50 @@ msgstr ""
 "obstoječih: %(skipped)s.Carovnik koncan. Ustvarjenih %(created)s "
 "zavihkov, preskocenih %(skipped)s obstoječih."
 
-#: app/blueprints/sheets/routes.py:643 app/blueprints/sheets/routes.py:816
+#: app/blueprints/sheets/routes.py:677 app/blueprints/sheets/routes.py:842
 msgid "Config not found."
 msgstr "Nastavitev ni bila najdena."
 
-#: app/blueprints/sheets/routes.py:646
+#: app/blueprints/sheets/routes.py:680
 msgid "Config is missing groups; cannot sync."
 msgstr "Nastavitvi manjkajo skupine; sinhronizacija ni mozna."
 
-#: app/blueprints/sheets/routes.py:679
+#: app/blueprints/sheets/routes.py:697
 #, python-format
 msgid "Failed to sync team numbers: %(error)s"
 msgstr "Sinhronizacija stevilk ekip ni uspela: %(error)s"
 
-#: app/blueprints/sheets/routes.py:696
+#: app/blueprints/sheets/routes.py:741
 #, python-format
 msgid "Synced checkpoint tabs but some summary rebuilds reported errors: %(errs)s"
 msgstr ""
 "Zavihki kontrolnih točk so sinhronizirani, a nekatere obnove povzetkov so"
 " javile napake: %(errs)s"
 
-#: app/blueprints/sheets/routes.py:703
-msgid "Synced team numbers and rebuilt Ekipe, Prihodi, and Skupni seštevek."
-msgstr ""
-"Številke ekip so sinhronizirane, zavihki Ekipe, Prihodi in Skupni "
-"seštevek pa obnovljeni."
+#: app/blueprints/sheets/routes.py:747
+msgid "Synced team numbers and rebuilt the summary tabs."
+msgstr "Številke ekip so sinhronizirane, zavihki povzetkov pa obnovljeni."
 
-#: app/blueprints/sheets/routes.py:733
-msgid "Team-number sync queued — refresh the spreadsheet in a few seconds."
+#: app/blueprints/sheets/routes.py:754
+msgid "Team-number sync queued - refresh the spreadsheet in a few seconds."
 msgstr ""
 "Sinhronizacija številk ekip je v čakalni vrsti - preglednico osveži čez "
 "nekaj sekund."
 
-#: app/blueprints/sheets/routes.py:757
+#: app/blueprints/sheets/routes.py:778
 msgid "Target spreadsheet ID is required."
 msgstr "ID ciljne preglednice je obvezen."
 
-#: app/blueprints/sheets/routes.py:761
+#: app/blueprints/sheets/routes.py:782
 msgid "Target spreadsheet must be a real Google Sheets ID, not a local: sentinel."
 msgstr "Ciljna preglednica mora biti pravi Google Sheets ID, ne oznaka local:."
 
-#: app/blueprints/sheets/routes.py:771
+#: app/blueprints/sheets/routes.py:792
 #, python-format
 msgid "Publish failed: %(error)s"
 msgstr "Objava ni uspela: %(error)s"
 
-#: app/blueprints/sheets/routes.py:777
+#: app/blueprints/sheets/routes.py:798
 #, python-format
 msgid ""
 "Published %(count)s checkpoint tab(s), skipped %(skip)s. Summary tabs "
@@ -985,7 +1019,13 @@ msgstr ""
 "Objavljenih %(count)s zavihkov kontrolnih točk, preskočenih %(skip)s. "
 "Zgrajeni povzetki: %(s)s."
 
-#: app/blueprints/sheets/routes.py:797
+#: app/blueprints/sheets/routes.py:807
+msgid "Nothing new to publish: all checkpoint tabs already point at the target."
+msgstr ""
+"Ničesar novega za objavo: vsi zavihki kontrolnih točk že kažejo na ciljno"
+" preglednico."
+
+#: app/blueprints/sheets/routes.py:823
 #, python-format
 msgid ""
 "Publish to %(sid)s queued. This takes ~30 seconds for a 15-CP "
@@ -996,30 +1036,30 @@ msgstr ""
 "približno 30 sekund; preglednico preveri čez nekaj časa. Napake se "
 "zapišejo v strežniški dnevnik."
 
-#: app/blueprints/sheets/routes.py:830
+#: app/blueprints/sheets/routes.py:856
 #, python-format
 msgid "Remote tab could not be deleted: %(error)s"
 msgstr "Oddaljeni zavihek ni bilo mogoče izbrisati: %(error)s"
 
-#: app/blueprints/sheets/routes.py:834
+#: app/blueprints/sheets/routes.py:860
 #, python-format
 msgid "Config '%(tab)s' deleted."
 msgstr "Konfiguracija '%(tab)s' je bila izbrisana."
 
-#: app/blueprints/sheets/routes.py:862
+#: app/blueprints/sheets/routes.py:888
 msgid "Tab title is required."
 msgstr "Naslov zavihka je obvezen."
 
-#: app/blueprints/sheets/routes.py:872
+#: app/blueprints/sheets/routes.py:898
 msgid "At least one group line is required."
 msgstr "Potrebna je vsaj ena vrstica skupine."
 
-#: app/blueprints/sheets/routes.py:925
+#: app/blueprints/sheets/routes.py:951
 #, python-format
 msgid "Could not add tab: %(error)s"
 msgstr "Ni bilo mogoce dodati zavihka: %(error)s"
 
-#: app/blueprints/sheets/routes.py:928
+#: app/blueprints/sheets/routes.py:954
 msgid ""
 "Check that the spreadsheet ID is correct and that the service account "
 "email has Editor access to it."
@@ -1027,8 +1067,13 @@ msgstr ""
 "Preverite, da je ID preglednice pravilen in da ima e-posta servisnega "
 "racuna urejevalni dostop."
 
+#: app/blueprints/sheets/routes.py:979
+#, python-format
+msgid "Tab '%(tab)s' on that spreadsheet already belongs to another competition."
+msgstr "Zavihek '%(tab)s' na tej preglednici že pripada drugemu tekmovanju."
+
 # Sheets duplicate / delete
-#: app/blueprints/sheets/routes.py:938
+#: app/blueprints/sheets/routes.py:988
 #, python-format
 msgid ""
 "A config for tab '%(tab)s' already exists. Submit again with overwrite "
@@ -1037,26 +1082,26 @@ msgstr ""
 "Konfiguracija za zavihek '%(tab)s' že obstaja. Oddajte znova z označeno "
 "možnostjo prepisa."
 
-#: app/blueprints/sheets/routes.py:961
+#: app/blueprints/sheets/routes.py:1011
 #, python-format
 msgid "Tab '%(tab)s' overwritten."
 msgstr "Zavihek '%(tab)s' je bil prepisan."
 
-#: app/blueprints/sheets/routes.py:975
+#: app/blueprints/sheets/routes.py:1025
 #, python-format
 msgid "Added local tab '%(tab)s'."
 msgstr "Dodan lokalni zavihek '%(tab)s'."
 
-#: app/blueprints/sheets/routes.py:977
+#: app/blueprints/sheets/routes.py:1027
 #, python-format
 msgid "Added tab '%(tab)s' to spreadsheet."
 msgstr "Zavihek '%(tab)s' je dodan v preglednico."
 
-#: app/blueprints/sheets/routes.py:998
+#: app/blueprints/sheets/routes.py:1048
 msgid "Sync job re-queued."
 msgstr "Opravilo znova uvrščeno v vrsto."
 
-#: app/blueprints/sheets/routes.py:1016
+#: app/blueprints/sheets/routes.py:1066
 msgid "Sync job deleted."
 msgstr "Opravilo izbrisano."
 
@@ -1119,7 +1164,7 @@ msgstr "Ekipa ustvarjena."
 msgid "Could not create team."
 msgstr "Ekipe ni bilo mogoče ustvariti."
 
-#: app/blueprints/teams/routes.py:212
+#: app/blueprints/teams/routes.py:212 app/resources/scores.py:272
 msgid "Team not found."
 msgstr "Ekipa ni bila najdena."
 
@@ -1269,6 +1314,34 @@ msgstr "Ta ekipa že ima dodeljeno RFID kartico."
 #: app/resources/rfid.py:227
 msgid "No UID read (check device, cable, or increase timeout)."
 msgstr "UID ni bil prebran (preveri napravo, kabel ali povečaj časovno omejitev)."
+
+#: app/resources/scores.py:236
+msgid "checkpoint_id is required."
+msgstr "checkpoint_id je obvezen."
+
+#: app/resources/scores.py:257 app/resources/scores.py:434
+msgid "Checkpoint not assigned."
+msgstr "Kontrolna točka ti ni dodeljena."
+
+#: app/resources/scores.py:263
+msgid "Card not mapped to a team."
+msgstr "Kartica ni povezana z ekipo."
+
+#: app/resources/scores.py:269
+msgid "uid or team_id is required."
+msgstr "uid ali team_id je obvezen."
+
+#: app/resources/scores.py:277 app/resources/scores.py:439
+msgid "Team has no active group."
+msgstr "Ekipa nima aktivne skupine."
+
+#: app/resources/scores.py:416
+msgid "team_id and checkpoint_id are required."
+msgstr "team_id in checkpoint_id sta obvezna."
+
+#: app/resources/scores.py:421
+msgid "Invalid team or checkpoint."
+msgstr "Neveljavna ekipa ali kontrolna točka."
 
 #: app/templates/add_checkin.html:2 app/templates/add_checkin.html:7
 #: app/templates/base.html:164 app/templates/live_arrivals.html:36
@@ -2935,11 +3008,11 @@ msgstr ""
 msgid "Total"
 msgstr "Skupaj"
 
-#: app/templates/judge_table.html:50
+#: app/templates/judge_table.html:53
 msgid "No groups visit this checkpoint."
 msgstr "Nobena skupina ne obišče te kontrolne točke."
 
-#: app/templates/judge_table.html:54
+#: app/templates/judge_table.html:57
 msgid "Save all"
 msgstr "Shrani vse"
 
@@ -4361,8 +4434,8 @@ msgid "Checkpoint (optional)"
 msgstr "Checkpoint (neobvezno)"
 
 #: app/templates/sheets_admin.html:333
-msgid "— none —"
-msgstr "— brez —"
+msgid "- none -"
+msgstr "- brez -"
 
 #: app/templates/sheets_admin.html:341
 msgid "Groups & fields"

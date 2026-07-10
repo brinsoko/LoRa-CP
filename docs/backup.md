@@ -22,7 +22,7 @@ is implicitly backed up.
 
 ## Daily backup (recommended)
 
-`sqlite3 .backup` is the safe way to copy a live database — it uses
+`sqlite3 .backup` is the safe way to copy a live database - it uses
 SQLite's online backup API and works correctly even while the app is
 writing.
 
@@ -47,7 +47,7 @@ gzip -9 "$out"
 find "$BACKUP_DIR" -name 'app-*.db.gz' -mtime "+$RETAIN_DAYS" -delete
 ```
 
-Schedule via host cron — the laptop runs the container, so cron lives
+Schedule via host cron - the laptop runs the container, so cron lives
 on the laptop, not in the container:
 
 ```cron
@@ -72,7 +72,7 @@ failure. Pick one (in order of preference for this setup):
    (a few MB even with thousands of check-ins).
 3. **scp to a phone or laptop** at minimum.
 
-Encrypt `.env` and `google_sa.json` separately if they leave the host —
+Encrypt `.env` and `google_sa.json` separately if they leave the host -
 e.g. `age -p` or `gpg -c`.
 
 ## Restore drill
