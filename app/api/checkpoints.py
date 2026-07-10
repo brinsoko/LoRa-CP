@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 
 from app.api.helpers import json_ok
 from app.extensions import db
-from app.models import Checkpoint, LoRaDevice, Path, PathStop
+from app.models import Checkpoint, LoRaDevice, Path, PathStop, TimedSegment
 from app.utils.audit import record_audit_event
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_login_required, json_roles_required
@@ -124,6 +124,13 @@ def _apply_paths(cp: Checkpoint, path_ids: list[int]) -> None:
                 PathStop(checkpoint_id=cid, position=position, expected_leg_minutes=minutes)
                 for position, (cid, minutes) in enumerate(remaining)
             ]
+            # Drop TimedSegments stranded by the removal: a segment whose
+            # start or end is no longer on the path can never produce a
+            # time again (mirrors the paths API stop-rewrite cleanup).
+            stop_ids = {cid for cid, _ in remaining}
+            for seg in TimedSegment.query.filter(TimedSegment.path_id == path.id).all():
+                if seg.start_checkpoint_id not in stop_ids or seg.end_checkpoint_id not in stop_ids:
+                    db.session.delete(seg)
 
 
 def _assign_lora_device(cp: Checkpoint, device_id: int | None) -> dict | None:

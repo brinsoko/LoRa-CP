@@ -335,6 +335,10 @@ def scoring_setup_segments():
         flash(_("A segment cannot end at a checkpoint with dead time enabled."), "warning")
         return redirect(url_for("scores.scoring_setup"))
 
+    # `or default` would rewrite an explicit 0 to the default; keep a real
+    # 0 (e.g. a zero-weight segment) with an is-None check instead.
+    max_points = _parse_float(request.form.get("max_points"))
+    min_points = _parse_float(request.form.get("min_points"))
     db.session.add(
         TimedSegment(
             competition_id=comp_id,
@@ -342,8 +346,8 @@ def scoring_setup_segments():
             start_checkpoint_id=start_id,
             end_checkpoint_id=end_id,
             name=(request.form.get("name") or "").strip()[:120] or None,
-            max_points=_parse_float(request.form.get("max_points")) or 100.0,
-            min_points=_parse_float(request.form.get("min_points")) or 0.0,
+            max_points=100.0 if max_points is None else max_points,
+            min_points=0.0 if min_points is None else min_points,
         )
     )
     record_audit_event(
@@ -440,7 +444,13 @@ def scoring_setup_group():
     return redirect(url_for("scores.scoring_setup"))
 
 
-def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
+def _build_scores_context(comp_id: int, group_id: int | None, persist_auto_dnf: bool = False) -> dict:
+    # persist_auto_dnf: whether to durably mark auto-DNF teams. Defaults
+    # False so read-only surfaces (the PUBLIC unauthenticated results
+    # page, CSV export, stats, judge results, the Sheets worker) never
+    # write to the DB just because someone rendered the leaderboard. Only
+    # the authenticated admin leaderboard passes True. Auto-DNF is still
+    # shown everywhere; it is just not materialized on a read.
     groups = (
         CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
@@ -580,6 +590,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
     global_totals = {}
     global_time_points = {}
     global_found_points = {}
+    auto_dnf_ids: set[int] = set()
     for team_id in team_ids:
         group_id_for_team = team_group_ids.get(team_id)
         if not group_id_for_team:
@@ -591,12 +602,20 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
         global_totals[team_id] = contrib["total"] or 0.0
         global_time_points[team_id] = contrib["time_points"] or 0.0
         global_found_points[team_id] = contrib["found_points"] or 0.0
-        # Auto-DNF from the race time rule's dq multiplier.
+        # Auto-DNF from the race time rule's dq multiplier. Shown on every
+        # surface via auto_dnf_ids; only materialized when the caller is
+        # allowed to write (the authenticated admin view).
         if contrib.get("auto_dnf"):
+            auto_dnf_ids.add(team_id)
+    if persist_auto_dnf and auto_dnf_ids:
+        changed = False
+        for team_id in auto_dnf_ids:
             team_obj = db.session.get(Team, team_id)
             if team_obj and not team_obj.dnf:
                 team_obj.dnf = True
-                db.session.commit()
+                changed = True
+        if changed:
+            db.session.commit()
 
     rows = []
     finished_map = {team_id: False for team_id in team_ids}
@@ -653,7 +672,7 @@ def _build_scores_context(comp_id: int, group_id: int | None) -> dict:
                 "notes": team_obj.notes if team_obj and team_obj.notes else "",
                 "segments": team_segments,
                 "segment_points": segment_points_total,
-                "dnf": bool(team.dnf),
+                "dnf": bool(team.dnf) or team.id in auto_dnf_ids,
                 "finished": finished_map.get(team.id, False),
                 "organization": team.organization or "",
                 "allowed_checkpoints": allowed_checkpoint_ids.get(team.id, set()),
@@ -725,7 +744,8 @@ def view_scores():
         return redirect(url_for("main.select_competition"))
 
     group_id = request.args.get("group_id", type=int)
-    context = _build_scores_context(comp_id, group_id)
+    # Authenticated interactive leaderboard: OK to materialize auto-DNF.
+    context = _build_scores_context(comp_id, group_id, persist_auto_dnf=True)
     context["show_actions"] = True
     return render_template("scores_view.html", **context)
 

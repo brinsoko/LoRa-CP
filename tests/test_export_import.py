@@ -89,6 +89,21 @@ class TestExport:
         resp = client.get(f"/api/competition/{comp.id}/export")
         assert resp.status_code == 403
 
+    def test_export_and_merge_scoped_to_active_competition(self, app, client):
+        # Admin of competition A must not be able to export or merge a
+        # DIFFERENT competition B by putting B's id in the URL: the role
+        # gate only checks the session's active competition.
+        admin_a = create_user(username="admin-a", role="public")
+        comp_a = create_competition(name="Comp A")
+        add_membership(admin_a, comp_a, role="admin")
+        comp_b = create_competition(name="Comp B")
+        login_as(client, admin_a, comp_a)
+
+        assert client.get(f"/api/competition/{comp_a.id}/export").status_code == 200
+        assert client.get(f"/api/competition/{comp_b.id}/export").status_code == 403
+        merge_b = client.post(f"/api/competition/{comp_b.id}/merge", json={"schema_version": "1.2.0"})
+        assert merge_b.status_code == 403
+
 
 class TestImport:
     def test_import_creates_new_competition(self, client, _seeded):

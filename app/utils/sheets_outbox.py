@@ -53,8 +53,18 @@ def enqueue_job(kind: str, competition_id: int, payload: dict | None, dedup_key:
     # already-running/done job, so the new payload never executes. The
     # conditional UPDATE instead matches 0 rows once the worker has
     # claimed it, and we fall through to insert a fresh pending job.
+    # Reset the retry budget too: a fresh write coalesced onto a job that
+    # was backing off (attempts>0, next_attempt_at in the future) should
+    # be sent promptly with a full budget, not inherit the old job's
+    # delay and shrunken attempt count.
     updated = SheetsSyncJob.query.filter_by(dedup_key=dedup_key, status="pending").update(
-        {"payload": payload, "updated_at": utcnow_naive()},
+        {
+            "payload": payload,
+            "updated_at": utcnow_naive(),
+            "attempts": 0,
+            "next_attempt_at": None,
+            "last_error": None,
+        },
         synchronize_session=False,
     )
     if updated:
@@ -100,16 +110,27 @@ def enqueue_summary_rebuilds(competition_id: int) -> None:
         if (cfg.spreadsheet_id or "").startswith("local:"):
             continue
         kind = kind_by_tab_type[cfg.tab_type]
-        enqueue_job(
-            kind,
-            competition_id,
-            {
-                "spreadsheet_id": cfg.spreadsheet_id,
-                "tab_name": cfg.tab_name,
-                "competition_id": competition_id,
-            },
-            f"{kind}:{cfg.spreadsheet_id}:{cfg.tab_name}",
-        )
+        # Carry the admin's stored layout overrides (group/checkpoint
+        # order, headers, include_dead_time_sum) into the rebuild so a
+        # roster change reproduces the arrangement instead of resetting
+        # the tab to defaults. Absent keys fall back to build_*_tab
+        # defaults, exactly as before.
+        layout = cfg.config or {}
+        payload = {
+            "spreadsheet_id": cfg.spreadsheet_id,
+            "tab_name": cfg.tab_name,
+            "competition_id": competition_id,
+        }
+        for key in (
+            "headers",
+            "group_order_override",
+            "checkpoint_order_override",
+            "per_group_checkpoint_order",
+            "include_dead_time_sum",
+        ):
+            if key in layout:
+                payload[key] = layout[key]
+        enqueue_job(kind, competition_id, payload, f"{kind}:{cfg.spreadsheet_id}:{cfg.tab_name}")
 
 
 # ---------------------------------------------------------------------------
@@ -148,15 +169,20 @@ def _execute(job: SheetsSyncJob) -> None:
     elif job.kind == "sync_team_numbers":
         sheets_sync.sync_all_checkpoint_tabs(competition_id=payload.get("competition_id"))
     elif job.kind == "rebuild_teams":
-        sheets_sync.build_teams_tab(
+        # build_*_tab return a soft-error string instead of raising; turn
+        # it into a raise so the job retries / dead-letters and shows up
+        # on the health panel instead of being silently marked done.
+        err = sheets_sync.build_teams_tab(
             payload["spreadsheet_id"],
             payload["tab_name"],
             headers=payload.get("headers"),
             group_order_override=payload.get("group_order_override"),
             competition_id=payload.get("competition_id"),
         )
+        if err:
+            raise RuntimeError(err)
     elif job.kind == "rebuild_arrivals":
-        sheets_sync.build_arrivals_tab(
+        err = sheets_sync.build_arrivals_tab(
             payload["spreadsheet_id"],
             payload["tab_name"],
             competition_id=payload.get("competition_id"),
@@ -164,8 +190,10 @@ def _execute(job: SheetsSyncJob) -> None:
             checkpoint_order_override=payload.get("checkpoint_order_override"),
             per_group_checkpoint_order=payload.get("per_group_checkpoint_order"),
         )
+        if err:
+            raise RuntimeError(err)
     elif job.kind == "rebuild_score":
-        sheets_sync.build_score_tab(
+        err = sheets_sync.build_score_tab(
             payload["spreadsheet_id"],
             payload["tab_name"],
             include_dead_time_sum=payload.get("include_dead_time_sum", True),
@@ -174,12 +202,17 @@ def _execute(job: SheetsSyncJob) -> None:
             per_group_checkpoint_order=payload.get("per_group_checkpoint_order"),
             competition_id=payload.get("competition_id"),
         )
+        if err:
+            raise RuntimeError(err)
     elif job.kind == "publish":
-        sheets_sync.publish_local_configs_to_spreadsheet(
+        result = sheets_sync.publish_local_configs_to_spreadsheet(
             payload["competition_id"],
             payload["spreadsheet_id"],
             build_summary_tabs=payload.get("build_summary_tabs", True),
         )
+        errs = result.get("errors") if isinstance(result, dict) else None
+        if errs:
+            raise RuntimeError("; ".join(str(e) for e in errs))
     else:
         raise ValueError(f"unknown sheets job kind {job.kind!r}")
 

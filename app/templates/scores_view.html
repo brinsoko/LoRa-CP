@@ -98,7 +98,7 @@
                   —
                 {% endif %}
               </td>
-              <td class="text-end">{{ (row.dead_time or 0)|round(0)|int }}</td>
+              <td class="text-end">{{ ((row.dead_time or 0) + (row.bonus_dead_time or 0))|round(0)|int }}</td>
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}
@@ -211,9 +211,9 @@
                   {% if row.dnf %}
                     {{ _('DNF') }}
                   {% elif val is not none %}
-                    {{ (val|round(0))|int }}
+                    {{ '%.2f'|format(val) }}
                   {% elif cp.id in (row.allowed_checkpoints or []) %}
-                    0
+                    {{ '%.2f'|format(0) }}
                   {% endif %}
                 </td>
               {% endfor %}
@@ -252,7 +252,7 @@
                   {{ '%.2f'|format(row.global_found or 0) }}
                 {% endif %}
               </td>
-              <td class="text-end">{{ (row.dead_time or 0)|round(0)|int }}</td>
+              <td class="text-end">{{ ((row.dead_time or 0) + (row.bonus_dead_time or 0))|round(0)|int }}</td>
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}

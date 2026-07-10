@@ -274,7 +274,18 @@ def build_arrivals():
             _("Arrivals tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
-    upsert_summary_config(comp_id, spreadsheet_id, None, tab_name, "arrivals")
+    upsert_summary_config(
+        comp_id,
+        spreadsheet_id,
+        None,
+        tab_name,
+        "arrivals",
+        {
+            "group_order_override": group_order,
+            "checkpoint_order_override": cp_order,
+            "per_group_checkpoint_order": per_group_cp_order or None,
+        },
+    )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -335,7 +346,14 @@ def build_teams():
             _("Teams tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
-    upsert_summary_config(comp_id, spreadsheet_id, None, tab_name, "teams")
+    upsert_summary_config(
+        comp_id,
+        spreadsheet_id,
+        None,
+        tab_name,
+        "teams",
+        {"headers": headers, "group_order_override": group_order},
+    )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -408,7 +426,19 @@ def build_score():
             _("Score tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
-    upsert_summary_config(comp_id, spreadsheet_id, None, tab_name, "total")
+    upsert_summary_config(
+        comp_id,
+        spreadsheet_id,
+        None,
+        tab_name,
+        "total",
+        {
+            "include_dead_time_sum": include_dead_time_sum,
+            "group_order_override": group_order,
+            "checkpoint_order_override": cp_order,
+            "per_group_checkpoint_order": per_group_cp_order or None,
+        },
+    )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 

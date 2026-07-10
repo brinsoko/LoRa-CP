@@ -49,11 +49,16 @@ def build_judge_checkpoint_view(comp_id: int, checkpoint_id: int) -> dict:
     groups = CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id).all()
     group_routes: dict[int, list[int]] = {}
     cp_index_by_group: dict[int, int] = {}
+    # All positions of this checkpoint on each route: a path may visit it
+    # twice (butterfly loop), and route.index() alone would always resolve
+    # to the first visit, misclassifying a team heading to a later visit.
+    cp_occurrences_by_group: dict[int, list[int]] = {}
     for group in groups:
         route = resolve_route_ids(group)
         if checkpoint_id in route:
             group_routes[group.id] = route
             cp_index_by_group[group.id] = route.index(checkpoint_id)
+            cp_occurrences_by_group[group.id] = [i for i, cid in enumerate(route) if cid == checkpoint_id]
     group_by_id = {g.id: g for g in groups}
 
     assignments = (
@@ -159,16 +164,27 @@ def build_judge_checkpoint_view(comp_id: int, checkpoint_id: int) -> dict:
         gid = team_group[tid]
         group = group_by_id[gid]
         route = group_routes[gid]
-        idx = cp_index_by_group[gid]
         times = team_cp_times.get(tid, {})
 
         if team.dnf:
             dnf_count += 1
             continue
-        # Any check-in at a LATER stop means they passed without visiting:
-        # that includes the finish, which is the strongest "stop waiting"
-        # signal of all. Counted as finished too when the finish was hit.
-        later_hit = next((cid for cid in route[idx + 1 :] if cid in times), None)
+        # Resolve which visit of this checkpoint the team is heading to.
+        # On a butterfly route the target is the first occurrence still
+        # ahead of the team's furthest recorded stop; if they are already
+        # past every occurrence, use the last one so the "missed" check
+        # below fires. On a normal (single-visit) route this is just the
+        # sole index, so behaviour is unchanged.
+        occurrences = cp_occurrences_by_group[gid]
+        progressed = [i for i, cid in enumerate(route) if cid in times]
+        furthest = max(progressed) if progressed else -1
+        idx = next((i for i in occurrences if i > furthest), occurrences[-1])
+        # A check-in past the LAST occurrence means they passed without
+        # ever visiting (includes the finish, the strongest stop-waiting
+        # signal). Using the last occurrence, not idx, so a team between
+        # the first and second visit is still "waiting", not "missed".
+        last_idx = occurrences[-1]
+        later_hit = next((cid for cid in route[last_idx + 1 :] if cid in times), None)
         if later_hit is not None:
             if route and route[-1] in times:
                 finished_count += 1

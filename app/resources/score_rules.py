@@ -164,7 +164,13 @@ def score_field_upsert():
         try:
             recompute_entry_totals(comp_id, checkpoint_id, group.id)
         except Exception:
-            pass
+            # recompute_entry_totals commits internally, so a failed commit
+            # (e.g. a SQLite write-lock timeout while the sheets-worker
+            # holds the lock) leaves the session in a pending-rollback
+            # state. Roll back before the next iteration / the response,
+            # otherwise the field save (already committed) is followed by a
+            # 500. The field change is durable; only the recompute is lost.
+            db.session.rollback()
     return {"ok": True, "field": _serialize_field(field), "created": created}, (201 if created else 200)
 
 

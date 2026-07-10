@@ -283,7 +283,12 @@ def _persist_row_maps(cfg: SheetConfig, row_maps_by_index: dict[int, dict[str, i
 
 
 def upsert_summary_config(
-    competition_id: int, spreadsheet_id: str, spreadsheet_name: str | None, tab_name: str, tab_type: str
+    competition_id: int,
+    spreadsheet_id: str,
+    spreadsheet_name: str | None,
+    tab_name: str,
+    tab_type: str,
+    config: dict | None = None,
 ) -> None:
     """Record (or repoint) a SheetConfig row for a published summary tab.
 
@@ -292,14 +297,23 @@ def upsert_summary_config(
     rows are never created by the checkpoint wizard (which only writes
     tab_type='checkpoint'), so without this the roster-change auto-refresh
     silently does nothing. One row per (competition, tab_type); a later
-    publish to a different sheet repoints it."""
+    publish to a different sheet repoints it.
+
+    config, when given, stores the admin's layout overrides (group order,
+    checkpoint order, headers, include_dead_time_sum) so the roster-change
+    auto-rebuild reproduces the arrangement instead of resetting it to
+    defaults. Only non-None keys are merged, so a publish (which passes no
+    overrides) never wipes a layout the admin set via the build buttons."""
     if (spreadsheet_id or "").startswith("local:"):
         return
+    merged = {k: v for k, v in (config or {}).items() if v is not None}
     existing = SheetConfig.query.filter_by(competition_id=competition_id, tab_type=tab_type).first()
     if existing is not None:
         existing.spreadsheet_id = spreadsheet_id
         existing.spreadsheet_name = spreadsheet_name or existing.spreadsheet_name
         existing.tab_name = tab_name
+        if merged:
+            existing.config = {**(existing.config or {}), **merged}
     else:
         db.session.add(
             SheetConfig(
@@ -308,6 +322,7 @@ def upsert_summary_config(
                 spreadsheet_name=spreadsheet_name or "Google Sheet",
                 tab_name=tab_name,
                 tab_type=tab_type,
+                config=merged or None,
             )
         )
     db.session.commit()
