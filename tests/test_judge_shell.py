@@ -306,3 +306,33 @@ class TestButterflyRoutes:
 
         view = build_judge_checkpoint_view(comp.id, c.id)
         assert view["finished_count"] == 1
+
+
+class TestJudgeValidationEdges:
+    def test_set_checkpoint_rejects_open_redirect(self, client, app):
+        """The 'next' form value goes through safe_redirect_target
+        (pass-1 fix): a crafted external URL must fall back to /judge."""
+        _user, _comp, _group, _path, cps, _teams = _seed(client)
+        for evil in ("https://evil.example/x", "//evil.example/x"):
+            resp = client.post(
+                "/judge/checkpoint",
+                data={"checkpoint_id": cps[1].id, "next": evil},
+            )
+            assert resp.status_code == 302
+            assert "evil.example" not in resp.headers["Location"]
+
+    def test_api_submit_rejects_negative_dead_time(self, client, app):
+        """Pass 1 removed dead_time's exemption from the negative-input
+        check: the engine ignores negatives while the display would sum
+        them, so accepting one creates a display-vs-scoring mismatch."""
+        _user, _comp, _group, _path, cps, teams = _seed(client)
+        resp = client.post(
+            "/api/scores/submit",
+            json={
+                "team_id": teams[0].id,
+                "checkpoint_id": cps[1].id,
+                "fields": {"dead_time": -5},
+            },
+        )
+        assert resp.status_code == 400, resp.data
+        assert ScoreEntry.query.filter_by(team_id=teams[0].id).count() == 0

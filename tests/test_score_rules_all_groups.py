@@ -199,3 +199,49 @@ def test_resolved_endpoint_returns_union_for_all_groups(client, app):
     # First-seen order preserved across the union.
     assert body["fields"] == ["task1", "task2", "topo"]
     assert [f["key"] for f in body["resolved"]] == ["task1", "task2", "topo"]
+
+
+def test_partial_update_keeps_rule_type_and_params(client, app):
+    """A POST that omits rule_type (e.g. a position-only reorder from the
+    setup UI) must not reset the field to rule_type='none' and wipe
+    rule_params (pass-1 fix: rule keys are only applied when present)."""
+    s = _seed(client)
+    cp = s["cp_shared"]
+    resp = client.post(
+        "/api/score-fields",
+        json={
+            "checkpoint_id": cp.id,
+            "key": "knots",
+            "rule_type": "multiplier",
+            "rule_params": {"factor": 3},
+        },
+    )
+    assert resp.status_code in (200, 201), resp.data
+
+    resp = client.post(
+        "/api/score-fields",
+        json={"checkpoint_id": cp.id, "key": "knots", "position": 5},
+    )
+    assert resp.status_code in (200, 201), resp.data
+
+    field = ScoreField.query.filter_by(checkpoint_id=cp.id, key="knots").one()
+    assert field.position == 5
+    assert field.rule_type == "multiplier"
+    assert field.rule_params == {"factor": 3}
+
+
+def test_resolved_endpoint_rejects_foreign_checkpoint(client, app):
+    """An admin of competition A must not read competition B's resolved
+    scoring config by passing a foreign checkpoint_id (pass-1 fix)."""
+    from tests.support import create_checkpoint as _create_cp
+    from tests.support import create_competition as _create_comp
+
+    s = _seed(client)
+    cp = s["cp_shared"]
+    other = _create_comp(name="Foreign Rules Race")
+    foreign_cp = _create_cp(other, name="CP-Foreign")
+
+    resp = client.get(f"/api/score-fields/resolved?checkpoint_id={foreign_cp.id}")
+    assert resp.status_code == 404, resp.data
+    resp = client.get(f"/api/score-fields/resolved?checkpoint_id={cp.id}")
+    assert resp.status_code == 200

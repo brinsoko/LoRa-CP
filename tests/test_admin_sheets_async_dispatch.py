@@ -208,3 +208,55 @@ def test_publish_route_returns_immediately_without_touching_sheets(async_sheets_
     resp = client.post("/sheets/publish-local", data={"spreadsheet_id": "REAL-SHEET-ID"})
     assert resp.status_code == 302  # would be 500 if explode() ran
     assert len(_jobs("publish")) == 1
+
+
+def test_build_score_stores_layout_and_clearing_removes_it(async_sheets_app):
+    """The build routes record the admin's layout in SheetConfig.config so
+    roster-change auto-rebuilds reproduce it (pass-2 fix), and a later
+    build WITHOUT an override clears the stored key (pass-3 fix: the
+    non-None merge made overrides unclearable, silently resurrecting an
+    old layout on the next auto-rebuild)."""
+    s = _seed_minimal("Layout Race")
+    client = async_sheets_app.test_client()
+    login_as(client, s["user"], s["comp"])
+
+    resp = client.post(
+        "/sheets/build-score",
+        data={
+            "spreadsheet_id": "REAL-SHEET",
+            "tab_name": "Rezultati",
+            "group_order": "Beta,Alpha",
+            # include_dead_time_sum checkbox unchecked -> False
+        },
+    )
+    assert resp.status_code == 302, resp.data
+    cfg = SheetConfig.query.filter_by(competition_id=s["comp"].id, tab_type="total").one()
+    assert cfg.config["group_order_override"] == ["Beta", "Alpha"]
+    assert cfg.config["include_dead_time_sum"] is False
+
+    # The roster-change auto-rebuild must carry the stored layout.
+    SheetsSyncJob.query.delete()
+    db.session.commit()
+    from app.utils.sheets_outbox import enqueue_summary_rebuilds
+
+    enqueue_summary_rebuilds(s["comp"].id)
+    db.session.commit()
+    payload = SheetsSyncJob.query.filter_by(kind="rebuild_score").one().payload
+    assert payload["group_order_override"] == ["Beta", "Alpha"]
+    assert payload["include_dead_time_sum"] is False
+
+    # Rebuild with the override cleared: the stored key must go away.
+    resp = client.post(
+        "/sheets/build-score",
+        data={
+            "spreadsheet_id": "REAL-SHEET",
+            "tab_name": "Rezultati",
+            "group_order": "",
+            "include_dead_time_sum": "1",
+        },
+    )
+    assert resp.status_code == 302, resp.data
+    db.session.expire_all()
+    cfg = SheetConfig.query.filter_by(competition_id=s["comp"].id, tab_type="total").one()
+    assert "group_order_override" not in (cfg.config or {})
+    assert cfg.config["include_dead_time_sum"] is True

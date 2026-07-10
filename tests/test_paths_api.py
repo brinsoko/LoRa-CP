@@ -185,3 +185,69 @@ def test_checkpoint_path_membership_append_and_remove(client, app):
     db.session.refresh(group)
     assert resolve_route_ids(group) == [cps[0].id, cps[1].id]
     assert [s.position for s in group.path.stops] == [0, 1]
+
+
+def test_duplicate_reversed_shifts_leg_minutes(client, app):
+    """expected_leg_minutes is stored on the LATER stop of each pair;
+    reversing the stop order must shift the list one slot (pass-1 fix),
+    not copy it per-stop, or every leg estimate lands on the wrong leg."""
+    comp, cps = _seed(client)
+    resp = client.post(
+        "/api/paths",
+        json={
+            "name": "Timed",
+            "checkpoint_ids": [cps[0].id, cps[1].id, cps[2].id],
+            "expected_leg_minutes": [None, 10, 20],
+        },
+    )
+    assert resp.status_code == 201, resp.data
+    path_id = resp.get_json()["path"]["id"]
+
+    resp = client.post(f"/api/paths/{path_id}/duplicate", json={"reversed": True})
+    assert resp.status_code == 201, resp.data
+    stops = resp.get_json()["path"]["stops"]
+    assert [s["checkpoint_id"] for s in stops] == [cps[2].id, cps[1].id, cps[0].id]
+    # Leg C-B was stored on C's successor (20), leg B-A on B's (10):
+    # reversed, the first traversed leg is C->B (20), then B->A (10).
+    assert [s["expected_leg_minutes"] for s in stops] == [None, 20, 10]
+
+
+def test_stop_rewrite_drops_stranded_segments(client, app):
+    """Removing a segment endpoint from the path must delete the segment
+    (pass-1 fix on the paths API side): it can never time again and its
+    directed end would keep blocking dead-time toggles forever."""
+    from tests.support import create_segment
+
+    comp, cps = _seed(client)
+    resp = client.post(
+        "/api/paths", json={"name": "SegDrop", "checkpoint_ids": [cps[0].id, cps[1].id]}
+    )
+    path_id = resp.get_json()["path"]["id"]
+    create_segment(db.session.get(Path, path_id), cps[0], cps[1])
+
+    resp = client.patch(
+        f"/api/paths/{path_id}", json={"checkpoint_ids": [cps[0].id, cps[2].id]}
+    )
+    assert resp.status_code == 200, resp.data
+    from app.models import TimedSegment
+
+    assert TimedSegment.query.filter_by(path_id=path_id).count() == 0
+
+
+def test_checkpoint_side_removal_drops_stranded_segments(client, app):
+    """Same invariant via the checkpoint edit (pass-2 fix in
+    _apply_paths): unticking a path there rewrites the stops too."""
+    from tests.support import create_segment
+
+    comp, cps = _seed(client)
+    resp = client.post(
+        "/api/paths", json={"name": "SegDropCp", "checkpoint_ids": [cps[0].id, cps[1].id]}
+    )
+    path_id = resp.get_json()["path"]["id"]
+    create_segment(db.session.get(Path, path_id), cps[0], cps[1])
+
+    resp = client.patch(f"/api/checkpoints/{cps[1].id}", json={"path_ids": []})
+    assert resp.status_code == 200, resp.data
+    from app.models import TimedSegment
+
+    assert TimedSegment.query.filter_by(path_id=path_id).count() == 0

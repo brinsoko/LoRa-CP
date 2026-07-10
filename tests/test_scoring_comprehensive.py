@@ -1183,3 +1183,44 @@ class TestCsvMirrorsPage:
         assert [row[rank_i] for row in data] == ["1", "2", "1", "2"]
         # bonus_dead_time joins the dead_time column like the page cell.
         assert data[0][dead_i] == "7"
+
+
+class TestRawSumFallbackScope:
+    def test_entry_with_only_counts_false_field_totals_none(self, app, seeded):
+        """Pass 1: when fields ARE configured, the legacy raw-sum fallback
+        must not run just because no counting field was filled - a
+        counts_in_total=False value would leak into the total."""
+        s = seeded
+        create_score_field(s["cp3"], "notes_only", counts_in_total=False)
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        assert compute_entry_total({"notes_only": 20}, fields, {}) is None
+
+
+class TestSegmentFormEdges:
+    def test_segment_create_form_keeps_explicit_zero_max_points(self, app, client):
+        """Pass 2: `or default` rewrote an explicit 0 to 100; a zero-weight
+        segment (timed but not scored) must stay 0."""
+        from app.models import TimedSegment
+
+        user = create_user(username="seg-admin", role="admin")
+        comp = create_competition(name="Seg Zero Cup")
+        add_membership(user, comp, role="admin")
+        group = create_group(comp, name="Alpha", prefix="1xx")
+        a = create_checkpoint(comp, name="Seg-A")
+        b = create_checkpoint(comp, name="Seg-B")
+        path = set_group_route(group, [a, b])
+        login_as(client, user, comp)
+
+        resp = client.post(
+            "/scores/setup/segments",
+            data={
+                "path_id": path.id,
+                "start_checkpoint_id": a.id,
+                "end_checkpoint_id": b.id,
+                "max_points": "0",
+                "min_points": "0",
+            },
+        )
+        assert resp.status_code == 302, resp.data
+        segment = TimedSegment.query.filter_by(path_id=path.id).one()
+        assert segment.max_points == 0.0

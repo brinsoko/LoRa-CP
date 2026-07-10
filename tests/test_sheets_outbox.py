@@ -324,3 +324,94 @@ class TestWorkerReliability:
         resp = client.delete(f"/api/teams/{team.id}", json={})
         assert resp.status_code == 200, resp.data
         assert SheetsSyncJob.query.filter_by(kind="sync_team_numbers").count() == 1
+
+
+class TestWorkerBackfilledRegressions:
+    """Tests backfilled for pass-1/pass-2 fixes that landed without any."""
+
+    def test_scores_dedup_key_is_per_group(self, outbox_app):
+        """Pass 1 added group_name to the scores dedup key: a team in two
+        groups gets a sheet cell per group block, so writes for different
+        groups must not coalesce into one job."""
+        comp, cp, team = _seed()
+        sheets_sync.update_checkpoint_scores(team.id, cp.id, "Alpha", {"points": 1})
+        sheets_sync.update_checkpoint_scores(team.id, cp.id, "Beta", {"points": 2})
+        jobs = SheetsSyncJob.query.filter_by(kind="scores").all()
+        assert len(jobs) == 2
+        assert {j.payload["group_name"] for j in jobs} == {"Alpha", "Beta"}
+
+    def test_rebuild_soft_error_string_retries(self, outbox_app, monkeypatch):
+        """build_*_tab report failure as a returned string; pass 2 made
+        _execute raise on it so the job retries instead of going done."""
+        comp, cp, team = _seed()
+        sheets_outbox.enqueue_job(
+            "rebuild_teams",
+            comp.id,
+            {"spreadsheet_id": "REAL-SHEET", "tab_name": "Ekipe", "competition_id": comp.id},
+            "rebuild_teams:REAL-SHEET:Ekipe",
+        )
+        db.session.commit()
+        monkeypatch.setattr(
+            sheets_sync, "build_teams_tab", lambda *a, **k: "Could not open spreadsheet"
+        )
+        stats = sheets_outbox.run_due_jobs()
+        job = SheetsSyncJob.query.one()
+        assert stats == {"done": 0, "retried": 1, "failed": 0}
+        assert job.status == "pending"
+        assert "Could not open spreadsheet" in (job.last_error or "")
+
+    def test_db_error_in_execute_does_not_strand_job_as_running(self, outbox_app, monkeypatch):
+        """Pass 1 added a rollback before the failure bookkeeping: a
+        DB-level error leaves the session pending-rollback, and without it
+        the bookkeeping commit raised too, stranding the job 'running'
+        with attempts never incremented."""
+        comp, cp, team = _seed()
+        sheets_sync.mark_arrival_checkbox(team.id, cp.id)
+        db.session.commit()
+
+        def dirty_boom(_job):
+            # Poison the session the way a mid-write IntegrityError does.
+            db.session.add(SheetsSyncJob(competition_id=None, kind=None, dedup_key=None))
+            db.session.flush()
+
+        monkeypatch.setattr(sheets_outbox, "_execute", dirty_boom)
+        stats = sheets_outbox.run_due_jobs()  # must not raise
+        job = SheetsSyncJob.query.one()
+        assert stats["retried"] == 1
+        assert job.status == "pending"
+        assert job.attempts == 1
+
+    def test_startup_recovery_reclaims_fresh_running_rows(self, outbox_app):
+        """all_running=True (worker startup) reclaims ANY running row, no
+        age guard: exactly one worker runs, so a fresh 'running' row is
+        necessarily an orphan of a crashed run."""
+        comp, cp, team = _seed()
+        sheets_sync.mark_arrival_checkbox(team.id, cp.id)
+        job = SheetsSyncJob.query.one()
+        job.status = "running"  # updated_at stays recent
+        db.session.commit()
+
+        sheets_outbox._recover_stuck_running()  # periodic call: age-guarded
+        assert SheetsSyncJob.query.one().status == "running"
+
+        sheets_outbox._recover_stuck_running(all_running=True)
+        assert SheetsSyncJob.query.one().status == "pending"
+
+    def test_startup_recovery_drops_superseded_orphan(self, outbox_app):
+        """An orphaned running row whose dedup_key has a NEWER pending job
+        carries a stale payload; recovery must drop it, not requeue it."""
+        comp, cp, team = _seed()
+        sheets_sync.mark_arrival_checkbox(team.id, cp.id)
+        orphan = SheetsSyncJob.query.one()
+        orphan.status = "running"
+        db.session.commit()
+        # New write for the same target while the orphan is 'running'.
+        sheets_outbox.enqueue_job(orphan.kind, comp.id, {"newer": True}, orphan.dedup_key)
+        db.session.commit()
+
+        sheets_outbox._recover_stuck_running(all_running=True)
+        jobs = SheetsSyncJob.query.order_by(SheetsSyncJob.id.asc()).all()
+        assert jobs[0].status == "done"
+        assert "superseded" in (jobs[0].last_error or "")
+        assert jobs[1].status == "pending"
+        assert jobs[1].payload == {"newer": True}
