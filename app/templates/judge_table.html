@@ -38,7 +38,7 @@
                              value="{{ row.raw_values.get(f.key, '') }}">
                     </td>
                   {% endfor %}
-                  <td class="text-end">{{ '%.1f'|format(row.total) if row.total is not none else '—' }}</td>
+                  <td class="text-end">{{ '%.1f'|format(row.total) if row.total is not none else '-' }}</td>
                 </tr>
               {% endfor %}
             </tbody>

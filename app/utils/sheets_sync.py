@@ -282,6 +282,37 @@ def _persist_row_maps(cfg: SheetConfig, row_maps_by_index: dict[int, dict[str, i
         db.session.commit()
 
 
+def upsert_summary_config(
+    competition_id: int, spreadsheet_id: str, spreadsheet_name: str | None, tab_name: str, tab_type: str
+) -> None:
+    """Record (or repoint) a SheetConfig row for a published summary tab.
+
+    enqueue_summary_rebuilds finds summary tabs to auto-refresh by
+    querying SheetConfig for tab_type in (teams, arrivals, total). Those
+    rows are never created by the checkpoint wizard (which only writes
+    tab_type='checkpoint'), so without this the roster-change auto-refresh
+    silently does nothing. One row per (competition, tab_type); a later
+    publish to a different sheet repoints it."""
+    if (spreadsheet_id or "").startswith("local:"):
+        return
+    existing = SheetConfig.query.filter_by(competition_id=competition_id, tab_type=tab_type).first()
+    if existing is not None:
+        existing.spreadsheet_id = spreadsheet_id
+        existing.spreadsheet_name = spreadsheet_name or existing.spreadsheet_name
+        existing.tab_name = tab_name
+    else:
+        db.session.add(
+            SheetConfig(
+                competition_id=competition_id,
+                spreadsheet_id=spreadsheet_id,
+                spreadsheet_name=spreadsheet_name or "Google Sheet",
+                tab_name=tab_name,
+                tab_type=tab_type,
+            )
+        )
+    db.session.commit()
+
+
 def _team_row_for_group(grp_def: dict, db_group, comp_id: int, team_id: int) -> int | None:
     """Row of a team inside a group block on a CP tab.
 
@@ -511,6 +542,10 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime
     checkpoint = db.session.get(_CP, checkpoint_id)
     if checkpoint is None:
         return
+    # No commit here: enqueue_job rides the caller's transaction (see its
+    # docstring) so the job and the domain change commit together. A
+    # commit at this point would flush the caller's still-open work
+    # mid-operation and break bulk saves.
     enqueue_job(
         "arrival",
         checkpoint.competition_id,
@@ -521,7 +556,6 @@ def mark_arrival_checkbox(team_id: int, checkpoint_id: int, arrived_at: datetime
         },
         f"arrival:{team_id}:{checkpoint_id}",
     )
-    db.session.commit()
 
 
 def mark_arrival_checkbox_sync(team_id: int, checkpoint_id: int, arrived_at: datetime | None = None):
@@ -617,6 +651,10 @@ def update_checkpoint_scores(
     checkpoint = db.session.get(_CP, checkpoint_id)
     if checkpoint is None:
         return
+    # No commit here (see mark_arrival_checkbox): the job rides the
+    # caller's transaction. group_name is part of the dedup key so
+    # concurrent writes for the same team+checkpoint in different groups
+    # don't coalesce into one and drop a group's scores.
     enqueue_job(
         "scores",
         checkpoint.competition_id,
@@ -627,9 +665,8 @@ def update_checkpoint_scores(
             "values": values,
             "scored_at": scored_at.isoformat() if scored_at else None,
         },
-        f"scores:{team_id}:{checkpoint_id}",
+        f"scores:{team_id}:{checkpoint_id}:{group_name}",
     )
-    db.session.commit()
 
 
 def update_checkpoint_scores_sync(
@@ -2031,7 +2068,7 @@ def _build_local_cp_grid(
 
     total_cols = current_col - 1
     if total_cols <= 0:
-        return [headers], {}
+        return [headers], {}, {}
 
     # Per group: ordered team list + their latest score + check-in timestamp
     cp_id = cfg.checkpoint_id
@@ -2065,6 +2102,7 @@ def _build_local_cp_grid(
                     checkin_ts = ci.timestamp
             rows.append(
                 {
+                    "team_id": t_id,
                     "team_label": t_num if t_num is not None else (t_name or ""),
                     "score": score,
                     "checkin_ts": checkin_ts,
@@ -2359,11 +2397,14 @@ def publish_local_configs_to_spreadsheet(
         # team, organization, total. Same try/except shape as the other
         # summary tabs so a failure here is logged but doesn't prevent
         # the rest of the publish from succeeding.
-        for label, fn, tab_label in [
-            ("teams", build_teams_tab, lang.get("teams_tab") or "Teams"),
-            ("arrivals", build_arrivals_tab, lang.get("arrivals_tab") or "Arrivals"),
-            ("score", build_score_tab, lang.get("score_tab") or "Score"),
-            ("public", build_public_summary_tab, lang.get("public_tab") or "Javno"),
+        # cfg_type is the SheetConfig.tab_type enqueue_summary_rebuilds
+        # looks up (teams/arrivals/total); 'public' has no auto-rebuild
+        # kind so it isn't recorded.
+        for label, fn, tab_label, cfg_type in [
+            ("teams", build_teams_tab, lang.get("teams_tab") or "Teams", "teams"),
+            ("arrivals", build_arrivals_tab, lang.get("arrivals_tab") or "Arrivals", "arrivals"),
+            ("score", build_score_tab, lang.get("score_tab") or "Score", "total"),
+            ("public", build_public_summary_tab, lang.get("public_tab") or "Javno", None),
         ]:
             try:
                 err = fn(
@@ -2375,6 +2416,10 @@ def publish_local_configs_to_spreadsheet(
                     result["errors"].append(f"{label}: {err}")
                 else:
                     result["summary_tabs"].append(tab_label)
+                    if cfg_type:
+                        upsert_summary_config(
+                            competition_id, spreadsheet_id, spreadsheet_name, tab_label, cfg_type
+                        )
             except Exception as exc:
                 result["errors"].append(f"{label} build raised: {exc}")
                 try:

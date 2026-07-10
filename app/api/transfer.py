@@ -32,6 +32,7 @@ from app.models import (
     TimedSegment,
     User,
 )
+from app.utils.competition import require_current_competition_id
 from app.utils.paths import resolve_route_ids
 from app.utils.rest_auth import json_roles_required
 from app.utils.scoring_backfill import convert_legacy_scoring
@@ -39,6 +40,23 @@ from app.utils.serial_helpers import normalize_uid
 from app.utils.time import utcnow_naive
 
 transfer_api_bp = Blueprint("api_transfer", __name__)
+
+
+def _opt_float(value, default: float) -> float:
+    """`value or default` rewrites an explicit 0 to the default; this
+    keeps a real 0.0 (e.g. a segment min_points of 0) on round-trip."""
+    return default if value is None else float(value)
+
+
+def _competition_in_scope(comp_id: int) -> bool:
+    """json_roles_required only checks the admin role in the session's
+    active competition, so an admin of competition A could otherwise
+    export/merge competition B by putting B's id in the URL. Require the
+    URL id to be the active competition; superadmin bypasses (its role
+    set spans every competition)."""
+    if (getattr(current_user, "role", None) or "").strip().lower() == "superadmin":
+        return True
+    return comp_id == require_current_competition_id()
 
 # 1.1.0: paths/path_stops become first-class; groups carry path_name +
 # direction. group_checkpoint_links is still exported as a derived legacy
@@ -781,8 +799,8 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                 start_checkpoint_id=start_cp.id,
                 end_checkpoint_id=end_cp.id,
                 name=s_data.get("name"),
-                max_points=s_data.get("max_points") or 100.0,
-                min_points=s_data.get("min_points") or 0.0,
+                max_points=_opt_float(s_data.get("max_points"), 100.0),
+                min_points=_opt_float(s_data.get("min_points"), 0.0),
             )
         )
 
@@ -1347,8 +1365,8 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                 start_checkpoint_id=start_cp.id,
                 end_checkpoint_id=end_cp.id,
                 name=s_data.get("name"),
-                max_points=s_data.get("max_points") or 100.0,
-                min_points=s_data.get("min_points") or 0.0,
+                max_points=_opt_float(s_data.get("max_points"), 100.0),
+                min_points=_opt_float(s_data.get("min_points"), 0.0),
             )
         )
         existing_segments.add(key)
@@ -1457,6 +1475,8 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
 @transfer_api_bp.get("/api/competition/<int:comp_id>/export")
 @json_roles_required("admin")
 def export_competition(comp_id: int):
+    if not _competition_in_scope(comp_id):
+        return jsonify({"error": "forbidden", "code": 403}), 403
     comp = Competition.query.get(comp_id)
     if not comp:
         return jsonify({"error": "not_found"}), 404
@@ -1506,6 +1526,8 @@ def import_competition():
 @transfer_api_bp.post("/api/competition/<int:comp_id>/merge")
 @json_roles_required("admin")
 def merge_competition(comp_id: int):
+    if not _competition_in_scope(comp_id):
+        return jsonify({"error": "forbidden", "code": 403}), 403
     comp = Competition.query.get(comp_id)
     if not comp:
         return jsonify({"error": "not_found"}), 404

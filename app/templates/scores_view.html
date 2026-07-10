@@ -231,7 +231,7 @@
                       {% if s.minutes is not none %}
                         <span class="text-muted small">({{ '%.1f'|format(s.minutes) }} {{ _('min') }})</span>
                       {% endif %}
-                      <div class="text-muted small">{{ s.start_hms or '—' }} → {{ s.end_hms or '—' }}</div>
+                      <div class="text-muted small">{{ s.start_hms or '-' }} → {{ s.end_hms or '-' }}</div>
                     </div>
                   {% endfor %}
                 {% else %}
@@ -267,7 +267,7 @@
             {% set ns.prev_group = row.group %}
           {% else %}
             <tr>
-              <td colspan="{{ 10 + (checkpoints|length) }}" class="text-muted text-center py-4">{{ _('No scores yet.') }}</td>
+              <td colspan="{{ 11 + (checkpoints|length) }}" class="text-muted text-center py-4">{{ _('No scores yet.') }}</td>
             </tr>
           {% endfor %}
         </tbody>

@@ -169,7 +169,22 @@ document.addEventListener("DOMContentLoaded", function() {
   reverseButton?.addEventListener("click", () => {
     if (!selectedList) return;
     const items = Array.from(selectedList.querySelectorAll("[data-cp-id]"));
-    items.reverse().forEach((item) => selectedList.appendChild(item));
+    // Capture leg minutes in current order before reordering. The value
+    // is the leg arriving at each stop, so reversing the stop order
+    // shifts every value one stop: the new first stop has no incoming
+    // leg, the rest are the original legs (skipping index 0) reversed.
+    // Mirrors the duplicate-reversed logic in app/api/paths.py; moving
+    // each value with its own checkpoint would misalign every leg.
+    const minutes = items.map((item) => {
+      const box = item.querySelector(".leg-minutes");
+      return box ? box.value : "";
+    });
+    const shifted = [""].concat(minutes.slice(1).reverse());
+    items.reverse().forEach((item, idx) => {
+      const box = item.querySelector(".leg-minutes");
+      if (box) box.value = shifted[idx];
+      selectedList.appendChild(item);
+    });
   });
 
   if (selectedList) {

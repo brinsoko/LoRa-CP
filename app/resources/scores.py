@@ -349,12 +349,12 @@ def score_resolve():
                 },
                 created_at=checkin.timestamp,
             )
-        db.session.commit()
         if checkin_created:
             try:
                 mark_arrival_checkbox(team.id, checkpoint_id, checkin.timestamp)
             except Exception:
                 pass
+        db.session.commit()
 
     checkin_exists = checkin is not None
 
@@ -398,10 +398,14 @@ def score_submit():
     # Same normalization as /api/ingest — see note in score_resolve.
     uid = normalize_uid((payload.get("uid") or "").split("|", 1)[0])
 
-    # Validate no negative numeric inputs (dead_time excluded — it's always >= 0)
-    for key, val in fields.items():
+    # Validate no negative numeric inputs, dead_time included: it is
+    # waiting minutes and must be >= 0. get_team_dead_time_total ignores
+    # negatives (num > 0) while the "Dead time (sum)" display would add
+    # them, so accepting a negative only creates a display-vs-scoring
+    # mismatch.
+    for val in fields.values():
         num = _to_number(val)
-        if num is not None and num < 0 and key != "dead_time":
+        if num is not None and num < 0:
             from flask_babel import gettext as _
 
             return jsonify({"error": "validation_error", "detail": _("Score cannot be negative.")}), 400
@@ -478,12 +482,12 @@ def score_submit():
                 created_at=checkin.timestamp,
             )
             created_checkin = True
-        db.session.commit()
         if created_checkin:
             try:
                 mark_arrival_checkbox(team.id, checkpoint_id, checkin.timestamp)
             except Exception:
                 pass
+        db.session.commit()
 
     total = compute_entry_total(
         fields,
@@ -512,9 +516,9 @@ def score_submit():
         details=_score_entry_snapshot(entry),
         created_at=entry.created_at,
     )
-    db.session.commit()
 
-    # Update Google Sheets
+    # Enqueue the Sheets write before committing so the outbox job rides
+    # the same transaction as the ScoreEntry (see enqueue_job docstring).
     try:
         values = dict(fields)
         if total is not None:
@@ -522,6 +526,7 @@ def score_submit():
         update_checkpoint_scores(team.id, checkpoint_id, group_name, values, entry.created_at)
     except Exception:
         pass
+    db.session.commit()
 
     card_writeback = None
     writeback_error = None

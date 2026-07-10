@@ -247,7 +247,11 @@ def scoring_setup_fields():
                 rule_type=rule_type,
                 rule_params=params,
                 max_input=_parse_float(request.form.get("new_max_input")),
-                counts_in_total=bool(request.form.get("new_counts", "on")),
+                # No "on" default: an unchecked checkbox sends nothing, so
+                # defaulting to "on" made counts_in_total always True and
+                # a non-counting field impossible to create (matches the
+                # existing-field update above).
+                counts_in_total=bool(request.form.get("new_counts")),
             )
         )
 

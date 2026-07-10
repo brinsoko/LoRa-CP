@@ -21,7 +21,7 @@
             {% if row.segments %}
               <div class="text-body-secondary small">
                 {% for s in row.segments %}
-                  {{ s.label }}: {{ s.start_hms or '—' }} → {{ s.end_hms or '—' }}{% if s.minutes is not none %} = {{ '%.1f'|format(s.minutes) }} {{ _('min') }}{% endif %}{% if s.points is not none %} ({{ '%.1f'|format(s.points) }}){% endif %}{{ '' if loop.last else '; ' }}
+                  {{ s.label }}: {{ s.start_hms or '-' }} → {{ s.end_hms or '-' }}{% if s.minutes is not none %} = {{ '%.1f'|format(s.minutes) }} {{ _('min') }}{% endif %}{% if s.points is not none %} ({{ '%.1f'|format(s.points) }}){% endif %}{{ '' if loop.last else '; ' }}
                 {% endfor %}
               </div>
             {% endif %}

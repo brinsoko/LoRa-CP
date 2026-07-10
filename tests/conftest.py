@@ -28,7 +28,8 @@ def build_test_config(tmp_path: Path) -> dict:
         "LORA_WEBHOOK_SECRET": "CHANGE_LATER",
         "SHEETS_SYNC_ENABLED": False,
         # Run Sheets writes inline so tests observe the side effects directly.
-        # The async dispatch is exercised separately in test_sheets_sync_async.
+        # The durable outbox dispatch is exercised separately in
+        # test_sheets_outbox.
         "SHEETS_SYNC_INLINE": True,
         "SERVER_NAME": "localhost",
         "GOOGLE_OAUTH_CLIENT_ID": None,

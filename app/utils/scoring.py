@@ -129,6 +129,7 @@ def compute_entry_total(values: dict, fields: list[dict], context: dict) -> floa
 
     base_total = None
     scored = [f for f in fields if f["key"] not in ("dead_time",)]
+    has_configured_fields = bool(scored)
     if scored:
         total = 0.0
         used = False
@@ -147,7 +148,11 @@ def compute_entry_total(values: dict, fields: list[dict], context: dict) -> floa
 
     if "points" in values:
         base_total = _to_number(values.get("points"))
-    if base_total is None:
+    # Raw-sum fallback is only for legacy entries with NO configured
+    # fields. When fields are configured, a counts_in_total=False field
+    # must never leak into the total, so we do not sum raw inputs just
+    # because no counting field happened to be filled.
+    if base_total is None and not has_configured_fields:
         total = 0.0
         used = False
         for key, val in values.items():

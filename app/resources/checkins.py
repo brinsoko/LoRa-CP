@@ -299,11 +299,11 @@ def checkin_create():
         details=_checkin_snapshot(c),
         created_at=ts,
     )
-    db.session.commit()
     try:
         mark_arrival_checkbox(team_id, checkpoint_id, ts)
     except Exception:
         pass
+    db.session.commit()
     return {"ok": True, "created": True, "checkin": _serialize_checkin(c)}, 201
 
 
@@ -435,11 +435,11 @@ def _update_checkin(checkin_id: int, partial: bool):
         details={"before": before, "after": _checkin_snapshot(c)},
         created_at=utcnow_naive(),
     )
-    db.session.commit()
     try:
         mark_arrival_checkbox(new_team_id, new_cp_id, new_ts)
     except Exception:
         pass
+    db.session.commit()
     return {"ok": True, "updated": True, "checkin": _serialize_checkin(c)}, 200
 
 

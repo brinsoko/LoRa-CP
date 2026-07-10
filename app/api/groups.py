@@ -301,6 +301,33 @@ def _update_group(group_id: int, partial: bool):
         group.direction = direction or "forward"
 
     db.session.flush()
+
+    # Changing a group's path or direction re-derives which checkpoints
+    # are timed-segment ends (endpoints swap for reverse groups). Enforce
+    # the same invariant the checkpoint and segment writes enforce: a
+    # dead-time checkpoint must never become a segment end. Checked after
+    # the flush so segment_end_checkpoint_ids sees the new path/direction.
+    if "path_id" in payload or "direction" in payload or not partial:
+        from app.models import Checkpoint
+        from app.utils.scoring import segment_end_checkpoint_ids
+
+        blocked = segment_end_checkpoint_ids(comp_id)
+        if blocked and Checkpoint.query.filter(
+            Checkpoint.competition_id == comp_id,
+            Checkpoint.id.in_(blocked),
+            Checkpoint.dead_time_enabled.is_(True),
+        ).first():
+            db.session.rollback()
+            return jsonify(
+                {
+                    "error": "validation_error",
+                    "detail": _(
+                        "This path/direction would put a dead-time checkpoint at a timed "
+                        "segment's end. Disable dead time there or adjust the segment first."
+                    ),
+                }
+            ), 400
+
     record_audit_event(
         competition_id=comp_id,
         event_type="group_updated",

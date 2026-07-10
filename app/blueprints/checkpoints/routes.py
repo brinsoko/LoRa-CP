@@ -60,7 +60,9 @@ def _parse_optional_int(raw_value, field_label: str) -> tuple[int | None, str | 
     try:
         return int(str(raw_value).strip()), None
     except (TypeError, ValueError):
-        return None, _(f"{field_label} must be an integer.")
+        # Named placeholder, not an f-string: Babel cannot extract
+        # _(f"...") (CLAUDE.md), so the message could never be translated.
+        return None, _("%(field)s must be an integer.", field=field_label)
 
 
 def _parse_int_list(values, field_label: str) -> tuple[list[int], str | None]:
@@ -84,8 +86,8 @@ def _normalize_checkpoint_form(form):
     northing_raw = form.get("northing")
     easting = float(easting_raw) if easting_raw else None
     northing = float(northing_raw) if northing_raw else None
-    lora_device_id, lora_device_error = _parse_optional_int(form.get("lora_device_id"), "Device ID")
-    path_ids, path_ids_error = _parse_int_list(form.getlist("path_ids"), "Path ID")
+    lora_device_id, lora_device_error = _parse_optional_int(form.get("lora_device_id"), _("Device ID"))
+    path_ids, path_ids_error = _parse_int_list(form.getlist("path_ids"), _("Path ID"))
 
     is_virtual = form.get("is_virtual") in ("on", "true", "True", "1")
     counts_for_found = form.get("counts_for_found") in ("on", "true", "True", "1")

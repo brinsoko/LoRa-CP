@@ -238,8 +238,14 @@ def downgrade() -> None:
             route_by_group.setdefault(group_id, []).append(checkpoint_id)
             direction_by_group[group_id] = direction
         for group_id, route in route_by_group.items():
+            # path_stops hold the path's forward order. Old code computes
+            # the effective route as reversed(links) when reverse=1, so a
+            # reverse group must store its links in forward (path) order
+            # and only flip the flag. Reversing the route here too would
+            # double-encode the direction (old code would then show the
+            # route forwards), and a later re-upgrade would lose the
+            # reverse direction entirely.
             if direction_by_group.get(group_id) == "reverse":
-                route = list(reversed(route))
                 bind.execute(
                     sa.text("UPDATE checkpoint_groups SET reverse = 1 WHERE id = :gid"),
                     {"gid": group_id},

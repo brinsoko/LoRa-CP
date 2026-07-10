@@ -67,7 +67,12 @@ def build_judge_checkpoint_view(comp_id: int, checkpoint_id: int) -> dict:
     teams = {t.id: t for t in Team.query.filter(Team.competition_id == comp_id).all()}
 
     # First check-in per (team, checkpoint) for every routed checkpoint.
+    # Always include this checkpoint even when no group's route passes
+    # through it (e.g. a checkpoint not placed on any path), otherwise
+    # real arrivals here would never load and the "whoever is physically
+    # standing there" arrived list would be empty.
     route_cp_ids = {cid for route in group_routes.values() for cid in route}
+    route_cp_ids.add(checkpoint_id)
     team_cp_times: dict[int, dict[int, object]] = {}
     if route_cp_ids:
         checkins = (
@@ -208,7 +213,8 @@ def build_judge_checkpoint_view(comp_id: int, checkpoint_id: int) -> dict:
             }
         )
 
-    # Closest ETA first, then overdue, then unknowns, then not started.
+    # Overdue first (most urgent for the judge), then nearest ETA, then
+    # on-course, then not started. Within a state, smaller |eta| first.
     state_order = {"overdue": 0, "eta": 1, "on_course": 2, "not_started": 3}
     waiting.sort(
         key=lambda row: (

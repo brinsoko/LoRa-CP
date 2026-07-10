@@ -199,6 +199,15 @@ def _login(client, state: SeededState, role: str) -> None:
         ("GET", "/api/score-fields/resolved", 403),
         ("POST", "/api/score-fields", 403),
         ("DELETE", "/api/score-fields/999999", 403),
+        # Paths: reads are open to any member, writes are judge+admin,
+        # delete is admin-only. The /paths pages are judge+admin.
+        ("GET", "/paths/", 403),
+        ("GET", "/api/paths", 200),
+        ("POST", "/api/paths", 403),
+        ("PATCH", "/api/paths/999999", 403),
+        ("DELETE", "/api/paths/999999", 403),
+        # Judge shell bulk-entry submit is judge+admin.
+        ("POST", "/judge/table", 403),
     ],
 )
 def test_viewer_endpoint_matrix(client, app, seeded_state, method, path, expected):
@@ -245,6 +254,11 @@ def test_viewer_endpoint_matrix(client, app, seeded_state, method, path, expecte
         ("GET", "/api/score-fields/resolved", 403),
         ("POST", "/api/score-fields", 403),
         ("DELETE", "/api/score-fields/999999", 403),
+        # Judges manage paths (list page + read/write API) but cannot
+        # delete them; delete is admin-only (404 = past authz for admin).
+        ("GET", "/paths/", 200),
+        ("GET", "/api/paths", 200),
+        ("DELETE", "/api/paths/999999", 403),
     ],
 )
 def test_judge_endpoint_matrix(client, app, seeded_state, method, path, expected):

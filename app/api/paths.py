@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 
 from app.api.helpers import json_ok
 from app.extensions import db
-from app.models import Checkpoint, CheckpointGroup, Path, PathStop
+from app.models import Checkpoint, CheckpointGroup, Path, PathStop, TimedSegment
 from app.utils.audit import record_audit_event
 from app.utils.competition import require_current_competition_id
 from app.utils.paths import replace_path_stops
@@ -213,6 +213,18 @@ def _update_path(path_id: int, partial: bool):
         if invalid:
             return jsonify({"error": "validation_error", "detail": invalid}), 400
         replace_path_stops(path, checkpoint_ids, _parse_minutes_list(payload.get("expected_leg_minutes")))
+        # A TimedSegment references two checkpoints on this path. If the
+        # new stop list no longer contains one of a segment's endpoints,
+        # that segment can never produce a time again, so drop it rather
+        # than leave it silently dead.
+        stop_ids = set(checkpoint_ids)
+        stale_segments = [
+            seg
+            for seg in TimedSegment.query.filter(TimedSegment.path_id == path.id).all()
+            if seg.start_checkpoint_id not in stop_ids or seg.end_checkpoint_id not in stop_ids
+        ]
+        for seg in stale_segments:
+            db.session.delete(seg)
 
     db.session.flush()
     record_audit_event(
@@ -272,15 +284,27 @@ def path_duplicate(path_id: int):
     copy = Path(competition_id=comp_id, name=name, notes=source.notes)
     db.session.add(copy)
     db.session.flush()
-    stops = list(source.stops)
+    stops = list(source.stops)  # ordered by position asc
+    checkpoint_ids = [s.checkpoint_id for s in stops]
+    leg_minutes = [s.expected_leg_minutes for s in stops]
     if reversed_copy:
-        stops = list(reversed(stops))
-    for position, stop in enumerate(stops):
+        checkpoint_ids = list(reversed(checkpoint_ids))
+        # expected_leg_minutes is stored undirected on the higher-position
+        # stop of each adjacent pair. Reversing the stop order moves each
+        # leg's value to the new higher-position stop, which is one slot
+        # down from a naive reversal: the new first stop has no incoming
+        # leg, and the rest are the original legs (skipping index 0)
+        # reversed. Without this shift every leg estimate would be off by
+        # one stop.
+        leg_minutes = [None] + list(reversed(leg_minutes[1:]))
+    for position, (checkpoint_id, minutes) in enumerate(
+        zip(checkpoint_ids, leg_minutes, strict=False)
+    ):
         copy.stops.append(
             PathStop(
-                checkpoint_id=stop.checkpoint_id,
+                checkpoint_id=checkpoint_id,
                 position=position,
-                expected_leg_minutes=stop.expected_leg_minutes,
+                expected_leg_minutes=minutes,
             )
         )
     db.session.flush()

@@ -80,12 +80,20 @@ def score_field_upsert():
     if not checkpoint:
         return jsonify({"error": "not_found", "detail": "Checkpoint not found."}), 404
 
-    rule_type = (payload.get("rule_type") or "none").strip().lower()
-    if rule_type not in _RULE_TYPES:
-        return jsonify({"error": "validation_error", "detail": "invalid rule_type"}), 400
-    rule_params = payload.get("rule_params")
-    if rule_params is not None and not isinstance(rule_params, dict):
-        return jsonify({"error": "validation_error", "detail": "rule_params must be an object"}), 400
+    # rule_type + rule_params are a unit and are only touched when
+    # rule_type is present. A partial update that omits rule_type (e.g.
+    # a reorder sending only position) must NOT silently reset the field
+    # to the raw-input 'none' rule and blow away rule_params - every
+    # other attribute below is guarded with `in payload` the same way.
+    rule_type = None
+    rule_params = None
+    if "rule_type" in payload:
+        rule_type = (payload.get("rule_type") or "none").strip().lower()
+        if rule_type not in _RULE_TYPES:
+            return jsonify({"error": "validation_error", "detail": "invalid rule_type"}), 400
+        rule_params = payload.get("rule_params")
+        if rule_params is not None and not isinstance(rule_params, dict):
+            return jsonify({"error": "validation_error", "detail": "rule_params must be an object"}), 400
 
     field = ScoreField.query.filter_by(checkpoint_id=checkpoint_id, key=key[:80]).first()
     created = field is None
@@ -111,8 +119,9 @@ def score_field_upsert():
             field.position = int(payload.get("position"))
         except (TypeError, ValueError):
             pass
-    field.rule_type = rule_type
-    field.rule_params = rule_params or None
+    if "rule_type" in payload:
+        field.rule_type = rule_type
+        field.rule_params = rule_params or None
     if "max_input" in payload:
         try:
             field.max_input = float(payload.get("max_input")) if payload.get("max_input") is not None else None
@@ -187,6 +196,13 @@ def score_field_resolved():
     checkpoint_id = request.args.get("checkpoint_id", type=int)
     if not checkpoint_id:
         return jsonify({"error": "invalid_request", "detail": "checkpoint_id is required."}), 400
+    # Scope the checkpoint to the caller's competition: without this an
+    # admin of one competition could read another competition's resolved
+    # scoring config by passing a foreign checkpoint_id.
+    if not Checkpoint.query.filter(
+        Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id
+    ).first():
+        return jsonify({"error": "not_found", "detail": "Checkpoint not found."}), 404
     raw_group_id = (request.args.get("group_id") or "").strip()
 
     if raw_group_id and raw_group_id != "__all__":
@@ -194,6 +210,10 @@ def score_field_resolved():
             group_id = int(raw_group_id)
         except ValueError:
             return jsonify({"error": "invalid_request", "detail": "group_id must be an integer."}), 400
+        if not CheckpointGroup.query.filter(
+            CheckpointGroup.competition_id == comp_id, CheckpointGroup.id == group_id
+        ).first():
+            return jsonify({"error": "not_found", "detail": "Group not found."}), 404
         fields = resolve_fields(checkpoint_id, group_id)
         return {"fields": [f["key"] for f in fields], "resolved": fields}, 200
 

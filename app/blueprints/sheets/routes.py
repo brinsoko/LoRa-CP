@@ -28,6 +28,7 @@ from app.utils.sheets_sync import (
     build_teams_tab,
     publish_local_configs_to_spreadsheet,
     sync_all_checkpoint_tabs,
+    upsert_summary_config,
     wizard_build_checkpoint_tabs,
     wizard_create_checkpoint_configs,
 )
@@ -273,6 +274,7 @@ def build_arrivals():
             _("Arrivals tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
+    upsert_summary_config(comp_id, spreadsheet_id, None, tab_name, "arrivals")
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -333,6 +335,7 @@ def build_teams():
             _("Teams tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
+    upsert_summary_config(comp_id, spreadsheet_id, None, tab_name, "teams")
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -405,6 +408,7 @@ def build_score():
             _("Score tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
+    upsert_summary_config(comp_id, spreadsheet_id, None, tab_name, "total")
     return redirect(url_for("sheets_admin.list_sheets"))
 
 

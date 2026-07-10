@@ -479,9 +479,13 @@ def _backfill(bind, tables) -> None:
 
 
 def downgrade() -> None:
-    # The legacy JSON tables cannot be faithfully reconstructed (the
-    # conversion is lossy in the other direction on purpose); recreate
-    # them empty so old code can boot, and keep the new tables' data.
+    # DESTRUCTIVE: reversing this migration drops the first-class scoring
+    # tables it created (score_fields / score_field_groups /
+    # timed_segments / group_scoring) and all their data. The legacy JSON
+    # tables cannot be faithfully reconstructed from them (the conversion
+    # is lossy on purpose), so we recreate score_rules / global_score_rules
+    # EMPTY, only so pre-1.2.0 code can boot. Back up the DB before
+    # downgrading if the scoring configuration still matters.
     op.execute(
         "CREATE TABLE IF NOT EXISTS score_rules ("
         "id INTEGER PRIMARY KEY, competition_id INTEGER NOT NULL, checkpoint_id INTEGER NOT NULL, "

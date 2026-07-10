@@ -45,14 +45,19 @@ def enqueue_job(kind: str, competition_id: int, payload: dict | None, dedup_key:
     commit so the job rides the same transaction."""
     if not sheets_sync_enabled():
         return
-    existing = (
-        SheetsSyncJob.query.filter_by(dedup_key=dedup_key, status="pending")
-        .order_by(SheetsSyncJob.id.desc())
-        .first()
+    # Coalesce by refreshing an existing PENDING job's payload, but do it
+    # as a conditional bulk UPDATE (WHERE status='pending') rather than a
+    # read-then-set. A read-then-set has a race: the worker can claim the
+    # job (status -> running) between our read and the caller's commit,
+    # and our stale-read object would then stamp the new payload onto an
+    # already-running/done job, so the new payload never executes. The
+    # conditional UPDATE instead matches 0 rows once the worker has
+    # claimed it, and we fall through to insert a fresh pending job.
+    updated = SheetsSyncJob.query.filter_by(dedup_key=dedup_key, status="pending").update(
+        {"payload": payload, "updated_at": utcnow_naive()},
+        synchronize_session=False,
     )
-    if existing is not None:
-        existing.payload = payload
-        existing.updated_at = utcnow_naive()
+    if updated:
         return
     db.session.add(
         SheetsSyncJob(
@@ -198,6 +203,13 @@ def run_due_jobs(limit: int = 25) -> dict:
         try:
             _execute(job)
         except Exception as exc:
+            # _execute may have raised a DB-level error that left the
+            # session in a pending-rollback state (e.g. an IntegrityError
+            # while writing). Roll back first so the bookkeeping UPDATE
+            # below can commit; otherwise it would itself raise, the job
+            # would stay 'running', attempts would never increment, and it
+            # would never dead-letter. job is re-loaded on next access.
+            db.session.rollback()
             job.attempts += 1
             job.last_error = str(exc)[:2000]
             if job.attempts >= MAX_ATTEMPTS:
@@ -235,17 +247,38 @@ def _prune_old_jobs() -> None:
     db.session.commit()
 
 
-def _recover_stuck_running() -> None:
-    """A worker crash mid-job leaves status='running' forever; on startup
-    (and periodically) push those back to pending so they retry."""
-    stuck = SheetsSyncJob.query.filter(
-        SheetsSyncJob.status == "running",
-        SheetsSyncJob.updated_at < utcnow_naive() - timedelta(minutes=10),
-    ).all()
+def _recover_stuck_running(all_running: bool = False) -> None:
+    """A worker crash mid-job leaves status='running' forever; push those
+    back to pending so they retry.
+
+    At startup pass all_running=True: exactly one worker runs (the
+    dedicated compose service), so any 'running' row is necessarily an
+    orphan from a previous crashed run, no matter how recent. The 10-min
+    age guard is only for the periodic in-loop call, where the current
+    worker may legitimately be mid-execute on a 'running' row.
+    """
+    q = SheetsSyncJob.query.filter(SheetsSyncJob.status == "running")
+    if not all_running:
+        q = q.filter(SheetsSyncJob.updated_at < utcnow_naive() - timedelta(minutes=10))
+    stuck = q.all()
+    if not stuck:
+        return
     for job in stuck:
-        job.status = "pending"
-    if stuck:
-        db.session.commit()
+        newer = SheetsSyncJob.query.filter(
+            SheetsSyncJob.dedup_key == job.dedup_key,
+            SheetsSyncJob.status == "pending",
+            SheetsSyncJob.id > job.id,
+        ).first()
+        if newer is not None:
+            # A newer write for the same target is already queued; the
+            # orphan carries a stale payload, so drop it instead of
+            # replaying stale data over the newer write.
+            job.status = "done"
+            job.last_error = "superseded after worker restart"
+        else:
+            job.status = "pending"
+            job.next_attempt_at = None
+    db.session.commit()
 
 
 def worker_loop(poll_seconds: float = 2.0, run_once: bool = False) -> None:
@@ -254,7 +287,7 @@ def worker_loop(poll_seconds: float = 2.0, run_once: bool = False) -> None:
     from app.models import Competition
 
     logger.info("sheets worker starting (poll every %.1fs)", poll_seconds)
-    _recover_stuck_running()
+    _recover_stuck_running(all_running=True)
     last_verify = 0.0
     last_prune = 0.0
     while True:

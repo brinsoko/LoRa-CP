@@ -35,6 +35,7 @@ from app.models import (
     CheckpointGroup,
     Competition,
     CompetitionMember,
+    JudgeCheckpoint,
     PathStop,
     RFIDCard,
     ScoreEntry,
@@ -450,6 +451,27 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
             set_group_checkpoints(g_bravo, [c for c in cps if 6 <= int(c.name.split("-")[1]) <= 10])
             set_group_checkpoints(g_charlie, [cps[1], cps[4], cps[7]])  # CP-02, CP-05, CP-08
             set_group_checkpoints(g_delta, [cps[0], cps[2], cps[5]])  # CP-01, CP-03, CP-06
+
+            # Assign the demo judge to a couple of checkpoints so the
+            # /judge shell works out of the box after a fresh seed.
+            # Without an assignment the judge lands on "No checkpoints
+            # assigned yet" and can't score anything.
+            print("Assigning demo judge to checkpoints...")
+            judge_cps = [cps[0], cps[1]]  # CP-01 (default), CP-02
+            for idx, cp in enumerate(judge_cps):
+                exists = JudgeCheckpoint.query.filter_by(user_id=judge.id, checkpoint_id=cp.id).first()
+                if not exists:
+                    db.session.add(
+                        JudgeCheckpoint(
+                            user_id=judge.id,
+                            checkpoint_id=cp.id,
+                            competition_id=competition.id,
+                            is_default=(idx == 0),
+                        )
+                    )
+            # bulk_entry_enabled on CP-02 exercises the judge Table tab.
+            cps[1].bulk_entry_enabled = True
+            db.session.flush()
 
             print("Seeding demo RFID cards...")
             all_teams = [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13]

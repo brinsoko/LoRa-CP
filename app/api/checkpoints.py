@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from flask import Blueprint, jsonify, request
+from flask_babel import gettext as _
 from flask_login import current_user
 from sqlalchemy.orm import joinedload
 
@@ -353,8 +354,11 @@ def _update_checkpoint(checkpoint_id: int, partial: bool):
     if "counts_for_found" in payload or not partial:
         cp.counts_for_found = bool(payload.get("counts_for_found", True))
 
-    if "dead_time_enabled" in payload:
-        enable = bool(payload.get("dead_time_enabled"))
+    if "dead_time_enabled" in payload or not partial:
+        # `or not partial`: a full PUT that omits the flag must reset it to
+        # the default (False), matching counts_for_found / bulk_entry_enabled
+        # below, instead of silently keeping the old value.
+        enable = bool(payload.get("dead_time_enabled", False))
         if enable:
             # Dead time may be awarded at a segment's start, never at its
             # end (redesign plan 3.3); block the flag on end checkpoints.
@@ -364,7 +368,7 @@ def _update_checkpoint(checkpoint_id: int, partial: bool):
                 return jsonify(
                     {
                         "error": "validation_error",
-                        "detail": "Dead time cannot be enabled on a timed segment's end checkpoint.",
+                        "detail": _("Dead time cannot be enabled on a timed segment's end checkpoint."),
                     }
                 ), 400
         cp.dead_time_enabled = enable

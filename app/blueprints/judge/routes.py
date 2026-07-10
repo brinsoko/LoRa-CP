@@ -12,6 +12,7 @@ from __future__ import annotations
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from flask_babel import gettext as _
 from flask_login import current_user
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models import (
@@ -27,6 +28,7 @@ from app.utils.audit import record_audit_event
 from app.utils.competition import get_current_competition_id, get_current_competition_role
 from app.utils.judge_view import build_judge_checkpoint_view
 from app.utils.perms import roles_required
+from app.utils.redirects import safe_redirect_target
 from app.utils.scoring import compute_entry_total, resolve_fields
 from app.utils.sheets_sync import mark_arrival_checkbox, update_checkpoint_scores
 from app.utils.time import utcnow_naive
@@ -97,7 +99,9 @@ def set_checkpoint():
     checkpoints, _default = _available_checkpoints(comp_id)
     if checkpoint_id in {cp.id for cp in checkpoints}:
         session[_session_key(comp_id)] = checkpoint_id
-    return redirect(request.form.get("next") or url_for("judge.home"))
+    # Validate 'next' so a crafted form value can't turn this into an
+    # open redirect (matches the auth/main next-redirect handling).
+    return redirect(safe_redirect_target(request.form.get("next"), url_for("judge.home")))
 
 
 @judge_bp.route("/", methods=["GET"])
@@ -251,6 +255,9 @@ def table_submit():
     for section in sections:
         group = section["group"]
         fields = section["fields"]
+        # Identical for every team row in this section; resolve once
+        # instead of re-querying ScoreField/ScoreFieldGroup per team.
+        resolved = resolve_fields(checkpoint.id, group.id)
         for row in section["rows"]:
             team = row["team"]
             values: dict[str, str] = {}
@@ -274,7 +281,7 @@ def table_submit():
                         "warning",
                     )
                     return redirect(url_for("judge.table"))
-                if number < 0 and field["key"] != "dead_time":
+                if number < 0:
                     flash(_("Score cannot be negative."), "warning")
                     return redirect(url_for("judge.table"))
                 values[field["key"]] = raw
@@ -289,21 +296,31 @@ def table_submit():
                 competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint.id
             ).first()
             if checkin is None and not checkpoint.is_virtual:
-                checkin = Checkin(
+                # Insert inside a savepoint so a concurrent scan racing on
+                # uq_team_checkpoint doesn't 500 and lose the whole grid;
+                # on collision we reuse the existing arrival. Mirrors
+                # /api/scores/submit and /api/scores/resolve.
+                new_checkin = Checkin(
                     competition_id=comp_id,
                     team_id=team.id,
                     checkpoint_id=checkpoint.id,
                     timestamp=utcnow_naive(),
                     created_by_user_id=current_user.id,
                 )
-                db.session.add(checkin)
-                db.session.flush()
                 try:
-                    mark_arrival_checkbox(team.id, checkpoint.id, checkin.timestamp)
-                except Exception:
-                    pass
+                    with db.session.begin_nested():
+                        db.session.add(new_checkin)
+                except IntegrityError:
+                    checkin = Checkin.query.filter_by(
+                        competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint.id
+                    ).first()
+                else:
+                    checkin = new_checkin
+                    try:
+                        mark_arrival_checkbox(team.id, checkpoint.id, checkin.timestamp)
+                    except Exception:
+                        pass
 
-            resolved = resolve_fields(checkpoint.id, group.id)
             total = compute_entry_total(
                 values,
                 resolved,
