@@ -22,7 +22,7 @@
               <th>{{ _('Name') }}</th>
               <th>{{ _('Location') }}</th>
               <th>{{ _('Description') }}</th>
-              <th>{{ _('Groups') }}</th>
+              <th>{{ _('Paths') }}</th>
               <th>{{ _('Judges') }}</th>
               {% if has_role('judge','admin') %}
                 <th class="text-end" style="width: 220px;">{{ _('Actions') }}</th>
@@ -34,15 +34,15 @@
             <tr>
               <td>{{ loop.index }}</td>  {# ← Auto counter from 1 #}
               <td>{{ cp.name }}{% if cp.is_virtual %} <span class="badge bg-info">{{ _('Virtual') }}</span>{% endif %}</td>
-              <td>{{ cp.location or '—' }}</td>
-              <td class="text-break" style="max-width: 360px;">{{ cp.description or '—' }}</td>
+              <td>{{ cp.location or '-' }}</td>
+              <td class="text-break" style="max-width: 360px;">{{ cp.description or '-' }}</td>
               <td>
-                {% if cp.groups %}
-                  {% for g in cp.groups %}
-                    <span class="badge bg-secondary">{{ g.name }}</span>
+                {% if cp.paths %}
+                  {% for p in cp.paths %}
+                    <span class="badge bg-secondary">{{ p.name }}</span>
                   {% endfor %}
                 {% else %}
-                  <span class="text-muted">—</span>
+                  <span class="text-muted">-</span>
                 {% endif %}
               </td>
               <td>
@@ -51,7 +51,7 @@
                     <span class="badge text-bg-light border">{{ j.username }}</span>
                   {% endfor %}
                 {% else %}
-                  <span class="text-muted">—</span>
+                  <span class="text-muted">-</span>
                 {% endif %}
               </td>
               {% if has_role('judge','admin') %}
@@ -108,7 +108,7 @@
                          username case-insensitively. "Show selected only"
                          narrows the list to currently-checked rows so
                          operators can review assignments without
-                         scrolling past everyone. Pure client-side — no
+                         scrolling past everyone. Pure client-side - no
                          pagination round-trips; the visible-count badge
                          updates as you type. #}
                       <div class="d-flex flex-wrap gap-2 mb-2 align-items-center sticky-top bg-body pt-1 pb-2"

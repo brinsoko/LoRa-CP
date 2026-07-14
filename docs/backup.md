@@ -22,7 +22,7 @@ is implicitly backed up.
 
 ## Daily backup (recommended)
 
-`sqlite3 .backup` is the safe way to copy a live database — it uses
+`sqlite3 .backup` is the safe way to copy a live database - it uses
 SQLite's online backup API and works correctly even while the app is
 writing.
 
@@ -47,7 +47,7 @@ gzip -9 "$out"
 find "$BACKUP_DIR" -name 'app-*.db.gz' -mtime "+$RETAIN_DAYS" -delete
 ```
 
-Schedule via host cron — the laptop runs the container, so cron lives
+Schedule via host cron - the laptop runs the container, so cron lives
 on the laptop, not in the container:
 
 ```cron
@@ -72,7 +72,7 @@ failure. Pick one (in order of preference for this setup):
    (a few MB even with thousands of check-ins).
 3. **scp to a phone or laptop** at minimum.
 
-Encrypt `.env` and `google_sa.json` separately if they leave the host —
+Encrypt `.env` and `google_sa.json` separately if they leave the host -
 e.g. `age -p` or `gpg -c`.
 
 ## Restore drill
@@ -80,8 +80,8 @@ e.g. `age -p` or `gpg -c`.
 Run this **before race day** so you know it works:
 
 ```bash
-# 1. Stop the app
-docker compose -f deploy/docker-compose.prod.yml stop web
+# 1. Stop everything that writes to the DB (web AND the sheets worker)
+docker compose -f deploy/docker-compose.prod.yml stop web sheets-worker
 
 # 2. Move the live DB out of the way (don't delete!)
 mv instance/app.db instance/app.db.broken
@@ -91,7 +91,7 @@ gunzip -k backups/app-YYYYMMDDTHHMMSSZ.db.gz
 mv backups/app-YYYYMMDDTHHMMSSZ.db instance/app.db
 
 # 4. Restart and verify
-docker compose -f deploy/docker-compose.prod.yml start web
+docker compose -f deploy/docker-compose.prod.yml start web sheets-worker
 curl -fsS http://localhost/ready
 ```
 

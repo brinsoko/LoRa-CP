@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block title %}{{ _('Scoring setup') }}{% endblock %}
+{% block content %}
+
+{# ---------- 1. Fields per checkpoint ---------- #}
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title mb-1">{{ _('Score fields per checkpoint') }}</h5>
+    <p class="text-body-secondary small">
+      {{ _('Each field is one judged input with a default scoring rule. The group matrix picks which fields each group uses; unticked means the field is hidden for that group.') }}
+    </p>
+
+    <div class="accordion" id="fieldsAccordion">
+      {% for cp in checkpoints %}
+        {% set cp_fields = fields_by_cp.get(cp.id, []) %}
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#cpFields{{ cp.id }}">
+              {{ cp.name }}
+              <span class="badge bg-secondary ms-2">{{ cp_fields|length }}</span>
+              {% if cp.dead_time_enabled %}<span class="badge text-bg-warning ms-1">{{ _('dead time') }}</span>{% endif %}
+            </button>
+          </h2>
+          <div id="cpFields{{ cp.id }}" class="accordion-collapse collapse" data-bs-parent="#fieldsAccordion">
+            <div class="accordion-body">
+              <form method="post" action="{{ url_for('scores.scoring_setup_fields') }}">
+                {{ csrf_input() }}
+                <input type="hidden" name="checkpoint_id" value="{{ cp.id }}">
+                <input type="hidden" name="matrix_present" value="1">
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle">
+                    <thead>
+                      <tr>
+                        <th>{{ _('Key') }}</th>
+                        <th>{{ _('Label') }}</th>
+                        <th>{{ _('Hint') }}</th>
+                        <th style="width:110px;">{{ _('Rule type') }}</th>
+                        <th>{{ _('Rule params (JSON)') }}</th>
+                        <th style="width:80px;">{{ _('Max') }}</th>
+                        <th style="width:60px;" title="{{ _('Counts toward the total') }}">{{ _('Total') }}</th>
+                        <th style="width:60px;">{{ _('Order') }}</th>
+                        <th style="width:60px;">{{ _('Del') }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for f in cp_fields %}
+                        <tr>
+                          <td><input class="form-control form-control-sm" name="field_{{ f.id }}_key" value="{{ f.key }}"></td>
+                          <td><input class="form-control form-control-sm" name="field_{{ f.id }}_label" value="{{ f.label or '' }}"></td>
+                          <td><input class="form-control form-control-sm" name="field_{{ f.id }}_hint" value="{{ f.hint or '' }}"></td>
+                          <td>
+                            <select class="form-select form-select-sm" name="field_{{ f.id }}_rule_type">
+                              {% for rt in ['none','mapping','interpolate','multiplier','deviation'] %}
+                                <option value="{{ rt }}" {% if f.rule_type == rt %}selected{% endif %}>{{ rt }}</option>
+                              {% endfor %}
+                            </select>
+                          </td>
+                          <td><input class="form-control form-control-sm font-monospace" name="field_{{ f.id }}_rule_params"
+                                     value="{{ (f.rule_params | tojson) if f.rule_params else '' }}"></td>
+                          <td><input class="form-control form-control-sm" name="field_{{ f.id }}_max_input" value="{{ f.max_input if f.max_input is not none else '' }}"></td>
+                          <td class="text-center"><input class="form-check-input" type="checkbox" name="field_{{ f.id }}_counts" {% if f.counts_in_total %}checked{% endif %}></td>
+                          <td><input class="form-control form-control-sm" name="field_{{ f.id }}_position" value="{{ f.position }}"></td>
+                          <td class="text-center"><input class="form-check-input" type="checkbox" name="field_{{ f.id }}_delete"></td>
+                        </tr>
+                      {% endfor %}
+                      <tr class="table-light">
+                        <td><input class="form-control form-control-sm" name="new_key" placeholder="{{ _('new field key') }}"></td>
+                        <td><input class="form-control form-control-sm" name="new_label"></td>
+                        <td><input class="form-control form-control-sm" name="new_hint"></td>
+                        <td>
+                          <select class="form-select form-select-sm" name="new_rule_type">
+                            {% for rt in ['none','mapping','interpolate','multiplier','deviation'] %}
+                              <option value="{{ rt }}">{{ rt }}</option>
+                            {% endfor %}
+                          </select>
+                        </td>
+                        <td><input class="form-control form-control-sm font-monospace" name="new_rule_params" placeholder='{"map": {"0": 0, "1": 10}}'></td>
+                        <td><input class="form-control form-control-sm" name="new_max_input"></td>
+                        <td class="text-center"><input class="form-check-input" type="checkbox" name="new_counts" checked></td>
+                        <td></td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {% if cp_fields and groups %}
+                  <h6 class="mt-3">{{ _('Which groups use which fields') }}</h6>
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle w-auto">
+                      <thead>
+                        <tr>
+                          <th>{{ _('Field') }}</th>
+                          {% for g in groups %}<th class="text-center">{{ g.name }}</th>{% endfor %}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for f in cp_fields %}
+                          <tr>
+                            <td>{{ f.label or f.key }}</td>
+                            {% for g in groups %}
+                              {% set o = override_map.get((f.id, g.id)) %}
+                              <td class="text-center">
+                                <input class="form-check-input" type="checkbox" name="enabled_{{ f.id }}_{{ g.id }}"
+                                       {% if not o or o.enabled %}checked{% endif %}>
+                                {% if o and o.rule_override %}<span title="{{ _('Group-specific rule override active') }}">*</span>{% endif %}
+                              </td>
+                            {% endfor %}
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                {% endif %}
+
+                <button class="btn btn-primary btn-sm" type="submit">{{ _('Save fields') }}</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ---------- 2. Time trials per path ---------- #}
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title mb-1">{{ _('Time trials') }}</h5>
+    <p class="text-body-secondary small">
+      {{ _('A timed stretch between two checkpoints of a path, scored by rank within each group: fastest gets max points, slowest min points. Groups running the path in reverse get the endpoints swapped automatically.') }}
+    </p>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>{{ _('Path') }}</th>
+            <th>{{ _('From') }}</th>
+            <th>{{ _('To') }}</th>
+            <th>{{ _('Name') }}</th>
+            <th class="text-end">{{ _('Max points') }}</th>
+            <th class="text-end">{{ _('Min points') }}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in segments %}
+            <tr>
+              <td>{{ (paths | selectattr('id', 'equalto', s.path_id) | map(attribute='name') | first) or '?' }}</td>
+              <td>{{ cp_name_by_id.get(s.start_checkpoint_id, '?') }}</td>
+              <td>{{ cp_name_by_id.get(s.end_checkpoint_id, '?') }}</td>
+              <td>{{ s.name or '' }}</td>
+              <td class="text-end">{{ s.max_points }}</td>
+              <td class="text-end">{{ s.min_points }}</td>
+              <td class="text-end">
+                <form method="post" action="{{ url_for('scores.scoring_setup_segment_delete', segment_id=s.id) }}" class="d-inline">
+                  {{ csrf_input() }}
+                  <button class="btn btn-sm btn-outline-danger" type="submit">{{ _('Delete') }}</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="text-muted text-center py-3">{{ _('No time trials yet.') }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <form method="post" action="{{ url_for('scores.scoring_setup_segments') }}" class="row g-2 align-items-end">
+      {{ csrf_input() }}
+      <div class="col-md-3">
+        <label class="form-label">{{ _('Path') }}</label>
+        <select class="form-select" name="path_id" id="segmentPathSelect" required>
+          <option value="" disabled selected>{{ _('Select path') }}</option>
+          {% for p in paths %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">{{ _('From') }}</label>
+        <select class="form-select" name="start_checkpoint_id" id="segmentStartSelect" required></select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">{{ _('To') }}</label>
+        <select class="form-select" name="end_checkpoint_id" id="segmentEndSelect" required></select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">{{ _('Max points') }}</label>
+        <input class="form-control" name="max_points" value="100">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">{{ _('Min points') }}</label>
+        <input class="form-control" name="min_points" value="0">
+      </div>
+      <div class="col-md-1">
+        <button class="btn btn-success w-100" type="submit">{{ _('Add') }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ---------- 3. Category rules ---------- #}
+<div class="card mb-4">
+  <div class="card-body">
+    <h5 class="card-title mb-1">{{ _('Category rules') }}</h5>
+    <p class="text-body-secondary small">
+      {{ _('Found points per visited checkpoint (only checkpoints marked as counting) and the race time rule: full points within the threshold, then a deduction per FULL penalty block over it, dead time subtracted first.') }}
+    </p>
+    <div class="row g-3">
+      {% for g in groups %}
+        {% set gs = scoring_by_group.get(g.id) %}
+        <div class="col-lg-6">
+          <form method="post" action="{{ url_for('scores.scoring_setup_group') }}" class="border rounded p-3">
+            {{ csrf_input() }}
+            <input type="hidden" name="group_id" value="{{ g.id }}">
+            <div class="fw-semibold mb-2">{{ g.name }}</div>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small">{{ _('Found points per checkpoint') }}</label>
+                <input class="form-control form-control-sm" name="found_points_per" value="{{ gs.found_points_per if gs and gs.found_points_per is not none else '' }}">
+              </div>
+              <div class="col-6">
+                <label class="form-label small">{{ _('Race max points') }}</label>
+                <input class="form-control form-control-sm" name="race_max_points" value="{{ gs.race_max_points if gs and gs.race_max_points is not none else '' }}">
+              </div>
+              <div class="col-6">
+                <label class="form-label small">{{ _('Threshold (min)') }}</label>
+                <input class="form-control form-control-sm" name="race_threshold_minutes" value="{{ gs.race_threshold_minutes if gs and gs.race_threshold_minutes is not none else '' }}">
+              </div>
+              <div class="col-3">
+                <label class="form-label small">{{ _('Per (min)') }}</label>
+                <input class="form-control form-control-sm" name="race_penalty_minutes" value="{{ gs.race_penalty_minutes if gs and gs.race_penalty_minutes is not none else '' }}">
+              </div>
+              <div class="col-3">
+                <label class="form-label small">{{ _('Deduct (pts)') }}</label>
+                <input class="form-control form-control-sm" name="race_penalty_points" value="{{ gs.race_penalty_points if gs and gs.race_penalty_points is not none else '' }}">
+              </div>
+              <div class="col-6">
+                <label class="form-label small">{{ _('Race min points') }}</label>
+                <input class="form-control form-control-sm" name="race_min_points" value="{{ gs.race_min_points if gs and gs.race_min_points is not none else '' }}">
+              </div>
+              <div class="col-6">
+                <label class="form-label small">{{ _('Auto-DNF multiplier') }}</label>
+                <input class="form-control form-control-sm" name="race_dq_multiplier" value="{{ gs.race_dq_multiplier if gs and gs.race_dq_multiplier is not none else '' }}">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm mt-2" type="submit">{{ _('Save') }}</button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+  // Segment endpoint selects follow the chosen path's stops.
+  const PATH_STOPS = {
+    {% for p in paths %}{{ p.id }}: {{ path_stop_options.get(p.id, []) | tojson }},
+    {% endfor %}
+  };
+  const pathSelect = document.getElementById("segmentPathSelect");
+  const startSelect = document.getElementById("segmentStartSelect");
+  const endSelect = document.getElementById("segmentEndSelect");
+  function fillStops() {
+    const stops = PATH_STOPS[pathSelect.value] || [];
+    for (const sel of [startSelect, endSelect]) {
+      sel.innerHTML = "";
+      stops.forEach((s) => {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.name;
+        sel.appendChild(opt);
+      });
+    }
+    if (endSelect.options.length > 1) endSelect.selectedIndex = endSelect.options.length - 1;
+  }
+  pathSelect?.addEventListener("change", fillStops);
+</script>
+{% endblock %}

@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from app.extensions import db
-from app.models import CheckpointGroupLink
 from tests.support import (
     add_membership,
     assign_team_group,
@@ -14,6 +13,7 @@ from tests.support import (
     create_team,
     create_user,
     login_as,
+    set_group_route,
 )
 
 
@@ -27,14 +27,7 @@ def _seed_live_arrivals(client):
     start = create_checkpoint(competition, name="Start")
     middle = create_checkpoint(competition, name="CP 1")
     finish = create_checkpoint(competition, name="Finish")
-    db.session.add_all(
-        [
-            CheckpointGroupLink(group_id=group.id, checkpoint_id=start.id, position=0),
-            CheckpointGroupLink(group_id=group.id, checkpoint_id=middle.id, position=1),
-            CheckpointGroupLink(group_id=group.id, checkpoint_id=finish.id, position=2),
-        ]
-    )
-    db.session.commit()
+    set_group_route(group, [start, middle, finish])
 
     alpha = create_team(competition, name="Alpha", number=1)
     bravo = create_team(competition, name="Bravo", number=2)
@@ -100,13 +93,7 @@ def test_live_arrivals_filters_by_group(client, app):
     second_group = create_group(competition, name="Category B")
     second_start = create_checkpoint(competition, name="B Start")
     second_finish = create_checkpoint(competition, name="B Finish")
-    db.session.add_all(
-        [
-            CheckpointGroupLink(group_id=second_group.id, checkpoint_id=second_start.id, position=0),
-            CheckpointGroupLink(group_id=second_group.id, checkpoint_id=second_finish.id, position=1),
-        ]
-    )
-    db.session.commit()
+    set_group_route(second_group, [second_start, second_finish])
     echo = create_team(competition, name="Echo", number=5)
     assign_team_group(echo, second_group)
     create_checkin(competition, echo, second_start, timestamp=datetime(2026, 5, 8, 9, 0, 0))

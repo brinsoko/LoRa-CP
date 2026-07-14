@@ -105,3 +105,67 @@ def test_qr_route_encodes_external_public_url(client, app, monkeypatch):
     # the QR pixels, but we can sanity-check the response shape.
     assert resp.data.startswith(b"<?xml")
     assert b'viewBox' in resp.data or b'width=' in resp.data
+
+
+class TestPublicGetNeverWrites:
+    """The spectator page is an unauthenticated GET that auto-refreshes
+    every 30 s; it must never mutate competition data. Auto-DNF used to
+    be committed by _build_scores_context on ANY leaderboard render;
+    only the authenticated admin view may materialize it now."""
+
+    def _seed_auto_dnf(self):
+        from datetime import datetime, timedelta
+
+        from tests.support import (
+            assign_team_group,
+            create_checkin,
+            create_checkpoint,
+            create_group,
+            create_team,
+            set_group_route,
+            set_group_scoring,
+        )
+
+        admin = create_user(username="dnf-admin", role="admin")
+        comp = create_competition(name="DNF Race")
+        comp.public_results = True
+        add_membership(admin, comp, role="admin")
+        group = create_group(comp, name="Alpha", prefix="1xx")
+        start = create_checkpoint(comp, name="Start-D")
+        finish = create_checkpoint(comp, name="Finish-D")
+        set_group_route(group, [start, finish])
+        # dq_multiplier 2 x 10 min threshold: a 60-min run auto-DNFs.
+        set_group_scoring(
+            group,
+            race_max_points=100,
+            race_threshold_minutes=10,
+            race_penalty_minutes=5,
+            race_penalty_points=10,
+            race_min_points=0,
+            race_dq_multiplier=2,
+        )
+        team = create_team(comp, name="Slowpoke", number=101)
+        assign_team_group(team, group)
+        t0 = datetime(2026, 6, 20, 8, 0, 0)
+        create_checkin(comp, team, start, timestamp=t0)
+        create_checkin(comp, team, finish, timestamp=t0 + timedelta(minutes=60))
+        db.session.commit()
+        return admin, comp, team
+
+    def test_anonymous_public_get_does_not_persist_auto_dnf(self, client, app):
+        _admin, comp, team = self._seed_auto_dnf()
+        for _ in range(3):  # the page reloads itself; repeat like a browser
+            resp = client.get(f"/scores/public/{comp.id}")
+            assert resp.status_code == 200
+            # The spectator still SEES the DNF, it just isn't written.
+            assert b"DNF" in resp.data
+        db.session.expire_all()
+        assert team.dnf is False
+
+    def test_admin_leaderboard_persists_auto_dnf(self, client, app):
+        admin, comp, team = self._seed_auto_dnf()
+        login_as(client, admin, comp)
+        resp = client.get("/scores/view")
+        assert resp.status_code == 200
+        db.session.expire_all()
+        assert team.dnf is True

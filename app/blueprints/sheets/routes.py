@@ -7,9 +7,10 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from flask_babel import gettext as _
 
 from app.extensions import db
-from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, SheetConfig, Team, TeamGroup
+from app.models import Checkpoint, CheckpointGroup, SheetConfig, Team, TeamGroup
 from app.utils.competition import get_current_competition_id
 from app.utils.lang_store import load_lang, save_lang
+from app.utils.paths import resolve_route_ids
 from app.utils.perms import roles_required
 from app.utils.sheets_client import SheetsClient, get_sheets_client
 from app.utils.sheets_settings import (
@@ -27,13 +28,9 @@ from app.utils.sheets_sync import (
     build_teams_tab,
     publish_local_configs_to_spreadsheet,
     sync_all_checkpoint_tabs,
+    upsert_summary_config,
     wizard_build_checkpoint_tabs,
     wizard_create_checkpoint_configs,
-)
-from app.utils.sheets_sync_worker import (
-    enqueue_build_arrivals_tab,
-    enqueue_build_score_tab,
-    enqueue_build_teams_tab,
 )
 
 sheets_bp = Blueprint("sheets_admin", __name__, template_folder="../../templates")
@@ -110,21 +107,50 @@ def list_sheets():
         .all()
     )
     groups = (
-        CheckpointGroup.query.options(
-            db.joinedload(CheckpointGroup.checkpoint_links).joinedload(CheckpointGroupLink.checkpoint)
-        )
-        .filter(CheckpointGroup.competition_id == comp_id)
+        CheckpointGroup.query.filter(CheckpointGroup.competition_id == comp_id)
         .order_by(CheckpointGroup.position.asc().nulls_last(), CheckpointGroup.name.asc())
         .all()
+    )
+    # Directed route names per group for the per-group column preview.
+    cp_name_by_id = {cp.id: cp.name for cp in checkpoints}
+    group_route_names = {
+        g.id: [cp_name_by_id[cid] for cid in resolve_route_ids(g) if cid in cp_name_by_id] for g in groups
+    }
+    from app.models import SheetsSyncJob
+
+    job_counts = dict(
+        db.session.query(SheetsSyncJob.status, db.func.count(SheetsSyncJob.id))
+        .filter(SheetsSyncJob.competition_id == comp_id)
+        .group_by(SheetsSyncJob.status)
+        .all()
+    )
+    failed_jobs = (
+        SheetsSyncJob.query.filter(
+            SheetsSyncJob.competition_id == comp_id, SheetsSyncJob.status == "failed"
+        )
+        .order_by(SheetsSyncJob.updated_at.desc())
+        .limit(20)
+        .all()
+    )
+    last_done = (
+        SheetsSyncJob.query.filter(
+            SheetsSyncJob.competition_id == comp_id, SheetsSyncJob.status == "done"
+        )
+        .order_by(SheetsSyncJob.updated_at.desc())
+        .first()
     )
     return render_template(
         "sheets_admin.html",
         configs=configs,
         checkpoints=checkpoints,
         groups=groups,
+        group_route_names=group_route_names,
         lang=lang,
         sheets_settings=sheets_settings,
         remembered_spreadsheet_id=session.get(SESSION_KEY_SPREADSHEET_ID, ""),
+        job_counts=job_counts,
+        failed_jobs=failed_jobs,
+        last_done_job=last_done,
     )
 
 
@@ -226,24 +252,40 @@ def build_arrivals():
             return redirect(url_for("sheets_admin.list_sheets"))
         flash(_("Arrivals tab '%(tab)s' updated.", tab=tab_name), "success")
     else:
-        # Async dispatch: the gunicorn worker returns immediately so the
-        # admin's page doesn't spin while the Sheets API runs. Errors land
-        # in the server log; visually verify the tab on the spreadsheet.
-        from app.utils.sheets_sync_worker import enqueue_build_arrivals_tab
+        # Async dispatch: the durable outbox row is drained by the
+        # dedicated sheets-worker; failures become visible (and
+        # retryable) in the sync-jobs panel below instead of only a log.
+        from app.utils.sheets_outbox import enqueue_and_commit
 
-        enqueue_build_arrivals_tab(
-            current_app._get_current_object(),
-            spreadsheet_id,
-            tab_name,
-            competition_id=comp_id,
-            group_order_override=group_order,
-            checkpoint_order_override=cp_order,
-            per_group_checkpoint_order=per_group_cp_order or None,
+        enqueue_and_commit(
+            "rebuild_arrivals",
+            comp_id,
+            {
+                "spreadsheet_id": spreadsheet_id,
+                "tab_name": tab_name,
+                "competition_id": comp_id,
+                "group_order_override": group_order,
+                "checkpoint_order_override": cp_order,
+                "per_group_checkpoint_order": per_group_cp_order or None,
+            },
+            f"rebuild_arrivals:{spreadsheet_id}:{tab_name}",
         )
         flash(
-            _("Arrivals tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
+            _("Arrivals tab '%(tab)s' queued - refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
+    upsert_summary_config(
+        comp_id,
+        spreadsheet_id,
+        None,
+        tab_name,
+        "arrivals",
+        {
+            "group_order_override": group_order,
+            "checkpoint_order_override": cp_order,
+            "per_group_checkpoint_order": per_group_cp_order or None,
+        },
+    )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -286,20 +328,32 @@ def build_teams():
             return redirect(url_for("sheets_admin.list_sheets"))
         flash(_("Teams tab '%(tab)s' updated.", tab=tab_name), "success")
     else:
-        from app.utils.sheets_sync_worker import enqueue_build_teams_tab
+        from app.utils.sheets_outbox import enqueue_and_commit
 
-        enqueue_build_teams_tab(
-            current_app._get_current_object(),
-            spreadsheet_id,
-            tab_name,
-            headers=headers,
-            group_order_override=group_order,
-            competition_id=comp_id,
+        enqueue_and_commit(
+            "rebuild_teams",
+            comp_id,
+            {
+                "spreadsheet_id": spreadsheet_id,
+                "tab_name": tab_name,
+                "headers": headers,
+                "group_order_override": group_order,
+                "competition_id": comp_id,
+            },
+            f"rebuild_teams:{spreadsheet_id}:{tab_name}",
         )
         flash(
-            _("Teams tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
+            _("Teams tab '%(tab)s' queued - refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
+    upsert_summary_config(
+        comp_id,
+        spreadsheet_id,
+        None,
+        tab_name,
+        "teams",
+        {"headers": headers, "group_order_override": group_order},
+    )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -352,22 +406,39 @@ def build_score():
             return redirect(url_for("sheets_admin.list_sheets"))
         flash(_("Score tab '%(tab)s' updated.", tab=tab_name), "success")
     else:
-        from app.utils.sheets_sync_worker import enqueue_build_score_tab
+        from app.utils.sheets_outbox import enqueue_and_commit
 
-        enqueue_build_score_tab(
-            current_app._get_current_object(),
-            spreadsheet_id,
-            tab_name,
-            include_dead_time_sum=include_dead_time_sum,
-            group_order_override=group_order,
-            checkpoint_order_override=cp_order,
-            per_group_checkpoint_order=per_group_cp_order or None,
-            competition_id=comp_id,
+        enqueue_and_commit(
+            "rebuild_score",
+            comp_id,
+            {
+                "spreadsheet_id": spreadsheet_id,
+                "tab_name": tab_name,
+                "include_dead_time_sum": include_dead_time_sum,
+                "group_order_override": group_order,
+                "checkpoint_order_override": cp_order,
+                "per_group_checkpoint_order": per_group_cp_order or None,
+                "competition_id": comp_id,
+            },
+            f"rebuild_score:{spreadsheet_id}:{tab_name}",
         )
         flash(
-            _("Score tab '%(tab)s' queued — refresh the spreadsheet in a few seconds.", tab=tab_name),
+            _("Score tab '%(tab)s' queued - refresh the spreadsheet in a few seconds.", tab=tab_name),
             "info",
         )
+    upsert_summary_config(
+        comp_id,
+        spreadsheet_id,
+        None,
+        tab_name,
+        "total",
+        {
+            "include_dead_time_sum": include_dead_time_sum,
+            "group_order_override": group_order,
+            "checkpoint_order_override": cp_order,
+            "per_group_checkpoint_order": per_group_cp_order or None,
+        },
+    )
     return redirect(url_for("sheets_admin.list_sheets"))
 
 
@@ -610,45 +681,14 @@ def sync_team_numbers(config_id: int):
         return redirect(url_for("sheets_admin.list_sheets"))
 
     # "Sync team numbers" is the operator's blanket refresh button.
-    # Beyond pushing team numbers to each per-CP tab, it must also rebuild
-    # the three summary tabs — Ekipe (roster + Člani), Prihodi (arrivals
-    # matrix), and Skupni seštevek (rankings) — so the visible state of
-    # the spreadsheet stays consistent with the DB after roster, group,
-    # or check-in changes. Mirrors the publish-flow's summary-rebuild
-    # loop ([sheets_sync.py: build_summary_tabs path]).
-    lang = load_lang()
-    summary_builders = [
-        (
-            "Ekipe",
-            lang.get("teams_tab") or "Ekipe",
-            build_teams_tab,
-            enqueue_build_teams_tab,
-        ),
-        (
-            "Prihodi",
-            lang.get("arrivals_tab") or "Prihodi",
-            build_arrivals_tab,
-            enqueue_build_arrivals_tab,
-        ),
-        (
-            "Skupni seštevek",
-            lang.get("score_tab") or "Skupni seštevek",
-            build_score_tab,
-            enqueue_build_score_tab,
-        ),
-    ]
-    real_sheet_ids = sorted(
-        {
-            sid
-            for (sid,) in db.session.query(SheetConfig.spreadsheet_id)
-            .filter(SheetConfig.competition_id == comp_id)
-            .filter(SheetConfig.tab_type == "checkpoint")
-            .filter(~SheetConfig.spreadsheet_id.like("local:%"))
-            .distinct()
-            .all()
-        }
-    )
-
+    # Beyond pushing team numbers to each per-CP tab, it rebuilds the
+    # recorded summary tabs (SheetConfig rows with tab_type teams /
+    # arrivals / total) so the visible state of the spreadsheet stays
+    # consistent with the DB after roster, group, or check-in changes.
+    # Both branches rebuild from the RECORDED SheetConfig rows, carrying
+    # the admin's stored tab name and layout overrides; rebuilding from
+    # lang-default names with a bare payload used to reset custom layouts
+    # (and could create duplicate default-named tabs).
     if current_app.config.get("SHEETS_SYNC_INLINE"):
         try:
             sync_all_checkpoint_tabs(competition_id=comp_id)
@@ -657,16 +697,43 @@ def sync_team_numbers(config_id: int):
             flash(_("Failed to sync team numbers: %(error)s", error=exc), "warning")
             return redirect(url_for("sheets_admin.list_sheets"))
 
+        build_by_tab_type = {
+            "teams": build_teams_tab,
+            "arrivals": build_arrivals_tab,
+            "total": build_score_tab,
+        }
+        summary_cfgs = (
+            SheetConfig.query.filter(SheetConfig.competition_id == comp_id)
+            .filter(SheetConfig.tab_type.in_(list(build_by_tab_type)))
+            .filter(~SheetConfig.spreadsheet_id.like("local:%"))
+            .all()
+        )
         summary_errors: list[str] = []
-        for label, tab_name, build_fn, _enqueue_fn in summary_builders:
-            for sid in real_sheet_ids:
-                try:
-                    err = build_fn(sid, tab_name, competition_id=comp_id)
-                    if err:
-                        summary_errors.append(f"{label} on {sid}: {err}")
-                except Exception as exc:
-                    current_app.logger.exception("Failed to rebuild %s on %s during sync_team_numbers", label, sid)
-                    summary_errors.append(f"{label} on {sid}: {exc}")
+        for cfg in summary_cfgs:
+            layout = cfg.config or {}
+            build_fn = build_by_tab_type[cfg.tab_type]
+            kwargs = {
+                "competition_id": comp_id,
+                "group_order_override": layout.get("group_order_override"),
+            }
+            if cfg.tab_type == "teams":
+                kwargs["headers"] = layout.get("headers")
+            else:
+                kwargs["checkpoint_order_override"] = layout.get("checkpoint_order_override")
+                kwargs["per_group_checkpoint_order"] = layout.get("per_group_checkpoint_order")
+            if cfg.tab_type == "total":
+                kwargs["include_dead_time_sum"] = layout.get("include_dead_time_sum", True)
+            try:
+                err = build_fn(cfg.spreadsheet_id, cfg.tab_name, **kwargs)
+                if err:
+                    summary_errors.append(f"{cfg.tab_name} on {cfg.spreadsheet_id}: {err}")
+            except Exception as exc:
+                current_app.logger.exception(
+                    "Failed to rebuild %s on %s during sync_team_numbers",
+                    cfg.tab_name,
+                    cfg.spreadsheet_id,
+                )
+                summary_errors.append(f"{cfg.tab_name} on {cfg.spreadsheet_id}: {exc}")
 
         if summary_errors:
             flash(
@@ -677,38 +744,14 @@ def sync_team_numbers(config_id: int):
                 "warning",
             )
         else:
-            flash(
-                _("Synced team numbers and rebuilt Ekipe, Prihodi, and Skupni seštevek."),
-                "success",
-            )
+            flash(_("Synced team numbers and rebuilt the summary tabs."), "success")
     else:
-        # Late import + module-attribute lookup so tests can monkeypatch
-        # the worker functions. Top-level imports bind a local reference
-        # at module-load time, which is invisible to monkeypatch.setattr
-        # on the worker module — same pattern as build_arrivals route.
-        from app.utils import sheets_sync_worker as _worker
+        from app.utils.sheets_outbox import enqueue_summary_rebuilds
 
-        _worker.enqueue_sync_all_checkpoint_tabs(
-            current_app._get_current_object(), competition_id=comp_id
-        )
-        worker_fn_by_label = {
-            "Ekipe": _worker.enqueue_build_teams_tab,
-            "Prihodi": _worker.enqueue_build_arrivals_tab,
-            "Skupni seštevek": _worker.enqueue_build_score_tab,
-        }
-        for label, tab_name, _build_fn, _enqueue_fn in summary_builders:
-            enqueue_fn = worker_fn_by_label.get(label)
-            if enqueue_fn is None:
-                continue
-            for sid in real_sheet_ids:
-                enqueue_fn(
-                    current_app._get_current_object(),
-                    sid,
-                    tab_name,
-                    competition_id=comp_id,
-                )
+        enqueue_summary_rebuilds(comp_id)
+        db.session.commit()
         flash(
-            _("Team-number sync queued — refresh the spreadsheet in a few seconds."),
+            _("Team-number sync queued - refresh the spreadsheet in a few seconds."),
             "info",
         )
     return redirect(url_for("sheets_admin.list_sheets"))
@@ -759,12 +802,22 @@ def publish_local():
             ),
             "success",
         )
+        if result.get("note"):
+            flash(
+                _("Nothing new to publish: all checkpoint tabs already point at the target."),
+                "info",
+            )
         for err in result.get("errors") or []:
             flash(err, "warning")
     else:
-        from app.utils.sheets_sync_worker import enqueue_publish_local
+        from app.utils.sheets_outbox import enqueue_and_commit
 
-        enqueue_publish_local(current_app._get_current_object(), comp_id, spreadsheet_id)
+        enqueue_and_commit(
+            "publish",
+            comp_id,
+            {"competition_id": comp_id, "spreadsheet_id": spreadsheet_id, "build_summary_tabs": True},
+            f"publish:{comp_id}:{spreadsheet_id}",
+        )
         flash(
             _(
                 "Publish to %(sid)s queued. This takes ~30 seconds for a 15-CP "
@@ -904,7 +957,31 @@ def add_tab():
             return redirect(url_for("sheets_admin.list_sheets"))
 
     overwrite = bool(request.form.get("overwrite"))
-    existing = SheetConfig.query.filter_by(spreadsheet_id=spreadsheet_id, tab_name=tab_title).first()
+    # Scope to the caller's competition: spreadsheet_id/tab_title come
+    # straight from the form, and an unscoped lookup would let an admin
+    # of competition A overwrite competition B's config by guessing its
+    # identifiers. A foreign-competition claim on the same (spreadsheet,
+    # tab) is refused outright; the UNIQUE(spreadsheet_id, tab_name)
+    # constraint would reject the insert anyway.
+    existing = SheetConfig.query.filter_by(
+        competition_id=comp_id, spreadsheet_id=spreadsheet_id, tab_name=tab_title
+    ).first()
+    if existing is None:
+        foreign = (
+            SheetConfig.query.filter(SheetConfig.spreadsheet_id == spreadsheet_id)
+            .filter(SheetConfig.tab_name == tab_title)
+            .filter(SheetConfig.competition_id != comp_id)
+            .first()
+        )
+        if foreign is not None:
+            flash(
+                _(
+                    "Tab '%(tab)s' on that spreadsheet already belongs to another competition.",
+                    tab=tab_title,
+                ),
+                "warning",
+            )
+            return redirect(url_for("sheets_admin.list_sheets"))
     if existing and not overwrite:
         flash(
             _(
@@ -948,4 +1025,43 @@ def add_tab():
             flash(_("Added local tab '%(tab)s'.", tab=tab_title), "success")
         else:
             flash(_("Added tab '%(tab)s' to spreadsheet.", tab=tab_title), "success")
+    return redirect(url_for("sheets_admin.list_sheets"))
+
+
+@sheets_bp.route("/jobs/<int:job_id>/retry", methods=["POST"])
+@roles_required("admin")
+def retry_job(job_id: int):
+    comp_id, redirect_resp = _require_competition()
+    if redirect_resp:
+        return redirect_resp
+    from app.models import SheetsSyncJob
+
+    job = SheetsSyncJob.query.filter(
+        SheetsSyncJob.competition_id == comp_id, SheetsSyncJob.id == job_id
+    ).first()
+    if job and job.status == "failed":
+        job.status = "pending"
+        job.attempts = 0
+        job.next_attempt_at = None
+        job.last_error = None
+        db.session.commit()
+        flash(_("Sync job re-queued."), "success")
+    return redirect(url_for("sheets_admin.list_sheets"))
+
+
+@sheets_bp.route("/jobs/<int:job_id>/delete", methods=["POST"])
+@roles_required("admin")
+def delete_job(job_id: int):
+    comp_id, redirect_resp = _require_competition()
+    if redirect_resp:
+        return redirect_resp
+    from app.models import SheetsSyncJob
+
+    job = SheetsSyncJob.query.filter(
+        SheetsSyncJob.competition_id == comp_id, SheetsSyncJob.id == job_id
+    ).first()
+    if job:
+        db.session.delete(job)
+        db.session.commit()
+        flash(_("Sync job deleted."), "success")
     return redirect(url_for("sheets_admin.list_sheets"))

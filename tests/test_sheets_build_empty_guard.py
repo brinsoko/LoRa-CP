@@ -19,7 +19,7 @@ from __future__ import annotations
 import pytest
 
 from app.extensions import db
-from app.models import CheckpointGroupLink, SheetConfig
+from app.models import SheetConfig
 from app.utils import sheets_client as sheets_client_module
 from app.utils import sheets_sync
 from tests.support import (
@@ -30,6 +30,7 @@ from tests.support import (
     create_group,
     create_team,
     create_user,
+    set_group_route,
 )
 
 
@@ -53,7 +54,7 @@ class _RecordingClient:
 
 @pytest.fixture
 def sheets_app(app_factory):
-    """App with sheets sync enabled — required because the builders early
+    """App with sheets sync enabled - required because the builders early
     out with the disabled-sync warning before reaching the empty-values
     guard we want to exercise."""
     application = app_factory(SHEETS_SYNC_ENABLED=True)
@@ -76,9 +77,9 @@ def _seed_with_unmatched_group_name(app):
     cp = create_checkpoint(comp, name="CP-One")
     team = create_team(comp, name="T1", number=11)
     assign_team_group(team, group)
-    db.session.add(CheckpointGroupLink(group_id=group.id, checkpoint_id=cp.id, position=0))
+    set_group_route(group, [cp])
     # The SheetConfig references a group name that doesn't exist in the
-    # current competition — every iteration of the values-building loop
+    # current competition - every iteration of the values-building loop
     # finds no matching cp_configs and skips the group.
     db.session.add(
         SheetConfig(
@@ -112,11 +113,11 @@ def _seed_with_teams_missing_numbers(app):
     add_membership(user, comp, role="admin")
     group = create_group(comp, name="Alpha", prefix="1xx")
     cp = create_checkpoint(comp, name="CP-One")
-    # Team exists but has no number — the arrivals build filters
+    # Team exists but has no number - the arrivals build filters
     # Team.number.isnot(None), so this group ends up with no teams.
     team = create_team(comp, name="NumberlessTeam", number=None)
     assign_team_group(team, group)
-    db.session.add(CheckpointGroupLink(group_id=group.id, checkpoint_id=cp.id, position=0))
+    set_group_route(group, [cp])
     db.session.add(
         SheetConfig(
             competition_id=comp.id,

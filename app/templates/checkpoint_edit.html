@@ -64,11 +64,11 @@
       <div class="mb-3 mt-3">
         <label class="form-label">{{ _('Device (optional)') }}</label>
         <select name="lora_device_id" class="form-select">
-          <option value="">— {{ _('none') }} —</option>
+          <option value="">- {{ _('none') }} -</option>
           {% for d in devices %}
             <option value="{{ d.id }}"
               {% if selected_device_id == d.id %}selected{% endif %}>
-              {{ d.name or _('Device') }} — #{{ d.dev_num }}
+              {{ d.name or _('Device') }} - #{{ d.dev_num }}
             </option>
           {% endfor %}
         </select>
@@ -85,23 +85,50 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label">{{ _('Groups') }}</label>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="countsForFound" name="counts_for_found" value="true"
+                 {% if cp.counts_for_found %}checked{% endif %}>
+          <label class="form-check-label" for="countsForFound">
+            {{ _('Counts for found-checkpoint points') }}
+          </label>
+          <div class="form-text">{{ _('Untick for virtual checkpoints, start and finish.') }}</div>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="deadTimeEnabled" name="dead_time_enabled" value="true"
+                 {% if cp.dead_time_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="deadTimeEnabled">
+            {{ _('Judges enter dead time here') }}
+          </label>
+          <div class="form-text">{{ _('Not allowed on a timed segment\'s end checkpoint.') }}</div>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="bulkEntryEnabled" name="bulk_entry_enabled" value="true"
+                 {% if cp.bulk_entry_enabled %}checked{% endif %}>
+          <label class="form-check-label" for="bulkEntryEnabled">
+            {{ _('Bulk score entry (table) available here') }}
+          </label>
+          <div class="form-text">{{ _('For stations scored offline, e.g. written tests.') }}</div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">{{ _('Paths') }}</label>
         <div class="row row-cols-1 row-cols-md-2 g-2">
-          {% for g in groups %}
+          {% for p in paths %}
             <div class="col">
               <div class="form-check">
                 <input class="form-check-input"
                        type="checkbox"
-                       id="gcp_{{ g.id }}"
-                       name="group_ids"
-                       value="{{ g.id }}"
-                       {% if g.id in (selected_group_ids or []) %}checked{% endif %}>
-                <label class="form-check-label" for="gcp_{{ g.id }}">{{ g.name }}</label>
+                       id="pcp_{{ p.id }}"
+                       name="path_ids"
+                       value="{{ p.id }}"
+                       {% if p.id in (selected_path_ids or []) %}checked{% endif %}>
+                <label class="form-check-label" for="pcp_{{ p.id }}">{{ p.name }}</label>
               </div>
             </div>
           {% endfor %}
         </div>
-        <div class="form-text">{{ _('A checkpoint can belong to many groups.') }}</div>
+        <div class="form-text">{{ _('Ticking a path appends this checkpoint as its last stop; adjust the order on the path edit page. Paths shared by several groups change for all of them.') }}</div>
       </div>
 
       <div class="d-flex gap-2">

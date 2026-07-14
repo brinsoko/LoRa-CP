@@ -8,17 +8,19 @@ import pytest
 
 from app.extensions import db
 from app.models import (
+    Checkpoint,
     CheckpointGroup,
-    CheckpointGroupLink,
     Competition,
-    GlobalScoreRule,
+    GroupScoring,
     LoRaDevice,
     RFIDCard,
     ScoreEntry,
-    ScoreRule,
+    ScoreField,
+    ScoreFieldGroup,
     SheetConfig,
     Team,
     TeamGroup,
+    TimedSegment,
 )
 from tests.support import (
     add_membership,
@@ -27,9 +29,14 @@ from tests.support import (
     create_checkpoint,
     create_competition,
     create_group,
+    create_score_field,
+    create_segment,
     create_team,
     create_user,
     login_as,
+    set_field_group,
+    set_group_route,
+    set_group_scoring,
 )
 
 
@@ -59,12 +66,16 @@ class TestExport:
         resp = client.get(f"/api/competition/{comp.id}/export")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["schema_version"] == "1.0.0"
+        assert data["schema_version"] == "1.2.0"
         assert "competition" in data
         assert "teams" in data
         assert "groups" in data
         assert "checkpoints" in data
         assert "checkins" in data
+        # Phase-2 scoring sections replace score_rules/global_score_rules.
+        assert "score_fields" in data
+        assert "timed_segments" in data
+        assert "group_scoring" in data
         assert len(data["teams"]) == 2
         assert len(data["groups"]) == 1
         assert len(data["checkpoints"]) == 1
@@ -77,6 +88,21 @@ class TestExport:
 
         resp = client.get(f"/api/competition/{comp.id}/export")
         assert resp.status_code == 403
+
+    def test_export_and_merge_scoped_to_active_competition(self, app, client):
+        # Admin of competition A must not be able to export or merge a
+        # DIFFERENT competition B by putting B's id in the URL: the role
+        # gate only checks the session's active competition.
+        admin_a = create_user(username="admin-a", role="public")
+        comp_a = create_competition(name="Comp A")
+        add_membership(admin_a, comp_a, role="admin")
+        comp_b = create_competition(name="Comp B")
+        login_as(client, admin_a, comp_a)
+
+        assert client.get(f"/api/competition/{comp_a.id}/export").status_code == 200
+        assert client.get(f"/api/competition/{comp_b.id}/export").status_code == 403
+        merge_b = client.post(f"/api/competition/{comp_b.id}/merge", json={"schema_version": "1.2.0"})
+        assert merge_b.status_code == 403
 
 
 class TestImport:
@@ -143,9 +169,11 @@ class TestImport:
         assert resp.status_code == 400
 
     def test_import_round_trips_scoring_fields(self, client, _seeded):
-        """Per-checkpoint scoring layout (SheetConfig.config) must survive an
-        export -> import cycle. Without this the destination installation has
-        no field list, no headers, and no group mapping for the score UI."""
+        """Per-checkpoint sheet layout (SheetConfig.config) must survive an
+        export -> import cycle. Phase-2 note: scoring truth now lives in
+        ScoreField, but the config still carries headers + group mapping for
+        the Sheets wiring, and its field lists feed the legacy conversion
+        when the payload has no score_fields section."""
         comp, _, group, cp, _, _ = _seeded
         db.session.add(
             SheetConfig(
@@ -205,27 +233,46 @@ class TestImport:
         ).first()
         assert local_group is not None
         assert new_group["group_id"] == local_group.id
+        # The payload had no score_fields section, so the import ran the
+        # legacy conversion: the config field lists materialize as
+        # ScoreField rows in the destination.
+        keys = {f.key for f in ScoreField.query.filter_by(competition_id=new_id).all()}
+        assert keys == {"task1", "task2", "topo"}
 
-    def test_import_round_trips_score_rules_and_score_metadata(self, client, _seeded):
-        """ScoreRule, GlobalScoreRule, and ScoreEntry.judge_user_id +
-        created_at must all round-trip through export+import."""
+    def test_import_round_trips_scoring_config_and_score_metadata(self, client, _seeded):
+        """ScoreField (+ per-group override), TimedSegment, GroupScoring,
+        and ScoreEntry.judge_user_id + created_at must all round-trip
+        through export+import. Phase-2 replacement for the old
+        ScoreRule/GlobalScoreRule round-trip."""
         comp, user, group, cp, t1, _ = _seeded
         from datetime import datetime
 
-        db.session.add(
-            ScoreRule(
-                competition_id=comp.id,
-                checkpoint_id=cp.id,
-                group_id=group.id,
-                rules={"field_rules": {"task1": {"type": "multiplier", "factor": 4}}},
-            )
+        extra_cp = create_checkpoint(comp, name="CP-Export-2")
+        path = set_group_route(group, [cp, extra_cp], path_name="Main route")
+        field = create_score_field(
+            cp,
+            "task1",
+            label="Task 1",
+            rule_type="multiplier",
+            rule_params={"factor": 4},
+            max_input=10.0,
         )
-        db.session.add(
-            GlobalScoreRule(
-                competition_id=comp.id,
-                group_id=group.id,
-                rules={"time": {"max_points": 50}},
-            )
+        set_field_group(
+            field,
+            group,
+            enabled=True,
+            rule_override={"rule_type": "multiplier", "rule_params": {"factor": 2}, "max_input": 5.0},
+        )
+        create_segment(path, cp, extra_cp, name="Sprint", max_points=100.0, min_points=10.0)
+        set_group_scoring(
+            group,
+            found_points_per=3.0,
+            race_max_points=50.0,
+            race_threshold_minutes=120.0,
+            race_penalty_minutes=5.0,
+            race_penalty_points=2.0,
+            race_min_points=0.0,
+            race_dq_multiplier=0.5,
         )
         # Seed a ScoreEntry with a judge + a known created_at so we can
         # assert both round-trip.
@@ -244,9 +291,37 @@ class TestImport:
         db.session.commit()
 
         export = client.get(f"/api/competition/{comp.id}/export").get_json()
-        assert "score_rules" in export and len(export["score_rules"]) == 1
-        assert export["score_rules"][0]["rules"]["field_rules"]["task1"]["factor"] == 4
-        assert "global_score_rules" in export and len(export["global_score_rules"]) == 1
+        assert len(export["score_fields"]) == 1
+        f_data = export["score_fields"][0]
+        assert f_data["checkpoint_name"] == cp.name
+        assert f_data["key"] == "task1"
+        assert f_data["rule_type"] == "multiplier"
+        assert f_data["rule_params"] == {"factor": 4}
+        assert f_data["max_input"] == 10.0
+        assert f_data["counts_in_total"] is True
+        assert f_data["groups"] == [
+            {
+                "group_name": group.name,
+                "enabled": True,
+                "rule_override": {
+                    "rule_type": "multiplier",
+                    "rule_params": {"factor": 2},
+                    "max_input": 5.0,
+                },
+            }
+        ]
+        assert len(export["timed_segments"]) == 1
+        s_data = export["timed_segments"][0]
+        assert s_data["path_name"] == "Main route"
+        assert s_data["start_checkpoint_name"] == cp.name
+        assert s_data["end_checkpoint_name"] == extra_cp.name
+        assert s_data["max_points"] == 100.0
+        assert s_data["min_points"] == 10.0
+        assert len(export["group_scoring"]) == 1
+        gs_data = export["group_scoring"][0]
+        assert gs_data["group_name"] == group.name
+        assert gs_data["found_points_per"] == 3.0
+        assert gs_data["race_max_points"] == 50.0
         # Score export now carries judge + created_at.
         landed_score = next(
             s for s in export["scores"] if s["team_name"] == t1.name and s["checkpoint_name"] == cp.name
@@ -259,12 +334,37 @@ class TestImport:
         assert resp.status_code == 201
         new_id = resp.get_json()["competition_id"]
 
-        new_rule = ScoreRule.query.filter_by(competition_id=new_id).first()
-        assert new_rule is not None
-        assert new_rule.rules["field_rules"]["task1"]["factor"] == 4
-        new_gr = GlobalScoreRule.query.filter_by(competition_id=new_id).first()
-        assert new_gr is not None
-        assert new_gr.rules["time"]["max_points"] == 50
+        new_field = ScoreField.query.filter_by(competition_id=new_id).one()
+        assert new_field.key == "task1"
+        assert new_field.rule_type == "multiplier"
+        assert new_field.rule_params == {"factor": 4}
+        assert new_field.max_input == 10.0
+        new_group = CheckpointGroup.query.filter_by(
+            competition_id=new_id, name=group.name
+        ).one()
+        override_row = ScoreFieldGroup.query.filter_by(
+            score_field_id=new_field.id, group_id=new_group.id
+        ).one()
+        assert override_row.enabled is True
+        assert override_row.rule_override["rule_params"] == {"factor": 2}
+
+        new_seg = TimedSegment.query.filter_by(competition_id=new_id).one()
+        new_start = Checkpoint.query.filter_by(competition_id=new_id, name=cp.name).one()
+        new_end = Checkpoint.query.filter_by(competition_id=new_id, name=extra_cp.name).one()
+        assert new_seg.start_checkpoint_id == new_start.id
+        assert new_seg.end_checkpoint_id == new_end.id
+        assert new_seg.max_points == 100.0
+        assert new_seg.min_points == 10.0
+
+        new_gs = GroupScoring.query.filter_by(competition_id=new_id).one()
+        assert new_gs.group_id == new_group.id
+        assert new_gs.found_points_per == 3.0
+        assert new_gs.race_max_points == 50.0
+        assert new_gs.race_threshold_minutes == 120.0
+        assert new_gs.race_penalty_minutes == 5.0
+        assert new_gs.race_penalty_points == 2.0
+        assert new_gs.race_min_points == 0.0
+        assert new_gs.race_dq_multiplier == 0.5
 
         # Judge attribution + created_at preserved on the imported score.
         new_score = ScoreEntry.query.filter_by(competition_id=new_id).first()
@@ -273,6 +373,29 @@ class TestImport:
         assert new_score.created_at == scored_at, (
             f"created_at not preserved: got {new_score.created_at}, expected {scored_at}"
         )
+
+    def test_import_round_trips_checkpoint_scoring_flags(self, client, _seeded):
+        """counts_for_found / dead_time_enabled ride the checkpoints
+        section (phase-2: they replace the SheetConfig dead-time toggle
+        and the global-rule exclude flags)."""
+        comp, _, _, cp, _, _ = _seeded
+        cp.counts_for_found = False
+        cp.dead_time_enabled = True
+        db.session.commit()
+
+        export = client.get(f"/api/competition/{comp.id}/export").get_json()
+        cp_data = next(c for c in export["checkpoints"] if c["name"] == cp.name)
+        assert cp_data["counts_for_found"] is False
+        assert cp_data["dead_time_enabled"] is True
+
+        export["competition"]["name"] = "Imported Flags"
+        resp = client.post("/api/competition/import", json=export)
+        assert resp.status_code == 201
+        new_id = resp.get_json()["competition_id"]
+
+        new_cp = Checkpoint.query.filter_by(competition_id=new_id, name=cp.name).one()
+        assert new_cp.counts_for_found is False
+        assert new_cp.dead_time_enabled is True
 
     def test_import_version_mismatch_warning(self, client, _seeded):
         comp, *_ = _seeded
@@ -517,7 +640,7 @@ class TestMerge:
         assert resp.status_code == 200
         summary = resp.get_json()["summary"]
         # At least the new team's link must land. The two existing teams
-        # may also be present in the payload — those re-add as no-ops.
+        # may also be present in the payload - those re-add as no-ops.
         assert summary["added"]["team_groups"] >= 1
 
         new_team = Team.query.filter_by(competition_id=comp.id, name="Team-Imported").first()
@@ -547,21 +670,17 @@ class TestMerge:
         after = TeamGroup.query.filter_by(team_id=t1.id, group_id=group.id).count()
         assert after == before, f"Re-merge duplicated TeamGroup row: {before} -> {after}"
 
-    def test_merge_carries_group_checkpoint_links(self, client, _seeded):
-        """Group -> checkpoint links must also flow through merge so that
-        the arrivals / score builders can find which groups score where."""
+    def test_merge_carries_legacy_group_checkpoint_links(self, client, _seeded):
+        """Legacy-format merge input (group_checkpoint_links, no paths
+        section) must still extend the group's route so old export files
+        keep working after the paths migration."""
         comp, _, group, cp, _, _ = _seeded
-        # Seed an existing link in the source export so we know what
-        # should round-trip.
-        db.session.add(
-            CheckpointGroupLink(group_id=group.id, checkpoint_id=cp.id, position=0)
-        )
-        db.session.commit()
+        set_group_route(group, [cp])
 
         export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
-        # Add a fresh checkpoint + link via the merge payload, simulating
-        # an admin who shipped a new checkpoint+group pairing in the
-        # source competition.
+        # Simulate a legacy file: no paths section, ordering carried only
+        # by group_checkpoint_links, plus a fresh checkpoint appended.
+        export_data.pop("paths", None)
         export_data["checkpoints"].append({"name": "CP-Merged", "is_virtual": False})
         export_data["group_checkpoint_links"] = list(
             export_data.get("group_checkpoint_links", [])
@@ -573,38 +692,97 @@ class TestMerge:
         summary = resp.get_json()["summary"]
         assert summary["added"]["group_checkpoint_links"] >= 1
 
-        new_cp = CheckpointGroup.query.filter_by(competition_id=comp.id, name=group.name).first()
-        assert new_cp is not None
-        # The link for the brand-new checkpoint must exist.
-        from app.models import Checkpoint as _CP
+        from app.utils.paths import resolve_route_ids
 
-        merged_cp = _CP.query.filter_by(competition_id=comp.id, name="CP-Merged").first()
+        merged_cp = Checkpoint.query.filter_by(competition_id=comp.id, name="CP-Merged").first()
         assert merged_cp is not None
-        link = CheckpointGroupLink.query.filter_by(
-            group_id=group.id, checkpoint_id=merged_cp.id
-        ).first()
-        assert link is not None, "group->checkpoint link did not land via merge"
-        assert link.position == 1
+        db.session.refresh(group)
+        route = resolve_route_ids(group)
+        assert merged_cp.id in route, "merged checkpoint did not land on the group's route"
+        assert route.index(merged_cp.id) == 1
 
-    def test_merge_carries_score_rules(self, client, _seeded):
-        """ScoreRule + GlobalScoreRule must land via merge. Without them
-        the destination has scoring layouts but no logic to compute totals."""
+    def test_merge_carries_paths_section(self, client, _seeded):
+        """New-format merge input adds unknown paths and wires groups that
+        have no route yet, honoring the direction field."""
         comp, _, group, cp, _, _ = _seeded
         export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
+        export_data["checkpoints"].append({"name": "CP-New", "is_virtual": False})
+        export_data["paths"] = list(export_data.get("paths", [])) + [
+            {
+                "name": "Merged path",
+                "notes": None,
+                "stops": [
+                    {"checkpoint_name": cp.name, "position": 0},
+                    {"checkpoint_name": "CP-New", "position": 1},
+                ],
+            }
+        ]
+        for g_data in export_data["groups"]:
+            if g_data["name"] == group.name:
+                g_data["path_name"] = "Merged path"
+                g_data["direction"] = "reverse"
+        export_data["resolutions"] = {}
 
-        # The export now carries score_rules/global_score_rules sections
-        # (empty in the fixture). Inject one of each.
+        resp = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
+        assert resp.status_code == 200
+        summary = resp.get_json()["summary"]
+        assert summary["added"]["paths"] >= 1
+
+        from app.utils.paths import resolve_route_ids
+
+        db.session.refresh(group)
+        assert group.path is not None
+        assert group.path.name == "Merged path"
+        assert group.direction == "reverse"
+        route = resolve_route_ids(group)
+        assert route[-1] == cp.id, "reverse direction should flip the merged path"
+
+    def test_merge_converts_legacy_score_rules(self, client, _seeded):
+        """Legacy pre-1.2.0 payloads carry score_rules/global_score_rules
+        (and no new-format scoring sections). The merge must convert them
+        into ScoreField / TimedSegment / GroupScoring rows, resolving
+        name-based checkpoint references to local IDs along the way."""
+        comp, _, group, cp, _, _ = _seeded
+        extra_cp = create_checkpoint(comp, name="CP-Export-2")
+        # time_race conversion needs the group to have a route (segments
+        # hang off the group's path).
+        set_group_route(group, [cp, extra_cp])
+
+        export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
+        # Simulate a legacy 1.1.0 file: legacy sections only.
+        export_data["schema_version"] = "1.1.0"
+        for section in ("score_fields", "timed_segments", "group_scoring"):
+            export_data.pop(section, None)
         export_data["score_rules"] = [
             {
                 "checkpoint_name": cp.name,
                 "group_name": group.name,
-                "rules": {"field_rules": {"task1": {"type": "multiplier", "factor": 2}}},
+                "rules": {
+                    "field_rules": {"task1": {"type": "multiplier", "factor": 2, "max": 10}},
+                    "time_race": {
+                        "start_checkpoint_name": cp.name,
+                        "end_checkpoint_name": extra_cp.name,
+                        "min_points": 10,
+                        "max_points": 100,
+                    },
+                },
             }
         ]
         export_data["global_score_rules"] = [
             {
                 "group_name": group.name,
-                "rules": {"found": {"points_per": 3}},
+                "rules": {
+                    "found": {"points_per": 3, "exclude_start_checkpoint": True},
+                    "time": {
+                        "start_checkpoint_name": cp.name,
+                        "end_checkpoint_name": extra_cp.name,
+                        "max_points": 50,
+                        "threshold_minutes": 120,
+                        "penalty_minutes": 5,
+                        "penalty_points": 2,
+                        "min_points": 0,
+                    },
+                },
             }
         ]
         export_data["resolutions"] = {}
@@ -612,59 +790,86 @@ class TestMerge:
         resp = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
         assert resp.status_code == 200
         summary = resp.get_json()["summary"]
+        # Legacy counters approximate the conversion output: ScoreField /
+        # GroupScoring row deltas.
         assert summary["added"]["score_rules"] == 1
         assert summary["added"]["global_score_rules"] == 1
 
-        score_rule = ScoreRule.query.filter_by(
-            competition_id=comp.id, checkpoint_id=cp.id, group_id=group.id
-        ).first()
-        assert score_rule is not None
-        assert score_rule.rules["field_rules"]["task1"]["factor"] == 2
+        # field_rules.task1 -> ScoreField (params split off type/max).
+        field = ScoreField.query.filter_by(
+            competition_id=comp.id, checkpoint_id=cp.id, key="task1"
+        ).one()
+        assert field.rule_type == "multiplier"
+        assert field.rule_params == {"factor": 2}
+        assert field.max_input == 10.0
 
-        gr = GlobalScoreRule.query.filter_by(
-            competition_id=comp.id, group_id=group.id
-        ).first()
-        assert gr is not None
-        assert gr.rules["found"]["points_per"] == 3
+        # time_race -> TimedSegment on the group's path, endpoints
+        # resolved from names to local checkpoint IDs.
+        seg = TimedSegment.query.filter_by(competition_id=comp.id).one()
+        assert seg.path_id == group.path_id
+        assert seg.start_checkpoint_id == cp.id
+        assert seg.end_checkpoint_id == extra_cp.id
+        assert seg.max_points == 100.0
+        assert seg.min_points == 10.0
 
-    def test_merge_score_rules_do_not_clobber_local(self, client, _seeded):
-        """Hand-tuned local ScoreRule rows must survive a re-merge —
-        admins often customize these locally and a merge that overwrites
-        would silently lose their tuning."""
+        # global rules -> GroupScoring.
+        gs = GroupScoring.query.filter_by(group_id=group.id).one()
+        assert gs.found_points_per == 3.0
+        assert gs.race_max_points == 50.0
+        assert gs.race_threshold_minutes == 120.0
+        assert gs.race_penalty_minutes == 5.0
+        assert gs.race_penalty_points == 2.0
+        assert gs.race_min_points == 0.0
+
+        # found.exclude_start_checkpoint -> counts_for_found cleared on
+        # the (name-resolved) start checkpoint.
+        db.session.refresh(cp)
+        db.session.refresh(extra_cp)
+        assert cp.counts_for_found is False
+        assert extra_cp.counts_for_found is True
+
+    def test_merge_scoring_sections_do_not_clobber_local(self, client, _seeded):
+        """Hand-tuned local scoring rows (ScoreField / TimedSegment /
+        GroupScoring) must survive a re-merge - admins customize these
+        locally and a merge that overwrites would silently lose their
+        tuning. Add-new-only semantics."""
         comp, _, group, cp, _, _ = _seeded
-        # Seed a hand-tuned local rule first.
-        db.session.add(
-            ScoreRule(
-                competition_id=comp.id,
-                checkpoint_id=cp.id,
-                group_id=group.id,
-                rules={"field_rules": {"task1": {"type": "multiplier", "factor": 99}}},
-            )
+        extra_cp = create_checkpoint(comp, name="CP-Export-2")
+        path = set_group_route(group, [cp, extra_cp], path_name="Main route")
+        # Seed hand-tuned local scoring config first.
+        field = create_score_field(
+            cp, "task1", rule_type="multiplier", rule_params={"factor": 99}
         )
-        db.session.commit()
+        segment = create_segment(path, cp, extra_cp, max_points=100.0, min_points=10.0)
+        scoring = set_group_scoring(group, found_points_per=7.0)
 
         export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
-        # The export carries the local rule; the merge inbound payload
-        # claims a different factor. The local row must win.
-        export_data["score_rules"] = [
-            {
-                "checkpoint_name": cp.name,
-                "group_name": group.name,
-                "rules": {"field_rules": {"task1": {"type": "multiplier", "factor": 1}}},
-            }
-        ]
+        # The export carries the local rows; the merge inbound payload
+        # claims different values. The local rows must win.
+        assert len(export_data["score_fields"]) == 1
+        export_data["score_fields"][0]["rule_params"] = {"factor": 1}
+        assert len(export_data["timed_segments"]) == 1
+        export_data["timed_segments"][0]["max_points"] = 1.0
+        assert len(export_data["group_scoring"]) == 1
+        export_data["group_scoring"][0]["found_points_per"] = 1.0
         export_data["resolutions"] = {}
 
         resp = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
         assert resp.status_code == 200
-        assert resp.get_json()["summary"]["added"]["score_rules"] == 0
+        added = resp.get_json()["summary"]["added"]
+        assert added["score_fields"] == 0
+        assert added["timed_segments"] == 0
+        assert added["group_scoring"] == 0
 
-        kept = ScoreRule.query.filter_by(
-            competition_id=comp.id, checkpoint_id=cp.id, group_id=group.id
-        ).one()
-        assert kept.rules["field_rules"]["task1"]["factor"] == 99, (
-            "Merge clobbered a hand-tuned local rule"
-        )
+        db.session.refresh(field)
+        db.session.refresh(segment)
+        db.session.refresh(scoring)
+        assert field.rule_params == {"factor": 99}, "Merge clobbered a hand-tuned local field"
+        assert segment.max_points == 100.0, "Merge clobbered a hand-tuned local segment"
+        assert scoring.found_points_per == 7.0, "Merge clobbered hand-tuned group scoring"
+        assert ScoreField.query.filter_by(competition_id=comp.id).count() == 1
+        assert TimedSegment.query.filter_by(competition_id=comp.id).count() == 1
+        assert GroupScoring.query.filter_by(competition_id=comp.id).count() == 1
 
     def test_merge_carries_devices_and_rfid_cards(self, client, _seeded):
         """LoRaDevice and RFIDCard rows must land via merge (the new-comp
@@ -690,88 +895,98 @@ class TestMerge:
         # UID is normalized on the way in.
         assert RFIDCard.query.filter_by(competition_id=comp.id).count() == 1
 
-    def test_merge_resolves_name_based_checkpoint_refs_in_score_rules(self, client, _seeded):
-        """Score rules authored with name-based checkpoint references
-        (e.g. time_race.start_checkpoint_name) must resolve to local
-        IDs at merge time. Without this, a hand-authored import file
-        is brittle — the source's integer IDs don't exist locally."""
+    def test_merge_carries_scoring_sections(self, client, _seeded):
+        """New-format score_fields / timed_segments / group_scoring
+        sections must land via merge (add-new-only, name-based refs),
+        and a re-merge of the same payload must be a no-op."""
         comp, _, group, cp, _, _ = _seeded
-        # Add a second checkpoint so the time_race references something
-        # other than the existing one.
         extra_cp = create_checkpoint(comp, name="CP-Export-2")
-        db.session.commit()
+        set_group_route(group, [cp, extra_cp], path_name="Main route")
 
         export_data = client.get(f"/api/competition/{comp.id}/export").get_json()
-        export_data["score_rules"] = [
+        # The export carries empty scoring sections (fixture has none).
+        # Inject one entry into each, the shape the export emits.
+        export_data["score_fields"] = [
             {
                 "checkpoint_name": cp.name,
-                "group_name": group.name,
-                "rules": {
-                    "time_race": {
-                        "start_checkpoint_name": cp.name,
-                        "end_checkpoint_name": extra_cp.name,
-                        "min_points": 10,
-                        "max_points": 100,
-                    },
-                    "field_rules": {
-                        "bonus": [
-                            {
-                                "type": "found",
-                                "points_per": 5,
-                                "checkpoint_names": [cp.name, extra_cp.name],
-                            }
-                        ]
-                    },
-                },
+                "key": "task1",
+                "label": "Task 1",
+                "hint": None,
+                "position": 0,
+                "rule_type": "multiplier",
+                "rule_params": {"factor": 2},
+                "max_input": 10.0,
+                "counts_in_total": True,
+                "groups": [
+                    {"group_name": group.name, "enabled": False, "rule_override": None}
+                ],
             }
         ]
-        export_data["global_score_rules"] = [
+        export_data["timed_segments"] = [
+            {
+                "path_name": "Main route",
+                "start_checkpoint_name": cp.name,
+                "end_checkpoint_name": extra_cp.name,
+                "name": "Sprint",
+                "max_points": 60.0,
+                "min_points": 5.0,
+            }
+        ]
+        export_data["group_scoring"] = [
             {
                 "group_name": group.name,
-                "rules": {
-                    "time": {
-                        "start_checkpoint_name": cp.name,
-                        "end_checkpoint_name": extra_cp.name,
-                        "max_points": 195,
-                        "threshold_minutes": 195,
-                        "penalty_minutes": 1,
-                        "penalty_points": 2,
-                        "min_points": 0,
-                    },
-                    "found": {"points_per": 100, "exclude_start_checkpoint": True},
-                },
+                "found_points_per": 4.0,
+                "race_max_points": 100.0,
+                "race_threshold_minutes": 90.0,
+                "race_penalty_minutes": 5.0,
+                "race_penalty_points": 3.0,
+                "race_min_points": 0.0,
+                "race_dq_multiplier": 0.5,
             }
         ]
         export_data["resolutions"] = {}
 
         resp = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
         assert resp.status_code == 200
-        summary = resp.get_json()["summary"]
-        assert summary["added"]["score_rules"] == 1
-        assert summary["added"]["global_score_rules"] == 1
+        added = resp.get_json()["summary"]["added"]
+        assert added["score_fields"] == 1
+        assert added["timed_segments"] == 1
+        assert added["group_scoring"] == 1
 
-        landed_rule = ScoreRule.query.filter_by(
-            competition_id=comp.id, checkpoint_id=cp.id, group_id=group.id
+        field = ScoreField.query.filter_by(
+            competition_id=comp.id, checkpoint_id=cp.id, key="task1"
         ).one()
-        # Name fields removed, id fields populated with local IDs.
-        tr = landed_rule.rules["time_race"]
-        assert "start_checkpoint_name" not in tr
-        assert "end_checkpoint_name" not in tr
-        assert tr["start_checkpoint_id"] == cp.id
-        assert tr["end_checkpoint_id"] == extra_cp.id
-        # Same for the chained "found" rule.
-        bonus_chain = landed_rule.rules["field_rules"]["bonus"]
-        assert isinstance(bonus_chain, list) and len(bonus_chain) == 1
-        bonus = bonus_chain[0]
-        assert "checkpoint_names" not in bonus
-        assert sorted(bonus["checkpoint_ids"]) == sorted([cp.id, extra_cp.id])
+        assert field.rule_type == "multiplier"
+        assert field.rule_params == {"factor": 2}
+        assert field.max_input == 10.0
+        fg = ScoreFieldGroup.query.filter_by(
+            score_field_id=field.id, group_id=group.id
+        ).one()
+        assert fg.enabled is False
 
-        gr = GlobalScoreRule.query.filter_by(
-            competition_id=comp.id, group_id=group.id
-        ).one()
-        assert gr.rules["time"]["start_checkpoint_id"] == cp.id
-        assert gr.rules["time"]["end_checkpoint_id"] == extra_cp.id
-        assert "start_checkpoint_name" not in gr.rules["time"]
+        seg = TimedSegment.query.filter_by(competition_id=comp.id).one()
+        assert seg.path_id == group.path_id
+        assert seg.start_checkpoint_id == cp.id
+        assert seg.end_checkpoint_id == extra_cp.id
+        assert seg.name == "Sprint"
+        assert seg.max_points == 60.0
+        assert seg.min_points == 5.0
+
+        gs = GroupScoring.query.filter_by(group_id=group.id).one()
+        assert gs.found_points_per == 4.0
+        assert gs.race_max_points == 100.0
+        assert gs.race_dq_multiplier == 0.5
+
+        # Re-merging the same payload adds nothing and duplicates nothing.
+        resp2 = client.post(f"/api/competition/{comp.id}/merge", json=export_data)
+        assert resp2.status_code == 200
+        added2 = resp2.get_json()["summary"]["added"]
+        assert added2["score_fields"] == 0
+        assert added2["timed_segments"] == 0
+        assert added2["group_scoring"] == 0
+        assert ScoreField.query.filter_by(competition_id=comp.id).count() == 1
+        assert TimedSegment.query.filter_by(competition_id=comp.id).count() == 1
+        assert GroupScoring.query.filter_by(competition_id=comp.id).count() == 1
 
     def test_merge_admin_only(self, app, client):
         viewer = create_user(username="viewer-merge", role="public")

@@ -1,20 +1,25 @@
 """Integration test for /api/scores/resolve enrichment.
 
 The judge UI relies on each field in the response carrying display_label,
-hint, widget, and (for mapping rules) widget_choices. This test pins the
-JSON contract so we catch regressions before judges hit them on race day.
+hint, widget, and (for mapping rules) widget_choices. Fields now come
+from ScoreField rows (phase-2 scoring model) instead of SheetConfig +
+ScoreRule JSON, the dead_time field comes from
+Checkpoint.dead_time_enabled, and the response no longer carries a
+"rules" key - but the enrichment contract is unchanged. This test pins
+the JSON contract so we catch regressions before judges hit them on
+race day.
 """
 
 from __future__ import annotations
 
 from app.extensions import db
-from app.models import ScoreRule, SheetConfig
 from tests.support import (
     add_membership,
     assign_team_group,
     create_checkpoint,
     create_competition,
     create_group,
+    create_score_field,
     create_team,
     create_user,
     login_as,
@@ -26,7 +31,7 @@ def _seed_vesla_setup(app):
     three pass/fail mapping fields (0/1 -> 0/10) plus a raw izgled field.
     Mirrors the real Ščukanujanje A/D config so the test exercises both
     button and number widgets in one resolve call."""
-    admin = create_user(username="judge-ui-admin", role="admin")
+    admin = create_user(username="judge-ui-admin")
     comp = create_competition(name="Judge UI Race")
     add_membership(admin, comp, role="admin")
     group = create_group(comp, name="mGG", prefix="1xx")
@@ -34,57 +39,22 @@ def _seed_vesla_setup(app):
     team = create_team(comp, name="VeslaTeam", number=101)
     assign_team_group(team, group)
 
-    # SheetConfig defines the four fields the judge will see.
-    cfg = SheetConfig(
-        competition_id=comp.id,
-        spreadsheet_id="local:judge-ui",
-        spreadsheet_name="Local",
-        tab_name=cp.name,
-        tab_type="checkpoint",
-        checkpoint_id=cp.id,
-        config={
-            "arrived_header": "Arr",
-            "points_header": "Points",
-            "dead_time_enabled": False,
-            "time_enabled": False,
-            "groups": [
-                {
-                    "group_id": group.id,
-                    "name": group.name,
-                    "fields": ["dolzina_plavuti", "sirina_plavuti", "sirina_rocaja", "izgled"],
-                },
-            ],
-        },
-    )
-    db.session.add(cfg)
-    db.session.add(
-        ScoreRule(
-            competition_id=comp.id,
-            checkpoint_id=cp.id,
-            group_id=group.id,
-            rules={
-                "field_rules": {
-                    # Per-competition polish lives in the rule dict, not
-                    # in hardcoded Python dicts.
-                    "dolzina_plavuti": {
-                        "type": "mapping", "map": {"0": 0, "1": 10},
-                        "label": "Dolžina plavuti",
-                    },
-                    "sirina_plavuti": {
-                        "type": "mapping", "map": {"0": 0, "1": 10},
-                        "label": "Širina plavuti",
-                    },
-                    "sirina_rocaja": {
-                        "type": "mapping", "map": {"0": 0, "1": 10},
-                        "label": "Širina ročaja",
-                    },
-                    "izgled": {"label": "Izgled", "max": 20},
-                },
-                "total_fields": ["dolzina_plavuti", "sirina_plavuti", "sirina_rocaja", "izgled"],
-            },
+    # Per-competition polish (labels, caps) lives on the ScoreField rows,
+    # not in hardcoded Python dicts. No SheetConfig needed: field
+    # existence comes from ScoreField alone in the phase-2 model.
+    for key, label in (
+        ("dolzina_plavuti", "Dolžina plavuti"),
+        ("sirina_plavuti", "Širina plavuti"),
+        ("sirina_rocaja", "Širina ročaja"),
+    ):
+        create_score_field(
+            cp, key, label=label, rule_type="mapping", rule_params={"map": {"0": 0, "1": 10}}
         )
-    )
-    db.session.commit()
+    # Raw number entry with a soft cap. The cap rides in rule_params
+    # ("max") because the derived "0-N tock" hint only reads that key;
+    # ScoreField.max_input does not feed the soft-cap hint (see report:
+    # judge_labels._soft_cap_hint_from_rule vs scoring.field_rule_dict).
+    create_score_field(cp, "izgled", label="Izgled", rule_params={"max": 20})
     return admin, comp, team, cp
 
 
@@ -100,6 +70,9 @@ def test_resolve_includes_display_label_hint_widget_for_each_field(client, app):
         assert resp.status_code == 200, resp.get_json()
         body = resp.get_json()
 
+        # Phase-2 contract: the old "rules" key is gone from the response.
+        assert "rules" not in body
+
         # Checkpoint description surfaces so the judge sees what to score.
         assert body["checkpoint"]["description"] == "Izdelava vesla (test)."
 
@@ -107,6 +80,9 @@ def test_resolve_includes_display_label_hint_widget_for_each_field(client, app):
         # All four expected fields are present.
         for k in ("dolzina_plavuti", "sirina_plavuti", "sirina_rocaja", "izgled"):
             assert k in fields, f"Missing field {k!r} in resolve response"
+        # dead_time now comes from Checkpoint.dead_time_enabled, which is
+        # off by default - so no dead_time input is offered here.
+        assert "dead_time" not in fields
 
         # Mapping fields render as buttons with the Slovene Ne/Da pass-fail
         # labels and the correct point values attached.
@@ -137,50 +113,29 @@ def test_resolve_renders_deviation_rule_with_target_hint(client, app):
     target+penalty visible, no buttons because deviation isn't a discrete
     choice."""
     with app.app_context():
-        admin = create_user(username="judge-ui-h-admin", role="admin")
+        admin = create_user(username="judge-ui-h-admin")
         comp = create_competition(name="Judge UI H Race")
         add_membership(admin, comp, role="admin")
         group = create_group(comp, name="PP", prefix="3xx")
         cp = create_checkpoint(comp, name="H", description="Predmet prostornine 0.6L (ocena), 0-50 pts")
+        # dead_time is a per-checkpoint flag now (was SheetConfig config).
+        cp.dead_time_enabled = True
+        db.session.commit()
         team = create_team(comp, name="HTeam", number=301)
         assign_team_group(team, group)
-        cfg = SheetConfig(
-            competition_id=comp.id,
-            spreadsheet_id="local:judge-ui-h",
-            spreadsheet_name="Local",
-            tab_name=cp.name,
-            tab_type="checkpoint",
-            checkpoint_id=cp.id,
-            config={
-                "points_header": "Points",
-                "dead_time_enabled": False,
-                "time_enabled": False,
-                "groups": [{"group_id": group.id, "name": group.name, "fields": ["prostornina_l"]}],
+        create_score_field(
+            cp,
+            "prostornina_l",
+            label="Prostornina (L)",
+            rule_type="deviation",
+            rule_params={
+                "target": 0.6,
+                "max_points": 50,
+                "penalty_points": 2.5,
+                "penalty_distance": 0.05,
+                "min_points": 0,
             },
         )
-        db.session.add(cfg)
-        db.session.add(
-            ScoreRule(
-                competition_id=comp.id,
-                checkpoint_id=cp.id,
-                group_id=group.id,
-                rules={
-                    "field_rules": {
-                        "prostornina_l": {
-                            "type": "deviation",
-                            "target": 0.6,
-                            "max_points": 50,
-                            "penalty_points": 2.5,
-                            "penalty_distance": 0.05,
-                            "min_points": 0,
-                            "label": "Prostornina (L)",
-                        },
-                    },
-                    "total_fields": ["prostornina_l"],
-                },
-            )
-        )
-        db.session.commit()
         login_as(client, admin, comp)
 
         resp = client.post(
@@ -198,3 +153,9 @@ def test_resolve_renders_deviation_rule_with_target_hint(client, app):
         assert "2.5" in field["hint"]
         assert "max 50" in field["hint"]
         assert field["display_label"] == "Prostornina (L)"
+
+        # Checkpoint.dead_time_enabled surfaces a dead_time input with the
+        # framework label.
+        dead = next(f for f in body["fields"] if f["key"] == "dead_time")
+        assert dead["widget"] == "number"
+        assert dead["display_label"] == "Mrtvi cas (min)"

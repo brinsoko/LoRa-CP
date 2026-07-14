@@ -35,6 +35,10 @@
                 {% endif %}
               </div>
             {% endif %}
+            <div id="judgesNote" class="alert alert-warning d-none mt-2 mb-0 small">
+              <strong>{{ _('Note for judges') }}</strong>
+              <span id="judgesNoteText" class="d-block" style="white-space: pre-line;"></span>
+            </div>
           </div>
 
           <div class="col-12">
@@ -112,6 +116,23 @@
   const cpScoringText = document.getElementById("cpScoringText");
   const teamSearch = document.getElementById("teamSearch");
   const fieldsContainer = document.getElementById("fieldsContainer");
+  const judgesNote = document.getElementById("judgesNote");
+  const judgesNoteText = document.getElementById("judgesNoteText");
+
+  // Per-checkpoint admin note for the judge on station (Checkpoint.judges_note),
+  // shown under the checkpoint selector and kept in sync with it.
+  const JUDGES_NOTES = {
+    {% for cp in checkpoints %}{{ cp.id }}: {{ (cp.judges_note or '')|tojson }},
+    {% endfor %}
+  };
+
+  function updateJudgesNote() {
+    const note = (JUDGES_NOTES[checkpointSelect.value] || "").trim();
+    judgesNoteText.textContent = note;
+    judgesNote.classList.toggle("d-none", !note);
+  }
+  checkpointSelect.addEventListener("change", updateJudgesNote);
+  updateJudgesNote();
 
   // datalist option.value -> team_id, built from the server-rendered options
   // so judges can search by number or name and we still know which team was

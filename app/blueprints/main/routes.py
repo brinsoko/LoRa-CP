@@ -118,7 +118,7 @@ def set_competition(competition_id: int):
     # may be doing setup work; superadmins likewise.
     role = (get_current_competition_role() or "").strip().lower()
     if role == "judge":
-        return redirect(url_for("scores.judge_score"))
+        return redirect(url_for("judge.home"))
     return redirect(url_for("teams.list_teams"))
 
 
@@ -136,7 +136,7 @@ def set_language(lang_code: str):
 
 
 def _parse_date_range(date_from_str, date_to_str):
-    """Parse YYYY-MM-DD bounds. Raises ValueError on malformed input —
+    """Parse YYYY-MM-DD bounds. Raises ValueError on malformed input -
     callers must catch and either flash a warning or return 400. Silently
     falling back to no filter could expand exports unexpectedly."""
     start = end = None

@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # Ensure project root (where 'app/' lives) is importable BEFORE any
-# `from app...` imports — otherwise running this script directly from
+# `from app...` imports - otherwise running this script directly from
 # a subprocess (instead of via the Makefile) raises ModuleNotFoundError.
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -33,16 +33,19 @@ from app.models import (
     Checkin,
     Checkpoint,
     CheckpointGroup,
-    CheckpointGroupLink,
     Competition,
     CompetitionMember,
+    JudgeCheckpoint,
+    PathStop,
     RFIDCard,
     ScoreEntry,
     Team,
     TeamGroup,
     User,
 )
+from app.models import Path as RoutePath
 from app.utils.competition import DEFAULT_COMPETITION_NAME, ensure_default_competition
+from app.utils.paths import replace_path_stops
 from app.utils.serial_helpers import normalize_uid
 from app.utils.time import utcnow_naive
 
@@ -220,8 +223,21 @@ def add_checkin(team: Team, cp: Checkpoint, when: datetime, competition_id: int)
 
 
 def set_group_checkpoints(group: CheckpointGroup, checkpoints: list[Checkpoint]):
-    """Assign ordered checkpoints to a group with positions."""
-    group.checkpoint_links = [CheckpointGroupLink(checkpoint=cp, position=idx) for idx, cp in enumerate(checkpoints)]
+    """Give the group a path with the ordered checkpoints as stops.
+
+    Reuses an existing path by (competition, name): paths has a UNIQUE
+    constraint there, and the documented add/merge mode re-runs the seed
+    against an existing DB, which used to crash on the second INSERT."""
+    name = f"{group.name} path"
+    path = RoutePath.query.filter_by(competition_id=group.competition_id, name=name).first()
+    if path is None:
+        path = RoutePath(competition_id=group.competition_id, name=name)
+        db.session.add(path)
+        db.session.flush()
+    replace_path_stops(path, [cp.id for cp in checkpoints])
+    db.session.flush()
+    group.path = path
+    group.direction = "forward"
 
 
 def load_teams_from_csv(csv_path: str) -> list[tuple[str, int | None, str, str | None]]:
@@ -391,7 +407,7 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
             t2 = get_or_create_team(competition.id, "Eagles", 302)
             t3 = get_or_create_team(competition.id, "Foxes", 303)
             t4 = get_or_create_team(competition.id, "Hawks", 304)
-            # Bravo teams (prefix 4xx → range 400-499) — some with numbers, some without
+            # Bravo teams (prefix 4xx → range 400-499) - some with numbers, some without
             t5 = get_or_create_team(competition.id, "Badgers", 401)
             t6 = get_or_create_team(competition.id, "Otters", 402)
             t7 = get_or_create_team(competition.id, "Ravens", None)
@@ -400,7 +416,7 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
             t9 = get_or_create_team(competition.id, "Bears", 100)
             t10 = get_or_create_team(competition.id, "Deer", 101)
             t11 = get_or_create_team(competition.id, "Rabbits", 102)
-            # Delta teams (no prefix — arbitrary numbers)
+            # Delta teams (no prefix - arbitrary numbers)
             t12 = get_or_create_team(competition.id, "Falcons", 7)
             t13 = get_or_create_team(competition.id, "Squirrels", 15)
 
@@ -442,6 +458,27 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
             set_group_checkpoints(g_charlie, [cps[1], cps[4], cps[7]])  # CP-02, CP-05, CP-08
             set_group_checkpoints(g_delta, [cps[0], cps[2], cps[5]])  # CP-01, CP-03, CP-06
 
+            # Assign the demo judge to a couple of checkpoints so the
+            # /judge shell works out of the box after a fresh seed.
+            # Without an assignment the judge lands on "No checkpoints
+            # assigned yet" and can't score anything.
+            print("Assigning demo judge to checkpoints...")
+            judge_cps = [cps[0], cps[1]]  # CP-01 (default), CP-02
+            for idx, cp in enumerate(judge_cps):
+                exists = JudgeCheckpoint.query.filter_by(user_id=judge.id, checkpoint_id=cp.id).first()
+                if not exists:
+                    db.session.add(
+                        JudgeCheckpoint(
+                            user_id=judge.id,
+                            checkpoint_id=cp.id,
+                            competition_id=competition.id,
+                            is_default=(idx == 0),
+                        )
+                    )
+            # bulk_entry_enabled on CP-02 exercises the judge Table tab.
+            cps[1].bulk_entry_enabled = True
+            db.session.flush()
+
             print("Seeding demo RFID cards...")
             all_teams = [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13]
             for idx, t in enumerate(all_teams, start=1):
@@ -451,12 +488,24 @@ def seed(fresh: bool = False, teams_csv: str | None = None, skip_demo: bool = Tr
             now = utcnow_naive()
 
             def checkpoints_for_team(team: Team) -> list[Checkpoint]:
-                group_ids = [tg.group_id for tg in team.group_assignments]
-                if not group_ids:
+                # Query TeamGroup directly: team.group_assignments was
+                # already loaded (as []) inside assign_team_to_groups
+                # before the rows were added, and the whole seed runs in
+                # one transaction, so the relationship cache would stay
+                # empty and every team would silently get 0 check-ins.
+                path_ids = [
+                    pid
+                    for (pid,) in db.session.query(CheckpointGroup.path_id)
+                    .join(TeamGroup, TeamGroup.group_id == CheckpointGroup.id)
+                    .filter(TeamGroup.team_id == team.id)
+                    .filter(CheckpointGroup.path_id.isnot(None))
+                    .all()
+                ]
+                if not path_ids:
                     return []
                 q = (
-                    Checkpoint.query.join(Checkpoint.groups)
-                    .filter(CheckpointGroup.id.in_(group_ids))
+                    Checkpoint.query.join(PathStop, PathStop.checkpoint_id == Checkpoint.id)
+                    .filter(PathStop.path_id.in_(path_ids))
                     .distinct()
                     .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
                 )

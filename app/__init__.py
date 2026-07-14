@@ -16,6 +16,7 @@ from .api.auth import auth_api_bp
 from .api.checkpoints import checkpoints_api_bp
 from .api.groups import groups_api_bp
 from .api.helpers import json_error
+from .api.paths import paths_api_bp
 from .api.teams import teams_api_bp
 from .api.transfer import transfer_api_bp
 from .extensions import babel, db, limiter, login_manager
@@ -66,7 +67,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     # Trust X-Forwarded-* headers from a single reverse proxy hop (Caddy in
     # prod). Without this, OAuth redirect_uri uses the internal scheme/host
     # (`http://web:5000/...`) which Google rejects as a redirect mismatch.
-    # Gated behind TRUST_PROXY_HEADERS — defaults to on in production, off
+    # Gated behind TRUST_PROXY_HEADERS - defaults to on in production, off
     # otherwise. ProxyFix without an actual proxy in front lets clients
     # spoof X-Forwarded-Host / X-Forwarded-Proto, so it must NOT be enabled
     # when the Flask container is reachable directly.
@@ -87,6 +88,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.register_blueprint(auth_api_bp)
     app.register_blueprint(checkpoints_api_bp)
     app.register_blueprint(groups_api_bp)
+    app.register_blueprint(paths_api_bp)
     app.register_blueprint(teams_api_bp)
     app.register_blueprint(checkins_api_bp)
     app.register_blueprint(docs_api_bp)
@@ -99,7 +101,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.register_blueprint(scores_api_bp)
     app.register_blueprint(transfer_api_bp)
 
-    # logging — DEBUG only when the app is in debug/testing mode, INFO otherwise.
+    # logging - DEBUG only when the app is in debug/testing mode, INFO otherwise.
     # Production logs every request at INFO via werkzeug; the per-request DEBUG
     # line below would otherwise log header/role info on every hit.
     log_level = logging.DEBUG if (app.debug or app.config.get("TESTING")) else logging.INFO
@@ -157,6 +159,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     from app.blueprints.audit.routes import audit_bp
     from app.blueprints.docs.routes import docs_bp
     from app.blueprints.firmware.routes import firmware_bp
+    from app.blueprints.judge.routes import judge_bp
     from app.blueprints.judges.routes import judges_bp
     from app.blueprints.messages.routes import messages_bp
     from app.blueprints.scores.routes import scores_bp
@@ -174,17 +177,20 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     from .blueprints.lora.routes import lora_bp
     from .blueprints.main.routes import main_bp
     from .blueprints.map.routes import maps_bp
+    from .blueprints.paths.routes import paths_bp
     from .blueprints.rfid.routes import rfid_bp
     from .blueprints.teams.routes import teams_bp
 
     app.register_blueprint(users_bp, url_prefix="/users")
     app.register_blueprint(judges_bp, url_prefix="/judges")
+    app.register_blueprint(judge_bp, url_prefix="/judge")
     app.register_blueprint(scores_bp, url_prefix="/scores")
     app.register_blueprint(audit_bp, url_prefix="/audit")
     app.register_blueprint(docs_bp, url_prefix="/docs")
     app.register_blueprint(messages_bp, url_prefix="/messages")
     app.register_blueprint(lora_bp, url_prefix="/lora")
     app.register_blueprint(groups_bp, url_prefix="/groups")
+    app.register_blueprint(paths_bp, url_prefix="/paths")
     app.register_blueprint(maps_bp, url_prefix="/map")
     app.register_blueprint(superadmin_bp, url_prefix="/superadmin")
     app.register_blueprint(auth_bp)
@@ -271,12 +277,12 @@ def create_app(config_overrides: dict | None = None) -> Flask:
 
     @app.get("/health")
     def health():
-        # Cheap liveness probe — if the process responds, it's up.
+        # Cheap liveness probe - if the process responds, it's up.
         return {"ok": True}, 200
 
     @app.get("/ready")
     def ready():
-        # Readiness probe — also exercises the DB so a locked or missing
+        # Readiness probe - also exercises the DB so a locked or missing
         # SQLite file shows up as 503 instead of pretending to be healthy.
         try:
             db.session.execute(text("SELECT 1"))
@@ -301,6 +307,14 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     @app.before_request
     def _set_competition_on_g():
         g.current_competition = get_current_competition()
+
+    @app.cli.command("sheets-worker")
+    def sheets_worker_command():
+        """Drain the sheets_sync_jobs outbox. Run exactly ONE instance
+        (the dedicated compose service); web workers only enqueue."""
+        from app.utils.sheets_outbox import worker_loop
+
+        worker_loop()
 
     @app.context_processor
     def inject_current_app():

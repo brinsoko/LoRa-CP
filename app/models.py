@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from flask_login import UserMixin
 from sqlalchemy import CheckConstraint, Index, UniqueConstraint, event
-from sqlalchemy.ext.associationproxy import association_proxy
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
@@ -92,6 +91,12 @@ class Competition(db.Model):
     )
     checkpoint_groups = db.relationship(
         "CheckpointGroup",
+        back_populates="competition",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    paths = db.relationship(
+        "Path",
         back_populates="competition",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -338,7 +343,7 @@ class RFIDCard(db.Model):
         nullable=False,
         index=True,
     )
-    # UID is unique only within a competition — the same physical card
+    # UID is unique only within a competition - the same physical card
     # can be reused across years/events. Globally-unique UID would have
     # blocked re-issuance of the same scout card to a new team.
     uid = db.Column(db.String(100), nullable=False)
@@ -364,9 +369,86 @@ class RFIDCard(db.Model):
 
 
 # ====================
+# Path (ordered course through checkpoints)
+# ====================
+class Path(db.Model):
+    """An ordered course through checkpoints, shared between categories.
+
+    A CheckpointGroup references a Path plus a direction, so two groups
+    running the same course opposite ways share one Path row and can never
+    disagree about the stop order. Route resolution (direction applied)
+    lives in app/utils/paths.py; nothing else may derive start/finish.
+    """
+
+    __tablename__ = "paths"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name = db.Column(db.String(120), nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
+
+    competition = db.relationship("Competition", back_populates="paths")
+    stops = db.relationship(
+        "PathStop",
+        back_populates="path",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="PathStop.position.asc()",
+    )
+    groups = db.relationship("CheckpointGroup", back_populates="path")
+
+    __table_args__ = (UniqueConstraint("competition_id", "name", name="uq_path_competition_name"),)
+
+    def __repr__(self) -> str:
+        return f"<Path id={self.id} comp={self.competition_id} name={self.name!r}>"
+
+
+class PathStop(db.Model):
+    """One ordered stop on a Path.
+
+    Unique on (path_id, position) only; the same checkpoint may appear
+    twice on a path (out-and-back courses). Checkin recording for revisits
+    is a separate, still-open feature; the model just doesn't block it.
+    """
+
+    __tablename__ = "path_stops"
+
+    id = db.Column(db.Integer, primary_key=True)
+    path_id = db.Column(
+        db.Integer, db.ForeignKey("paths.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    checkpoint_id = db.Column(
+        db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    position = db.Column(db.Integer, nullable=False)
+    # Expected duration of the leg (previous stop -> this stop) in minutes,
+    # undirected. ETA fallback for the judge "who is still coming" view
+    # until enough observed leg times exist (redesign plan 3.1/3.5).
+    # Null on the first stop or when unknown.
+    expected_leg_minutes = db.Column(db.Float, nullable=True)
+
+    path = db.relationship("Path", back_populates="stops")
+    checkpoint = db.relationship("Checkpoint", back_populates="path_stops")
+
+    __table_args__ = (UniqueConstraint("path_id", "position", name="uq_path_stop_position"),)
+
+    def __repr__(self) -> str:
+        return (
+            f"<PathStop id={self.id} path_id={self.path_id} "
+            f"checkpoint_id={self.checkpoint_id} position={self.position}>"
+        )
+
+
+# ====================
 # CheckpointGroup
 # ====================
 class CheckpointGroup(db.Model):
+    """A category of teams: identity (name/prefix) + team assignment +
+    (path, direction). The ordered checkpoint list lives on the Path."""
+
     __tablename__ = "checkpoint_groups"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -377,31 +459,21 @@ class CheckpointGroup(db.Model):
     prefix = db.Column(db.String(20), nullable=True)
     description = db.Column(db.Text)
     position = db.Column(db.Integer, nullable=False, default=0)
-    # Per-group direction flag. When True, _build_group_routes flips the
-    # checkpoint order so the live arrivals view shows the route in the
-    # direction this group actually traverses it.
-    reverse = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    # The course this category runs, and in which direction. SET NULL on
+    # path delete keeps the category (teams, scoring scope) alive; the API
+    # additionally refuses to delete a path that groups still reference.
+    path_id = db.Column(
+        db.Integer, db.ForeignKey("paths.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    direction = db.Column(db.String(10), nullable=False, default="forward", server_default="forward")
 
     competition = db.relationship("Competition", back_populates="checkpoint_groups")
-    checkpoint_links = db.relationship(
-        "CheckpointGroupLink",
-        back_populates="group",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-        order_by="CheckpointGroupLink.position.asc()",
-    )
-    checkpoints = association_proxy(
-        "checkpoint_links",
-        "checkpoint",
-        creator=lambda checkpoint: CheckpointGroupLink(checkpoint=checkpoint),
-    )
+    path = db.relationship("Path", back_populates="groups")
 
-    # If you prefer explicit:
-    # team_assignments = db.relationship("TeamGroup", back_populates="group",
-    #                                    cascade="all, delete-orphan",
-    #                                    passive_deletes=True)
-
-    __table_args__ = (UniqueConstraint("competition_id", "name", name="uq_checkpoint_group_competition_name"),)
+    __table_args__ = (
+        UniqueConstraint("competition_id", "name", name="uq_checkpoint_group_competition_name"),
+        CheckConstraint("direction IN ('forward','reverse')", name="ck_group_direction"),
+    )
 
     def __repr__(self) -> str:
         return f"<CheckpointGroup id={self.id} comp={self.competition_id} name={self.name!r}>"
@@ -431,12 +503,24 @@ class Checkpoint(db.Model):
     position = db.Column(db.Integer, nullable=True)
     # When True, this CP is excluded from per-CP scoreboard columns and
     # from per-CP Google Sheet output. Check-ins are still recorded so
-    # arrival tracking + time-trial leg end detection still work — the
+    # arrival tracking + time-trial leg end detection still work - the
     # CP just doesn't get its own column on every team row. Typical use:
     # a finish line that's also a time-trial leg's end_cp; we don't want
     # it cluttering the leaderboard as "Cilj: 0" since the leg cell
     # already reports the leg result.
     hide_from_results = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    # Whether a visit here earns found-checkpoint points (GroupScoring.
+    # found_points_per). Unchecked for virtual CPs, start, finish and
+    # similar (redesign plan 3.2).
+    counts_for_found = db.Column(db.Boolean, nullable=False, default=True, server_default="1")
+    # Whether judges enter dead time here. Must never be enabled on a
+    # checkpoint that is a timed segment's end stop (redesign plan 3.3);
+    # enforced in the checkpoints API and segment admin.
+    dead_time_enabled = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
+    # Stations like written tests are scored offline and entered in one
+    # sitting; this opts the checkpoint into the judge shell's bulk-entry
+    # grid (redesign plan 3.6).
+    bulk_entry_enabled = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
 
     # Device mapping (one device ↔ one checkpoint)
     lora_device_id = db.Column(
@@ -451,49 +535,24 @@ class Checkpoint(db.Model):
     checkins = db.relationship("Checkin", back_populates="checkpoint", lazy=True)
 
     competition = db.relationship("Competition", back_populates="checkpoints")
-    group_links = db.relationship(
-        "CheckpointGroupLink",
+    path_stops = db.relationship(
+        "PathStop",
         back_populates="checkpoint",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-    groups = association_proxy(
-        "group_links",
-        "group",
-        creator=lambda group: CheckpointGroupLink(group=group),
+    score_fields = db.relationship(
+        "ScoreField",
+        back_populates="checkpoint",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ScoreField.position.asc()",
     )
 
     __table_args__ = (UniqueConstraint("competition_id", "name", name="uq_checkpoint_competition_name"),)
 
     def __repr__(self) -> str:
         return f"<Checkpoint id={self.id} comp={self.competition_id} name={self.name!r}>"
-
-
-class CheckpointGroupLink(db.Model):
-    __tablename__ = "checkpoint_group_links"
-
-    group_id = db.Column(
-        db.Integer,
-        db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    checkpoint_id = db.Column(
-        db.Integer,
-        db.ForeignKey("checkpoints.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    position = db.Column(db.Integer, nullable=False)
-
-    group = db.relationship("CheckpointGroup", back_populates="checkpoint_links")
-    checkpoint = db.relationship("Checkpoint", back_populates="group_links")
-
-    __table_args__ = (UniqueConstraint("checkpoint_id", "group_id", name="uq_cp_group"),)
-
-    def __repr__(self) -> str:
-        return (
-            f"<CheckpointGroupLink checkpoint_id={self.checkpoint_id} "
-            f"group_id={self.group_id} position={self.position}>"
-        )
 
 
 # =========
@@ -744,10 +803,15 @@ class ScoreEntry(db.Model):
 
 
 # =========================
-# ScoreRule (scoring logic)
+# ScoreField (what can be scored at a checkpoint)
 # =========================
-class ScoreRule(db.Model):
-    __tablename__ = "score_rules"
+class ScoreField(db.Model):
+    """One judged input at a checkpoint: its key in ScoreEntry.raw_fields,
+    display metadata, and the default scoring transform. Per-group
+    enable/override lives in ScoreFieldGroup; no row there means the field
+    is enabled with these defaults (redesign plan 3.2)."""
+
+    __tablename__ = "score_fields"
 
     id = db.Column(db.Integer, primary_key=True)
     competition_id = db.Column(
@@ -756,22 +820,175 @@ class ScoreRule(db.Model):
     checkpoint_id = db.Column(
         db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    key = db.Column(db.String(80), nullable=False)
+    label = db.Column(db.String(160), nullable=True)
+    hint = db.Column(db.String(255), nullable=True)
+    position = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    # 'none' means the raw numeric input is the score. rule_params holds
+    # the per-type parameters (map / points / factor / deviation params);
+    # this is the one deliberately-polymorphic JSON left in scoring.
+    rule_type = db.Column(db.String(20), nullable=False, default="none", server_default="none")
+    rule_params = db.Column(db.JSON, nullable=True)
+    max_input = db.Column(db.Float, nullable=True)
+    counts_in_total = db.Column(db.Boolean, nullable=False, default=True, server_default="1")
+
+    checkpoint = db.relationship("Checkpoint", back_populates="score_fields")
+    group_overrides = db.relationship(
+        "ScoreFieldGroup",
+        back_populates="field",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("checkpoint_id", "key", name="uq_score_field_checkpoint_key"),
+        CheckConstraint(
+            "rule_type IN ('none','mapping','interpolate','multiplier','deviation')",
+            name="ck_score_field_rule_type",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ScoreField id={self.id} checkpoint_id={self.checkpoint_id} key={self.key!r}>"
+
+
+class ScoreFieldGroup(db.Model):
+    """Per-group selection/override for a ScoreField. Absent row = enabled
+    with the field's defaults. enabled=False hides the field for that
+    group; rule_override (JSON: rule_type/rule_params/max_input) replaces
+    the default transform when present."""
+
+    __tablename__ = "score_field_groups"
+
+    id = db.Column(db.Integer, primary_key=True)
+    score_field_id = db.Column(
+        db.Integer, db.ForeignKey("score_fields.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     group_id = db.Column(
         db.Integer, db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    rules = db.Column(db.JSON, nullable=False, default=dict)
-    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False, index=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=True, server_default="1")
+    rule_override = db.Column(db.JSON, nullable=True)
 
-    checkpoint = db.relationship("Checkpoint")
+    field = db.relationship("ScoreField", back_populates="group_overrides")
     group = db.relationship("CheckpointGroup")
 
-    __table_args__ = (UniqueConstraint("competition_id", "checkpoint_id", "group_id", name="uq_score_rule_scope"),)
+    __table_args__ = (UniqueConstraint("score_field_id", "group_id", name="uq_score_field_group"),)
+
+    def __repr__(self) -> str:
+        return f"<ScoreFieldGroup field={self.score_field_id} group={self.group_id} enabled={self.enabled}>"
+
+
+# =========================
+# TimedSegment (time trial between two stops of a path)
+# =========================
+class TimedSegment(db.Model):
+    """A timed stretch between two checkpoints of a path, scored by rank
+    spread within each category: fastest team gets max_points, slowest
+    min_points, linear in between. Endpoints swap automatically for
+    groups running the path in reverse. Any number per path. Results are
+    computed by the engine at read time; nothing is stored in ScoreEntry
+    (redesign plan 3.3)."""
+
+    __tablename__ = "timed_segments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    path_id = db.Column(db.Integer, db.ForeignKey("paths.id", ondelete="CASCADE"), nullable=False, index=True)
+    start_checkpoint_id = db.Column(
+        db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False
+    )
+    end_checkpoint_id = db.Column(
+        db.Integer, db.ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False
+    )
+    name = db.Column(db.String(120), nullable=True)
+    max_points = db.Column(db.Float, nullable=False, default=100.0, server_default="100")
+    min_points = db.Column(db.Float, nullable=False, default=0.0, server_default="0")
+
+    path = db.relationship("Path", backref=db.backref("segments", cascade="all, delete-orphan"))
+    start_checkpoint = db.relationship("Checkpoint", foreign_keys=[start_checkpoint_id])
+    end_checkpoint = db.relationship("Checkpoint", foreign_keys=[end_checkpoint_id])
 
     def __repr__(self) -> str:
         return (
-            f"<ScoreRule id={self.id} competition_id={self.competition_id} "
-            f"checkpoint_id={self.checkpoint_id} group_id={self.group_id}>"
+            f"<TimedSegment id={self.id} path_id={self.path_id} "
+            f"{self.start_checkpoint_id}->{self.end_checkpoint_id}>"
         )
+
+
+# =========================
+# GroupScoring (category-level scoring parameters)
+# =========================
+class GroupScoring(db.Model):
+    """Category-level scoring: found-checkpoint points and the race time
+    rule (whole race route start -> finish, threshold + stepped penalty,
+    dead time subtracted). All nullable; null race_max_points means no
+    race time rule. Deduction is floor(minutes_over / penalty_minutes) *
+    penalty_points, per the decisions log (redesign plan 3.3/7)."""
+
+    __tablename__ = "group_scoring"
+
+    group_id = db.Column(
+        db.Integer, db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    found_points_per = db.Column(db.Float, nullable=True)
+    race_max_points = db.Column(db.Float, nullable=True)
+    race_threshold_minutes = db.Column(db.Float, nullable=True)
+    race_penalty_minutes = db.Column(db.Float, nullable=True)
+    race_penalty_points = db.Column(db.Float, nullable=True)
+    race_min_points = db.Column(db.Float, nullable=True)
+    race_dq_multiplier = db.Column(db.Float, nullable=True)
+
+    group = db.relationship(
+        "CheckpointGroup",
+        backref=db.backref("scoring", uselist=False, cascade="all, delete-orphan"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<GroupScoring group_id={self.group_id}>"
+
+
+# =========================
+# SheetsSyncJob (durable outbox for Google Sheets writes)
+# =========================
+class SheetsSyncJob(db.Model):
+    """One pending/processed Sheets write, inserted in the same DB
+    transaction as the domain change it mirrors (redesign plan 3.4).
+
+    Replaces the per-process in-memory queue: nothing is lost to a
+    restart, an overflow, or a swallowed exception, and a single
+    dedicated worker process (flask sheets-worker) drains the table with
+    an accurate global throttle. dedup_key coalesces bursts: an enqueue
+    for a key with a pending job just refreshes that job's payload.
+    """
+
+    __tablename__ = "sheets_sync_jobs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    competition_id = db.Column(
+        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind = db.Column(db.String(40), nullable=False, index=True)
+    payload = db.Column(db.JSON, nullable=True)
+    dedup_key = db.Column(db.String(200), nullable=False, index=True)
+    status = db.Column(db.String(10), nullable=False, default="pending", server_default="pending", index=True)
+    attempts = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    next_attempt_at = db.Column(db.DateTime, nullable=True)
+    last_error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow_naive, onupdate=utcnow_naive, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('pending','running','done','failed')", name="ck_sheets_job_status"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<SheetsSyncJob id={self.id} kind={self.kind!r} status={self.status!r}>"
 
 
 # =========================
@@ -808,48 +1025,10 @@ class AuditEvent(db.Model):
         )
 
 
-# =========================
-# GlobalScoreRule (group-wide scoring logic)
-# =========================
-class GlobalScoreRule(db.Model):
-    __tablename__ = "global_score_rules"
-
-    id = db.Column(db.Integer, primary_key=True)
-    competition_id = db.Column(
-        db.Integer, db.ForeignKey("competitions.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    group_id = db.Column(
-        db.Integer, db.ForeignKey("checkpoint_groups.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    rules = db.Column(db.JSON, nullable=False, default=dict)
-    created_at = db.Column(db.DateTime, default=utcnow_naive, nullable=False, index=True)
-
-    group = db.relationship("CheckpointGroup")
-
-    __table_args__ = (UniqueConstraint("competition_id", "group_id", name="uq_global_score_rule_scope"),)
-
-    def __repr__(self) -> str:
-        return f"<GlobalScoreRule id={self.id} competition_id={self.competition_id} group_id={self.group_id}>"
-
-
-def _assign_checkpoint_link_position(link: CheckpointGroupLink) -> None:
-    if link.position is not None:
+@event.listens_for(Path.stops, "append")
+def _on_path_stop_append(path: Path, stop: PathStop, *_):
+    """Assign the next position to stops appended via path.stops."""
+    if stop.position is not None:
         return
-    group = link.group
-    if not group:
-        return
-
-    existing_positions = [cl.position for cl in group.checkpoint_links if cl is not link and cl.position is not None]
-    link.position = (max(existing_positions) + 1) if existing_positions else 0
-
-
-@event.listens_for(CheckpointGroup.checkpoint_links, "append")
-def _on_group_link_append(group: CheckpointGroup, link: CheckpointGroupLink, *_):
-    """Ensure new links created via group.checkpoints get a position."""
-    _assign_checkpoint_link_position(link)
-
-
-@event.listens_for(Checkpoint.group_links, "append")
-def _on_checkpoint_link_append(checkpoint: Checkpoint, link: CheckpointGroupLink, *_):
-    """Ensure new links created via checkpoint.groups get a position."""
-    _assign_checkpoint_link_position(link)
+    existing = [s.position for s in path.stops if s is not stop and s.position is not None]
+    stop.position = (max(existing) + 1) if existing else 0

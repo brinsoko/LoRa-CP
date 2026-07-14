@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
+from flask_babel import gettext as _
 from flask_login import current_user
 from sqlalchemy.exc import IntegrityError
 
@@ -13,7 +14,6 @@ from app.models import (
     JudgeCheckpoint,
     RFIDCard,
     ScoreEntry,
-    ScoreRule,
     Team,
     TeamGroup,
 )
@@ -21,6 +21,7 @@ from app.utils.audit import record_audit_event
 from app.utils.card_tokens import compute_card_digest, looks_like_card_uid
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_roles_required
+from app.utils.scoring import compute_entry_total, resolve_fields
 from app.utils.serial_helpers import normalize_uid
 from app.utils.sheets_sync import mark_arrival_checkbox, update_checkpoint_scores
 from app.utils.time import utcnow_naive
@@ -34,47 +35,6 @@ def _norm_name(value: str | None) -> str:
 
 def _get_active_group(team_id: int) -> TeamGroup | None:
     return TeamGroup.query.filter(TeamGroup.team_id == team_id, TeamGroup.active.is_(True)).first()
-
-
-def _get_checkpoint_fields(
-    competition_id: int, checkpoint_id: int, group_name: str, group_id: int | None = None
-) -> dict:
-    from app.models import SheetConfig
-
-    cfg = (
-        SheetConfig.query.filter(
-            SheetConfig.competition_id == competition_id,
-            SheetConfig.checkpoint_id == checkpoint_id,
-            SheetConfig.tab_type == "checkpoint",
-        )
-        .order_by(SheetConfig.created_at.desc())
-        .first()
-    )
-    if not cfg:
-        return {"fields": [], "headers": {}, "config": None}
-
-    headers = {
-        "dead_time": (cfg.config or {}).get("dead_time_header"),
-        "time": (cfg.config or {}).get("time_header"),
-        "points": (cfg.config or {}).get("points_header"),
-    }
-    group_defs = (cfg.config or {}).get("groups", [])
-    group_def = None
-    if group_id is not None:
-        group_def = next((g for g in group_defs if g.get("group_id") == group_id), None)
-    if group_def is None:
-        group_def = next((g for g in group_defs if _norm_name(g.get("name")) == _norm_name(group_name)), None)
-    fields = list(group_def.get("fields") or []) if group_def else []
-    return {"fields": fields, "headers": headers, "config": cfg.config or {}}
-
-
-def _get_score_rule(competition_id: int, checkpoint_id: int, group_id: int) -> dict | None:
-    rule = ScoreRule.query.filter(
-        ScoreRule.competition_id == competition_id,
-        ScoreRule.checkpoint_id == checkpoint_id,
-        ScoreRule.group_id == group_id,
-    ).first()
-    return rule.rules if rule else None
 
 
 def _to_number(value):
@@ -205,273 +165,10 @@ def _apply_field_rule(value, rule, context: dict) -> float | None:
     return _round_score(_to_number(value))
 
 
-def _get_team_dead_time_total(competition_id: int, team_id: int) -> float:
-    """Sum all dead_time values for a team — CP-bound entries plus the
-    team-level ``Team.bonus_dead_time`` adjustment (set by admins for
-    organizer-caused delays that don't belong to any single checkpoint).
-
-    Per-CP component: latest ScoreEntry's ``raw_fields.dead_time`` per CP.
-    Team-level component: ``Team.bonus_dead_time`` (in minutes, default 0).
-    """
-    entries = (
-        ScoreEntry.query.filter(
-            ScoreEntry.competition_id == competition_id,
-            ScoreEntry.team_id == team_id,
-        )
-        .order_by(ScoreEntry.created_at.desc())
-        .all()
-    )
-    latest_by_cp: dict[int, ScoreEntry] = {}
-    for entry in entries:
-        if entry.checkpoint_id not in latest_by_cp:
-            latest_by_cp[entry.checkpoint_id] = entry
-    total_dead = 0.0
-    for entry in latest_by_cp.values():
-        raw = entry.raw_fields or {}
-        dead_val = raw.get("dead_time", raw.get("Dead Time"))
-        num = _to_number(dead_val)
-        if num is not None and num > 0:
-            total_dead += num
-
-    # Team-level adjustment. Stored in minutes on the Team row so admins
-    # can flag delays the team had no control over (e.g. checkpoint
-    # offline for 15 min) without inventing fake CP-level dead-time.
-    team = db.session.get(Team, team_id)
-    if team and team.bonus_dead_time:
-        try:
-            total_dead += float(team.bonus_dead_time)
-        except (TypeError, ValueError):
-            pass
-
-    return total_dead
-
-
-def _compute_global_contrib(
-    competition_id: int,
-    team_id: int,
-    group_id: int,
-    global_rule: dict | None,
-) -> dict:
-    """Per-team contribution from the group's GlobalScoreRule.
-
-    Time rule is the classic threshold-and-penalty formula: ``max_points``
-    if the team finishes within ``threshold_minutes``, lose
-    ``penalty_points`` per ``penalty_minutes`` over, clamped at
-    ``min_points``. Auto-DNF triggers if effective duration exceeds
-    ``threshold_minutes * dq_multiplier``.
-
-    For rank-based scoring on a short leg between two intermediate CPs,
-    use ScoreRule.time_race (configured per group on /scores/rules).
-    """
-    if not global_rule:
-        return {"total": None, "found_points": None, "time_points": None, "auto_dnf": False}
-
-    total = 0.0
-    used = False
-    found_points = None
-    time_points = None
-    auto_dnf = False
-
-    found_rule = global_rule.get("found") or {}
-    points_per = _to_number(found_rule.get("points_per"))
-    if points_per is not None:
-        from app.models import CheckpointGroupLink
-
-        cp_ids = (
-            db.session.query(CheckpointGroupLink.checkpoint_id).filter(CheckpointGroupLink.group_id == group_id).all()
-        )
-        checkpoint_ids = [row[0] for row in cp_ids]
-        time_rule = global_rule.get("time") or {}
-        if found_rule.get("exclude_start_checkpoint") and time_rule.get("start_checkpoint_id"):
-            try:
-                checkpoint_ids.remove(int(time_rule.get("start_checkpoint_id")))
-            except ValueError:
-                pass
-        if found_rule.get("exclude_end_checkpoint") and time_rule.get("end_checkpoint_id"):
-            try:
-                checkpoint_ids.remove(int(time_rule.get("end_checkpoint_id")))
-            except ValueError:
-                pass
-        if checkpoint_ids:
-            found = (
-                Checkin.query.filter(
-                    Checkin.competition_id == competition_id,
-                    Checkin.team_id == team_id,
-                    Checkin.checkpoint_id.in_(checkpoint_ids),
-                )
-                .with_entities(Checkin.checkpoint_id)
-                .distinct()
-                .count()
-            )
-            found_points = points_per * found
-            total += found_points
-            used = True
-
-    time_rule = global_rule.get("time") or {}
-    start_cp = time_rule.get("start_checkpoint_id")
-    end_cp = time_rule.get("end_checkpoint_id")
-    max_points = _to_number(time_rule.get("max_points"))
-    threshold_minutes = _to_number(time_rule.get("threshold_minutes"))
-    penalty_minutes = _to_number(time_rule.get("penalty_minutes"))
-    penalty_points = _to_number(time_rule.get("penalty_points"))
-    min_points = _to_number(time_rule.get("min_points")) or 0.0
-    dq_multiplier = _to_number(time_rule.get("dq_multiplier"))
-    if (
-        start_cp
-        and end_cp
-        and max_points is not None
-        and threshold_minutes is not None
-        and penalty_minutes
-        and penalty_points is not None
-    ):
-        start_row = (
-            Checkin.query.filter(
-                Checkin.competition_id == competition_id,
-                Checkin.team_id == team_id,
-                Checkin.checkpoint_id == int(start_cp),
-            )
-            .order_by(Checkin.timestamp.asc())
-            .first()
-        )
-        end_row = (
-            Checkin.query.filter(
-                Checkin.competition_id == competition_id,
-                Checkin.team_id == team_id,
-                Checkin.checkpoint_id == int(end_cp),
-            )
-            .order_by(Checkin.timestamp.asc())
-            .first()
-        )
-        if start_row and end_row:
-            raw_duration = (end_row.timestamp - start_row.timestamp).total_seconds() / 60.0
-            dead_time_total = _get_team_dead_time_total(competition_id, team_id)
-            duration_minutes = max(0.0, raw_duration - dead_time_total)
-            if dq_multiplier is not None and dq_multiplier > 0 and duration_minutes > threshold_minutes * dq_multiplier:
-                auto_dnf = True
-            if duration_minutes <= threshold_minutes:
-                time_points = max_points
-            else:
-                over = max(0.0, duration_minutes - threshold_minutes)
-                time_points = max_points - (over / penalty_minutes) * penalty_points
-            time_points = _round_score(_clamp_non_negative(max(time_points, min_points)))
-            total += time_points
-            used = True
-
-    return {
-        "total": (_round_score(total) if used else None),
-        "found_points": _round_score(found_points),
-        "time_points": time_points,
-        "auto_dnf": auto_dnf,
-    }
-
-
-def _compute_total(
-    values: dict,
-    points_header: str | None,
-    rule: dict | None,
-    context: dict,
-) -> float | None:
-    base_total = None
-    if rule and rule.get("field_rules"):
-        computed = {}
-        for key, val in values.items():
-            field_rule = rule["field_rules"].get(key)
-            computed[key] = _apply_field_rule(val, field_rule, context) if field_rule else _to_number(val)
-        total_fields = rule.get("total_fields") or list(computed.keys())
-        total_fields = [key for key in total_fields if key != "dead_time"]
-        total = 0.0
-        used = False
-        for key in total_fields:
-            val = computed.get(key)
-            if val is None:
-                continue
-            total += float(val)
-            used = True
-        base_total = total if used else None
-
-    if points_header and points_header in values:
-        base_total = _to_number(values.get(points_header))
-    if "points" in values:
-        base_total = _to_number(values.get("points"))
-    if base_total is None:
-        total = 0.0
-        used = False
-        for key, val in values.items():
-            if key in ("time", "dead_time"):
-                continue
-            num = _to_number(val)
-            if num is None:
-                continue
-            total += num
-            used = True
-        base_total = total if used else None
-
-    return _round_score(base_total)
-
-
-def _compute_time_race_scores_from_checkins(
-    team_ids: list[int],
-    competition_id: int,
-    start_checkpoint_id: int,
-    end_checkpoint_id: int,
-    min_points: float,
-    max_points: float,
-) -> dict[int, float]:
-    from sqlalchemy import func
-
-    if not team_ids:
-        return {}
-
-    start_rows = (
-        db.session.query(Checkin.team_id, func.min(Checkin.timestamp))
-        .filter(
-            Checkin.competition_id == competition_id,
-            Checkin.checkpoint_id == start_checkpoint_id,
-            Checkin.team_id.in_(team_ids),
-        )
-        .group_by(Checkin.team_id)
-        .all()
-    )
-    end_rows = (
-        db.session.query(Checkin.team_id, func.min(Checkin.timestamp))
-        .filter(
-            Checkin.competition_id == competition_id,
-            Checkin.checkpoint_id == end_checkpoint_id,
-            Checkin.team_id.in_(team_ids),
-        )
-        .group_by(Checkin.team_id)
-        .all()
-    )
-
-    start_map = {team_id: ts for team_id, ts in start_rows if ts}
-    end_map = {team_id: ts for team_id, ts in end_rows if ts}
-
-    durations = {}
-    for team_id in team_ids:
-        start_ts = start_map.get(team_id)
-        end_ts = end_map.get(team_id)
-        if not start_ts or not end_ts:
-            continue
-        duration = (end_ts - start_ts).total_seconds()
-        if duration < 0:
-            continue
-        durations[team_id] = duration
-
-    if not durations:
-        return {}
-    min_d = min(durations.values())
-    max_d = max(durations.values())
-    if max_d == min_d:
-        return {team_id: _round_score(max_points) for team_id in durations.keys()}
-
-    scores = {}
-    for team_id, duration in durations.items():
-        t = (duration - min_d) / (max_d - min_d)
-        scores[team_id] = _round_score(_clamp_non_negative(max_points - t * (max_points - min_points)))
-    return scores
-
-
-def recompute_scores_for_rule(competition_id: int, checkpoint_id: int, group_id: int) -> None:
+def recompute_entry_totals(competition_id: int, checkpoint_id: int, group_id: int) -> None:
+    """Re-derive ScoreEntry.total for the latest entry per team after the
+    checkpoint's fields changed, and push the values to sheets. Timed
+    segments are computed at read time and never touch entries."""
     from app.models import CheckpointGroup
 
     group = CheckpointGroup.query.filter(
@@ -481,7 +178,7 @@ def recompute_scores_for_rule(competition_id: int, checkpoint_id: int, group_id:
     if not group:
         return
     group_name = group.name or ""
-    rule = _get_score_rule(competition_id, checkpoint_id, group_id)
+    fields = resolve_fields(checkpoint_id, group_id)
 
     latest_entries = (
         ScoreEntry.query.join(TeamGroup, TeamGroup.team_id == ScoreEntry.team_id)
@@ -502,42 +199,10 @@ def recompute_scores_for_rule(competition_id: int, checkpoint_id: int, group_id:
     if not entries:
         return
 
-    if rule and rule.get("time_race"):
-        tr = rule["time_race"] or {}
-        start_checkpoint_id = tr.get("start_checkpoint_id")
-        end_checkpoint_id = tr.get("end_checkpoint_id")
-        if start_checkpoint_id and end_checkpoint_id:
-            min_points = _to_number(tr.get("min_points")) or 0.0
-            max_points = _to_number(tr.get("max_points")) or 0.0
-            team_ids = [entry.team_id for entry in entries]
-            scores = _compute_time_race_scores_from_checkins(
-                team_ids,
-                competition_id,
-                int(start_checkpoint_id),
-                int(end_checkpoint_id),
-                min_points,
-                max_points,
-            )
-            for entry in entries:
-                if entry.team_id in scores:
-                    entry.total = scores[entry.team_id]
-            db.session.commit()
-
-            for entry in entries:
-                if entry.team_id in scores:
-                    try:
-                        values = dict(entry.raw_fields or {})
-                        values["points"] = scores[entry.team_id]
-                        update_checkpoint_scores(entry.team_id, checkpoint_id, group_name, values, entry.created_at)
-                    except Exception:
-                        pass
-            return
-
     for entry in entries:
-        total = _compute_total(
+        total = compute_entry_total(
             entry.raw_fields or {},
-            None,
-            rule,
+            fields,
             {"team_id": entry.team_id, "competition_id": competition_id, "group_id": group_id},
         )
         entry.total = total
@@ -560,7 +225,7 @@ def score_resolve():
 
     payload = request.get_json(silent=True) or {}
     # Same normalization as /api/ingest: drop any "|HMAC" suffix from v2
-    # LoRa-format clients, strip ':'/'-', uppercase — so Web NFC scans
+    # LoRa-format clients, strip ':'/'-', uppercase - so Web NFC scans
     # (colon-separated UIDs) match the canonical form stored on rfid_cards.
     uid = normalize_uid((payload.get("uid") or "").split("|", 1)[0])
     team_id = payload.get("team_id")
@@ -568,14 +233,14 @@ def score_resolve():
     try:
         checkpoint_id = int(checkpoint_id)
     except Exception:
-        return jsonify({"error": "invalid_request", "detail": "checkpoint_id is required."}), 400
+        return jsonify({"error": "invalid_request", "detail": _("checkpoint_id is required.")}), 400
 
     checkpoint = Checkpoint.query.filter(
         Checkpoint.competition_id == comp_id,
         Checkpoint.id == checkpoint_id,
     ).first()
     if not checkpoint:
-        return jsonify({"error": "not_found", "detail": "Checkpoint not found."}), 404
+        return jsonify({"error": "not_found", "detail": _("Checkpoint not found.")}), 404
 
     # Enforce judge assignment
     if CompetitionMember.query.filter(
@@ -589,55 +254,44 @@ def score_resolve():
             JudgeCheckpoint.checkpoint_id == checkpoint_id,
         ).first()
         if not assigned:
-            return jsonify({"error": "forbidden", "detail": "Checkpoint not assigned."}), 403
+            return jsonify({"error": "forbidden", "detail": _("Checkpoint not assigned.")}), 403
 
     team = None
     if uid:
         card = RFIDCard.query.filter_by(competition_id=comp_id, uid=uid).first()
         if not card:
-            return jsonify({"error": "not_found", "detail": "Card not mapped to a team."}), 404
+            return jsonify({"error": "not_found", "detail": _("Card not mapped to a team.")}), 404
         team = Team.query.filter(Team.competition_id == comp_id, Team.id == card.team_id).first()
     else:
         try:
             team_id = int(team_id)
         except Exception:
-            return jsonify({"error": "invalid_request", "detail": "uid or team_id is required."}), 400
+            return jsonify({"error": "invalid_request", "detail": _("uid or team_id is required.")}), 400
         team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
     if not team:
-        return jsonify({"error": "not_found", "detail": "Team not found."}), 404
+        return jsonify({"error": "not_found", "detail": _("Team not found.")}), 404
 
     group_link = _get_active_group(team.id)
     group_name = group_link.group.name if group_link and group_link.group else ""
     if not group_name:
-        return jsonify({"error": "invalid_request", "detail": "Team has no active group."}), 400
+        return jsonify({"error": "invalid_request", "detail": _("Team has no active group.")}), 400
     group_id = group_link.group_id if group_link else None
 
-    fields_info = _get_checkpoint_fields(comp_id, checkpoint_id, group_name, group_id)
-    config = fields_info.get("config")
-    if config is None:
-        return jsonify({"error": "invalid_request", "detail": "No scoring fields configured for this checkpoint."}), 400
-    if not fields_info["fields"] and not config.get("dead_time_enabled") and not config.get("time_enabled"):
-        # Points-only is allowed; require at least the checkpoint config to exist.
-        pass
-
-    # Pull the per-CP/per-group rule once so we can enrich each field_def
-    # with display_label, hint, and widget metadata for the judge form.
-    rule = _get_score_rule(comp_id, checkpoint_id, group_id) if group_id else None
-    per_field_rules = (rule or {}).get("field_rules") or {}
+    # Fields come from ScoreField + per-group overrides. Scoring no longer
+    # depends on any Sheets configuration; a checkpoint with no fields
+    # falls back to a single points-only input.
+    resolved = resolve_fields(checkpoint_id, group_id)
 
     from app.utils.judge_labels import auto_scoring_text, enrich_field_def
 
     field_defs = []
-    if config.get("dead_time_enabled"):
+    if checkpoint.dead_time_enabled:
         field_defs.append(
-            enrich_field_def(
-                {"key": "dead_time", "label": fields_info["headers"].get("dead_time") or "Dead Time", "type": "number"},
-                None,
-            )
+            enrich_field_def({"key": "dead_time", "label": "Dead Time", "type": "number"}, None)
         )
-    for field in fields_info["fields"]:
+    for field in resolved:
         field_defs.append(
-            enrich_field_def({"key": field, "label": field, "type": "number"}, per_field_rules.get(field))
+            enrich_field_def({"key": field["key"], "label": field["label"], "type": "number"}, field.get("rule"))
         )
     has_score_input = any(fd.get("key") in ("score", "points") for fd in field_defs)
     has_scored_fields = any(fd.get("key") not in ("dead_time",) for fd in field_defs)
@@ -654,17 +308,64 @@ def score_resolve():
         .first()
     )
 
-    checkin_exists = (
-        Checkin.query.filter_by(competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id).first()
-        is not None
-    )
+    checkin = Checkin.query.filter_by(
+        competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id
+    ).first()
+    checkin_created = False
+    # The judge shell records the arrival at scan time (scan = the team is
+    # standing in front of the judge), not at score submit. Same savepoint
+    # pattern as submit for the concurrent-judges race.
+    if checkin is None and payload.get("create_checkin") and not checkpoint.is_virtual:
+        new_checkin = Checkin(
+            competition_id=comp_id,
+            team_id=team.id,
+            checkpoint_id=checkpoint_id,
+            timestamp=utcnow_naive(),
+            created_by_user_id=current_user.id,
+        )
+        try:
+            with db.session.begin_nested():
+                db.session.add(new_checkin)
+        except IntegrityError:
+            checkin = Checkin.query.filter_by(
+                competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id
+            ).first()
+        else:
+            checkin = new_checkin
+            checkin_created = True
+            record_audit_event(
+                competition_id=comp_id,
+                event_type="checkin_created",
+                entity_type="checkin",
+                entity_id=checkin.id,
+                actor_user=current_user,
+                summary=f"Check-in recorded at scan for team {team.name} at {checkpoint.name}.",
+                details={
+                    "id": checkin.id,
+                    "team_id": team.id,
+                    "team_name": team.name,
+                    "checkpoint_id": checkpoint.id,
+                    "checkpoint_name": checkpoint.name,
+                    "timestamp": checkin.timestamp.isoformat() if checkin.timestamp else None,
+                },
+                created_at=checkin.timestamp,
+            )
+        if checkin_created:
+            try:
+                mark_arrival_checkbox(team.id, checkpoint_id, checkin.timestamp)
+            except Exception:
+                pass
+        db.session.commit()
+
+    checkin_exists = checkin is not None
 
     # Checkpoint scoring_text: curated admin override wins; otherwise
     # auto-generate from the rule so the judge always sees something
     # actionable instead of a bare description.
     scoring_text = (checkpoint.scoring_text or "").strip()
-    if not scoring_text and rule:
-        scoring_text = auto_scoring_text(rule, field_keys=fields_info.get("fields"))
+    if not scoring_text and resolved:
+        pseudo_rule = {"field_rules": {f["key"]: (f.get("rule") or {"label": f["label"]}) for f in resolved}}
+        scoring_text = auto_scoring_text(pseudo_rule, field_keys=[f["key"] for f in resolved])
 
     return {
         "ok": True,
@@ -680,9 +381,8 @@ def score_resolve():
         "fields": field_defs,
         "latest_score": existing.raw_fields if existing else None,
         "latest_total": existing.total if existing else None,
-        "checkin_created": False,
+        "checkin_created": checkin_created,
         "checkin_exists": checkin_exists,
-        "rules": rule,
     }, 200
 
 
@@ -696,27 +396,29 @@ def score_submit():
     team_id = payload.get("team_id")
     checkpoint_id = payload.get("checkpoint_id")
     fields = payload.get("fields") or {}
-    # Same normalization as /api/ingest — see note in score_resolve.
+    # Same normalization as /api/ingest - see note in score_resolve.
     uid = normalize_uid((payload.get("uid") or "").split("|", 1)[0])
 
-    # Validate no negative numeric inputs (dead_time excluded — it's always >= 0)
-    for key, val in fields.items():
+    # Validate no negative numeric inputs, dead_time included: it is
+    # waiting minutes and must be >= 0. get_team_dead_time_total ignores
+    # negatives (num > 0) while the "Dead time (sum)" display would add
+    # them, so accepting a negative only creates a display-vs-scoring
+    # mismatch.
+    for val in fields.values():
         num = _to_number(val)
-        if num is not None and num < 0 and key != "dead_time":
-            from flask_babel import gettext as _
-
+        if num is not None and num < 0:
             return jsonify({"error": "validation_error", "detail": _("Score cannot be negative.")}), 400
 
     try:
         team_id = int(team_id)
         checkpoint_id = int(checkpoint_id)
     except Exception:
-        return jsonify({"error": "invalid_request", "detail": "team_id and checkpoint_id are required."}), 400
+        return jsonify({"error": "invalid_request", "detail": _("team_id and checkpoint_id are required.")}), 400
 
     team = Team.query.filter(Team.competition_id == comp_id, Team.id == team_id).first()
     checkpoint = Checkpoint.query.filter(Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id).first()
     if not team or not checkpoint:
-        return jsonify({"error": "invalid_request", "detail": "Invalid team or checkpoint."}), 400
+        return jsonify({"error": "invalid_request", "detail": _("Invalid team or checkpoint.")}), 400
 
     if CompetitionMember.query.filter(
         CompetitionMember.competition_id == comp_id,
@@ -729,16 +431,14 @@ def score_submit():
             JudgeCheckpoint.checkpoint_id == checkpoint_id,
         ).first()
         if not assigned:
-            return jsonify({"error": "forbidden", "detail": "Checkpoint not assigned."}), 403
+            return jsonify({"error": "forbidden", "detail": _("Checkpoint not assigned.")}), 403
 
     group_link = _get_active_group(team.id)
     group_name = group_link.group.name if group_link and group_link.group else ""
     if not group_name:
-        return jsonify({"error": "invalid_request", "detail": "Team has no active group."}), 400
+        return jsonify({"error": "invalid_request", "detail": _("Team has no active group.")}), 400
     group_id = group_link.group_id if group_link else None
-    fields_info = _get_checkpoint_fields(comp_id, checkpoint_id, group_name, group_id)
-    points_header = (fields_info.get("headers") or {}).get("points")
-    rule = _get_score_rule(comp_id, checkpoint_id, group_id) if group_id else None
+    resolved = resolve_fields(checkpoint_id, group_id)
 
     checkin = Checkin.query.filter_by(competition_id=comp_id, team_id=team.id, checkpoint_id=checkpoint_id).first()
     created_checkin = False
@@ -781,17 +481,16 @@ def score_submit():
                 created_at=checkin.timestamp,
             )
             created_checkin = True
-        db.session.commit()
         if created_checkin:
             try:
                 mark_arrival_checkbox(team.id, checkpoint_id, checkin.timestamp)
             except Exception:
                 pass
+        db.session.commit()
 
-    total = _compute_total(
+    total = compute_entry_total(
         fields,
-        points_header,
-        rule,
+        resolved,
         {"team_id": team.id, "competition_id": comp_id, "group_id": group_id},
     )
     entry = ScoreEntry(
@@ -816,9 +515,9 @@ def score_submit():
         details=_score_entry_snapshot(entry),
         created_at=entry.created_at,
     )
-    db.session.commit()
 
-    # Update Google Sheets
+    # Enqueue the Sheets write before committing so the outbox job rides
+    # the same transaction as the ScoreEntry (see enqueue_job docstring).
     try:
         values = dict(fields)
         if total is not None:
@@ -826,67 +525,12 @@ def score_submit():
         update_checkpoint_scores(team.id, checkpoint_id, group_name, values, entry.created_at)
     except Exception:
         pass
-
-    # Time-based race scoring: recompute latest entries for this checkpoint+group.
-    if rule and rule.get("time_race"):
-        tr = rule["time_race"] or {}
-        start_checkpoint_id = tr.get("start_checkpoint_id")
-        end_checkpoint_id = tr.get("end_checkpoint_id")
-        if start_checkpoint_id and end_checkpoint_id:
-            min_points = _to_number(tr.get("min_points")) or 0.0
-            max_points = _to_number(tr.get("max_points")) or (total if total is not None else 0.0)
-            latest_entries = (
-                ScoreEntry.query.join(TeamGroup, TeamGroup.team_id == ScoreEntry.team_id)
-                .filter(
-                    ScoreEntry.competition_id == comp_id,
-                    ScoreEntry.checkpoint_id == checkpoint_id,
-                    TeamGroup.group_id == group_id,
-                    TeamGroup.active.is_(True),
-                )
-                .order_by(ScoreEntry.created_at.desc())
-                .all()
-            )
-            latest_by_team = {}
-            for e in latest_entries:
-                if e.team_id not in latest_by_team:
-                    latest_by_team[e.team_id] = e
-            entries = list(latest_by_team.values())
-            team_ids = [e.team_id for e in entries]
-            scores = _compute_time_race_scores_from_checkins(
-                team_ids,
-                comp_id,
-                int(start_checkpoint_id),
-                int(end_checkpoint_id),
-                min_points,
-                max_points,
-            )
-            for e in entries:
-                base_total = _compute_total(
-                    e.raw_fields or {},
-                    points_header,
-                    rule,
-                    {"team_id": e.team_id, "competition_id": comp_id, "group_id": group_id},
-                )
-                if e.team_id in scores:
-                    base_val = base_total or 0.0
-                    e.total = base_val + scores[e.team_id]
-                else:
-                    e.total = base_total
-            db.session.commit()
-
-            for e in entries:
-                if e.team_id in scores:
-                    try:
-                        values = dict(e.raw_fields or {})
-                        values["points"] = e.total
-                        update_checkpoint_scores(e.team_id, checkpoint_id, group_name, values, e.created_at)
-                    except Exception:
-                        pass
+    db.session.commit()
 
     card_writeback = None
     writeback_error = None
     # Only produce a writeback for inputs that actually look like a scanned
-    # card UID — see looks_like_card_uid for the heuristic. Manual judge
+    # card UID - see looks_like_card_uid for the heuristic. Manual judge
     # entries (selected via team dropdown) used to trigger a writeback
     # attempt that always failed and flashed "Card write-back failed" in
     # the UI, which was confusing.

@@ -15,27 +15,93 @@ from app.models import (
     Checkin,
     Checkpoint,
     CheckpointGroup,
-    CheckpointGroupLink,
     Competition,
     CompetitionMember,
-    GlobalScoreRule,
+    GroupScoring,
     LoRaDevice,
+    Path,
+    PathStop,
     RFIDCard,
     ScoreEntry,
-    ScoreRule,
+    ScoreField,
+    ScoreFieldGroup,
     SheetConfig,
     Team,
     TeamGroup,
     TeamMember,
+    TimedSegment,
     User,
 )
+from app.utils.competition import require_current_competition_id
+from app.utils.paths import resolve_route_ids
 from app.utils.rest_auth import json_roles_required
+from app.utils.scoring_backfill import convert_legacy_scoring
 from app.utils.serial_helpers import normalize_uid
 from app.utils.time import utcnow_naive
 
 transfer_api_bp = Blueprint("api_transfer", __name__)
 
-SCHEMA_VERSION = "1.0.0"
+
+def _opt_float(value, default: float) -> float:
+    """`value or default` rewrites an explicit 0 to the default; this
+    keeps a real 0.0 (e.g. a segment min_points of 0) on round-trip."""
+    return default if value is None else float(value)
+
+
+def _competition_in_scope(comp_id: int) -> bool:
+    """json_roles_required only checks the admin role in the session's
+    active competition, so an admin of competition A could otherwise
+    export/merge competition B by putting B's id in the URL. Require the
+    URL id to be the active competition; superadmin bypasses (its role
+    set spans every competition)."""
+    if (getattr(current_user, "role", None) or "").strip().lower() == "superadmin":
+        return True
+    return comp_id == require_current_competition_id()
+
+# 1.1.0: paths/path_stops become first-class; groups carry path_name +
+# direction. group_checkpoint_links is still exported as a derived legacy
+# view (per-group resolved route) and still accepted on import for old
+# files, where it is converted into paths.
+# 1.2.0: scoring becomes first-class (score_fields / timed_segments /
+# group_scoring, checkpoint counts_for_found + dead_time_enabled).
+# Legacy score_rules / global_score_rules sections are still accepted on
+# import and converted (app/utils/scoring_backfill.py).
+SCHEMA_VERSION = "1.2.0"
+
+
+def _get_or_create_path_for_sequence(
+    comp_id: int,
+    preferred_name: str,
+    checkpoint_ids: list[int],
+    cache: dict[tuple[int, ...], Path],
+) -> tuple[Path | None, str]:
+    """Return (path, direction) for a checkpoint sequence, creating if new.
+
+    Same merge rule as the phase-1 migration backfill: an existing path
+    with the identical sequence is shared forward; one with the exact
+    reversed sequence is shared with direction='reverse'.
+    """
+    if not checkpoint_ids:
+        return None, "forward"
+    seq = tuple(checkpoint_ids)
+    if seq in cache:
+        return cache[seq], "forward"
+    if tuple(reversed(seq)) in cache:
+        return cache[tuple(reversed(seq))], "reverse"
+
+    name = preferred_name
+    existing_names = {p.name for p in cache.values()}
+    counter = 2
+    while name in existing_names:
+        name = f"{preferred_name} ({counter})"
+        counter += 1
+    path = Path(competition_id=comp_id, name=name)
+    db.session.add(path)
+    db.session.flush()
+    for position, checkpoint_id in enumerate(checkpoint_ids):
+        db.session.add(PathStop(path_id=path.id, checkpoint_id=checkpoint_id, position=position))
+    cache[seq] = path
+    return path, "forward"
 
 
 # ---- serialisation helpers ----
@@ -50,15 +116,45 @@ def _export_competition(comp: Competition) -> dict:
     devices = LoRaDevice.query.filter_by(competition_id=comp.id).all()
     scores = ScoreEntry.query.filter_by(competition_id=comp.id).all()
     sheet_configs = SheetConfig.query.filter_by(competition_id=comp.id).all()
-    score_rules = ScoreRule.query.filter_by(competition_id=comp.id).all()
-    global_score_rules = GlobalScoreRule.query.filter_by(competition_id=comp.id).all()
-    rfid_cards = RFIDCard.query.join(Team, RFIDCard.team_id == Team.id).filter(Team.competition_id == comp.id).all()
-    team_groups = TeamGroup.query.join(Team, TeamGroup.team_id == Team.id).filter(Team.competition_id == comp.id).all()
-    group_links = (
-        CheckpointGroupLink.query.join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
-        .filter(CheckpointGroup.competition_id == comp.id)
+    score_fields = ScoreField.query.filter_by(competition_id=comp.id).order_by(
+        ScoreField.checkpoint_id.asc(), ScoreField.position.asc()
+    ).all()
+    field_group_rows = (
+        ScoreFieldGroup.query.join(ScoreField, ScoreFieldGroup.score_field_id == ScoreField.id)
+        .filter(ScoreField.competition_id == comp.id)
         .all()
     )
+    field_groups_by_field: dict[int, list] = {}
+    for row in field_group_rows:
+        field_groups_by_field.setdefault(row.score_field_id, []).append(row)
+    timed_segments = TimedSegment.query.filter_by(competition_id=comp.id).all()
+    group_scoring_rows = GroupScoring.query.filter_by(competition_id=comp.id).all()
+    group_name_by_id = {g.id: g.name for g in groups}
+    rfid_cards = RFIDCard.query.join(Team, RFIDCard.team_id == Team.id).filter(Team.competition_id == comp.id).all()
+    team_groups = TeamGroup.query.join(Team, TeamGroup.team_id == Team.id).filter(Team.competition_id == comp.id).all()
+    paths = Path.query.filter_by(competition_id=comp.id).all()
+    path_name_by_id = {path.id: path.name for path in paths}
+    cp_name_by_id = {cp.id: cp.name for cp in checkpoints}
+
+    # Derived legacy view of each group's resolved directed route, kept so
+    # older importers and scripts/json_export_to_csv.py keep working. The
+    # authoritative data is the "paths" section; import prefers it.
+    legacy_links = []
+    for g in groups:
+        seen: set[int] = set()
+        position = 0
+        for cp_id in resolve_route_ids(g):
+            if cp_id in seen:
+                continue
+            seen.add(cp_id)
+            legacy_links.append(
+                {
+                    "group_name": g.name,
+                    "checkpoint_name": cp_name_by_id.get(cp_id),
+                    "position": position,
+                }
+            )
+            position += 1
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -92,8 +188,25 @@ def _export_competition(comp: Competition) -> dict:
                 "prefix": g.prefix,
                 "description": g.description,
                 "position": g.position,
+                "path_name": g.path.name if g.path else None,
+                "direction": g.direction,
             }
             for g in groups
+        ],
+        "paths": [
+            {
+                "name": p.name,
+                "notes": p.notes,
+                "stops": [
+                    {
+                        "checkpoint_name": cp_name_by_id.get(stop.checkpoint_id),
+                        "position": stop.position,
+                        "expected_leg_minutes": stop.expected_leg_minutes,
+                    }
+                    for stop in p.stops
+                ],
+            }
+            for p in paths
         ],
         "checkpoints": [
             {
@@ -105,6 +218,8 @@ def _export_competition(comp: Competition) -> dict:
                 "easting": cp.easting,
                 "northing": cp.northing,
                 "is_virtual": bool(cp.is_virtual),
+                "counts_for_found": bool(cp.counts_for_found),
+                "dead_time_enabled": bool(cp.dead_time_enabled),
             }
             for cp in checkpoints
         ],
@@ -142,23 +257,53 @@ def _export_competition(comp: Competition) -> dict:
             }
             for s in scores
         ],
-        # Scoring rules — without these the destination has scoring
-        # layouts (SheetConfig) but no way to compute totals from raw
-        # fields, and judge submissions can't be re-scored.
-        "score_rules": [
+        # Scoring configuration: fields per checkpoint (with per-group
+        # enable/override), timed segments per path, category rules.
+        "score_fields": [
             {
-                "checkpoint_name": r.checkpoint.name if r.checkpoint else None,
-                "group_name": r.group.name if r.group else None,
-                "rules": r.rules,
+                "checkpoint_name": cp_name_by_id.get(f.checkpoint_id),
+                "key": f.key,
+                "label": f.label,
+                "hint": f.hint,
+                "position": f.position,
+                "rule_type": f.rule_type,
+                "rule_params": f.rule_params,
+                "max_input": f.max_input,
+                "counts_in_total": bool(f.counts_in_total),
+                "groups": [
+                    {
+                        "group_name": group_name_by_id.get(row.group_id),
+                        "enabled": bool(row.enabled),
+                        "rule_override": row.rule_override,
+                    }
+                    for row in field_groups_by_field.get(f.id, [])
+                ],
             }
-            for r in score_rules
+            for f in score_fields
         ],
-        "global_score_rules": [
+        "timed_segments": [
             {
-                "group_name": r.group.name if r.group else None,
-                "rules": r.rules,
+                "path_name": path_name_by_id.get(s.path_id),
+                "start_checkpoint_name": cp_name_by_id.get(s.start_checkpoint_id),
+                "end_checkpoint_name": cp_name_by_id.get(s.end_checkpoint_id),
+                "name": s.name,
+                "max_points": s.max_points,
+                "min_points": s.min_points,
             }
-            for r in global_score_rules
+            for s in timed_segments
+        ],
+        "group_scoring": [
+            {
+                "group_name": group_name_by_id.get(row.group_id),
+                "found_points_per": row.found_points_per,
+                "race_max_points": row.race_max_points,
+                "race_threshold_minutes": row.race_threshold_minutes,
+                "race_penalty_minutes": row.race_penalty_minutes,
+                "race_penalty_points": row.race_penalty_points,
+                "race_min_points": row.race_min_points,
+                "race_dq_multiplier": row.race_dq_multiplier,
+            }
+            for row in group_scoring_rows
         ],
         # SheetConfig holds the per-checkpoint scoring layout (which fields
         # the judge UI exposes, dead-time / time toggles, headers, per-group
@@ -191,14 +336,7 @@ def _export_competition(comp: Competition) -> dict:
             }
             for tg in team_groups
         ],
-        "group_checkpoint_links": [
-            {
-                "group_name": gl.group.name if gl.group else None,
-                "checkpoint_name": gl.checkpoint.name if gl.checkpoint else None,
-                "position": gl.position,
-            }
-            for gl in group_links
-        ],
+        "group_checkpoint_links": legacy_links,
     }
 
 
@@ -366,7 +504,7 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
             )
         )
 
-    # Groups
+    # Groups (path wiring happens after checkpoints + paths exist)
     group_map = {}  # name → CheckpointGroup
     for g_data in data.get("groups", []):
         g = CheckpointGroup(
@@ -391,6 +529,8 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
             easting=cp_data.get("easting"),
             northing=cp_data.get("northing"),
             is_virtual=bool(cp_data.get("is_virtual", False)),
+            counts_for_found=bool(cp_data.get("counts_for_found", True)),
+            dead_time_enabled=bool(cp_data.get("dead_time_enabled", False)),
         )
         db.session.add(cp)
         db.session.flush()
@@ -441,18 +581,62 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
         )
         db.session.add(d)
 
-    # Group ↔ checkpoint links
-    for gl_data in data.get("group_checkpoint_links", []):
-        group = group_map.get(gl_data.get("group_name"))
-        cp = cp_map.get(gl_data.get("checkpoint_name"))
-        if group and cp:
-            db.session.add(
-                CheckpointGroupLink(
-                    group_id=group.id,
-                    checkpoint_id=cp.id,
-                    position=gl_data.get("position", 0),
+    # Paths. New-format files carry a "paths" section plus per-group
+    # path_name/direction; legacy files only have group_checkpoint_links,
+    # which we convert into paths with the same forward/reverse merge rule
+    # as the schema migration.
+    path_map: dict[str, Path] = {}  # name → Path
+    if data.get("paths"):
+        for p_data in data.get("paths", []):
+            p = Path(competition_id=comp.id, name=p_data["name"], notes=p_data.get("notes"))
+            db.session.add(p)
+            db.session.flush()
+            stops = sorted(p_data.get("stops") or [], key=lambda s: s.get("position", 0))
+            position = 0
+            for s_data in stops:
+                cp = cp_map.get(s_data.get("checkpoint_name"))
+                if not cp:
+                    warnings.append(
+                        f"Path '{p.name}': unknown checkpoint '{s_data.get('checkpoint_name')}' skipped."
+                    )
+                    continue
+                db.session.add(
+                    PathStop(
+                        path_id=p.id,
+                        checkpoint_id=cp.id,
+                        position=position,
+                        expected_leg_minutes=s_data.get("expected_leg_minutes"),
+                    )
                 )
+                position += 1
+            path_map[p.name] = p
+        for g_data in data.get("groups", []):
+            group = group_map.get(g_data.get("name"))
+            if not group:
+                continue
+            path_name = g_data.get("path_name")
+            if path_name:
+                group.path = path_map.get(path_name)
+                if group.path is None:
+                    warnings.append(f"Group '{group.name}': unknown path '{path_name}'.")
+            direction = (g_data.get("direction") or "forward").strip().lower()
+            group.direction = direction if direction in ("forward", "reverse") else "forward"
+    else:
+        links_by_group: dict[str, list[tuple[int, int]]] = {}
+        for gl_data in data.get("group_checkpoint_links", []):
+            group = group_map.get(gl_data.get("group_name"))
+            cp = cp_map.get(gl_data.get("checkpoint_name"))
+            if group and cp:
+                links_by_group.setdefault(group.name, []).append((gl_data.get("position", 0), cp.id))
+        sequence_cache: dict[tuple[int, ...], Path] = {}
+        for group_name, entries in links_by_group.items():
+            group = group_map[group_name]
+            ordered_ids = [cp_id for (_pos, cp_id) in sorted(entries, key=lambda e: e[0])]
+            path, direction = _get_or_create_path_for_sequence(
+                comp.id, group_name, ordered_ids, sequence_cache
             )
+            group.path = path
+            group.direction = direction
 
     # Team ↔ group assignments
     for tg_data in data.get("team_groups", []):
@@ -471,7 +655,7 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
     for card_data in data.get("rfid_cards", []):
         team = team_map.get(card_data.get("team_name"))
         if team:
-            # Normalize on import — older exports may carry colon-separated
+            # Normalize on import - older exports may carry colon-separated
             # UIDs that wouldn't match the canonical /api/ingest lookup form.
             uid = normalize_uid(card_data.get("uid", ""))
             if not uid:
@@ -568,34 +752,73 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                 score_kwargs["created_at"] = created_at
             db.session.add(ScoreEntry(**score_kwargs))
 
-    # Score rules (per checkpoint+group). Without these the destination
-    # has scoring layouts but no logic to turn raw_fields into a total.
-    # Name-based checkpoint references inside the rule blob (e.g.
-    # time_race.start_checkpoint_name) are resolved to local IDs here.
-    for sr_data in data.get("score_rules", []):
-        cp = cp_map.get(sr_data.get("checkpoint_name"))
-        group = group_map.get(sr_data.get("group_name"))
-        if not (cp and group):
+    # Scoring configuration. New-format sections are created directly;
+    # legacy files (score_rules / global_score_rules / config field lists)
+    # are converted after sheet_configs land, see below.
+    for f_data in data.get("score_fields", []):
+        cp = cp_map.get(f_data.get("checkpoint_name"))
+        if not cp:
+            continue
+        field = ScoreField(
+            competition_id=comp.id,
+            checkpoint_id=cp.id,
+            key=(f_data.get("key") or "")[:80],
+            label=f_data.get("label"),
+            hint=f_data.get("hint"),
+            position=f_data.get("position", 0),
+            rule_type=(f_data.get("rule_type") or "none"),
+            rule_params=f_data.get("rule_params"),
+            max_input=f_data.get("max_input"),
+            counts_in_total=bool(f_data.get("counts_in_total", True)),
+        )
+        db.session.add(field)
+        db.session.flush()
+        for g_data in f_data.get("groups") or []:
+            group = group_map.get(g_data.get("group_name"))
+            if not group:
+                continue
+            db.session.add(
+                ScoreFieldGroup(
+                    score_field_id=field.id,
+                    group_id=group.id,
+                    enabled=bool(g_data.get("enabled", True)),
+                    rule_override=g_data.get("rule_override"),
+                )
+            )
+
+    for s_data in data.get("timed_segments", []):
+        seg_path = path_map.get(s_data.get("path_name"))
+        start_cp = cp_map.get(s_data.get("start_checkpoint_name"))
+        end_cp = cp_map.get(s_data.get("end_checkpoint_name"))
+        if not (seg_path and start_cp and end_cp):
             continue
         db.session.add(
-            ScoreRule(
+            TimedSegment(
                 competition_id=comp.id,
-                checkpoint_id=cp.id,
-                group_id=group.id,
-                rules=_remap_score_rule_blob(sr_data.get("rules"), cp_map) or {},
+                path_id=seg_path.id,
+                start_checkpoint_id=start_cp.id,
+                end_checkpoint_id=end_cp.id,
+                name=s_data.get("name"),
+                max_points=_opt_float(s_data.get("max_points"), 100.0),
+                min_points=_opt_float(s_data.get("min_points"), 0.0),
             )
         )
 
-    # Global score rules (per group: found-points, time race, etc.).
-    for gr_data in data.get("global_score_rules", []):
-        group = group_map.get(gr_data.get("group_name"))
+    for gs_data in data.get("group_scoring", []):
+        group = group_map.get(gs_data.get("group_name"))
         if not group:
             continue
         db.session.add(
-            GlobalScoreRule(
-                competition_id=comp.id,
+            GroupScoring(
                 group_id=group.id,
-                rules=_remap_score_rule_blob(gr_data.get("rules"), cp_map) or {},
+                competition_id=comp.id,
+                found_points_per=gs_data.get("found_points_per"),
+                race_max_points=gs_data.get("race_max_points"),
+                race_threshold_minutes=gs_data.get("race_threshold_minutes"),
+                race_penalty_minutes=gs_data.get("race_penalty_minutes"),
+                race_penalty_points=gs_data.get("race_penalty_points"),
+                race_min_points=gs_data.get("race_min_points"),
+                race_dq_multiplier=gs_data.get("race_dq_multiplier"),
             )
         )
 
@@ -617,6 +840,31 @@ def _import_competition_from_json(data: dict) -> tuple[Competition, list[str]]:
                 checkpoint_id=target_cp.id if target_cp else None,
                 config=_remap_sheet_config(sc_data.get("config"), group_map),
             )
+        )
+
+    # Legacy scoring (pre-1.2.0 files): convert score_rules /
+    # global_score_rules / config field lists into the phase-2 tables.
+    if not data.get("score_fields") and (
+        data.get("score_rules") or data.get("global_score_rules") or data.get("sheet_configs")
+    ):
+        legacy_rules = [
+            {
+                "checkpoint_name": sr.get("checkpoint_name"),
+                "group_name": sr.get("group_name"),
+                "rules": _remap_score_rule_blob(sr.get("rules"), cp_map) or {},
+            }
+            for sr in data.get("score_rules", [])
+        ]
+        legacy_globals = [
+            {
+                "group_name": gr.get("group_name"),
+                "rules": _remap_score_rule_blob(gr.get("rules"), cp_map) or {},
+            }
+            for gr in data.get("global_score_rules", [])
+        ]
+        db.session.flush()
+        convert_legacy_scoring(
+            comp.id, cp_map, group_map, data.get("sheet_configs", []), legacy_rules, legacy_globals
         )
 
     db.session.flush()
@@ -711,9 +959,13 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
         "scores": 0,
         "sheet_configs": 0,
         "team_groups": 0,
+        "paths": 0,
         "group_checkpoint_links": 0,
         "score_rules": 0,
         "global_score_rules": 0,
+        "score_fields": 0,
+        "timed_segments": 0,
+        "group_scoring": 0,
         "devices": 0,
         "rfid_cards": 0,
     }
@@ -767,6 +1019,9 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                 cp.description = cp_data.get("description")
                 cp.scoring_text = cp_data.get("scoring_text")
                 cp.judges_note = cp_data.get("judges_note")
+                cp.is_virtual = bool(cp_data.get("is_virtual", cp.is_virtual))
+                cp.counts_for_found = bool(cp_data.get("counts_for_found", cp.counts_for_found))
+                cp.dead_time_enabled = bool(cp_data.get("dead_time_enabled", cp.dead_time_enabled))
                 updated["checkpoints"] += 1
             elif action == "skip":
                 skipped += 1
@@ -780,6 +1035,9 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
                 judges_note=cp_data.get("judges_note"),
                 easting=cp_data.get("easting"),
                 northing=cp_data.get("northing"),
+                is_virtual=bool(cp_data.get("is_virtual", False)),
+                counts_for_found=bool(cp_data.get("counts_for_found", True)),
+                dead_time_enabled=bool(cp_data.get("dead_time_enabled", False)),
             )
             db.session.add(cp)
             db.session.flush()
@@ -860,31 +1118,85 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
         existing_team_groups.add((team.id, group.id))
         added["team_groups"] += 1
 
-    # Group -> checkpoint links. Same shape: without this, newly merged
-    # groups or checkpoints have no link rows, so they don't appear in
-    # arrivals/score builds that gate on CheckpointGroupLink.
-    existing_group_links = {
-        (gl.group_id, gl.checkpoint_id)
-        for gl in CheckpointGroupLink.query.join(CheckpointGroup, CheckpointGroupLink.group_id == CheckpointGroup.id)
-        .filter(CheckpointGroup.competition_id == comp.id)
-        .all()
-    }
-    for gl_data in data.get("group_checkpoint_links", []):
-        group = group_map.get(gl_data.get("group_name"))
-        cp = cp_map.get(gl_data.get("checkpoint_name"))
-        if not (group and cp):
-            continue
-        if (group.id, cp.id) in existing_group_links:
-            continue
-        db.session.add(
-            CheckpointGroupLink(
-                group_id=group.id,
-                checkpoint_id=cp.id,
-                position=gl_data.get("position", 0),
-            )
-        )
-        existing_group_links.add((group.id, cp.id))
-        added["group_checkpoint_links"] += 1
+    # Routes. Without this, newly merged groups or checkpoints have no
+    # route, so they don't appear in arrivals/score builds that gate on
+    # the resolved path. New-format files merge the "paths" section
+    # (add-new-only by name) and wire groups; legacy files carry only
+    # group_checkpoint_links, which are converted/appended per group.
+    existing_paths = {p.name: p for p in Path.query.filter_by(competition_id=comp.id).all()}
+    if data.get("paths"):
+        for p_data in data.get("paths", []):
+            name = p_data.get("name")
+            if not name or name in existing_paths:
+                continue
+            p = Path(competition_id=comp.id, name=name, notes=p_data.get("notes"))
+            db.session.add(p)
+            db.session.flush()
+            stops = sorted(p_data.get("stops") or [], key=lambda s: s.get("position", 0))
+            position = 0
+            for s_data in stops:
+                cp = cp_map.get(s_data.get("checkpoint_name"))
+                if not cp:
+                    continue
+                db.session.add(
+                    PathStop(
+                        path_id=p.id,
+                        checkpoint_id=cp.id,
+                        position=position,
+                        expected_leg_minutes=s_data.get("expected_leg_minutes"),
+                    )
+                )
+                position += 1
+            existing_paths[name] = p
+            added["paths"] += 1
+        for g_data in data.get("groups", []):
+            group = group_map.get(g_data.get("name"))
+            if not group or group.path_id:
+                continue
+            path_name = g_data.get("path_name")
+            if path_name and path_name in existing_paths:
+                group.path = existing_paths[path_name]
+                direction = (g_data.get("direction") or "forward").strip().lower()
+                group.direction = direction if direction in ("forward", "reverse") else "forward"
+    else:
+        links_by_group: dict[str, list[tuple[int, int]]] = {}
+        for gl_data in data.get("group_checkpoint_links", []):
+            group = group_map.get(gl_data.get("group_name"))
+            cp = cp_map.get(gl_data.get("checkpoint_name"))
+            if group and cp:
+                links_by_group.setdefault(group.name, []).append((gl_data.get("position", 0), cp.id))
+        sequence_cache = {
+            tuple(stop.checkpoint_id for stop in p.stops): p for p in existing_paths.values()
+        }
+        for group_name, entries in links_by_group.items():
+            group = group_map[group_name]
+            ordered_ids = [cp_id for (_pos, cp_id) in sorted(entries, key=lambda e: e[0])]
+            if group.path_id is None:
+                path, direction = _get_or_create_path_for_sequence(
+                    comp.id, group_name, ordered_ids, sequence_cache
+                )
+                if path is not None:
+                    group.path = path
+                    group.direction = direction
+                    added["group_checkpoint_links"] += len(ordered_ids)
+                continue
+            # Existing route: preserve the legacy add-new-only semantics by
+            # appending checkpoints the route doesn't have yet. This edits
+            # the shared path, matching how a legacy merge extended the
+            # group's own link list.
+            path = group.path
+            current_ids = {stop.checkpoint_id for stop in path.stops}
+            next_position = max((stop.position for stop in path.stops), default=-1) + 1
+            for cp_id in ordered_ids:
+                if cp_id in current_ids:
+                    continue
+                db.session.add(
+                    PathStop(path_id=path.id, checkpoint_id=cp_id, position=next_position)
+                )
+                current_ids.add(cp_id)
+                next_position += 1
+                added["group_checkpoint_links"] += 1
+        db.session.flush()
 
     # Check-ins (add only new ones, matched by team+checkpoint)
     for ci_data in data.get("checkins", []):
@@ -991,47 +1303,126 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
         existing_configs.add((tab_type, tab_name))
         added["sheet_configs"] += 1
 
-    # Score rules (per checkpoint+group). Add only rules whose
-    # (checkpoint_name, group_name) pair has no local rule yet — admins
-    # often hand-tune these so a merge must not clobber existing logic.
-    existing_score_rules = {
-        (r.checkpoint_id, r.group_id) for r in ScoreRule.query.filter_by(competition_id=comp.id).all()
+    # Scoring configuration. Add-new-only, matched by structure: fields
+    # by (checkpoint, key), segments by (path, endpoints), group scoring
+    # by group; admins hand-tune these, a merge must not clobber them.
+    existing_fields = {
+        (f.checkpoint_id, f.key)
+        for f in ScoreField.query.filter_by(competition_id=comp.id).all()
     }
-    for sr_data in data.get("score_rules", []):
-        cp = cp_map.get(sr_data.get("checkpoint_name"))
-        group = group_map.get(sr_data.get("group_name"))
-        if not (cp and group):
+    for f_data in data.get("score_fields", []):
+        cp = cp_map.get(f_data.get("checkpoint_name"))
+        key = (f_data.get("key") or "")[:80]
+        if not cp or not key or (cp.id, key) in existing_fields:
             continue
-        if (cp.id, group.id) in existing_score_rules:
-            continue
-        db.session.add(
-            ScoreRule(
-                competition_id=comp.id,
-                checkpoint_id=cp.id,
-                group_id=group.id,
-                rules=_remap_score_rule_blob(sr_data.get("rules"), cp_map) or {},
-            )
+        field = ScoreField(
+            competition_id=comp.id,
+            checkpoint_id=cp.id,
+            key=key,
+            label=f_data.get("label"),
+            hint=f_data.get("hint"),
+            position=f_data.get("position", 0),
+            rule_type=(f_data.get("rule_type") or "none"),
+            rule_params=f_data.get("rule_params"),
+            max_input=f_data.get("max_input"),
+            counts_in_total=bool(f_data.get("counts_in_total", True)),
         )
-        existing_score_rules.add((cp.id, group.id))
-        added["score_rules"] += 1
+        db.session.add(field)
+        db.session.flush()
+        for g_data in f_data.get("groups") or []:
+            group = group_map.get(g_data.get("group_name"))
+            if not group:
+                continue
+            db.session.add(
+                ScoreFieldGroup(
+                    score_field_id=field.id,
+                    group_id=group.id,
+                    enabled=bool(g_data.get("enabled", True)),
+                    rule_override=g_data.get("rule_override"),
+                )
+            )
+        existing_fields.add((cp.id, key))
+        added["score_fields"] += 1
 
-    # Global score rules (per group). Same add-new-only semantics.
-    existing_global_rules = {r.group_id for r in GlobalScoreRule.query.filter_by(competition_id=comp.id).all()}
-    for gr_data in data.get("global_score_rules", []):
-        group = group_map.get(gr_data.get("group_name"))
-        if not group:
+    existing_segments = {
+        (s.path_id, s.start_checkpoint_id, s.end_checkpoint_id)
+        for s in TimedSegment.query.filter_by(competition_id=comp.id).all()
+    }
+    local_paths = {p.name: p for p in Path.query.filter_by(competition_id=comp.id).all()}
+    for s_data in data.get("timed_segments", []):
+        seg_path = local_paths.get(s_data.get("path_name"))
+        start_cp = cp_map.get(s_data.get("start_checkpoint_name"))
+        end_cp = cp_map.get(s_data.get("end_checkpoint_name"))
+        if not (seg_path and start_cp and end_cp):
             continue
-        if group.id in existing_global_rules:
+        key = (seg_path.id, start_cp.id, end_cp.id)
+        if key in existing_segments or (seg_path.id, end_cp.id, start_cp.id) in existing_segments:
             continue
         db.session.add(
-            GlobalScoreRule(
+            TimedSegment(
                 competition_id=comp.id,
-                group_id=group.id,
-                rules=_remap_score_rule_blob(gr_data.get("rules"), cp_map) or {},
+                path_id=seg_path.id,
+                start_checkpoint_id=start_cp.id,
+                end_checkpoint_id=end_cp.id,
+                name=s_data.get("name"),
+                max_points=_opt_float(s_data.get("max_points"), 100.0),
+                min_points=_opt_float(s_data.get("min_points"), 0.0),
             )
         )
-        existing_global_rules.add(group.id)
-        added["global_score_rules"] += 1
+        existing_segments.add(key)
+        added["timed_segments"] += 1
+
+    existing_group_scoring = {
+        row.group_id for row in GroupScoring.query.filter_by(competition_id=comp.id).all()
+    }
+    for gs_data in data.get("group_scoring", []):
+        group = group_map.get(gs_data.get("group_name"))
+        if not group or group.id in existing_group_scoring:
+            continue
+        db.session.add(
+            GroupScoring(
+                group_id=group.id,
+                competition_id=comp.id,
+                found_points_per=gs_data.get("found_points_per"),
+                race_max_points=gs_data.get("race_max_points"),
+                race_threshold_minutes=gs_data.get("race_threshold_minutes"),
+                race_penalty_minutes=gs_data.get("race_penalty_minutes"),
+                race_penalty_points=gs_data.get("race_penalty_points"),
+                race_min_points=gs_data.get("race_min_points"),
+                race_dq_multiplier=gs_data.get("race_dq_multiplier"),
+            )
+        )
+        existing_group_scoring.add(group.id)
+        added["group_scoring"] += 1
+
+    # Legacy scoring sections (pre-1.2.0 files): converted add-new-only.
+    if not data.get("score_fields") and (data.get("score_rules") or data.get("global_score_rules")):
+        legacy_rules = [
+            {
+                "checkpoint_name": sr.get("checkpoint_name"),
+                "group_name": sr.get("group_name"),
+                "rules": _remap_score_rule_blob(sr.get("rules"), cp_map) or {},
+            }
+            for sr in data.get("score_rules", [])
+        ]
+        legacy_globals = [
+            {
+                "group_name": gr.get("group_name"),
+                "rules": _remap_score_rule_blob(gr.get("rules"), cp_map) or {},
+            }
+            for gr in data.get("global_score_rules", [])
+        ]
+        before_fields = ScoreField.query.filter_by(competition_id=comp.id).count()
+        before_globals = GroupScoring.query.filter_by(competition_id=comp.id).count()
+        db.session.flush()
+        convert_legacy_scoring(
+            comp.id, cp_map, group_map, data.get("sheet_configs", []), legacy_rules, legacy_globals
+        )
+        db.session.flush()
+        added["score_rules"] += ScoreField.query.filter_by(competition_id=comp.id).count() - before_fields
+        added["global_score_rules"] += (
+            GroupScoring.query.filter_by(competition_id=comp.id).count() - before_globals
+        )
 
     # LoRa devices (matched by dev_num within the competition).
     existing_dev_nums = {d.dev_num for d in LoRaDevice.query.filter_by(competition_id=comp.id).all()}
@@ -1084,6 +1475,8 @@ def _apply_merge(data: dict, comp: Competition, resolutions: dict) -> dict:
 @transfer_api_bp.get("/api/competition/<int:comp_id>/export")
 @json_roles_required("admin")
 def export_competition(comp_id: int):
+    if not _competition_in_scope(comp_id):
+        return jsonify({"error": "forbidden", "code": 403}), 403
     comp = Competition.query.get(comp_id)
     if not comp:
         return jsonify({"error": "not_found"}), 404
@@ -1133,6 +1526,8 @@ def import_competition():
 @transfer_api_bp.post("/api/competition/<int:comp_id>/merge")
 @json_roles_required("admin")
 def merge_competition(comp_id: int):
+    if not _competition_in_scope(comp_id):
+        return jsonify({"error": "forbidden", "code": 403}), 403
     comp = Competition.query.get(comp_id)
     if not comp:
         return jsonify({"error": "not_found"}), 404
@@ -1163,7 +1558,7 @@ def merge_competition(comp_id: int):
     resolutions = data.get("resolutions")
 
     if resolutions is None:
-        # Step 1: Dry run — detect conflicts
+        # Step 1: Dry run - detect conflicts
         conflicts = _find_conflicts(data, comp)
         return json_ok(
             {

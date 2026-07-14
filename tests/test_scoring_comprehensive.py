@@ -2,7 +2,13 @@
 
 Tests all scoring types (no-rule, mapping, interpolation, multiplier, found,
 deviation), timeline/časovnica, time trial, DNF, virtual checkpoints, org
-scoring, negative-score clamping, and decimal precision — all LOCAL (no Sheets).
+scoring, negative-score clamping, and decimal precision - all LOCAL (no Sheets).
+
+Phase-2 model: field rules live on ScoreField rows, timed segments on
+TimedSegment (computed at read time, never stored in ScoreEntry), and the
+category rules (found points + race time rule with a STEPPED penalty) on
+GroupScoring. Race endpoints are always the group's directed route
+start/finish.
 """
 
 from __future__ import annotations
@@ -13,18 +19,20 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    CheckpointGroupLink,
-    GlobalScoreRule,
     ScoreEntry,
     Team,
 )
 from app.resources.scores import (
     _apply_field_rule,
     _clamp_non_negative,
-    _compute_global_contrib,
-    _compute_time_race_scores_from_checkins,
-    _compute_total,
     _round_score,
+)
+from app.utils.scoring import (
+    compute_entry_total,
+    compute_group_contrib,
+    compute_segment_results,
+    resolve_fields,
+    resolve_group_segments,
 )
 from tests.support import (
     add_membership,
@@ -33,9 +41,13 @@ from tests.support import (
     create_checkpoint,
     create_competition,
     create_group,
+    create_score_field,
+    create_segment,
     create_team,
     create_user,
     login_as,
+    set_group_route,
+    set_group_scoring,
 )
 
 T0 = datetime(2026, 6, 20, 8, 0, 0)
@@ -69,14 +81,10 @@ def seeded(app):
     vcp.is_virtual = True
     db.session.commit()
 
-    # Link checkpoints to groups
-    for pos, cp in enumerate([vcp, cp1, cp2, cp3, cp4, cp5]):
-        db.session.add(CheckpointGroupLink(group_id=cat1.id, checkpoint_id=cp.id, position=pos))
-    for pos, cp in enumerate([vcp, cp2, cp1, cp3, cp4, cp5]):  # reversed cp1/cp2 for cat2
-        db.session.add(CheckpointGroupLink(group_id=cat2.id, checkpoint_id=cp.id, position=pos))
-    for pos, cp in enumerate([vcp, cp1, cp2, cp3, cp4, cp5]):
-        db.session.add(CheckpointGroupLink(group_id=cat3.id, checkpoint_id=cp.id, position=pos))
-    db.session.commit()
+    # Routes (cat2 visits cp1/cp2 in swapped order)
+    path1 = set_group_route(cat1, [vcp, cp1, cp2, cp3, cp4, cp5])
+    path2 = set_group_route(cat2, [vcp, cp2, cp1, cp3, cp4, cp5])
+    path3 = set_group_route(cat3, [vcp, cp1, cp2, cp3, cp4, cp5])
 
     # --- Teams ---
     teams = {}
@@ -107,6 +115,9 @@ def seeded(app):
         "cat1": cat1,
         "cat2": cat2,
         "cat3": cat3,
+        "path1": path1,
+        "path2": path2,
+        "path3": path3,
         "cp1": cp1,
         "cp2": cp2,
         "cp3": cp3,
@@ -132,7 +143,7 @@ def _rule(rule_dict, value, context=None):
 
 
 # ===========================================================================
-# DEVIATION TESTS (CP4 — Minefield)
+# DEVIATION TESTS (CP4 - Minefield)
 # ===========================================================================
 
 
@@ -186,7 +197,7 @@ class TestDeviation:
 
 
 # ===========================================================================
-# MULTIPLIER TESTS (CP5 — Bonus task)
+# MULTIPLIER TESTS (CP5 - Bonus task)
 # ===========================================================================
 
 
@@ -216,7 +227,7 @@ class TestMultiplier:
 
 
 # ===========================================================================
-# MAPPING TESTS (Virtual CP — Topo test)
+# MAPPING TESTS (Virtual CP - Topo test)
 # ===========================================================================
 
 
@@ -239,7 +250,7 @@ class TestMapping:
 
 
 # ===========================================================================
-# NO-RULE / CONSTRAINT TESTS (CP3 — Looks + Effect)
+# NO-RULE / CONSTRAINT TESTS (CP3 - Looks + Effect)
 # ===========================================================================
 
 
@@ -304,33 +315,62 @@ class TestInterpolation:
 
 
 class TestFoundPoints:
+    """Phase 2: found points come from GroupScoring.found_points_per.
+
+    Every distinct visited route checkpoint with counts_for_found=True
+    earns points_per; the old 'found' field rule's checkpoint_ids
+    allowlist is replaced by the per-checkpoint counts_for_found flag.
+    """
+
     def test_found_points_auto_awarded_on_checkin(self, app, seeded):
+        s = seeded
+        set_group_scoring(s["cat1"], found_points_per=100)
+        _checkin(s["comp"], s["teams"]["mGG-1"], s["cp3"], 60)
+        contrib = compute_group_contrib(s["comp"].id, s["teams"]["mGG-1"].id, s["cat1"])
+        assert contrib["found_points"] == 100.0
+
+    def test_found_points_configurable_amount(self, app, seeded):
+        s = seeded
+        set_group_scoring(s["cat1"], found_points_per=50)
+        _checkin(s["comp"], s["teams"]["mGG-1"], s["cp3"], 60)
+        contrib = compute_group_contrib(s["comp"].id, s["teams"]["mGG-1"].id, s["cat1"])
+        assert contrib["found_points"] == 50.0
+
+    def test_found_multiple_checkpoints(self, app, seeded):
+        s = seeded
+        set_group_scoring(s["cat1"], found_points_per=100)
+        _checkin(s["comp"], s["teams"]["mGG-1"], s["cp3"], 60)
+        _checkin(s["comp"], s["teams"]["mGG-1"], s["cp4"], 90)
+        contrib = compute_group_contrib(s["comp"].id, s["teams"]["mGG-1"].id, s["cat1"])
+        assert contrib["found_points"] == 200.0
+
+    def test_found_no_checkin_zero(self, app, seeded):
+        s = seeded
+        set_group_scoring(s["cat1"], found_points_per=100)
+        contrib = compute_group_contrib(s["comp"].id, s["teams"]["mGG-1"].id, s["cat1"])
+        assert contrib["found_points"] == 0.0
+
+    def test_found_counts_for_found_false_excluded(self, app, seeded):
+        """counts_for_found=False replaces the old checkpoint_ids allowlist:
+        a flagged-off checkpoint earns nothing even when visited."""
+        s = seeded
+        s["cp4"].counts_for_found = False
+        db.session.commit()
+        set_group_scoring(s["cat1"], found_points_per=100)
+        _checkin(s["comp"], s["teams"]["mGG-1"], s["cp3"], 60)
+        _checkin(s["comp"], s["teams"]["mGG-1"], s["cp4"], 90)
+        contrib = compute_group_contrib(s["comp"].id, s["teams"]["mGG-1"].id, s["cat1"])
+        assert contrib["found_points"] == 100.0
+
+    def test_legacy_found_field_rule_engine_still_works(self, app, seeded):
+        """'found' is not a valid ScoreField.rule_type anymore (check
+        constraint), but _apply_field_rule still evaluates legacy-shaped
+        found rules; exercise the engine branch directly."""
         s = seeded
         _checkin(s["comp"], s["teams"]["mGG-1"], s["cp3"], 60)
         rule = {"type": "found", "checkpoint_ids": [s["cp3"].id], "points_per": 100}
         ctx = {"team_id": s["teams"]["mGG-1"].id, "competition_id": s["comp"].id}
         assert _rule(rule, None, ctx) == 100.0
-
-    def test_found_points_configurable_amount(self, app, seeded):
-        s = seeded
-        _checkin(s["comp"], s["teams"]["mGG-1"], s["cp3"], 60)
-        rule = {"type": "found", "checkpoint_ids": [s["cp3"].id], "points_per": 50}
-        ctx = {"team_id": s["teams"]["mGG-1"].id, "competition_id": s["comp"].id}
-        assert _rule(rule, None, ctx) == 50.0
-
-    def test_found_multiple_checkpoints(self, app, seeded):
-        s = seeded
-        _checkin(s["comp"], s["teams"]["mGG-1"], s["cp3"], 60)
-        _checkin(s["comp"], s["teams"]["mGG-1"], s["cp4"], 90)
-        rule = {"type": "found", "checkpoint_ids": [s["cp3"].id, s["cp4"].id], "points_per": 100}
-        ctx = {"team_id": s["teams"]["mGG-1"].id, "competition_id": s["comp"].id}
-        assert _rule(rule, None, ctx) == 200.0
-
-    def test_found_no_checkin_zero(self, app, seeded):
-        s = seeded
-        rule = {"type": "found", "checkpoint_ids": [s["cp3"].id], "points_per": 100}
-        ctx = {"team_id": s["teams"]["mGG-1"].id, "competition_id": s["comp"].id}
-        assert _rule(rule, None, ctx) == 0.0
 
 
 # ===========================================================================
@@ -339,17 +379,26 @@ class TestFoundPoints:
 
 
 class TestTimeTrial:
+    """Phase 2: TimedSegment replaces the time_race JSON rule.
+
+    Segment results are computed at read time by compute_segment_results
+    (rank spread within the category pool); they are joined into the
+    leaderboard rows and never stored in ScoreEntry.total.
+    """
+
     def _setup_cat1_time_trial(self, s):
-        """Set up Cat 1 time trial checkins (CP1=start, CP2=end)."""
+        """Set up Cat 1 time trial: one TimedSegment (CP1=start, CP2=end)
+        on cat1's path plus the checkins."""
         teams = s["teams"]
         comp = s["comp"]
+        create_segment(s["path1"], s["cp1"], s["cp2"], max_points=100, min_points=10)
         # mGG-1: 60 min
         _checkin(comp, teams["mGG-1"], s["cp1"], 0)
         _checkin(comp, teams["mGG-1"], s["cp2"], 60)
         # mGG-2: 90 min
         _checkin(comp, teams["mGG-2"], s["cp1"], 5)
         _checkin(comp, teams["mGG-2"], s["cp2"], 95)
-        # mGG-3: 120 min (but has 30 min dead time — effective 90, but time_race uses raw)
+        # mGG-3: 120 min (but has 30 min dead time - segment times use raw)
         _checkin(comp, teams["mGG-3"], s["cp1"], 10)
         _checkin(comp, teams["mGG-3"], s["cp2"], 130)
         # mGG-4: 150 min
@@ -357,88 +406,77 @@ class TestTimeTrial:
         _checkin(comp, teams["mGG-4"], s["cp2"], 165)
         return [teams[n].id for n in ["mGG-1", "mGG-2", "mGG-3", "mGG-4"]]
 
+    def _segment_points(self, s, group, team_ids):
+        segment = resolve_group_segments(group)[0]
+        results = compute_segment_results(s["comp"].id, team_ids, segment)
+        return {tid: r["points"] for tid, r in results.items()}
+
     def test_time_trial_cat1_fastest_gets_max(self, app, seeded):
         team_ids = self._setup_cat1_time_trial(seeded)
-        scores = _compute_time_race_scores_from_checkins(
-            team_ids,
-            seeded["comp"].id,
-            seeded["cp1"].id,
-            seeded["cp2"].id,
-            min_points=10,
-            max_points=100,
-        )
+        scores = self._segment_points(seeded, seeded["cat1"], team_ids)
         # mGG-1 (60 min) is fastest → max points
         assert scores[seeded["teams"]["mGG-1"].id] == 100.0
 
     def test_time_trial_cat1_slowest_gets_min(self, app, seeded):
         team_ids = self._setup_cat1_time_trial(seeded)
-        scores = _compute_time_race_scores_from_checkins(
-            team_ids,
-            seeded["comp"].id,
-            seeded["cp1"].id,
-            seeded["cp2"].id,
-            min_points=10,
-            max_points=100,
-        )
+        scores = self._segment_points(seeded, seeded["cat1"], team_ids)
         # mGG-4 (150 min) is slowest → min points
         assert scores[seeded["teams"]["mGG-4"].id] == 10.0
 
     def test_time_trial_cat1_linear_interpolation(self, app, seeded):
         team_ids = self._setup_cat1_time_trial(seeded)
-        scores = _compute_time_race_scores_from_checkins(
-            team_ids,
-            seeded["comp"].id,
-            seeded["cp1"].id,
-            seeded["cp2"].id,
-            min_points=10,
-            max_points=100,
-        )
+        scores = self._segment_points(seeded, seeded["cat1"], team_ids)
         # mGG-2 (90 min): t = (90-60)/(150-60) = 30/90 = 1/3 → 100 - 1/3*90 = 70
         assert scores[seeded["teams"]["mGG-2"].id] == pytest.approx(70.0, abs=0.01)
 
     def test_time_trial_cat1_monotonically_decreasing(self, app, seeded):
         team_ids = self._setup_cat1_time_trial(seeded)
-        scores = _compute_time_race_scores_from_checkins(
-            team_ids,
-            seeded["comp"].id,
-            seeded["cp1"].id,
-            seeded["cp2"].id,
-            min_points=10,
-            max_points=100,
-        )
+        scores = self._segment_points(seeded, seeded["cat1"], team_ids)
         vals = [scores[tid] for tid in team_ids]
         for a, b in zip(vals, vals[1:], strict=False):
             assert a >= b
 
     def test_time_trial_cat2_reversed_direction(self, app, seeded):
-        """Cat 2 uses CP2 as start and CP1 as end."""
+        """Cat 2 runs the SAME path in reverse: one shared path, one
+        TimedSegment stored in forward (cp1→cp2) order; the resolver swaps
+        the endpoints for the reversed group and both directions score."""
         s = seeded
         teams = s["teams"]
         comp = s["comp"]
-        # PP-1: CP2 at T0, CP1 at T0+45 → 45 min
+        # Share cat1's path; cat2 traverses it in reverse.
+        s["cat2"].path_id = s["path1"].id
+        s["cat2"].direction = "reverse"
+        db.session.commit()
+        create_segment(s["path1"], s["cp1"], s["cp2"], max_points=100, min_points=10)
+
+        # cat1 runs cp1 → cp2
+        _checkin(comp, teams["mGG-1"], s["cp1"], 0)
+        _checkin(comp, teams["mGG-1"], s["cp2"], 60)
+        _checkin(comp, teams["mGG-2"], s["cp1"], 5)
+        _checkin(comp, teams["mGG-2"], s["cp2"], 95)
+        # cat2 runs cp2 → cp1
         _checkin(comp, teams["PP-1"], s["cp2"], 0)
         _checkin(comp, teams["PP-1"], s["cp1"], 45)
-        # PP-2: CP2 at T0+5, CP1 at T0+80 → 75 min
         _checkin(comp, teams["PP-2"], s["cp2"], 5)
         _checkin(comp, teams["PP-2"], s["cp1"], 80)
 
-        team_ids = [teams["PP-1"].id, teams["PP-2"].id]
-        # Note: start=cp2, end=cp1 (reversed for cat2)
-        scores = _compute_time_race_scores_from_checkins(
-            team_ids,
-            comp.id,
-            s["cp2"].id,
-            s["cp1"].id,
-            min_points=10,
-            max_points=100,
-        )
-        assert scores[teams["PP-1"].id] == 100.0  # fastest
-        assert scores[teams["PP-2"].id] == 10.0  # slowest
+        fwd = resolve_group_segments(s["cat1"])[0]
+        rev = resolve_group_segments(s["cat2"])[0]
+        assert (fwd["start_checkpoint_id"], fwd["end_checkpoint_id"]) == (s["cp1"].id, s["cp2"].id)
+        assert (rev["start_checkpoint_id"], rev["end_checkpoint_id"]) == (s["cp2"].id, s["cp1"].id)
+
+        cat1_results = compute_segment_results(comp.id, [teams["mGG-1"].id, teams["mGG-2"].id], fwd)
+        cat2_results = compute_segment_results(comp.id, [teams["PP-1"].id, teams["PP-2"].id], rev)
+        assert cat1_results[teams["mGG-1"].id]["points"] == 100.0  # fastest forward
+        assert cat1_results[teams["mGG-2"].id]["points"] == 10.0  # slowest forward
+        assert cat2_results[teams["PP-1"].id]["points"] == 100.0  # fastest reverse
+        assert cat2_results[teams["PP-2"].id]["points"] == 10.0  # slowest reverse
 
     def test_time_trial_equal_times_all_get_max(self, app, seeded):
         s = seeded
         teams = s["teams"]
         comp = s["comp"]
+        create_segment(s["path3"], s["cp1"], s["cp2"], max_points=100, min_points=10)
         # RR-1 and RR-4 both 90 min
         _checkin(comp, teams["RR-1"], s["cp1"], 0)
         _checkin(comp, teams["RR-1"], s["cp2"], 90)
@@ -446,51 +484,37 @@ class TestTimeTrial:
         _checkin(comp, teams["RR-4"], s["cp2"], 105)
 
         team_ids = [teams["RR-1"].id, teams["RR-4"].id]
-        scores = _compute_time_race_scores_from_checkins(
-            team_ids,
-            comp.id,
-            s["cp1"].id,
-            s["cp2"].id,
-            min_points=10,
-            max_points=100,
-        )
+        scores = self._segment_points(s, s["cat3"], team_ids)
         assert scores[teams["RR-1"].id] == 100.0
         assert scores[teams["RR-4"].id] == 100.0
 
-    def test_time_trial_no_finish_gets_zero(self, app, seeded):
+    def test_time_trial_no_finish_gets_no_points(self, app, seeded):
         s = seeded
         teams = s["teams"]
         comp = s["comp"]
+        create_segment(s["path3"], s["cp1"], s["cp2"], max_points=100, min_points=10)
         # RR-5: only checked in at CP1 (start), never at CP2
         _checkin(comp, teams["RR-5"], s["cp1"], 20)
 
-        team_ids = [teams["RR-5"].id]
-        scores = _compute_time_race_scores_from_checkins(
-            team_ids,
-            comp.id,
-            s["cp1"].id,
-            s["cp2"].id,
-            min_points=10,
-            max_points=100,
-        )
-        # No end checkin → not in scores dict → 0
-        assert teams["RR-5"].id not in scores
+        segment = resolve_group_segments(s["cat3"])[0]
+        results = compute_segment_results(comp.id, [teams["RR-5"].id], segment)
+        # Phase 2: the partial start timestamp is surfaced for display
+        # ('A 10:03; B -'), but no minutes/points without the end checkin.
+        row = results[teams["RR-5"].id]
+        assert row["start_at"] is not None
+        assert row["end_at"] is None
+        assert row["minutes"] is None
+        assert row["points"] is None
 
     def test_time_trial_single_team_gets_max(self, app, seeded):
         s = seeded
         teams = s["teams"]
         comp = s["comp"]
+        create_segment(s["path3"], s["cp1"], s["cp2"], max_points=100, min_points=10)
         _checkin(comp, teams["RR-3"], s["cp1"], 10)
         _checkin(comp, teams["RR-3"], s["cp2"], 160)
 
-        scores = _compute_time_race_scores_from_checkins(
-            [teams["RR-3"].id],
-            comp.id,
-            s["cp1"].id,
-            s["cp2"].id,
-            min_points=10,
-            max_points=100,
-        )
+        scores = self._segment_points(s, s["cat3"], [teams["RR-3"].id])
         # Only 1 team → min_d == max_d → all get max
         assert scores[teams["RR-3"].id] == 100.0
 
@@ -499,36 +523,46 @@ class TestTimeTrial:
         s = seeded
         teams = s["teams"]
         comp = s["comp"]
+        create_segment(s["path1"], s["cp1"], s["cp2"], max_points=100, min_points=10)
+        # path2's stored stop order already visits cp2 before cp1
+        create_segment(s["path2"], s["cp2"], s["cp1"], max_points=100, min_points=10)
         # Cat 1: mGG-1=60min, mGG-2=90min
         _checkin(comp, teams["mGG-1"], s["cp1"], 0)
         _checkin(comp, teams["mGG-1"], s["cp2"], 60)
         _checkin(comp, teams["mGG-2"], s["cp1"], 5)
         _checkin(comp, teams["mGG-2"], s["cp2"], 95)
-        # Cat 2: PP-1=45min, PP-2=75min (reversed cp2→cp1)
+        # Cat 2: PP-1=45min, PP-2=75min (cp2→cp1)
         _checkin(comp, teams["PP-1"], s["cp2"], 0)
         _checkin(comp, teams["PP-1"], s["cp1"], 45)
         _checkin(comp, teams["PP-2"], s["cp2"], 5)
         _checkin(comp, teams["PP-2"], s["cp1"], 80)
 
-        cat1_scores = _compute_time_race_scores_from_checkins(
-            [teams["mGG-1"].id, teams["mGG-2"].id],
-            comp.id,
-            s["cp1"].id,
-            s["cp2"].id,
-            min_points=10,
-            max_points=100,
-        )
-        cat2_scores = _compute_time_race_scores_from_checkins(
-            [teams["PP-1"].id, teams["PP-2"].id],
-            comp.id,
-            s["cp2"].id,
-            s["cp1"].id,
-            min_points=10,
-            max_points=100,
-        )
+        cat1_scores = self._segment_points(s, s["cat1"], [teams["mGG-1"].id, teams["mGG-2"].id])
+        cat2_scores = self._segment_points(s, s["cat2"], [teams["PP-1"].id, teams["PP-2"].id])
         # Both fastest get max independently
         assert cat1_scores[teams["mGG-1"].id] == 100.0
         assert cat2_scores[teams["PP-1"].id] == 100.0
+
+    def test_time_trial_points_in_leaderboard_rows_not_entries(self, app, seeded):
+        """Segment points appear in leaderboard rows (segments /
+        segment_points / total) and are never written into ScoreEntry."""
+        from app.blueprints.scores.routes import _build_scores_context
+
+        s = seeded
+        self._setup_cat1_time_trial(s)
+        context = _build_scores_context(s["comp"].id, s["cat1"].id)
+        rows = {row["id"]: row for row in context["rows"]}
+        winner = rows[s["teams"]["mGG-1"].id]
+        assert len(winner["segments"]) == 1
+        segment_row = winner["segments"][0]
+        assert segment_row["minutes"] == pytest.approx(60.0)
+        assert segment_row["points"] == 100.0
+        assert segment_row["start_hms"]
+        assert segment_row["end_hms"]
+        assert winner["segment_points"] == 100.0
+        # No judged entries and no group scoring → total is segment points only
+        assert winner["total"] == 100.0
+        assert ScoreEntry.query.filter_by(competition_id=s["comp"].id).count() == 0
 
 
 # ===========================================================================
@@ -537,14 +571,17 @@ class TestTimeTrial:
 
 
 class TestTimeline:
-    """Test the global time rule (timeline/časovnica scoring)."""
+    """Test the race time rule (timeline/časovnica scoring).
 
-    def _make_global_time_rule(
+    Phase 2: the rule lives on GroupScoring.race_* columns. The measured
+    stretch is ALWAYS the group's directed route start→finish (vcp→cp5 in
+    the seeded routes; the old configurable start/end CPs are gone) and
+    the penalty is STEPPED: floor(over / penalty_minutes) * penalty_points.
+    """
+
+    def _set_race_rule(
         self,
-        comp_id,
-        group_id,
-        cp_start_id,
-        cp_end_id,
+        group,
         threshold=120,
         max_pts=120,
         penalty_min=1,
@@ -552,103 +589,98 @@ class TestTimeline:
         min_pts=0,
         dq_mult=None,
     ):
-        time_cfg = {
-            "start_checkpoint_id": cp_start_id,
-            "end_checkpoint_id": cp_end_id,
-            "max_points": max_pts,
-            "threshold_minutes": threshold,
-            "penalty_minutes": penalty_min,
-            "penalty_points": penalty_pts,
-            "min_points": min_pts,
-        }
-        if dq_mult is not None:
-            time_cfg["dq_multiplier"] = dq_mult
-        rules = {"time": time_cfg}
-        rec = GlobalScoreRule(competition_id=comp_id, group_id=group_id, rules=rules)
-        db.session.add(rec)
-        db.session.commit()
-        return rules
+        set_group_scoring(
+            group,
+            race_max_points=max_pts,
+            race_threshold_minutes=threshold,
+            race_penalty_minutes=penalty_min,
+            race_penalty_points=penalty_pts,
+            race_min_points=min_pts,
+            race_dq_multiplier=dq_mult,
+        )
 
     def test_timeline_under_limit_gets_max(self, app, seeded):
         s = seeded
         t = s["teams"]["mGG-1"]
         # 100 min elapsed, timeline=120
-        _checkin(s["comp"], t, s["cp1"], 0)
-        _checkin(s["comp"], t, s["cp2"], 100)
-        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
-        result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
+        _checkin(s["comp"], t, s["vcp"], 0)
+        _checkin(s["comp"], t, s["cp5"], 100)
+        self._set_race_rule(s["cat1"], threshold=120)
+        result = compute_group_contrib(s["comp"].id, t.id, s["cat1"])
         assert result["time_points"] == 120.0
 
     def test_timeline_over_limit_penalty(self, app, seeded):
         s = seeded
         t = s["teams"]["mGG-2"]
-        # 130 min elapsed, timeline=120 → 10 over × 2 = 20 penalty → 100
-        _checkin(s["comp"], t, s["cp1"], 0)
-        _checkin(s["comp"], t, s["cp2"], 130)
-        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
-        result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
+        # 130 min elapsed, timeline=120 → floor(10/1)=10 blocks × 2 = 20 penalty → 100
+        _checkin(s["comp"], t, s["vcp"], 0)
+        _checkin(s["comp"], t, s["cp5"], 130)
+        self._set_race_rule(s["cat1"], threshold=120)
+        result = compute_group_contrib(s["comp"].id, t.id, s["cat1"])
         assert result["time_points"] == pytest.approx(100.0, abs=0.01)
 
     def test_timeline_exactly_at_limit(self, app, seeded):
         s = seeded
         t = s["teams"]["mGG-3"]
         # Exactly 120 min → max points
-        _checkin(s["comp"], t, s["cp1"], 0)
-        _checkin(s["comp"], t, s["cp2"], 120)
-        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
-        result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
+        _checkin(s["comp"], t, s["vcp"], 0)
+        _checkin(s["comp"], t, s["cp5"], 120)
+        self._set_race_rule(s["cat1"], threshold=120)
+        result = compute_group_contrib(s["comp"].id, t.id, s["cat1"])
         assert result["time_points"] == 120.0
+
+    def test_timeline_stepped_penalty_full_blocks_only(self, app, seeded):
+        """Phase 2 change: the deduction is stepped, only FULL penalty
+        blocks count (was proportional)."""
+        s = seeded
+        t1 = s["teams"]["mGG-1"]
+        # 10 min over with 15-min blocks → floor(10/15)=0 blocks → no deduction
+        _checkin(s["comp"], t1, s["vcp"], 0)
+        _checkin(s["comp"], t1, s["cp5"], 130)
+        t2 = s["teams"]["mGG-2"]
+        # 35 min over → floor(35/15)=2 blocks × 10 = 20 → 100
+        _checkin(s["comp"], t2, s["vcp"], 0)
+        _checkin(s["comp"], t2, s["cp5"], 155)
+        self._set_race_rule(s["cat1"], threshold=120, penalty_min=15, penalty_pts=10)
+        assert compute_group_contrib(s["comp"].id, t1.id, s["cat1"])["time_points"] == 120.0
+        assert compute_group_contrib(s["comp"].id, t2.id, s["cat1"])["time_points"] == 100.0
 
     def test_timeline_heavily_over_clamped_to_zero(self, app, seeded):
         s = seeded
         t = s["teams"]["mGG-4"]
         # 200 min, timeline=120 → 80 over × 2 = 160 → 120-160 = -40 → clamped to 0
-        _checkin(s["comp"], t, s["cp1"], 0)
-        _checkin(s["comp"], t, s["cp2"], 200)
-        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
-        result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
+        _checkin(s["comp"], t, s["vcp"], 0)
+        _checkin(s["comp"], t, s["cp5"], 200)
+        self._set_race_rule(s["cat1"], threshold=120)
+        result = compute_group_contrib(s["comp"].id, t.id, s["cat1"])
         assert result["time_points"] == 0.0
 
     def test_timeline_dq_at_2x(self, app, seeded):
         s = seeded
         t = s["teams"]["mGG-5"]
         # 250 min, threshold=120, dq_mult=2 → 2×120=240 → 250>240 → auto_dnf
-        _checkin(s["comp"], t, s["cp1"], 0)
-        _checkin(s["comp"], t, s["cp2"], 250)
-        rules = self._make_global_time_rule(
-            s["comp"].id,
-            s["cat1"].id,
-            s["cp1"].id,
-            s["cp2"].id,
-            threshold=120,
-            dq_mult=2.0,
-        )
-        result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
+        _checkin(s["comp"], t, s["vcp"], 0)
+        _checkin(s["comp"], t, s["cp5"], 250)
+        self._set_race_rule(s["cat1"], threshold=120, dq_mult=2.0)
+        result = compute_group_contrib(s["comp"].id, t.id, s["cat1"])
         assert result["auto_dnf"] is True
 
     def test_timeline_exactly_at_dq_boundary_not_dq(self, app, seeded):
         s = seeded
         t = s["teams"]["mGG-4"]
         # Exactly 240 min, threshold=120, dq_mult=2 → 240 is NOT > 240 → no DQ
-        _checkin(s["comp"], t, s["cp1"], 0)
-        _checkin(s["comp"], t, s["cp2"], 240)
-        rules = self._make_global_time_rule(
-            s["comp"].id,
-            s["cat1"].id,
-            s["cp1"].id,
-            s["cp2"].id,
-            threshold=120,
-            dq_mult=2.0,
-        )
-        result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
+        _checkin(s["comp"], t, s["vcp"], 0)
+        _checkin(s["comp"], t, s["cp5"], 240)
+        self._set_race_rule(s["cat1"], threshold=120, dq_mult=2.0)
+        result = compute_group_contrib(s["comp"].id, t.id, s["cat1"])
         assert result["auto_dnf"] is False
 
     def test_timeline_dead_time_subtracted(self, app, seeded):
         s = seeded
         t = s["teams"]["mGG-3"]
         # 150 min raw - 30 min dead time = 120 effective → at limit → max points
-        ci = _checkin(s["comp"], t, s["cp1"], 0)
-        _checkin(s["comp"], t, s["cp2"], 150)
+        ci = _checkin(s["comp"], t, s["vcp"], 0)
+        _checkin(s["comp"], t, s["cp5"], 150)
         # Add score entry with 30 min dead time
         entry = ScoreEntry(
             competition_id=s["comp"].id,
@@ -661,18 +693,18 @@ class TestTimeline:
         db.session.add(entry)
         db.session.commit()
 
-        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
-        result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
+        self._set_race_rule(s["cat1"], threshold=120)
+        result = compute_group_contrib(s["comp"].id, t.id, s["cat1"])
         assert result["time_points"] == 120.0
 
     def test_timeline_minimum_zero_not_negative(self, app, seeded):
         s = seeded
         t = s["teams"]["mGG-1"]
         # Way over: 500 min → penalty exceeds max → clamped to 0
-        _checkin(s["comp"], t, s["cp1"], 0)
-        _checkin(s["comp"], t, s["cp2"], 500)
-        rules = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
-        result = _compute_global_contrib(s["comp"].id, t.id, s["cat1"].id, rules)
+        _checkin(s["comp"], t, s["vcp"], 0)
+        _checkin(s["comp"], t, s["cp5"], 500)
+        self._set_race_rule(s["cat1"], threshold=120)
+        result = compute_group_contrib(s["comp"].id, t.id, s["cat1"])
         assert result["time_points"] >= 0
 
     def test_timeline_different_per_category(self, app, seeded):
@@ -680,29 +712,16 @@ class TestTimeline:
         # Same elapsed 170 min, cat1 timeline=120 (50 over), cat3 timeline=180 (under)
         t1 = s["teams"]["mGG-1"]
         t3 = s["teams"]["RR-1"]
-        _checkin(s["comp"], t1, s["cp1"], 0)
-        _checkin(s["comp"], t1, s["cp2"], 170)
-        _checkin(s["comp"], t3, s["cp1"], 0)
-        _checkin(s["comp"], t3, s["cp2"], 170)
+        _checkin(s["comp"], t1, s["vcp"], 0)
+        _checkin(s["comp"], t1, s["cp5"], 170)
+        _checkin(s["comp"], t3, s["vcp"], 0)
+        _checkin(s["comp"], t3, s["cp5"], 170)
 
-        rules1 = self._make_global_time_rule(s["comp"].id, s["cat1"].id, s["cp1"].id, s["cp2"].id, threshold=120)
-        rules3 = {
-            "time": {
-                "start_checkpoint_id": s["cp1"].id,
-                "end_checkpoint_id": s["cp2"].id,
-                "max_points": 180,
-                "threshold_minutes": 180,
-                "penalty_minutes": 1,
-                "penalty_points": 2,
-                "min_points": 0,
-            }
-        }
-        r3_db = GlobalScoreRule(competition_id=s["comp"].id, group_id=s["cat3"].id, rules=rules3)
-        db.session.add(r3_db)
-        db.session.commit()
+        self._set_race_rule(s["cat1"], threshold=120)
+        self._set_race_rule(s["cat3"], threshold=180, max_pts=180)
 
-        result1 = _compute_global_contrib(s["comp"].id, t1.id, s["cat1"].id, rules1)
-        result3 = _compute_global_contrib(s["comp"].id, t3.id, s["cat3"].id, rules3)
+        result1 = compute_group_contrib(s["comp"].id, t1.id, s["cat1"])
+        result3 = compute_group_contrib(s["comp"].id, t3.id, s["cat3"])
         # cat1: 50 over × 2 = 100 penalty → 120-100 = 20
         assert result1["time_points"] == pytest.approx(20.0, abs=0.01)
         # cat3: 170 < 180 → max
@@ -809,47 +828,59 @@ class TestVirtualCheckpoint:
 
 
 class TestOrgScoring:
-    def test_org_total_sum_logic(self):
-        """Org total = sum of non-DNF member teams."""
-        rows = [
-            {"organization": "Rod A", "dnf": False, "total": 100},
-            {"organization": "Rod A", "dnf": False, "total": 80},
-            {"organization": "Rod B", "dnf": False, "total": 50},
-        ]
-        org_totals = {}
-        for row in rows:
-            org = row.get("organization", "").strip()
-            if not org or row.get("dnf"):
-                continue
-            org_totals[org] = org_totals.get(org, 0.0) + float(row.get("total") or 0.0)
-        assert org_totals["Rod A"] == 180.0
-        assert org_totals["Rod B"] == 50.0
+    """Runs the REAL aggregation in _build_scores_context (the previous
+    version re-implemented the loop inside the test body and asserted on
+    its own dict, so it passed regardless of the production code)."""
 
-    def test_org_dnf_excluded(self):
-        rows = [
-            {"organization": "Rod A", "dnf": False, "total": 100},
-            {"organization": "Rod A", "dnf": True, "total": 200},
-        ]
-        org_totals = {}
-        for row in rows:
-            org = row.get("organization", "").strip()
-            if not org or row.get("dnf"):
-                continue
-            org_totals[org] = org_totals.get(org, 0.0) + float(row.get("total") or 0.0)
-        assert org_totals["Rod A"] == 100.0
+    def _seed_orgs(self):
+        user = create_user(username="org-admin", role="admin")
+        comp = create_competition(name="Org Cup")
+        add_membership(user, comp, role="admin")
+        group = create_group(comp, name="Alpha", prefix="1xx")
+        cp = create_checkpoint(comp, name="CP-Org")
+        set_group_route(group, [cp])
+        teams = []
+        for i, org in enumerate(["Rod A", "Rod A", "Rod B", "", None], start=1):
+            team = create_team(comp, name=f"Org-T{i}", number=100 + i, organization=org)
+            assign_team_group(team, group)
+            teams.append(team)
+        totals = [100, 80, 50, 30, 20]
+        for team, total in zip(teams, totals, strict=True):
+            db.session.add(
+                ScoreEntry(
+                    competition_id=comp.id,
+                    team_id=team.id,
+                    checkpoint_id=cp.id,
+                    raw_fields={"points": total},
+                    total=float(total),
+                    created_at=T0,
+                )
+            )
+        db.session.commit()
+        return comp, teams
 
-    def test_org_unaffiliated_not_counted(self):
-        rows = [
-            {"organization": "", "dnf": False, "total": 100},
-            {"organization": None, "dnf": False, "total": 50},
-        ]
-        org_totals = {}
-        for row in rows:
-            org = (row.get("organization") or "").strip()
-            if not org or row.get("dnf"):
-                continue
-            org_totals[org] = org_totals.get(org, 0.0) + float(row.get("total") or 0.0)
-        assert len(org_totals) == 0
+    def _org_totals(self, comp_id):
+        from app.blueprints.scores.routes import _build_scores_context
+
+        context = _build_scores_context(comp_id, None)
+        return {o["name"]: o for o in context["org_totals"]}
+
+    def test_org_total_sum_and_unaffiliated_excluded(self, app):
+        """Org total = sum of member teams; blank/None orgs don't appear."""
+        comp, _teams = self._seed_orgs()
+        orgs = self._org_totals(comp.id)
+        assert set(orgs) == {"Rod A", "Rod B"}
+        assert orgs["Rod A"]["total"] == 180.0
+        assert orgs["Rod A"]["team_count"] == 2
+        assert orgs["Rod B"]["total"] == 50.0
+
+    def test_org_dnf_excluded(self, app):
+        comp, teams = self._seed_orgs()
+        teams[1].dnf = True  # the 80-point Rod A team
+        db.session.commit()
+        orgs = self._org_totals(comp.id)
+        assert orgs["Rod A"]["total"] == 100.0
+        assert orgs["Rod A"]["team_count"] == 1
 
 
 # ===========================================================================
@@ -858,39 +889,36 @@ class TestOrgScoring:
 
 
 class TestComputeTotal:
-    def test_total_is_sum_of_fields_with_rules(self):
-        rule = {
-            "field_rules": {
-                "looks": {"type": "multiplier", "factor": 1},
-                "effect": {"type": "multiplier", "factor": 1},
-            },
-            "total_fields": ["looks", "effect"],
-        }
-        values = {"looks": 20, "effect": 22}
-        total = _compute_total(values, None, rule, {})
+    """compute_entry_total over ScoreField-resolved fields replaces the old
+    _compute_total(values, sheet_cfg, rules, ctx); ScoreField.counts_in_total
+    replaces the rules-JSON total_fields list."""
+
+    def test_total_is_sum_of_fields_with_rules(self, app, seeded):
+        s = seeded
+        create_score_field(s["cp3"], "looks", rule_type="multiplier", rule_params={"factor": 1})
+        create_score_field(s["cp3"], "effect", rule_type="multiplier", rule_params={"factor": 1})
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        total = compute_entry_total({"looks": 20, "effect": 22}, fields, {})
         assert total == 42.0
 
-    def test_include_in_total_toggle(self):
-        rule = {
-            "field_rules": {
-                "a": {"type": "multiplier", "factor": 1},
-                "b": {"type": "multiplier", "factor": 1},
-            },
-            "total_fields": ["a"],  # only 'a' included
-        }
-        values = {"a": 10, "b": 20}
-        total = _compute_total(values, None, rule, {})
+    def test_include_in_total_toggle(self, app, seeded):
+        s = seeded
+        create_score_field(s["cp3"], "a", rule_type="multiplier", rule_params={"factor": 1})
+        create_score_field(
+            s["cp3"], "b", rule_type="multiplier", rule_params={"factor": 1}, counts_in_total=False
+        )
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        total = compute_entry_total({"a": 10, "b": 20}, fields, {})
         assert total == 10.0
 
-    def test_dead_time_excluded_from_total(self):
-        rule = {
-            "field_rules": {
-                "score": {"type": "multiplier", "factor": 1},
-                "dead_time": {"type": "multiplier", "factor": 1},
-            },
-        }
-        values = {"score": 50, "dead_time": 10}
-        total = _compute_total(values, None, rule, {})
+    def test_dead_time_excluded_from_total(self, app, seeded):
+        s = seeded
+        # dead_time is a synthetic per-checkpoint input now
+        # (Checkpoint.dead_time_enabled), never a scored field.
+        s["cp3"].dead_time_enabled = True
+        create_score_field(s["cp3"], "score", rule_type="multiplier", rule_params={"factor": 1})
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        total = compute_entry_total({"score": 50, "dead_time": 10}, fields, {})
         assert total == 50.0
 
 
@@ -961,15 +989,12 @@ class TestNoNegativePoints:
         rule = {"type": "interpolate", "points": [[0, 10], [100, -50]]}
         assert _rule(rule, 100) == 0.0
 
-    def test_no_negative_total(self):
+    def test_no_negative_total(self, app, seeded):
         """Total should never be negative even if all sub-fields are zero."""
-        rule = {
-            "field_rules": {
-                "a": {"type": "multiplier", "factor": 1},
-            },
-        }
-        values = {"a": 0}
-        total = _compute_total(values, None, rule, {})
+        s = seeded
+        create_score_field(s["cp3"], "a", rule_type="multiplier", rule_params={"factor": 1})
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        total = compute_entry_total({"a": 0}, fields, {})
         assert total >= 0
 
     def test_negative_score_input_rejected_by_api(self, app, seeded):
@@ -992,7 +1017,7 @@ class TestNoNegativePoints:
 
 
 # ===========================================================================
-# SIGNALING (Multiplier ×5) — Regression
+# SIGNALING (Multiplier ×5) - Regression
 # ===========================================================================
 
 
@@ -1004,3 +1029,198 @@ class TestSignaling:
     def test_signaling_0_correct_gets_0(self):
         rule = {"type": "multiplier", "factor": 5}
         assert _rule(rule, 0) == 0.0
+
+
+# ===========================================================================
+# PASS-3 REGRESSIONS: points-key bypass, race-rule edges, CSV parity
+# ===========================================================================
+
+
+class TestConfiguredPointsField:
+    """An explicit 'points' value must only act as the synthetic
+    points-only override when NO 'points' ScoreField is configured;
+    a configured one goes through its rule and counts_in_total flag."""
+
+    def test_points_field_counts_in_total_false_yields_none(self, app, seeded):
+        s = seeded
+        create_score_field(s["cp3"], "points", counts_in_total=False)
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        assert compute_entry_total({"points": 5}, fields, {}) is None
+
+    def test_points_field_rule_applies(self, app, seeded):
+        s = seeded
+        create_score_field(s["cp3"], "points", rule_type="multiplier", rule_params={"factor": 2})
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        assert compute_entry_total({"points": 5}, fields, {}) == 10.0
+
+    def test_unconfigured_points_key_still_overrides(self, app, seeded):
+        s = seeded
+        create_score_field(s["cp3"], "task", rule_type="multiplier", rule_params={"factor": 1})
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        # The quick points-only flow keeps working when 'points' is not a
+        # configured field.
+        assert compute_entry_total({"task": 3, "points": 7}, fields, {}) == 7.0
+
+
+class TestRaceRuleEdges:
+    def _race_comp(self):
+        user = create_user(username="race-admin", role="admin")
+        comp = create_competition(name="Race Edges")
+        add_membership(user, comp, role="admin")
+        group = create_group(comp, name="Alpha", prefix="1xx")
+        start = create_checkpoint(comp, name="Start-R")
+        mid = create_checkpoint(comp, name="Mid-R")
+        finish = create_checkpoint(comp, name="Finish-R")
+        off_route = create_checkpoint(comp, name="Off-Route")
+        set_group_route(group, [start, mid, finish])
+        set_group_scoring(
+            group,
+            race_max_points=100,
+            race_threshold_minutes=60,
+            race_penalty_minutes=5,
+            race_penalty_points=10,
+            race_min_points=0,
+        )
+        team = create_team(comp, name="Racer", number=101)
+        assign_team_group(team, group)
+        return comp, group, team, start, mid, finish, off_route
+
+    def test_finish_before_start_scores_no_time_points(self, app):
+        """A stray early finish check-in used to clamp to a 0-minute run
+        and win full max points; it is an invalid pair, like segments."""
+        comp, group, team, start, mid, finish, _off = self._race_comp()
+        create_checkin(comp, team, finish, timestamp=T0)
+        create_checkin(comp, team, start, timestamp=T0 + timedelta(minutes=30))
+        contrib = compute_group_contrib(comp.id, team.id, group)
+        assert contrib["time_points"] is None
+        assert contrib["auto_dnf"] is False
+
+    def test_off_route_dead_time_does_not_shrink_race_time(self, app):
+        """Dead time left on an off-route checkpoint must not reduce the
+        race elapsed time (the leaderboard column already ignored it)."""
+        comp, group, team, start, mid, finish, off_route = self._race_comp()
+        create_checkin(comp, team, start, timestamp=T0)
+        create_checkin(comp, team, finish, timestamp=T0 + timedelta(minutes=70))
+        db.session.add(
+            ScoreEntry(
+                competition_id=comp.id,
+                team_id=team.id,
+                checkpoint_id=off_route.id,
+                raw_fields={"dead_time": 30},
+                total=None,
+                created_at=T0,
+            )
+        )
+        db.session.commit()
+        contrib = compute_group_contrib(comp.id, team.id, group)
+        # 70 min elapsed, 10 over threshold -> 2 full 5-min blocks -> -20.
+        # With the off-route 30 min wrongly subtracted it would be 100.
+        assert contrib["time_points"] == 80.0
+
+    def test_on_route_dead_time_still_counts(self, app):
+        comp, group, team, start, mid, finish, _off = self._race_comp()
+        create_checkin(comp, team, start, timestamp=T0)
+        create_checkin(comp, team, finish, timestamp=T0 + timedelta(minutes=70))
+        db.session.add(
+            ScoreEntry(
+                competition_id=comp.id,
+                team_id=team.id,
+                checkpoint_id=mid.id,
+                raw_fields={"dead_time": 30},
+                total=None,
+                created_at=T0,
+            )
+        )
+        db.session.commit()
+        contrib = compute_group_contrib(comp.id, team.id, group)
+        # 70 - 30 dead = 40 min, inside the 60 min threshold -> max.
+        assert contrib["time_points"] == 100.0
+
+
+class TestCsvMirrorsPage:
+    """/scores/view/export.csv documents 'same data as /scores/view'."""
+
+    def _seed_two_groups(self, client):
+        user = create_user(username="csv-admin", role="admin")
+        comp = create_competition(name="CSV Cup")
+        add_membership(user, comp, role="admin")
+        cp = create_checkpoint(comp, name="CP-CSV")
+        rows = []
+        for g_idx, gname in enumerate(["Alpha", "Beta"], start=1):
+            group = create_group(comp, name=gname, prefix=f"{g_idx}xx")
+            set_group_route(group, [cp])
+            for t_idx in range(2):
+                team = create_team(
+                    comp, name=f"{gname}-T{t_idx}", number=g_idx * 100 + t_idx + 1
+                )
+                assign_team_group(team, group)
+                db.session.add(
+                    ScoreEntry(
+                        competition_id=comp.id,
+                        team_id=team.id,
+                        checkpoint_id=cp.id,
+                        raw_fields={"points": 10 - t_idx},
+                        total=float(10 - t_idx),
+                        created_at=T0,
+                    )
+                )
+                rows.append(team)
+        rows[0].bonus_dead_time = 7
+        db.session.commit()
+        login_as(client, user, comp)
+        return comp, rows
+
+    def test_rank_resets_per_group_and_dead_time_includes_bonus(self, app, client):
+        comp, teams = self._seed_two_groups(client)
+        resp = client.get("/scores/view/export.csv")
+        assert resp.status_code == 200
+        lines = resp.get_data(as_text=True).strip().splitlines()
+        header = lines[0].split(",")
+        rank_i = header.index("rank")
+        dead_i = header.index("dead_time")
+        data = [ln.split(",") for ln in lines[1:]]
+        # Per-group place exactly as the page shows: resets to 1 for Beta.
+        assert [row[rank_i] for row in data] == ["1", "2", "1", "2"]
+        # bonus_dead_time joins the dead_time column like the page cell.
+        assert data[0][dead_i] == "7"
+
+
+class TestRawSumFallbackScope:
+    def test_entry_with_only_counts_false_field_totals_none(self, app, seeded):
+        """Pass 1: when fields ARE configured, the legacy raw-sum fallback
+        must not run just because no counting field was filled - a
+        counts_in_total=False value would leak into the total."""
+        s = seeded
+        create_score_field(s["cp3"], "notes_only", counts_in_total=False)
+        fields = resolve_fields(s["cp3"].id, s["cat1"].id)
+        assert compute_entry_total({"notes_only": 20}, fields, {}) is None
+
+
+class TestSegmentFormEdges:
+    def test_segment_create_form_keeps_explicit_zero_max_points(self, app, client):
+        """Pass 2: `or default` rewrote an explicit 0 to 100; a zero-weight
+        segment (timed but not scored) must stay 0."""
+        from app.models import TimedSegment
+
+        user = create_user(username="seg-admin", role="admin")
+        comp = create_competition(name="Seg Zero Cup")
+        add_membership(user, comp, role="admin")
+        group = create_group(comp, name="Alpha", prefix="1xx")
+        a = create_checkpoint(comp, name="Seg-A")
+        b = create_checkpoint(comp, name="Seg-B")
+        path = set_group_route(group, [a, b])
+        login_as(client, user, comp)
+
+        resp = client.post(
+            "/scores/setup/segments",
+            data={
+                "path_id": path.id,
+                "start_checkpoint_id": a.id,
+                "end_checkpoint_id": b.id,
+                "max_points": "0",
+                "min_points": "0",
+            },
+        )
+        assert resp.status_code == 302, resp.data
+        segment = TimedSegment.query.filter_by(path_id=path.id).one()
+        assert segment.max_points == 0.0

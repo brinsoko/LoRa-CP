@@ -3,12 +3,13 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from flask import Blueprint, jsonify, request
+from flask_babel import gettext as _
 from flask_login import current_user
 from sqlalchemy.orm import joinedload
 
 from app.api.helpers import json_ok
 from app.extensions import db
-from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, LoRaDevice
+from app.models import Checkpoint, LoRaDevice, Path, PathStop, TimedSegment
 from app.utils.audit import record_audit_event
 from app.utils.competition import require_current_competition_id
 from app.utils.rest_auth import json_login_required, json_roles_required
@@ -44,15 +45,18 @@ def _serialize_checkpoint(cp: Checkpoint) -> dict:
         "easting": cp.easting,
         "northing": cp.northing,
         "is_virtual": cp.is_virtual,
-        "groups": [
+        "counts_for_found": bool(cp.counts_for_found),
+        "dead_time_enabled": bool(cp.dead_time_enabled),
+        "bulk_entry_enabled": bool(cp.bulk_entry_enabled),
+        "paths": [
             {
-                "id": link.group_id,
-                "name": link.group.name if link.group else None,
-                "position": link.position,
+                "id": stop.path_id,
+                "name": stop.path.name if stop.path else None,
+                "position": stop.position,
             }
-            for link in sorted(
-                cp.group_links,
-                key=lambda link: (link.group.name if link.group else "", link.position),
+            for stop in sorted(
+                cp.path_stops,
+                key=lambda stop: (stop.path.name if stop.path else "", stop.position),
             )
         ],
         "lora_device": (
@@ -71,7 +75,7 @@ def _checkpoint_snapshot(cp: Checkpoint) -> dict:
     return _serialize_checkpoint(cp)
 
 
-def _parse_group_ids(values: Iterable) -> list[int]:
+def _parse_path_ids(values: Iterable) -> list[int]:
     ids: list[int] = []
     for value in values or []:
         try:
@@ -83,44 +87,50 @@ def _parse_group_ids(values: Iterable) -> list[int]:
     return ids
 
 
-def _apply_groups(cp: Checkpoint, group_ids: list[int]) -> None:
-    if group_ids is None:
+def _apply_paths(cp: Checkpoint, path_ids: list[int]) -> None:
+    """Sync which paths include this checkpoint.
+
+    Newly ticked paths get the checkpoint appended as their last stop;
+    unticked paths lose every stop for it (positions re-densified). Editing
+    a shared path from here affects every group that runs it; that is the
+    point of shared paths, and the edit UI says so.
+    """
+    if path_ids is None:
         return
 
-    existing = {link.group_id: link for link in cp.group_links}
-    new_links: list[CheckpointGroupLink] = []
-
-    if not group_ids:
-        for link in existing.values():
-            db.session.delete(link)
-        cp.group_links = []
-        return
-
-    groups = (
-        db.session.query(CheckpointGroup)
-        .options(joinedload(CheckpointGroup.checkpoint_links))
-        .filter(
-            CheckpointGroup.id.in_(group_ids),
-            CheckpointGroup.competition_id == cp.competition_id,
-        )
+    selected = set(path_ids)
+    paths = (
+        db.session.query(Path)
+        .options(joinedload(Path.stops))
+        .filter(Path.competition_id == cp.competition_id)
         .all()
     )
-    group_lookup = {g.id: g for g in groups}
-
-    for gid in group_ids:
-        group = group_lookup.get(gid)
-        if not group:
-            continue
-        link = existing.pop(gid, None)
-        if link is None:
-            next_position = max((cl.position for cl in group.checkpoint_links), default=-1) + 1
-            link = CheckpointGroupLink(group=group, checkpoint=cp, position=next_position)
-        new_links.append(link)
-
-    for leftover in existing.values():
-        db.session.delete(leftover)
-
-    cp.group_links = new_links
+    for path in paths:
+        on_path = any(stop.checkpoint_id == cp.id for stop in path.stops)
+        if path.id in selected and not on_path:
+            next_position = max((stop.position for stop in path.stops), default=-1) + 1
+            path.stops.append(PathStop(checkpoint_id=cp.id, position=next_position))
+        elif path.id not in selected and on_path:
+            # Rebuild the stop list: flush the deletes first so re-densified
+            # positions can't collide with uq_path_stop_position mid-flush.
+            remaining = [
+                (stop.checkpoint_id, stop.expected_leg_minutes)
+                for stop in path.stops
+                if stop.checkpoint_id != cp.id
+            ]
+            path.stops = []
+            db.session.flush()
+            path.stops = [
+                PathStop(checkpoint_id=cid, position=position, expected_leg_minutes=minutes)
+                for position, (cid, minutes) in enumerate(remaining)
+            ]
+            # Drop TimedSegments stranded by the removal: a segment whose
+            # start or end is no longer on the path can never produce a
+            # time again (mirrors the paths API stop-rewrite cleanup).
+            stop_ids = {cid for cid, _ in remaining}
+            for seg in TimedSegment.query.filter(TimedSegment.path_id == path.id).all():
+                if seg.start_checkpoint_id not in stop_ids or seg.end_checkpoint_id not in stop_ids:
+                    db.session.delete(seg)
 
 
 def _assign_lora_device(cp: Checkpoint, device_id: int | None) -> dict | None:
@@ -166,7 +176,7 @@ def checkpoint_list():
     cps = (
         _checkpoint_query(comp_id)
         .options(
-            joinedload(Checkpoint.group_links).joinedload(CheckpointGroupLink.group),
+            joinedload(Checkpoint.path_stops).joinedload(PathStop.path),
             joinedload(Checkpoint.lora_device),
         )
         .order_by(Checkpoint.position.asc().nulls_last(), Checkpoint.name.asc())
@@ -214,13 +224,16 @@ def checkpoint_create():
         easting=easting,
         northing=northing,
         is_virtual=bool(payload.get("is_virtual")),
+        counts_for_found=bool(payload.get("counts_for_found", True)),
+        dead_time_enabled=bool(payload.get("dead_time_enabled", False)),
+        bulk_entry_enabled=bool(payload.get("bulk_entry_enabled", False)),
     )
     db.session.add(cp)
     db.session.flush()
 
-    group_ids = _parse_group_ids(payload.get("group_ids"))
-    if group_ids:
-        _apply_groups(cp, group_ids)
+    path_ids = _parse_path_ids(payload.get("path_ids"))
+    if path_ids:
+        _apply_paths(cp, path_ids)
 
     lora_device_id = payload.get("lora_device_id")
     if lora_device_id is not None:
@@ -257,7 +270,7 @@ def checkpoint_get(checkpoint_id: int):
         _checkpoint_query(comp_id)
         .filter(Checkpoint.id == checkpoint_id)
         .options(
-            joinedload(Checkpoint.group_links).joinedload(CheckpointGroupLink.group),
+            joinedload(Checkpoint.path_stops).joinedload(PathStop.path),
             joinedload(Checkpoint.lora_device),
         )
         .first()
@@ -272,7 +285,7 @@ def _update_checkpoint(checkpoint_id: int, partial: bool):
     if not comp_id:
         return jsonify({"error": "no_competition"}), 400
     cp = (
-        Checkpoint.query.options(joinedload(Checkpoint.group_links))
+        Checkpoint.query.options(joinedload(Checkpoint.path_stops))
         .filter(Checkpoint.competition_id == comp_id, Checkpoint.id == checkpoint_id)
         .first()
     )
@@ -345,9 +358,34 @@ def _update_checkpoint(checkpoint_id: int, partial: bool):
     if "is_virtual" in payload or not partial:
         cp.is_virtual = bool(payload.get("is_virtual"))
 
-    if "group_ids" in payload:
-        group_ids = _parse_group_ids(payload.get("group_ids"))
-        _apply_groups(cp, group_ids)
+    if "counts_for_found" in payload or not partial:
+        cp.counts_for_found = bool(payload.get("counts_for_found", True))
+
+    if "dead_time_enabled" in payload or not partial:
+        # `or not partial`: a full PUT that omits the flag must reset it to
+        # the default (False), matching counts_for_found / bulk_entry_enabled
+        # below, instead of silently keeping the old value.
+        enable = bool(payload.get("dead_time_enabled", False))
+        if enable:
+            # Dead time may be awarded at a segment's start, never at its
+            # end (redesign plan 3.3); block the flag on end checkpoints.
+            from app.utils.scoring import segment_end_checkpoint_ids
+
+            if cp.id in segment_end_checkpoint_ids(comp_id):
+                return jsonify(
+                    {
+                        "error": "validation_error",
+                        "detail": _("Dead time cannot be enabled on a timed segment's end checkpoint."),
+                    }
+                ), 400
+        cp.dead_time_enabled = enable
+
+    if "bulk_entry_enabled" in payload or not partial:
+        cp.bulk_entry_enabled = bool(payload.get("bulk_entry_enabled", False))
+
+    if "path_ids" in payload:
+        path_ids = _parse_path_ids(payload.get("path_ids"))
+        _apply_paths(cp, path_ids)
 
     if "lora_device_id" in payload or (not partial and "lora_device_id" not in payload):
         raw_device_id = payload.get("lora_device_id", None)
@@ -504,9 +542,9 @@ def checkpoint_import():
             if northing is not None:
                 cp.northing = northing
 
-        if "group_ids" in item:
-            group_ids = _parse_group_ids(item.get("group_ids"))
-            _apply_groups(cp, group_ids)
+        if "path_ids" in item:
+            path_ids = _parse_path_ids(item.get("path_ids"))
+            _apply_paths(cp, path_ids)
 
         if "lora_device_id" in item:
             raw_device_id = item.get("lora_device_id")

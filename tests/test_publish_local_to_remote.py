@@ -13,7 +13,6 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    CheckpointGroupLink,
     ScoreEntry,
     SheetConfig,
 )
@@ -27,6 +26,7 @@ from tests.support import (
     create_group,
     create_team,
     create_user,
+    set_group_route,
 )
 
 
@@ -182,10 +182,8 @@ def _seed_imported_competition():
     assign_team_group(t3, grp_b)
     assign_team_group(t4, grp_b)
 
-    db.session.add(CheckpointGroupLink(group_id=grp_a.id, checkpoint_id=cp1.id, position=0))
-    db.session.add(CheckpointGroupLink(group_id=grp_a.id, checkpoint_id=cp2.id, position=1))
-    db.session.add(CheckpointGroupLink(group_id=grp_b.id, checkpoint_id=cp1.id, position=0))
-    db.session.add(CheckpointGroupLink(group_id=grp_b.id, checkpoint_id=cp2.id, position=1))
+    set_group_route(grp_a, [cp1, cp2])
+    set_group_route(grp_b, [cp1, cp2])
 
     local_id = f"local:{comp.id}"
     cfg1 = SheetConfig(
@@ -345,7 +343,12 @@ def test_publish_is_idempotent_when_rerun(sheets_app, monkeypatch):
             competition_id=s["comp"].id, spreadsheet_id="REAL-SHEET-ID"
         )
         assert second["published"] == 0
-        assert any("already point at the target" in e for e in second["errors"]), second
+        # The no-op is a SUCCESS (a worker retry after a partial first
+        # attempt lands here and must not dead-letter); the summary tabs
+        # are still rebuilt so an interrupted publish gets completed.
+        assert second["errors"] == [], second
+        assert "already point at the target" in (second.get("note") or ""), second
+        assert second["summary_tabs"], second
 
 
 def test_publish_rejects_local_sentinel_target(sheets_app, monkeypatch):
@@ -426,7 +429,7 @@ def test_publish_replaces_stale_slot_holder_with_fresh_config(sheets_app, monkey
     """Real-world case: an older publish left a SheetConfig pointing at the
     target spreadsheet for tab 'CP-One'. The operator then re-ran the
     wizard, producing a fresh `local:N` row for the same tab_name. The
-    fresh row is what they want published — the publish loop must drop
+    fresh row is what they want published - the publish loop must drop
     the older slot-holder and rebuild the remote tab from the fresh row,
     not skip the fresh row to preserve the old one.
 
@@ -477,14 +480,14 @@ def test_publish_replaces_stale_slot_holder_with_fresh_config(sheets_app, monkey
         assert all(not c.spreadsheet_id.startswith("local:") for c in remaining), (
             [c.spreadsheet_id for c in remaining]
         )
-        # The stale row was the one deleted — the survivor for CP-One is
+        # The stale row was the one deleted - the survivor for CP-One is
         # the fresh config (it kept the real spreadsheet_name from the
         # seed, not STALE-MARKER).
         cp1_survivor = next(c for c in remaining if c.tab_name == s["cp1"].name)
         assert cp1_survivor.spreadsheet_name != stale_id_marker, (
             "the older slot-holder was kept, not replaced"
         )
-        # And the remote tab was actually (re)built — the fake client
+        # And the remote tab was actually (re)built - the fake client
         # records the A1 grid write.
         ws = fake.spreadsheet.worksheet(s["cp1"].name)
         assert any(u["range_name"] == "A1" for u in ws.updates), ws.updates

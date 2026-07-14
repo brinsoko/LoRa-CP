@@ -152,6 +152,11 @@ def edit_rfid(card_id: int):
 @rfid_bp.route("/judge-console", methods=["GET"])
 @roles_required("judge", "admin")
 def judge_console():
+    # Superseded for judges by the /judge shell (phase 3); kept for
+    # admins until the phase-5 cleanup removes it entirely.
+    from app.utils.competition import get_current_competition_role as _role
+    if _role() == "judge":
+        return redirect(url_for("judge.home"))
     comp_id = get_current_competition_id()
     assigned = []
     default_checkpoint_id = None

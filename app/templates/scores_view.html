@@ -95,10 +95,10 @@
                 {% elif row.time_minutes is not none %}
                   {{ '%.1f'|format(row.time_minutes) }}
                 {% else %}
-                  —
+                  -
                 {% endif %}
               </td>
-              <td class="text-end">{{ (row.dead_time or 0)|round(0)|int }}</td>
+              <td class="text-end">{{ ((row.dead_time or 0) + (row.bonus_dead_time or 0))|round(0)|int }}</td>
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}
@@ -171,7 +171,7 @@
             {% for cp in checkpoints %}
               <th class="text-end">{{ cp.name }}</th>
             {% endfor %}
-            <th class="text-end">{{ _('Time-trial leg') }}</th>
+            <th class="text-end">{{ _('Time trials') }}</th>
             <th class="text-end">{{ _('Time points') }}</th>
             <th class="text-end">{{ _('Found points') }}</th>
             <th class="text-end">{{ _('Dead time (sum)') }}</th>
@@ -202,7 +202,7 @@
                 {% elif row.time_minutes is not none %}
                   {{ '%.1f'|format(row.time_minutes) }}
                 {% else %}
-                  —
+                  -
                 {% endif %}
               </td>
               {% for cp in checkpoints %}
@@ -210,36 +210,32 @@
                 <td class="text-end">
                   {% if row.dnf %}
                     {{ _('DNF') }}
-                  {% elif cp.id in (row.leg_cp_ids or []) %}
-                    {# leg endpoint CPs are consolidated into the Time-trial
-                       leg column below; render empty here so they don't
-                       confuse with "0 points" #}
-                    <span class="text-muted small">—</span>
-                  {% elif cp.id in (row.excluded_checkpoints or []) %}
-                    —
                   {% elif val is not none %}
-                    {{ (val|round(0))|int }}
+                    {{ '%.2f'|format(val) }}
                   {% elif cp.id in (row.allowed_checkpoints or []) %}
-                    0
+                    {{ '%.2f'|format(0) }}
                   {% endif %}
                 </td>
               {% endfor %}
-              {# Time-trial leg cell: the LEG label (e.g. "B→C") + the LEG
-                 points (rank-based, 100→10 by default) + the time it took
-                 the team to traverse the leg. Independent of the whole-race
-                 time block above — these are points awarded specifically
-                 for the chosen leg between two intermediate CPs. #}
+              {# Timed segments: four values each (start arrival, end
+                 arrival, diff, points) per the redesign plan 3.3 contract.
+                 A dash marks an endpoint the team has not reached yet. #}
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}
-                {% elif row.leg_label %}
-                  <span class="text-muted small me-1">{{ row.leg_label }}:</span>
-                  {{ '%.2f'|format(row.leg_points or 0) }}
-                  {% if row.leg_minutes is not none %}
-                    <span class="text-muted small">({{ '%.1f'|format(row.leg_minutes) }} {{ _('min') }})</span>
-                  {% endif %}
+                {% elif row.segments %}
+                  {% for s in row.segments %}
+                    <div>
+                      <span class="text-muted small me-1">{{ s.label }}:</span>
+                      {{ '%.2f'|format(s.points or 0) }}
+                      {% if s.minutes is not none %}
+                        <span class="text-muted small">({{ '%.1f'|format(s.minutes) }} {{ _('min') }})</span>
+                      {% endif %}
+                      <div class="text-muted small">{{ s.start_hms or '-' }} → {{ s.end_hms or '-' }}</div>
+                    </div>
+                  {% endfor %}
                 {% else %}
-                  —
+                  -
                 {% endif %}
               </td>
               <td class="text-end">
@@ -256,7 +252,7 @@
                   {{ '%.2f'|format(row.global_found or 0) }}
                 {% endif %}
               </td>
-              <td class="text-end">{{ (row.dead_time or 0)|round(0)|int }}</td>
+              <td class="text-end">{{ ((row.dead_time or 0) + (row.bonus_dead_time or 0))|round(0)|int }}</td>
               <td class="text-end">
                 {% if row.dnf %}
                   {{ _('DNF') }}
@@ -271,7 +267,7 @@
             {% set ns.prev_group = row.group %}
           {% else %}
             <tr>
-              <td colspan="{{ 10 + (checkpoints|length) }}" class="text-muted text-center py-4">{{ _('No scores yet.') }}</td>
+              <td colspan="{{ 11 + (checkpoints|length) }}" class="text-muted text-center py-4">{{ _('No scores yet.') }}</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -297,7 +293,7 @@
 {% if public_competition %}
 <script>
   // Auto-refresh the public results page every 30 seconds. Spectator
-  // page only — admin /scores/view stays untouched. A countdown is
+  // page only - admin /scores/view stays untouched. A countdown is
   // shown in the header so it's clear the page is live.
   (function () {
     const REFRESH_SECONDS = 30;

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{# The judge shell suppresses the global action bar; navigation happens
+   through the fixed bottom bar, one thumb, one hand. #}
+{% block actionbar %}{% endblock %}
+{% block content %}
+<div class="judge-shell mx-auto" style="max-width: 640px; padding-bottom: 5.5rem;">
+  <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+    <h5 class="mb-0">{{ checkpoint.name }}</h5>
+    {% if checkpoints|length > 1 %}
+      <form method="post" action="{{ url_for('judge.set_checkpoint') }}" class="d-flex">
+        {{ csrf_input() }}
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <select class="form-select form-select-sm" name="checkpoint_id" onchange="this.form.submit()">
+          {% for cp in checkpoints %}
+            <option value="{{ cp.id }}" {% if cp.id == checkpoint.id %}selected{% endif %}>{{ cp.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    {% endif %}
+  </div>
+
+  {% if checkpoint.judges_note %}
+    <div class="alert alert-warning py-2 small mb-3" style="white-space: pre-line;"><strong>{{ _('Note for judges') }}:</strong>
+{{ checkpoint.judges_note }}</div>
+  {% endif %}
+
+  {% block judge_content %}{% endblock %}
+</div>
+
+<nav class="navbar fixed-bottom bg-body-tertiary border-top" style="z-index: 1030;">
+  <div class="container-fluid justify-content-around" style="max-width: 640px;">
+    <a class="btn {{ 'btn-primary' if active_tab == 'home' else 'btn-outline-secondary' }} flex-fill mx-1"
+       href="{{ url_for('judge.home') }}">
+      <i class="bi bi-qr-code-scan"></i> {{ _('My CP') }}
+    </a>
+    <a class="btn {{ 'btn-primary' if active_tab == 'teams' else 'btn-outline-secondary' }} flex-fill mx-1"
+       href="{{ url_for('judge.teams') }}">
+      <i class="bi bi-people"></i> {{ _('Teams') }}
+    </a>
+    <a class="btn {{ 'btn-primary' if active_tab == 'results' else 'btn-outline-secondary' }} flex-fill mx-1"
+       href="{{ url_for('judge.results') }}">
+      <i class="bi bi-trophy"></i> {{ _('Results') }}
+    </a>
+    {% if checkpoint.bulk_entry_enabled or current_competition_role == 'admin' %}
+      <a class="btn {{ 'btn-primary' if active_tab == 'table' else 'btn-outline-secondary' }} flex-fill mx-1"
+         href="{{ url_for('judge.table') }}">
+        <i class="bi bi-table"></i> {{ _('Table') }}
+      </a>
+    {% endif %}
+  </div>
+</nav>
+
+<div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" id="judgeToasts" style="z-index: 1080;"></div>
+<script>
+  function judgeToast(message, kind) {
+    const container = document.getElementById("judgeToasts");
+    const toast = document.createElement("div");
+    toast.className = `toast align-items-center text-bg-${kind || "success"} border-0 show`;
+    toast.setAttribute("role", "status");
+    const inner = document.createElement("div");
+    inner.className = "d-flex";
+    const body = document.createElement("div");
+    body.className = "toast-body";
+    body.textContent = message;
+    inner.appendChild(body);
+    toast.appendChild(inner);
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3500);
+  }
+</script>
+{% block judge_scripts %}{% endblock %}
+{% endblock %}

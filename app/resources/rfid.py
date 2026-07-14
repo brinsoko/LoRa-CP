@@ -374,15 +374,15 @@ def rfid_verify():
         .first()
     )
 
-    # When no explicit filter is provided, scope to checkpoints
-    # assigned to the team's active group(s) if available.
+    # When no explicit filter is provided, scope to checkpoints on the
+    # team's active group's route if available.
     allowed_checkpoint_ids: set[int] = set()
     if team:
+        from app.utils.paths import resolve_route_ids
+
         for tg in team.group_assignments or []:
             if tg.active and tg.group:
-                for link in tg.group.checkpoint_links:
-                    if link.checkpoint_id:
-                        allowed_checkpoint_ids.add(link.checkpoint_id)
+                allowed_checkpoint_ids.update(resolve_route_ids(tg.group))
 
     if device_ids is not None:
         try:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Convert a competition export JSON (from /api/transfer/export) into one CSV
-per logical table — drop the folder into Google Drive, open each CSV as a
+per logical table - drop the folder into Google Drive, open each CSV as a
 sheet/tab, and you have a working manual replacement for sheets sync.
 
 Usage:
@@ -132,7 +132,7 @@ def main() -> None:
         rows,
     )
 
-    # 9. scores — raw_fields varies per CP, so expand all unique keys as columns
+    # 9. scores - raw_fields varies per CP, so expand all unique keys as columns
     scores = data.get("scores", []) or []
     field_keys: list[str] = []
     seen: set[str] = set()
@@ -158,7 +158,7 @@ def main() -> None:
     )
     _w(os.path.join(args.out_dir, "09_scores.csv"), header, rows)
 
-    # 10. score rules — JSON blob per (checkpoint, group), one row each
+    # 10. score rules - JSON blob per (checkpoint, group), one row each
     rows = [
         [sr.get("checkpoint_name", ""), sr.get("group_name", ""), json.dumps(sr.get("rules") or {}, ensure_ascii=False)]
         for sr in data.get("score_rules", []) or []
@@ -191,8 +191,52 @@ def main() -> None:
     ]
     _w(os.path.join(args.out_dir, "13_devices.csv"), ["dev_num", "name", "active", "note"], rows)
 
+    # 14. paths (schema >= 1.1.0) - the authoritative course definition;
+    # one row per stop in traversal order, with the leg-minutes estimate.
+    rows = []
+    for p in data.get("paths", []) or []:
+        for stop in sorted(p.get("stops") or [], key=lambda s: s.get("position", 0)):
+            rows.append(
+                [
+                    p.get("name"),
+                    stop.get("position"),
+                    stop.get("checkpoint_name"),
+                    stop.get("expected_leg_minutes"),
+                    p.get("notes") or "",
+                ]
+            )
+    _w(os.path.join(args.out_dir, "14_paths.csv"),
+       ["path", "position", "checkpoint", "expected_leg_minutes", "notes"], rows)
+
+    # 15-17. phase-2 scoring sections (schema >= 1.2.0); empty for old files
+    rows = [
+        [f.get("checkpoint_name"), f.get("key"), f.get("label"), f.get("rule_type"),
+         json.dumps(f.get("rule_params") or {}, ensure_ascii=False), f.get("counts_in_total")]
+        for f in data.get("score_fields", []) or []
+    ]
+    _w(os.path.join(args.out_dir, "15_score_fields.csv"),
+       ["checkpoint", "key", "label", "rule_type", "rule_params_json", "counts_in_total"], rows)
+
+    rows = [
+        [s.get("path_name"), s.get("start_checkpoint_name"), s.get("end_checkpoint_name"),
+         s.get("max_points"), s.get("min_points")]
+        for s in data.get("timed_segments", []) or []
+    ]
+    _w(os.path.join(args.out_dir, "16_timed_segments.csv"),
+       ["path", "from", "to", "max_points", "min_points"], rows)
+
+    rows = [
+        [g.get("group_name"), g.get("found_points_per"), g.get("race_max_points"),
+         g.get("race_threshold_minutes"), g.get("race_penalty_minutes"),
+         g.get("race_penalty_points"), g.get("race_min_points"), g.get("race_dq_multiplier")]
+        for g in data.get("group_scoring", []) or []
+    ]
+    _w(os.path.join(args.out_dir, "17_group_scoring.csv"),
+       ["group", "found_points_per", "race_max_points", "race_threshold_minutes",
+        "race_penalty_minutes", "race_penalty_points", "race_min_points", "race_dq_multiplier"], rows)
+
     print()
-    print(f"done — {len(os.listdir(args.out_dir))} files in {args.out_dir}/")
+    print(f"done - {len(os.listdir(args.out_dir))} files in {args.out_dir}/")
     print("Next: upload the whole folder to Google Drive, then in Sheets:")
     print("  - either open each CSV individually (one Sheet per file), or")
     print("  - create one Sheet and use File > Import > Upload (one tab at a time)")

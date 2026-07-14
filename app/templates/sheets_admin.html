@@ -7,6 +7,55 @@
 
 <div class="card mt-3">
   <div class="card-body">
+    <h6 class="card-title">{{ _('Sync queue') }}</h6>
+    <div class="d-flex flex-wrap gap-3 small mb-2">
+      <span>{{ _('Pending') }}: <span class="badge text-bg-secondary">{{ job_counts.get('pending', 0) }}</span></span>
+      <span>{{ _('Running') }}: <span class="badge text-bg-info">{{ job_counts.get('running', 0) }}</span></span>
+      <span>{{ _('Failed') }}: <span class="badge text-bg-danger">{{ job_counts.get('failed', 0) }}</span></span>
+      {% if last_done_job %}
+        <span class="text-body-secondary">{{ _('Last successful write') }}: {{ last_done_job.updated_at | local_dt }} ({{ last_done_job.kind }})</span>
+      {% endif %}
+    </div>
+    {% if failed_jobs %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>{{ _('Job') }}</th>
+              <th>{{ _('Attempts') }}</th>
+              <th>{{ _('Last error') }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for job in failed_jobs %}
+              <tr>
+                <td class="text-nowrap">{{ job.kind }} <span class="text-body-secondary small">#{{ job.id }}</span></td>
+                <td>{{ job.attempts }}</td>
+                <td class="small text-break" style="max-width: 420px;">{{ job.last_error or '' }}</td>
+                <td class="text-end text-nowrap">
+                  <form method="post" action="{{ url_for('sheets_admin.retry_job', job_id=job.id) }}" class="d-inline">
+                    {{ csrf_input() }}
+                    <button class="btn btn-sm btn-outline-primary" type="submit">{{ _('Retry') }}</button>
+                  </form>
+                  <form method="post" action="{{ url_for('sheets_admin.delete_job', job_id=job.id) }}" class="d-inline">
+                    {{ csrf_input() }}
+                    <button class="btn btn-sm btn-outline-danger" type="submit">{{ _('Discard') }}</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-body-secondary small">{{ _('No failed sync jobs.') }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-body">
     {% if sheets_settings and not sheets_settings.sync_enabled %}
       <div class="alert alert-warning">
         {{ _('Sheets sync is disabled. Scoring will not update Google Sheets.') }}
@@ -71,23 +120,17 @@
               <small class="text-muted">{{ _('Drag to reorder; uncheck to exclude a checkpoint for this group.') }}</small>
             </div>
             <ul class="list-group list-group-sm per-group-list" data-group="{{ g.name }}">
-              {% set ordered_links = g.checkpoint_links|sort(attribute='position') %}
-              {% set linked_cp_names = ordered_links
-                | selectattr('checkpoint', 'ne', None)
-                | map(attribute='checkpoint.name')
-                | list %}
-              {% for link in ordered_links %}
-                {% if link.checkpoint %}
-                  <li class="list-group-item d-flex align-items-center justify-content-between py-1 drag-handle">
-                    <div class="d-flex align-items-center gap-2">
-                      <span class="fw-semibold">::</span>
-                      <span class="flex-grow-1">{{ link.checkpoint.name }}</span>
-                    </div>
-                    <div class="form-check m-0">
-                      <input class="form-check-input cp-include" type="checkbox" value="{{ link.checkpoint.name }}" checked>
-                    </div>
-                  </li>
-                {% endif %}
+              {% set linked_cp_names = group_route_names.get(g.id, []) %}
+              {% for cp_name in linked_cp_names %}
+                <li class="list-group-item d-flex align-items-center justify-content-between py-1 drag-handle">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="fw-semibold">::</span>
+                    <span class="flex-grow-1">{{ cp_name }}</span>
+                  </div>
+                  <div class="form-check m-0">
+                    <input class="form-check-input cp-include" type="checkbox" value="{{ cp_name }}" checked>
+                  </div>
+                </li>
               {% endfor %}
               {% for cp in checkpoints %}
                 {% if cp.name not in linked_cp_names %}
@@ -287,7 +330,7 @@
           <div class="mb-3">
             <label class="form-label">{{ _('Checkpoint (optional)') }}</label>
             <select class="form-select" name="checkpoint_id">
-              <option value="">{{ _('— none —') }}</option>
+              <option value="">{{ _('- none -') }}</option>
               {% for cp in checkpoints %}
                 <option value="{{ cp.id }}">{{ cp.name }}</option>
               {% endfor %}
@@ -367,7 +410,7 @@
                 <td><code>{{ c.spreadsheet_name }}</code><br><small class="text-muted">{{ c.spreadsheet_id }}</small></td>
                 <td>{{ c.tab_name }}</td>
                 <td>{{ c.tab_type }}</td>
-                <td>{{ c.checkpoint.name if c.checkpoint else "—" }}</td>
+                <td>{{ c.checkpoint.name if c.checkpoint else "-" }}</td>
                 <td>
                   <div class="d-flex gap-1 flex-wrap">
                   {% if c.config and c.config.get("groups") %}

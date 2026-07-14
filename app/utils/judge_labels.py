@@ -94,7 +94,10 @@ def _soft_cap_hint_from_rule(rule: dict | None) -> str:
     if rule.get("type"):
         # Structured rules carry their own derivable hint; don't double up.
         return ""
-    cap = rule.get("max")
+    # ScoreField.max_input surfaces as "max_input" in the rule dict
+    # (field_rule_dict); legacy blobs used "max". Accept both so raw
+    # fields keep their soft-cap hint after the phase-2 migration.
+    cap = rule.get("max", rule.get("max_input"))
     if cap is None:
         return ""
     return f"0-{_fmt_num(cap)} tock"

@@ -144,12 +144,19 @@
   </nav>
 
   <!-- ACTION BAR -->
+  {% block actionbar %}
   <div class="mb-3 d-flex flex-wrap gap-2">
-    {% if current_competition %}
+    {% if current_competition and current_user.is_authenticated and current_competition_role == 'judge' %}
+      {# Judges get a minimal bar; their real home is the /judge shell
+         with its own bottom navigation. #}
+      <a href="{{ url_for('judge.home') }}" class="btn btn-primary">{{ _('Judge') }}</a>
+      <a href="{{ url_for('checkins.live_arrivals') }}" class="btn btn-outline-info">{{ _('Live Arrivals') }}</a>
+      <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-outline-info">{{ _('View Check-ins') }}</a>
+    {% elif current_competition %}
       <a href="{{ url_for('teams.list_teams') }}" class="btn btn-outline-primary">{{ _('Teams') }}</a>
     {% endif %}
 
-    {% if current_competition and current_user.is_authenticated and current_competition_role in ['judge','admin'] %}
+    {% if current_competition and current_user.is_authenticated and current_competition_role == 'admin' %}
       {# High-frequency-during-race tabs: keep visible #}
       <a href="{{ url_for('checkpoints.list_checkpoints') }}" class="btn btn-outline-secondary">{{ _('Checkpoints') }}</a>
       <a href="{{ url_for('checkins.list_checkins') }}" class="btn btn-outline-info">{{ _('View Check-ins') }}</a>
@@ -160,6 +167,7 @@
       <a href="{{ url_for('scores.view_scores') }}" class="btn btn-outline-secondary">{{ _('Scores') }}</a>
       <a href="{{ url_for('rfid.finish_console') }}" class="btn btn-outline-success">{{ _('Finish Check') }}</a>
       <a href="{{ url_for('groups.list_groups') }}" class="btn btn-outline-secondary">{{ _('Groups') }}</a>
+      <a href="{{ url_for('paths.list_paths') }}" class="btn btn-outline-secondary">{{ _('Paths') }}</a>
 
       {# Lower-traffic-during-race utilities: collapse under "More" #}
       <div class="dropdown">
@@ -193,7 +201,7 @@
         </button>
         <ul class="dropdown-menu">
           <li><a class="dropdown-item" href="{{ url_for('sheets_admin.list_sheets') }}">{{ _('Sheets') }}</a></li>
-          <li><a class="dropdown-item" href="{{ url_for('scores.score_rules') }}">{{ _('Score Rules') }}</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('scores.scoring_setup') }}">{{ _('Scoring setup') }}</a></li>
           {% if not current_competition.hide_audit_messages %}
           <li><a class="dropdown-item" href="{{ url_for('audit.list_audit_events') }}">{{ _('Audit') }}</a></li>
           {% endif %}
@@ -207,6 +215,7 @@
     {% endif %}
 
   </div>
+  {% endblock %}
 
   <!-- FLASH MESSAGES -->
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -241,7 +250,7 @@
                 try {
                   bootstrap.Alert.getOrCreateInstance(el).close();
                 } catch (e) {
-                  /* bootstrap not loaded yet — leave the alert visible */
+                  /* bootstrap not loaded yet - leave the alert visible */
                 }
               }, ttl);
             }

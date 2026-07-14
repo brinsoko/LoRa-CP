@@ -53,6 +53,17 @@ def format_datetime_display(dt: datetime | None) -> str:
     return _as_display(dt).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def format_time_display(dt: datetime | None) -> str:
+    """Clock time only (HH:MM:SS) in the display timezone.
+
+    For compact cells (e.g. time-trial arrival times) where the date is
+    implied by the competition day.
+    """
+    if not dt:
+        return ""
+    return _as_display(dt).strftime("%H:%M:%S")
+
+
 def format_datetime_input_local(dt: datetime | None) -> str:
     if not dt:
         return ""

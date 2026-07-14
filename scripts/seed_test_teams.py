@@ -10,7 +10,7 @@ Lays down:
   * one checkpoint group containing all those checkpoints
   * a handful of teams, all assigned to that group
 
-Cards/UIDs are NOT created here — register them as you scan, either
+Cards/UIDs are NOT created here - register them as you scan, either
 via the team edit page in the web UI or whichever workflow you use.
 
 Idempotent: re-running with the same args won't create duplicates.
@@ -39,9 +39,10 @@ from app.extensions import db
 from app.models import (
     Checkpoint,
     CheckpointGroup,
-    CheckpointGroupLink,
     Competition,
     LoRaDevice,
+    Path,
+    PathStop,
 )
 from scripts.seed_db import (
     assign_team_to_groups,
@@ -121,14 +122,21 @@ def link_device_to_checkpoint(competition_id: int, dev_id: int, checkpoint: Chec
 
 def set_group_checkpoints_idempotent(group: CheckpointGroup, checkpoints: list[Checkpoint]) -> None:
     """Same intent as seed_db.set_group_checkpoints but safe to re-run:
-    only adds missing links, preserves existing order, and never wipes
-    unrelated checkpoints from the group."""
-    existing_ids = {link.checkpoint_id for link in group.checkpoint_links}
-    next_pos = max((link.position for link in group.checkpoint_links), default=-1) + 1
+    only appends missing stops to the group's path, preserves existing
+    order, and never wipes unrelated checkpoints from the route."""
+    path = group.path
+    if path is None:
+        path = Path(competition_id=group.competition_id, name=f"{group.name} path")
+        db.session.add(path)
+        db.session.flush()
+        group.path = path
+        group.direction = "forward"
+    existing_ids = {stop.checkpoint_id for stop in path.stops}
+    next_pos = max((stop.position for stop in path.stops), default=-1) + 1
     for cp in checkpoints:
         if cp.id in existing_ids:
             continue
-        db.session.add(CheckpointGroupLink(group_id=group.id, checkpoint_id=cp.id, position=next_pos))
+        db.session.add(PathStop(path_id=path.id, checkpoint_id=cp.id, position=next_pos))
         next_pos += 1
 
 
@@ -182,16 +190,16 @@ def main() -> None:
             print(f"  team: {name!r} #{number} -> id={team.id} (group={group.name!r})")
 
         db.session.commit()
-        # Capture before the session closes — bare ORM attribute access on
+        # Capture before the session closes - bare ORM attribute access on
         # `competition` after the `with` block detaches the instance.
         comp_id = competition.id
 
     print()
     print("Done. Next steps for live hardware testing:")
     print(f"  1. POST to /api/ingest with competition_id={comp_id} (or set COMPETITION_ID in the reader).")
-    print("  2. Scan a card — the message logs and `uid_seen` will be False the first time.")
+    print("  2. Scan a card - the message logs and `uid_seen` will be False the first time.")
     print("  3. Open the team's edit page, paste the UID from the response into the RFID UID field, save.")
-    print("  4. Scan again — `checkin_created: True` and the team shows up on the checkpoint.")
+    print("  4. Scan again - `checkin_created: True` and the team shows up on the checkpoint.")
 
 
 if __name__ == "__main__":

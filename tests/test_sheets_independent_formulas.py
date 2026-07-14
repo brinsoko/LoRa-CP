@@ -2,20 +2,23 @@
 its own from raw judge inputs + check-in timestamps, with no live
 dependency on the LoRa-KT scoring engine.
 
-Three new behaviors:
+Migrated to the phase-2 scoring model (tables instead of JSON blobs):
 
-1. Per-CP `Points` cell is emitted as a *formula* on the publish path
-   when the ScoreRule is expressible (multiplier, mapping, deviation,
-   raw sum). The formula reads the field cells in the same row, so a
-   manual edit to a raw field on the sheet propagates through Points.
+1. Per-CP `Points` cells are emitted as *formulas* on the publish path
+   when the resolved ScoreField rules are expressible (multiplier,
+   mapping, deviation, raw sum). _build_local_cp_grid builds a
+   legacy-shaped rule blob from ScoreField rows (never time_race);
+   per-group ScoreFieldGroup overrides and counts_in_total are honored.
 
 2. `update_checkpoint_scores_sync` honors a per-group `points_formula`
    flag on SheetConfig.config and skips writing the Points cell when
    set, so live score submissions don't clobber the formula.
 
-3. The Score summary tab grows two new columns — Časovnica
-   (Article 39) and Found-points (Article 38) — driven by formulas
-   that look up Time-column timestamps across the per-CP tabs.
+3. The Score summary tab emits Časovnica + Found-points columns from
+   GroupScoring (race_* columns, STEPPED deduction via FLOOR; endpoints
+   are the group's directed route start/finish) and Checkpoint.
+   counts_for_found, plus four formula columns per TimedSegment
+   (A arrival, B arrival, diff in minutes, rank-spread points).
 """
 
 from __future__ import annotations
@@ -23,13 +26,7 @@ from __future__ import annotations
 import pytest
 
 from app.extensions import db
-from app.models import (
-    CheckpointGroupLink,
-    GlobalScoreRule,
-    ScoreEntry,
-    ScoreRule,
-    SheetConfig,
-)
+from app.models import ScoreEntry, SheetConfig
 from app.utils import sheets_client as sheets_client_module
 from app.utils import sheets_sync
 from tests.support import (
@@ -38,8 +35,13 @@ from tests.support import (
     create_checkpoint,
     create_competition,
     create_group,
+    create_score_field,
+    create_segment,
     create_team,
     create_user,
+    set_field_group,
+    set_group_route,
+    set_group_scoring,
 )
 
 # ---------------------------------------------------------------------------
@@ -92,14 +94,21 @@ def test_field_rule_to_formula_deviation_guards_empty_cell():
 
 
 def test_field_rule_to_formula_unsupported_returns_none():
-    """time_race nested inside field_rules can't be expressed; fall back."""
+    """interpolate is a real phase-2 ScoreField.rule_type but has no
+    static-formula translation; the caller falls back to the
+    system-written total. Legacy blobs with nested time_race bail too."""
+    assert sheets_sync._field_rule_to_formula(
+        {"type": "interpolate", "points": [[0, 0], [10, 100]]}, "D2"
+    ) is None
     assert sheets_sync._field_rule_to_formula(
         {"type": "time_race", "start_checkpoint_id": 1}, "D2"
     ) is None
 
 
 def test_points_formula_from_rule_sums_multiple_fields():
-    """vesla = veslo_izgled + veslo_dimenzija (both raw 0-50)."""
+    """vesla = veslo_izgled + veslo_dimenzija (both raw 0-50). The blob
+    shape is exactly what _build_local_cp_grid derives from ScoreField
+    rows: field_rules per key, total_fields from counts_in_total."""
     rule = {
         "field_rules": {"veslo_izgled": {}, "veslo_dimenzija": {}},
         "total_fields": ["veslo_izgled", "veslo_dimenzija"],
@@ -111,7 +120,10 @@ def test_points_formula_from_rule_sums_multiple_fields():
 
 
 def test_points_formula_from_rule_time_race_returns_none():
-    """time_race CPs (hitrostna etapa) stay system-dependent."""
+    """Phase-2 blobs built from ScoreField rows never carry time_race
+    (segments moved to TimedSegment + Score-tab columns), but the guard
+    must survive for legacy-shaped blobs: a time_race rule cannot become
+    a static Points formula."""
     rule = {
         "time_race": {"start_checkpoint_id": 1, "end_checkpoint_id": 2, "min_points": 10, "max_points": 100}
     }
@@ -119,9 +131,10 @@ def test_points_formula_from_rule_time_race_returns_none():
 
 
 def test_points_formula_from_rule_drops_dead_time_from_total():
-    """The app's _compute_total excludes 'dead_time' from total_fields;
-    the spreadsheet formula must do the same so dead time penalties
-    are accounted for only via the Časovnica column."""
+    """The engine's compute_entry_total excludes 'dead_time' from the
+    total (dead_time now comes from Checkpoint.dead_time_enabled, not a
+    ScoreField); the spreadsheet formula must do the same so dead time
+    penalties are accounted for only via the Časovnica column."""
     rule = {
         "field_rules": {"dead_time": {}, "points": {}},
         "total_fields": ["dead_time", "points"],
@@ -236,9 +249,14 @@ def _install_fake_client(monkeypatch) -> _FakeClient:
     return fake
 
 
-def _seed_competition_with_rule(rule_blob):
-    """Set up: one group, one CP with two field-columns, one team, one
-    ScoreRule with the given blob. Returns the SheetConfig + comp."""
+def _seed_competition_with_fields(field_specs):
+    """Set up: one group, one CP with field columns, one team.
+
+    `field_specs` is a list of (key, create_score_field kwargs); the
+    SheetConfig's per-group `fields` list mirrors the keys, matching
+    what wizard_create_checkpoint_configs derives via resolve_fields.
+    Returns the seeded objects incl. the created ScoreFields by key.
+    """
     user = create_user(username="phase2-admin", role="admin")
     comp = create_competition(name="Phase 2 Race")
     add_membership(user, comp, role="admin")
@@ -246,7 +264,8 @@ def _seed_competition_with_rule(rule_blob):
     cp = create_checkpoint(comp, name="CP-One")
     team = create_team(comp, name="Team-A1", number=101)
     assign_team_group(team, grp)
-    db.session.add(CheckpointGroupLink(group_id=grp.id, checkpoint_id=cp.id, position=0))
+    set_group_route(grp, [cp])
+    fields = {key: create_score_field(cp, key, **kwargs) for key, kwargs in field_specs}
     cfg = SheetConfig(
         competition_id=comp.id,
         spreadsheet_id=f"local:{comp.id}",
@@ -259,34 +278,25 @@ def _seed_competition_with_rule(rule_blob):
             "dead_time_enabled": False,
             "time_enabled": False,
             "groups": [
-                {"group_id": grp.id, "name": "Alpha", "fields": ["task1", "task2"]},
+                {"group_id": grp.id, "name": "Alpha", "fields": [key for key, _ in field_specs]},
             ],
         },
     )
-    rule = ScoreRule(
-        competition_id=comp.id,
-        checkpoint_id=cp.id,
-        group_id=grp.id,
-        rules=rule_blob,
-    )
-    db.session.add_all([cfg, rule])
+    db.session.add(cfg)
     db.session.commit()
-    return {"comp": comp, "cp": cp, "grp": grp, "team": team, "cfg": cfg}
+    return {"comp": comp, "cp": cp, "grp": grp, "team": team, "cfg": cfg, "fields": fields}
 
 
 def test_publish_emits_formula_in_points_cell_for_simple_rule(sheets_app, monkeypatch):
-    """A multiplier rule (×20) means Points cell = =D2*20, not the
-    raw ScoreEntry.total. So a manual edit to D2 on the sheet
+    """A multiplier ScoreField (x20) means Points cell = =(B2*20)+C2, not
+    the raw ScoreEntry.total. So a manual edit to B2/C2 on the sheet
     propagates through Points without our system."""
     with sheets_app.app_context():
-        s = _seed_competition_with_rule(
-            {
-                "field_rules": {
-                    "task1": {"type": "multiplier", "factor": 20},
-                    "task2": {},  # raw
-                },
-                "total_fields": ["task1", "task2"],
-            }
+        s = _seed_competition_with_fields(
+            [
+                ("task1", {"rule_type": "multiplier", "rule_params": {"factor": 20}}),
+                ("task2", {}),  # raw
+            ]
         )
         # Seed a score so we can also assert backfill uses the formula
         # (not the precomputed total).
@@ -308,7 +318,7 @@ def test_publish_emits_formula_in_points_cell_for_simple_rule(sheets_app, monkey
         assert result["published"] == 1, result
 
         ws = fake.spreadsheet.worksheet("CP-One")
-        # Pick the A1 write (the grid one — there's also a separate
+        # Pick the A1 write (the grid one - there's also a separate
         # set_header_row write but the A1 one carries the full grid).
         full_writes = [u for u in ws.updates if u["range_name"] == "A1"]
         grid = full_writes[-1]["values"]
@@ -317,13 +327,9 @@ def test_publish_emits_formula_in_points_cell_for_simple_rule(sheets_app, monkey
         assert team_row[0] == 101
         assert team_row[1] == 7
         assert team_row[2] == 3
-        # Points cell is a formula, not the literal 143.0.
-        assert isinstance(team_row[3], str) and team_row[3].startswith("=")
-        # Specifically: task1*20 + task2 with B/C as raw field columns.
-        assert "(B2*20)" in team_row[3]
-        assert "C2" in team_row[3]
-        # The pre-existing 143.0 must NOT be the value written.
-        assert team_row[3] != 143.0
+        # Points cell is a formula, not the literal 143.0: task1*20 + task2
+        # with B/C as raw field columns.
+        assert team_row[3] == "=(B2*20)+C2"
 
         # SheetConfig has the points_formula flag set per group so
         # update_checkpoint_scores_sync knows to skip the Points cell.
@@ -334,21 +340,66 @@ def test_publish_emits_formula_in_points_cell_for_simple_rule(sheets_app, monkey
         assert groups_blob[0].get("points_formula") is True
 
 
-def test_publish_leaves_points_raw_when_rule_is_time_race(sheets_app, monkeypatch):
-    """Hitrostna etapa CPs (time_race rule) can't be expressed as a
-    static formula — the Points cell stays system-written. The
-    points_formula flag must NOT be set so update_checkpoint_scores_sync
-    keeps writing the cell."""
+def test_publish_formula_excludes_counts_in_total_false_field(sheets_app, monkeypatch):
+    """counts_in_total=False (the ScoreRule.total_fields replacement)
+    keeps a judged field out of the Points formula, matching
+    compute_entry_total which skips it in the app."""
     with sheets_app.app_context():
-        s = _seed_competition_with_rule(
-            {
-                "time_race": {
-                    "start_checkpoint_id": 999,
-                    "end_checkpoint_id": 998,
-                    "min_points": 10,
-                    "max_points": 100,
-                }
-            }
+        s = _seed_competition_with_fields(
+            [
+                ("task1", {}),
+                ("task2", {"counts_in_total": False}),
+            ]
+        )
+        fake = _install_fake_client(monkeypatch)
+        result = sheets_sync.publish_local_configs_to_spreadsheet(
+            competition_id=s["comp"].id, spreadsheet_id="REAL-SHEET"
+        )
+        assert result["published"] == 1, result
+
+        ws = fake.spreadsheet.worksheet("CP-One")
+        grid = [u for u in ws.updates if u["range_name"] == "A1"][-1]["values"]
+        # Only task1 (B) contributes; task2 (C) is excluded from the total.
+        assert grid[1][3] == "=B2"
+
+
+def test_publish_formula_honors_group_rule_override(sheets_app, monkeypatch):
+    """A ScoreFieldGroup.rule_override (per-group divergence, replacing
+    the old per-group ScoreRule rows) drives the published formula."""
+    with sheets_app.app_context():
+        s = _seed_competition_with_fields(
+            [("task1", {"rule_type": "multiplier", "rule_params": {"factor": 20}})]
+        )
+        set_field_group(
+            s["fields"]["task1"],
+            s["grp"],
+            rule_override={"rule_type": "multiplier", "rule_params": {"factor": 30}},
+        )
+        fake = _install_fake_client(monkeypatch)
+        result = sheets_sync.publish_local_configs_to_spreadsheet(
+            competition_id=s["comp"].id, spreadsheet_id="REAL-SHEET"
+        )
+        assert result["published"] == 1, result
+
+        ws = fake.spreadsheet.worksheet("CP-One")
+        grid = [u for u in ws.updates if u["range_name"] == "A1"][-1]["values"]
+        # The group's override factor (30) wins over the default (20).
+        assert grid[1][2] == "=(B2*30)"
+
+
+def test_publish_leaves_points_raw_when_rule_not_expressible(sheets_app, monkeypatch):
+    """Behavior change note: time_race ScoreRules are gone - timed
+    segments now live on the Score tab as formula columns. The CP-tab
+    equivalent of "system-dependent Points" is a ScoreField whose
+    rule_type has no formula translation (interpolate): the Points cell
+    stays the system-written total and the points_formula flag must NOT
+    be set so update_checkpoint_scores_sync keeps writing the cell."""
+    with sheets_app.app_context():
+        s = _seed_competition_with_fields(
+            [
+                ("task1", {"rule_type": "interpolate", "rule_params": {"points": [[0, 0], [10, 100]]}}),
+                ("task2", {}),
+            ]
         )
         db.session.add(
             ScoreEntry(
@@ -421,7 +472,7 @@ def test_update_checkpoint_scores_sync_skips_points_when_flag_set(sheets_app, mo
         # Points column. update_checkpoint_scores_sync now batches per
         # cfg via batch_update_columns, so the mock unpacks the column
         # spec list into the same (row, col, value) tuples the original
-        # update_cell path emitted — keeps the assertions API-shape
+        # update_cell path emitted - keeps the assertions API-shape
         # agnostic.
         written_cells: list[tuple[int, int, object]] = []
 
@@ -472,7 +523,7 @@ def test_update_checkpoint_scores_sync_skips_points_when_flag_set(sheets_app, mo
 
 def test_update_checkpoint_scores_sync_still_writes_points_without_flag(sheets_app, monkeypatch):
     """Backwards-compat: SheetConfigs without the flag (legacy or
-    time_race CPs) keep getting Points written as before."""
+    non-expressible CPs) keep getting Points written as before."""
     with sheets_app.app_context():
         user = create_user(username="nofl-admin", role="admin")
         comp = create_competition(name="NoFlag Race")
@@ -536,12 +587,44 @@ def test_update_checkpoint_scores_sync_still_writes_points_without_flag(sheets_a
         assert 3 in cols_written, f"Points should be written: {written}"
 
 
-def test_score_tab_found_formula_excludes_virtual_checkpoints(sheets_app, monkeypatch):
+# ---------------------------------------------------------------------------
+# Score-tab formulas from GroupScoring / TimedSegment
+# ---------------------------------------------------------------------------
+
+
+def _lookup(tab: str, col: str, row_idx: int) -> str:
+    """The INDEX/MATCH arrival-time lookup emitted for CP tabs whose
+    layout is [group name, Time, Points] (team col A, time col `col`)."""
+    return f"INDEX('{tab}'!{col}:{col}; MATCH(B{row_idx}; '{tab}'!A:A; 0))"
+
+
+def _cp_sheet_config(comp, grp, cp) -> SheetConfig:
+    """A per-CP SheetConfig with time_enabled so the Time column exists
+    (otherwise the score-tab formulas short-circuit to =0/'=\"\"')."""
+    return SheetConfig(
+        competition_id=comp.id,
+        spreadsheet_id="REAL-SHEET",
+        spreadsheet_name="Sheet",
+        tab_name=cp.name,
+        tab_type="checkpoint",
+        checkpoint_id=cp.id,
+        config={
+            "points_header": "Points",
+            "dead_time_enabled": False,
+            "time_enabled": True,
+            "time_header": "Time",
+            "groups": [{"group_id": grp.id, "name": "Alpha", "fields": []}],
+        },
+    )
+
+
+def test_score_tab_found_formula_excludes_non_counting_checkpoints(sheets_app, monkeypatch):
     """Virtual CPs (Topo&Vrisovanje, Lokostrelstvo) carry no physical
-    arrival — the in-app _compute_global_contrib naturally skips them
-    (no Checkin row gets auto-created for virtual CPs), so the
-    spreadsheet's Found formula must too. Otherwise a team that scored
-    Topo would get +100 on the sheet but not in the app."""
+    arrival and start/finish never earn found points. In phase 2 the
+    exclusion mechanism is Checkpoint.counts_for_found=False (which the
+    setup UI / backfill applies to virtual CPs and route endpoints,
+    replacing the exclude_start/end flags), and the sheet's Found
+    formula must honor it exactly like compute_group_contrib does."""
     with sheets_app.app_context():
         user = create_user(username="virt-excl-admin", role="admin")
         comp = create_competition(name="Virtual Excl Race")
@@ -550,57 +633,31 @@ def test_score_tab_found_formula_excludes_virtual_checkpoints(sheets_app, monkey
         start = create_checkpoint(comp, name="Start")
         cilj = create_checkpoint(comp, name="Cilj")
         mid = create_checkpoint(comp, name="CP-Mid")
-        # Virtual CPs — same shape as the real race's Topo&Vrisovanje
+        # Virtual CPs - same shape as the real race's Topo&Vrisovanje
         # and Lokostrelstvo.
         topo = create_checkpoint(comp, name="Topo&Vrisovanje")
         topo.is_virtual = True
         loko = create_checkpoint(comp, name="Lokostrelstvo")
         loko.is_virtual = True
+        # counts_for_found=False is how virtual CPs and route endpoints
+        # are kept out of found points now (default is True).
+        for cp in (start, cilj, topo, loko):
+            cp.counts_for_found = False
         team = create_team(comp, name="T1", number=101)
         assign_team_group(team, grp)
-        for pos, cp in enumerate([start, topo, mid, loko, cilj]):
-            db.session.add(CheckpointGroupLink(group_id=grp.id, checkpoint_id=cp.id, position=pos))
-        # SheetConfigs with time_enabled so the Time column exists
-        # (otherwise the formula short-circuits on missing column).
+        set_group_route(grp, [start, topo, mid, loko, cilj])
         for cp in (start, topo, mid, loko, cilj):
-            db.session.add(
-                SheetConfig(
-                    competition_id=comp.id,
-                    spreadsheet_id="REAL-SHEET",
-                    spreadsheet_name="Sheet",
-                    tab_name=cp.name,
-                    tab_type="checkpoint",
-                    checkpoint_id=cp.id,
-                    config={
-                        "points_header": "Points",
-                        "dead_time_enabled": False,
-                        "time_enabled": True,
-                        "time_header": "Time",
-                        "groups": [{"group_id": grp.id, "name": "Alpha", "fields": []}],
-                    },
-                )
-            )
-        db.session.add(
-            GlobalScoreRule(
-                competition_id=comp.id,
-                group_id=grp.id,
-                rules={
-                    "time": {
-                        "start_checkpoint_id": start.id,
-                        "end_checkpoint_id": cilj.id,
-                        "max_points": 195,
-                        "threshold_minutes": 195,
-                        "penalty_minutes": 1,
-                        "penalty_points": 2,
-                        "min_points": 0,
-                    },
-                    "found": {
-                        "points_per": 100,
-                        "exclude_start_checkpoint": True,
-                        "exclude_end_checkpoint": True,
-                    },
-                },
-            )
+            db.session.add(_cp_sheet_config(comp, grp, cp))
+        # Category rules live on GroupScoring now (race_* columns +
+        # found_points_per) instead of a GlobalScoreRule JSON blob.
+        set_group_scoring(
+            grp,
+            found_points_per=100,
+            race_max_points=195,
+            race_threshold_minutes=195,
+            race_penalty_minutes=1,
+            race_penalty_points=2,
+            race_min_points=0,
         )
         db.session.commit()
         fake = _install_fake_client(monkeypatch)
@@ -615,26 +672,28 @@ def test_score_tab_found_formula_excludes_virtual_checkpoints(sheets_app, monkey
         team_row = grid[1]
         found_cell = team_row[found_idx]
         assert isinstance(found_cell, str)
-        # Only CP-Mid is a physical CP between Start and Cilj. Topo and
-        # Lokostrelstvo are virtual and excluded; Start and Cilj are
-        # excluded via the exclude_start/end flags.
-        assert "'CP-Mid'!" in found_cell, found_cell
+        # Only CP-Mid counts: exact one-term formula.
+        assert found_cell == (
+            f'=100*(IFERROR(IF({_lookup("CP-Mid", "B", 2)}<>""; 1; 0); 0))'
+        ), found_cell
         assert "'Topo&Vrisovanje'!" not in found_cell, (
             f"Topo (virtual) leaked into Found formula: {found_cell}"
         )
         assert "'Lokostrelstvo'!" not in found_cell, (
             f"Lokostrelstvo (virtual) leaked into Found formula: {found_cell}"
         )
-        # Start and Cilj also stay out (already covered by exclude_* flags).
+        # Start and Cilj also stay out (counts_for_found=False).
         assert "'Start'!" not in found_cell
         assert "'Cilj'!" not in found_cell
 
 
 def test_score_tab_has_casovnica_and_found_columns(sheets_app, monkeypatch):
     """build_score_tab emits Časovnica + Found-points columns whose
-    formulas reach into the per-CP tabs' Time columns. With a
-    GlobalScoreRule referencing real Start/Cilj CPs, the formulas use
-    INDEX/MATCH lookups; the Total formula sums all three contributions."""
+    formulas reach into the per-CP tabs' Time columns. Časovnica comes
+    from GroupScoring race_* columns: endpoints are the group's directed
+    route start/finish and the deduction is STEPPED - FLOOR(minutes over
+    threshold / penalty_minutes) * penalty_points (behavior change from
+    the old proportional GlobalScoreRule formula)."""
     with sheets_app.app_context():
         user = create_user(username="score-tab-admin", role="admin")
         comp = create_competition(name="Score Tab Race")
@@ -643,61 +702,28 @@ def test_score_tab_has_casovnica_and_found_columns(sheets_app, monkeypatch):
         start = create_checkpoint(comp, name="Start")
         cilj = create_checkpoint(comp, name="Cilj")
         mid = create_checkpoint(comp, name="CP-Mid")
+        # Endpoints don't earn found points; CP-Mid does.
+        start.counts_for_found = False
+        cilj.counts_for_found = False
         team = create_team(comp, name="T1", number=101)
         assign_team_group(team, grp)
-        for pos, cp in enumerate([start, mid, cilj]):
-            db.session.add(CheckpointGroupLink(group_id=grp.id, checkpoint_id=cp.id, position=pos))
-        # SheetConfigs for each CP with time_enabled so the Time column
-        # exists for the formulas to reference.
+        set_group_route(grp, [start, mid, cilj])
         for cp in (start, mid, cilj):
-            db.session.add(
-                SheetConfig(
-                    competition_id=comp.id,
-                    spreadsheet_id="REAL-SHEET",
-                    spreadsheet_name="Sheet",
-                    tab_name=cp.name,
-                    tab_type="checkpoint",
-                    checkpoint_id=cp.id,
-                    config={
-                        "points_header": "Points",
-                        "dead_time_enabled": False,
-                        "time_enabled": True,
-                        "time_header": "Time",
-                        "groups": [
-                            {"group_id": grp.id, "name": "Alpha", "fields": []},
-                        ],
-                    },
-                )
-            )
-        # Global rule wiring Start -> Cilj with the user's actual
-        # numbers (195 min threshold, -2 per min, found=100 with
-        # exclude_start + exclude_end).
-        db.session.add(
-            GlobalScoreRule(
-                competition_id=comp.id,
-                group_id=grp.id,
-                rules={
-                    "time": {
-                        "start_checkpoint_id": start.id,
-                        "end_checkpoint_id": cilj.id,
-                        "max_points": 195,
-                        "threshold_minutes": 195,
-                        "penalty_minutes": 1,
-                        "penalty_points": 2,
-                        "min_points": 0,
-                    },
-                    "found": {
-                        "points_per": 100,
-                        "exclude_start_checkpoint": True,
-                        "exclude_end_checkpoint": True,
-                    },
-                },
-            )
+            db.session.add(_cp_sheet_config(comp, grp, cp))
+        # The race numbers (195 min threshold, -2 per full minute over,
+        # found=100) now live on GroupScoring; the route start/finish
+        # replace the old configurable start/end_checkpoint_id.
+        set_group_scoring(
+            grp,
+            found_points_per=100,
+            race_max_points=195,
+            race_threshold_minutes=195,
+            race_penalty_minutes=1,
+            race_penalty_points=2,
+            race_min_points=0,
         )
         db.session.commit()
         fake = _install_fake_client(monkeypatch)
-        # Pre-create the Score tab name so add_worksheet doesn't collide
-        # on a second call (build_score_tab creates the tab itself).
         sheets_sync.build_score_tab(
             "REAL-SHEET", tab_name="Score", competition_id=comp.id, include_dead_time_sum=False
         )
@@ -711,24 +737,135 @@ def test_score_tab_has_casovnica_and_found_columns(sheets_app, monkeypatch):
         assert any("Časovnica" in h or "casov" in h.lower() for h in header), header
         assert any("Najden" in h or "Found" in h or "found" in h.lower() for h in header), header
 
-        # Team row should have a Časovnica formula that references both
-        # Start and Cilj tabs and uses the *1440 minutes conversion.
+        # Časovnica: directed endpoints Start -> Cilj, minutes via *1440,
+        # dead time (0 here) subtracted before the threshold comparison,
+        # stepped deduction via FLOOR, floored at min_points.
         team_row = grid[1]
+        start_lk = _lookup("Start", "B", 2)
+        end_lk = _lookup("Cilj", "B", 2)
         cas_cell = team_row[-3]
-        assert isinstance(cas_cell, str) and cas_cell.startswith("=")
-        assert "'Start'!" in cas_cell
-        assert "'Cilj'!" in cas_cell
-        assert "1440" in cas_cell, f"Časovnica formula missing minute conversion: {cas_cell}"
-        assert "195" in cas_cell, f"Časovnica threshold not embedded: {cas_cell}"
+        assert cas_cell == (
+            f'=IFERROR(IF({end_lk}=""; 0; '
+            f"MAX(195-FLOOR(MAX(0; ({end_lk}-{start_lk})*1440-(0)-195)/1)*2; 0)); 0)"
+        ), cas_cell
 
-        # Found formula references CP-Mid (the one not excluded) but
-        # NOT Start or Cilj (excluded via the flag).
+        # Found formula references CP-Mid (counts_for_found) but NOT
+        # Start or Cilj (counts_for_found=False).
         found_cell = team_row[-2]
-        assert isinstance(found_cell, str) and found_cell.startswith("=100*")
-        assert "'CP-Mid'!" in found_cell
+        assert found_cell == (
+            f'=100*(IFERROR(IF({_lookup("CP-Mid", "B", 2)}<>""; 1; 0); 0))'
+        ), found_cell
         assert "'Start'!" not in found_cell
         assert "'Cilj'!" not in found_cell
 
         # Total formula sums per-CP lookups + casovnica + found.
         total_cell = team_row[-1]
         assert isinstance(total_cell, str) and total_cell.startswith("=SUM(")
+        assert "FLOOR" in total_cell  # časovnica joined the total
+
+
+def test_score_tab_casovnica_uses_directed_route_endpoints(sheets_app, monkeypatch):
+    """A reverse-direction group runs the same path backwards: the
+    Časovnica endpoints must come from the DIRECTED route, so the last
+    path stop ('Start' here after reversal... i.e. the stored first stop)
+    becomes the finish lookup and the stored last stop the start."""
+    with sheets_app.app_context():
+        user = create_user(username="rev-admin", role="admin")
+        comp = create_competition(name="Reverse Race")
+        add_membership(user, comp, role="admin")
+        grp = create_group(comp, name="Alpha", prefix="1xx")
+        start = create_checkpoint(comp, name="Start")
+        cilj = create_checkpoint(comp, name="Cilj")
+        mid = create_checkpoint(comp, name="CP-Mid")
+        team = create_team(comp, name="T1", number=101)
+        assign_team_group(team, grp)
+        # Stops stored forward as Start -> CP-Mid -> Cilj, but the group
+        # traverses in reverse: directed route is Cilj -> CP-Mid -> Start.
+        set_group_route(grp, [start, mid, cilj], direction="reverse")
+        for cp in (start, mid, cilj):
+            db.session.add(_cp_sheet_config(comp, grp, cp))
+        set_group_scoring(
+            grp,
+            race_max_points=195,
+            race_threshold_minutes=195,
+            race_penalty_minutes=1,
+            race_penalty_points=2,
+            race_min_points=0,
+        )
+        db.session.commit()
+        fake = _install_fake_client(monkeypatch)
+        sheets_sync.build_score_tab(
+            "REAL-SHEET", tab_name="Score", competition_id=comp.id, include_dead_time_sum=False
+        )
+        grid = fake.spreadsheet.worksheet("Score").updates[-1]["values"]
+        team_row = grid[1]
+        # Directed: race start = Cilj tab, race finish = Start tab.
+        start_lk = _lookup("Cilj", "B", 2)
+        end_lk = _lookup("Start", "B", 2)
+        cas_cell = team_row[-3]
+        assert cas_cell == (
+            f'=IFERROR(IF({end_lk}=""; 0; '
+            f"MAX(195-FLOOR(MAX(0; ({end_lk}-{start_lk})*1440-(0)-195)/1)*2; 0)); 0)"
+        ), cas_cell
+
+
+def test_score_tab_emits_segment_formula_columns(sheets_app, monkeypatch):
+    """New in phase 2: each TimedSegment adds four Score-tab columns -
+    A/B arrival lookups, diff = (B-A)*1440 minutes over the A/B cells,
+    and rank-spread points via MIN/MAX over the group's diff range. The
+    segment points cell joins the Total SUM (segments are no longer part
+    of ScoreEntry totals)."""
+    with sheets_app.app_context():
+        user = create_user(username="seg-admin", role="admin")
+        comp = create_competition(name="Segment Race")
+        add_membership(user, comp, role="admin")
+        grp = create_group(comp, name="Alpha", prefix="1xx")
+        start = create_checkpoint(comp, name="Start")
+        cilj = create_checkpoint(comp, name="Cilj")
+        mid = create_checkpoint(comp, name="CP-Mid")
+        t1 = create_team(comp, name="T1", number=101)
+        t2 = create_team(comp, name="T2", number=102)
+        assign_team_group(t1, grp)
+        assign_team_group(t2, grp)
+        path = set_group_route(grp, [start, mid, cilj])
+        create_segment(path, start, mid, name="Etapa", max_points=100.0, min_points=10.0)
+        for cp in (start, mid, cilj):
+            db.session.add(_cp_sheet_config(comp, grp, cp))
+        db.session.commit()
+        fake = _install_fake_client(monkeypatch)
+
+        sheets_sync.build_score_tab(
+            "REAL-SHEET", tab_name="Score", competition_id=comp.id, include_dead_time_sum=False
+        )
+        grid = fake.spreadsheet.worksheet("Score").updates[-1]["values"]
+        header = grid[0]
+        # 4 base cols + 3 CP cols (route order Start, CP-Mid, Cilj), then
+        # the segment block at columns H..K, then Časovnica/Found/Total.
+        assert header[7:11] == ["Etapa A", "Etapa B", "Etapa čas (min)", "Etapa točke"], header
+
+        row2, row3 = grid[1], grid[2]
+        assert row2[1] == 101 and row3[1] == 102
+
+        # A/B lookups pull the segment endpoints' Time cells.
+        assert row2[7] == f'=IFERROR({_lookup("Start", "B", 2)}; "")'
+        assert row2[8] == f'=IFERROR({_lookup("CP-Mid", "B", 2)}; "")'
+        # diff recomputes from the A/B cells so a hand-patched arrival
+        # flows through; blank endpoints or end-before-start (a stray
+        # early check-in would otherwise win the MIN rank spread) yield
+        # a blank diff, matching compute_segment_results.
+        assert row2[9] == '=IF(OR(H2=""; I2=""; I2<H2); ""; (I2-H2)*1440)'
+        # points: rank spread over the group's diff range J2:J3 - fastest
+        # gets max (100), slowest min (10), all-equal gets max.
+        assert row2[10] == (
+            "=IF(J2=\"\"; 0; IF(MAX(J2:J3)=MIN(J2:J3); 100; "
+            "MAX(100-(J2-MIN(J2:J3))/(MAX(J2:J3)-MIN(J2:J3))*(100-(10)); 10)))"
+        ), row2[10]
+        # Second team: same shared range, own cells.
+        assert row3[9] == '=IF(OR(H3=""; I3=""; I3<H3); ""; (I3-H3)*1440)'
+        assert "J2:J3" in row3[10] and "J3" in row3[10]
+
+        # The segment points cell (K2) joins the Total SUM; no GroupScoring
+        # here so časovnica/found contribute literal zeros.
+        total_cell = row2[-1]
+        assert total_cell.startswith("=SUM(")
+        assert ";K2;0;0)" in total_cell, total_cell

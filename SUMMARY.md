@@ -1,14 +1,24 @@
-# Post-race overhaul — what shipped
+# Post-race overhaul - what shipped
+
+> **Historical document.** This is the changelog of the
+> `post-race-improvements` branch as it landed. The July 2026 redesign
+> (see `docs/redesign-plan.md`) has since replaced several things
+> described below: the JSON-blob score rules became first-class tables
+> (`ScoreField`/`TimedSegment`/`GroupScoring`), group `reverse` became
+> Path + direction, the in-process Sheets worker became a durable
+> outbox drained by a separate `sheets-worker` service, judges now work
+> in the `/judge` shell, and `scripts/migrate_to_rank_scoring.py` was
+> removed. Consult `docs/architecture.md` for the current state.
 
 Branch: `post-race-improvements` (off `master @ 04f2c70`). Not pushed.
 
 20 items requested. **19 shipped, 1 deferred** (per the agreed scope from
-the kickoff PUSH-BACK exchange — item 15 sheets readback is its own
+the kickoff PUSH-BACK exchange - item 15 sheets readback is its own
 project, agreed to defer).
 
 Tests at end: **520 passed, 23 skipped, 1 pre-existing failure** (the
 `test_sync_team_numbers_route_dispatches_to_worker` flake that was
-already broken on master before any of these changes — confirmed via
+already broken on master before any of these changes - confirmed via
 `git stash` round-trip). 23 skipped tests are the sheets-integration
 tests that need a real service-account file. Ruff check + format both
 clean.
@@ -52,7 +62,7 @@ clean.
 
 ## What was done, item by item
 
-### Wave 1 — bug fixes
+### Wave 1 - bug fixes
 
 #### #12 Judge assignment leaks across competitions
 - **Root cause**: `JudgeCheckpoint` table had no `competition_id`. The
@@ -68,7 +78,7 @@ clean.
 
 #### #13 CSV export header cleanup
 - `cp.<name>` prefix dropped from the per-CP column headers. Headers now
-  read `<name> — <description>` if a description is set, otherwise just
+  read `<name> - <description>` if a description is set, otherwise just
   `<name>`. Cells still hold just the points for downstream Sheets
   formulas to work cleanly.
 - **Files**: `app/blueprints/scores/routes.py:view_scores_export_csv`.
@@ -78,7 +88,7 @@ clean.
   Manual judge entries that left a stale UID in the field showed a
   spurious "Card write-back failed" UI message.
 - **Fix**: new `looks_like_card_uid()` heuristic in
-  `app/utils/card_tokens.py` — accepts only canonical card UID shapes
+  `app/utils/card_tokens.py` - accepts only canonical card UID shapes
   (8/10/14/16/20 hex chars). Both `app/resources/scores.py:score_submit`
   and `app/resources/ingest.py` gate writeback on this check.
 
@@ -99,7 +109,7 @@ clean.
   appropriate for the setup work they typically do first).
 - **Files**: `app/blueprints/main/routes.py`.
 
-### Wave 2 — sheets infrastructure
+### Wave 2 - sheets infrastructure
 
 #### #14 Batch sheets writes (massive rate-limit reduction)
 - `update_checkpoint_scores_sync` and `mark_arrival_checkbox_sync` now
@@ -113,7 +123,7 @@ clean.
 
 #### #3 Sheet remap UI fix
 - The `/sheets/` publish form's `spreadsheet_id` was a hidden input
-  that no JS was populating — operators had to `docker exec` to
+  that no JS was populating - operators had to `docker exec` to
   repoint. Replaced with a visible text input pre-populated from the
   remembered ID, labeled "Target spreadsheet ID" with help text.
 - **Files**: `app/templates/sheets_admin.html`.
@@ -121,10 +131,10 @@ clean.
 #### #16 Public-only summary tab
 - New `build_public_summary_tab` in `app/utils/sheets_sync.py`. Produces
   a single "Javno" tab with Group / Number / Team / Organization / Total
-  only — no per-CP detail, no formulas. Auto-built during `publish_local_configs_to_spreadsheet`.
+  only - no per-CP detail, no formulas. Auto-built during `publish_local_configs_to_spreadsheet`.
 - **Files**: `app/utils/sheets_sync.py`, `app/utils/lang_store.py`.
 
-### Wave 3 — scoring consolidation
+### Wave 3 - scoring consolidation
 
 #### #2 + #9 Time-trial scoring rework (consolidation option A)
 - **Root cause** (from the diagnostic dump earlier in the day): comp 10
@@ -134,9 +144,9 @@ clean.
   inflated and confusing scores.
 - **Fix**: added a `mode` field to `GlobalScoreRule.time` JSON blob.
   Two values:
-  - `"absolute"` (default — preserves old behavior, no migration
+  - `"absolute"` (default - preserves old behavior, no migration
     needed for unrelated competitions).
-  - `"rank"` (new — fastest gets `max_points`, slowest gets
+  - `"rank"` (new - fastest gets `max_points`, slowest gets
     `min_points`, linear interp by **effective** duration, i.e.
     raw elapsed minus all dead time including the new team-level
     `bonus_dead_time`).
@@ -159,7 +169,7 @@ clean.
   flips the time block to `mode=rank` and drops overlapping
   `ScoreRule.time_race` rows. Idempotent. Always supports `--dry-run`.
 
-### Wave 4 — live arrivals + judges on checkpoints + team search
+### Wave 4 - live arrivals + judges on checkpoints + team search
 
 #### #4 Per-group route direction (`reverse`)
 - New `CheckpointGroup.reverse` Boolean column (default False).
@@ -197,7 +207,7 @@ clean.
 - Search matches both team number AND name (formatted "123 - Name").
 - **Files**: the three templates above.
 
-### Wave 5 — notes + team dead-time UI + navigation + popups
+### Wave 5 - notes + team dead-time UI + navigation + popups
 
 #### #19 Team notes (free-text)
 - New `Team.notes` TEXT column. Edit/Add team forms get a textarea
@@ -235,39 +245,39 @@ clean.
 
 ---
 
-## What was NOT done — and why
+## What was NOT done - and why
 
 | # | Item | Why deferred |
 |---|---|---|
 | 15 | Sheets readback (judges write to sheet → DB import with admin approval workflow) | **Explicitly deferred at kickoff.** Needs: read wrapper in SheetsClient (none today), conflict detection vs DB state, new admin page with diff/approve UI. ~170 lines minimum and prone to mid-cycle race conditions when the sheet is mutated during review. Should be its own PR with its own design pass. |
-| — | Drag-and-drop checkpoint reordering UI | Backend (Checkpoint.position + sort) shipped. The reorder UI mirroring the groups one is a natural follow-up — order can be set via the existing number input on the edit form in the meantime. |
-| — | Full nav redesign | Only the "Admin/More/Manage" dropdown grouping shipped. Reorganizing the actual nav hierarchy / collapsing duplicate tabs (e.g. consolidating View Check-ins + Live Arrivals + Add Check-in into a single tabbed page) is a design conversation, not autonomous work. |
-| — | Toast-style stacking flash messages with inline action buttons | Just icons + auto-dismiss + dismissible shipped. Toast positioning + in-context buttons (e.g. "Override" inline in a duplicate-checkin flash) needs UX decisions per flow. |
+| - | Drag-and-drop checkpoint reordering UI | Backend (Checkpoint.position + sort) shipped. The reorder UI mirroring the groups one is a natural follow-up - order can be set via the existing number input on the edit form in the meantime. |
+| - | Full nav redesign | Only the "Admin/More/Manage" dropdown grouping shipped. Reorganizing the actual nav hierarchy / collapsing duplicate tabs (e.g. consolidating View Check-ins + Live Arrivals + Add Check-in into a single tabbed page) is a design conversation, not autonomous work. |
+| - | Toast-style stacking flash messages with inline action buttons | Just icons + auto-dismiss + dismissible shipped. Toast positioning + in-context buttons (e.g. "Override" inline in a duplicate-checkin flash) needs UX decisions per flow. |
 
 ---
 
 ## Open issues / pre-existing failures
 
-These were already failing on `master` before any of this work — verified
+These were already failing on `master` before any of this work - verified
 via `git stash` round-trip. They are **not** regressions from this branch:
 
 - `tests/test_admin_sheets_async_dispatch.py::test_sync_team_numbers_route_dispatches_to_worker`
-  — `/sheets/sync-team-numbers/<id>` route doesn't actually call the
+  - `/sheets/sync-team-numbers/<id>` route doesn't actually call the
   monkeypatched `enqueue_sync_all_checkpoint_tabs`. Worth a 15-min
   investigation in a follow-up.
-- `tests/test_public_scores_qr_and_refresh.py` (2 tests) — missing
+- `tests/test_public_scores_qr_and_refresh.py` (2 tests) - missing
   `qrcode` Python module in the venv. Either install it or skip the
   tests.
 
 ---
 
-## Files changed (counts only — see `git diff` for detail)
+## Files changed (counts only - see `git diff` for detail)
 
 - **4 new files**: `PLAN.md`, `SUMMARY.md` (this file),
   `alembic/versions/c6d7e8f9a0b1_post_race_columns.py`,
   `scripts/migrate_to_rank_scoring.py`.
 - **46 modified source files** across models, blueprints, resources,
   utilities, templates, and tests.
-- **0 deletions** — all changes are additive or refactored-in-place.
+- **0 deletions** - all changes are additive or refactored-in-place.
 
 Branch state: clean working tree if you commit; nothing pushed.

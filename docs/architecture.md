@@ -19,8 +19,8 @@ events. Check-ins can arrive through:
 1. **Manual entry** -- judges use the web UI or API.
 2. **LoRa device ingest** -- hardware devices send RFID card UIDs over LoRa to
    the `/api/ingest` endpoint.
-3. **Web NFC** -- Android Chrome reads NFC tags and calls ingest directly from
-   the judge console page.
+3. **Web NFC** -- Android Chrome reads NFC tags in the judge shell
+   (`/judge`, My CP tab) and records the arrival via the scores API.
 
 ---
 
@@ -44,7 +44,7 @@ lora-kt/
       ingest.py          #   device message ingest
       lora.py            #   LoRa device management
       scores.py          #   scoring entries
-      score_rules.py     #   scoring rule config
+      score_rules.py     #   ScoreField REST API
       rfid.py            #   RFID card management, verify
       map.py             #   map data endpoints
       messages.py        #   raw LoRa messages
@@ -57,10 +57,11 @@ lora-kt/
       checkins/          #   check-in list and forms
       groups/            #   group management UI
       map/               #   Google Maps view
-      rfid/              #   NFC judge console, finish verifier
+      rfid/              #   RFID cards, finish verifier, legacy console (admin-only)
       sheets/            #   Google Sheets admin
       audit/             #   audit log viewer
-      scores/            #   scoring UI
+      scores/            #   scoring UI + /scores/setup admin
+      judge/             #   mobile judge shell (/judge)
       judges/            #   judge assignment UI
       firmware/          #   ESP32 firmware flasher
       users/             #   user management UI
@@ -113,12 +114,20 @@ flag. Belongs to one competition. Optionally assigned to one group via
 **Checkpoint** -- a location where teams check in. Has coordinates
 (easting/northing) and an optional linked LoRa device.
 
-**CheckpointGroup** -- a named grouping of checkpoints with a `prefix` field
-(e.g., `1xx`) used for team number randomization. Groups have an ordering
+**CheckpointGroup** -- a category of teams: name, `prefix` (e.g., `1xx`,
+used for team number randomization), team assignment, and a reference to
+a Path plus a direction (`forward`/`reverse`). Groups have an ordering
 `position`.
 
-**CheckpointGroupLink** -- many-to-many between checkpoints and groups with
-a `position` for ordering within the group.
+**Path** -- an ordered course through checkpoints, shared between
+categories. Two groups running the same course opposite ways reference
+one Path row with opposite directions. Route resolution (direction
+applied) lives in `app/utils/paths.py` and is the single authority for
+start/finish and traversal order.
+
+**PathStop** -- one ordered stop on a Path (unique on path + position, so
+a checkpoint may appear twice). Carries `expected_leg_minutes`, the
+manual ETA fallback for the judge shell.
 
 **TeamGroup** -- links a team to a checkpoint group with an `active` flag.
 Each team should have at most one active group.
@@ -137,9 +146,19 @@ SNR, and timestamp.
 **ScoreEntry** -- judge-assigned scores for a team at a checkpoint, linked to
 a check-in. Stores `raw_fields` (JSON) and a computed `total`.
 
-**ScoreRule** -- per-checkpoint scoring rules scoped to a group.
+**ScoreField** -- one judged input at a checkpoint: key, label/hint,
+structured scoring rule (`rule_type` + `rule_params`), and whether it
+counts toward the total. **ScoreFieldGroup** holds per-group
+enable/override rows (no row = enabled with defaults).
 
-**GlobalScoreRule** -- competition-wide scoring rules scoped to a group.
+**TimedSegment** -- a time trial between two checkpoints of a path,
+scored by rank spread within each category; endpoints swap automatically
+for reverse-direction groups. Computed at read time, never stored in
+ScoreEntry.
+
+**GroupScoring** -- category-level rules: found-checkpoint points and the
+race time rule (route start -> finish, threshold + stepped penalty, dead
+time subtracted). The engine lives in `app/utils/scoring.py`.
 
 ### Audit
 
@@ -166,21 +185,26 @@ Competition
   |     +-- RFIDCard
   |     +-- Checkin --> Checkpoint
   |     +-- TeamGroup --> CheckpointGroup
+  +-- Path
+  |     +-- PathStop --> Checkpoint
+  |     +-- TimedSegment --> Checkpoint (start/end)
   +-- Checkpoint
-  |     +-- CheckpointGroupLink --> CheckpointGroup
+  |     +-- ScoreField (+-- ScoreFieldGroup --> CheckpointGroup)
   |     +-- LoRaDevice (optional, 1:1)
-  +-- CheckpointGroup
+  +-- CheckpointGroup --> Path (direction) (+-- GroupScoring)
   +-- LoRaDevice
   +-- LoRaMessage
   +-- SheetConfig
+  +-- SheetsSyncJob
   +-- FirmwareFile
   +-- ScoreEntry --> Checkin, Team, Checkpoint
-  +-- ScoreRule --> Checkpoint, CheckpointGroup
-  +-- GlobalScoreRule --> CheckpointGroup
   +-- AuditEvent
 ```
 
-A full ERD is available at `docs/erd.png` / `docs/erd.pdf`.
+A full ERD is available at `docs/erd.png` / `docs/erd.pdf`. NOTE: the
+rendered images predate the July 2026 redesign (paths + scoring tables +
+sheets outbox); regenerate with `scripts/render_erd.py` on a machine
+with graphviz installed.
 
 ---
 
@@ -225,10 +249,14 @@ A full ERD is available at `docs/erd.png` / `docs/erd.pdf`.
 
 ### Google Sheets sync
 
-When a check-in is created (manually or via ingest), the system optionally
-calls `mark_arrival_checkbox()` to update the Google Sheets arrivals matrix.
-This runs synchronously but failures are caught and ignored to avoid blocking
-the primary operation.
+Sheets writes go through a durable outbox (`SheetsSyncJob` rows, see
+`app/utils/sheets_outbox.py`). Domain code enqueues; the dedicated
+`flask sheets-worker` process (its own compose service, exactly one
+replica) drains the table with dedup-key coalescing, an accurate global
+throttle, exponential backoff, and dead-lettering visible on the sheets
+admin page. Roster changes dirty-flag the summary tabs, and a periodic
+pass re-verifies/heals tabs. In tests/CLI (`SHEETS_SYNC_INLINE`), writes
+run synchronously.
 
 ---
 

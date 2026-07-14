@@ -133,7 +133,7 @@ def _parse_ingest_payload() -> dict:
         "password": payload.get("password"),
         "gps_lat": _optional_float(payload, "gps_lat", minimum=-90.0, maximum=90.0),
         "gps_lon": _optional_float(payload, "gps_lon", minimum=-180.0, maximum=180.0),
-        # Altitude in metres — Mt. Everest is 8848, the deepest mine ~4000 below
+        # Altitude in metres - Mt. Everest is 8848, the deepest mine ~4000 below
         # sea level. ±20000 is generous and rejects garbage like 1e308.
         "gps_alt": _optional_float(payload, "gps_alt", minimum=-20000.0, maximum=20000.0),
         "gps_age_ms": _optional_int(payload, "gps_age_ms"),
@@ -228,7 +228,7 @@ def ingest_post():
 
     # The competition-level ingest password gates non-webhook callers.
     # An authenticated user may skip it only if they are an active
-    # admin/judge of *this* competition — same rule as the webhook secret
+    # admin/judge of *this* competition - same rule as the webhook secret
     # bypass above. Previously any authenticated user (including a viewer
     # from another competition) could bypass.
     if competition.ingest_password_hash and not (
@@ -437,30 +437,11 @@ def ingest_post():
                     # do not fail ingest if Sheets update fails
                     pass
 
-                # If this check-in lands on the END checkpoint of a
-                # ScoreRule.time_race rule, the team's leg time just
-                # crystallized — and every other finished team's rank
-                # may have shifted because the spread changed. Push an
-                # async recompute so the leaderboard + sheet update
-                # without waiting for a judge form submission. No-op
-                # for non-leg CPs or when sheets sync is disabled.
-                try:
-                    from app.models import ScoreRule as _SR
-                    from app.utils.sheets_sync_worker import enqueue_recompute_time_race_push as _enqueue
-
-                    rules = _SR.query.filter(_SR.competition_id == competition_id).all()
-                    for _r in rules:
-                        tr = (_r.rules or {}).get("time_race") or {}
-                        if str(tr.get("end_checkpoint_id") or "") != str(cp.id):
-                            continue
-                        _enqueue(
-                            current_app._get_current_object(),
-                            competition_id,
-                            _r.checkpoint_id,
-                            _r.group_id,
-                        )
-                except Exception:
-                    pass
+                # Timed segments are computed at read time from checkins
+                # and rendered in Sheets as formulas over the CP tabs'
+                # Time cells, so an arrival needs no extra recompute push
+                # here; the mark_arrival_checkbox write above already
+                # feeds every downstream surface.
 
         # Skip writeback for non-UID payloads (GPS frames, comma-list data)
         # AND for inputs whose shape doesn't match a real card UID. The old

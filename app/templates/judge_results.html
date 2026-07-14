@@ -1,0 +1,38 @@
+{% extends "judge_base.html" %}
+{% block title %}{{ _('Results') }}{% endblock %}
+{% block judge_content %}
+
+{% for group_name, rows in rows_by_group.items() %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <h6 class="card-title">{{ group_name }}</h6>
+      <div class="list-group list-group-flush">
+        {% for row in rows %}
+          <div class="list-group-item px-0">
+            <div class="d-flex justify-content-between align-items-center">
+              <span>
+                <span class="fw-semibold">{{ row.place }}.</span>
+                {% if row.number is not none %}{{ row.number }} · {% endif %}{{ row.name }}
+                {% if row.dnf %}<span class="badge text-bg-danger">{{ _('DNF') }}</span>
+                {% elif row.finished %}<span class="badge text-bg-success">{{ _('finished') }}</span>{% endif %}
+              </span>
+              <span class="fw-semibold">{{ '%.1f'|format(row.total or 0) }}</span>
+            </div>
+            {% if row.segments %}
+              <div class="text-body-secondary small">
+                {% for s in row.segments %}
+                  {{ s.label }}: {{ s.start_hms or '-' }} → {{ s.end_hms or '-' }}{% if s.minutes is not none %} = {{ '%.1f'|format(s.minutes) }} {{ _('min') }}{% endif %}{% if s.points is not none %} ({{ '%.1f'|format(s.points) }}){% endif %}{{ '' if loop.last else '; ' }}
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="text-body-secondary">{{ _('No scores yet.') }}</div>
+{% endfor %}
+
+<script>setTimeout(() => window.location.reload(), 60000);</script>
+{% endblock %}

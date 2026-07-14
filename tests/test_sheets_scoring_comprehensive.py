@@ -20,7 +20,6 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    CheckpointGroupLink,
     ScoreEntry,
 )
 from tests.support import (
@@ -33,6 +32,7 @@ from tests.support import (
     create_team,
     create_user,
     login_as,
+    set_group_route,
 )
 
 SPREADSHEET_ID = os.environ.get("TEST_SPREADSHEET_ID", "")
@@ -126,11 +126,8 @@ def seeded(sheets_app, sheets_client):
     vcp.is_virtual = True
     db.session.commit()
 
-    for pos, cp in enumerate([cp1, cp2, vcp]):
-        db.session.add(CheckpointGroupLink(group_id=grp.id, checkpoint_id=cp.id, position=pos))
-    for pos, cp in enumerate([cp1, cp2]):
-        db.session.add(CheckpointGroupLink(group_id=grp2.id, checkpoint_id=cp.id, position=pos))
-    db.session.commit()
+    set_group_route(grp, [cp1, cp2, vcp])
+    set_group_route(grp2, [cp1, cp2])
 
     t1 = create_team(comp, name="Team-A", number=101, organization="Org-1")
     t2 = create_team(comp, name="Team-B", number=102, organization="Org-1")
@@ -371,7 +368,7 @@ class TestScoreTabFormulas:
             ws_cp1.update_cell(cp1_row, pts_col + 1, 999)
             time.sleep(3)
 
-            # Re-read score tab total — should now be 999 + 50 = 1049
+            # Re-read score tab total - should now be 999 + 50 = 1049
             updated = ws_score.acell(rowcol_to_a1(team_row, total_col + 1)).value
             assert float(updated) == pytest.approx(1049.0, abs=1), f"Propagation failed: expected ~1049, got {updated}"
         finally:
@@ -609,7 +606,7 @@ class TestMarkArrival:
             assert team_row is not None
             header = all_vals[0]
             # The time column header comes from config (default "Čas")
-            # Find it — it's the column AFTER dead time and BEFORE extra fields
+            # Find it - it's the column AFTER dead time and BEFORE extra fields
             # Header layout: [GroupName, DeadTime, Time, Points]
             # Time column is at index 2 when dead_time is enabled
             time_col = 2  # 0-based: Group(0), DeadTime(1), Time(2), Points(3)
@@ -703,7 +700,7 @@ class TestConcurrentSubmissions:
             _cleanup_tabs(sp)
 
     def test_concurrent_same_team_last_write_wins(self, sheets_app, sheets_client, seeded):
-        """Two rapid submissions for the same team — last write wins."""
+        """Two rapid submissions for the same team - last write wins."""
         s = seeded
         gc = _get_gc()
         sp = gc.open_by_key(SPREADSHEET_ID)
@@ -755,7 +752,7 @@ class TestOrgSummary:
         try:
             ws = sp.worksheet(tab)
             all_vals = ws.get_all_values()
-            # Find org section — look for "Org-1" in any row
+            # Find org section - look for "Org-1" in any row
             for _i, row in enumerate(all_vals):
                 if "Org-1" in row:
                     # The last cell with a number should be the org total
@@ -805,7 +802,7 @@ class TestOrgSummary:
 @skip_no_sheets
 class TestCheckpointTabValues:
     def test_cp_tab_values_are_raw_not_formulas(self, sheets_app, sheets_client, seeded):
-        """Checkpoint tab points are raw values — judges can edit them manually."""
+        """Checkpoint tab points are raw values - judges can edit them manually."""
         s = seeded
         gc = _get_gc()
         sp = gc.open_by_key(SPREADSHEET_ID)

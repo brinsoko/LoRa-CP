@@ -16,7 +16,6 @@ import pytest
 
 from app.extensions import db
 from app.models import (
-    CheckpointGroupLink,
     SheetConfig,
 )
 from app.utils import sheets_client as sheets_client_module
@@ -29,6 +28,7 @@ from tests.support import (
     create_group,
     create_team,
     create_user,
+    set_group_route,
 )
 
 
@@ -105,7 +105,7 @@ class _FakeClient:
         self.batch_update_columns_calls.append((tab_name, list(columns)))
 
     def update_column(self, spreadsheet_id, tab_name, col, start_row, values):
-        # If this gets called we're back on the per-group pattern — fail loud.
+        # If this gets called we're back on the per-group pattern - fail loud.
         self.update_column_calls.append((tab_name, col, start_row, values))
 
     def add_tab(self, spreadsheet_id, title, rows=100, cols=26):
@@ -162,10 +162,10 @@ def _seed_competition_with_n_cps(n_cps: int, groups_per_cp: int = 5, teams_per_g
         for t_idx in range(teams_per_group):
             t = create_team(comp, name=f"{g.name}-T{t_idx}", number=(g_idx + 1) * 100 + t_idx + 1)
             assign_team_group(t, g)
+    cps = []
     for i in range(n_cps):
         cp = create_checkpoint(comp, name=f"CP-{i}")
-        for g in groups:
-            db.session.add(CheckpointGroupLink(group_id=g.id, checkpoint_id=cp.id, position=0))
+        cps.append(cp)
         db.session.add(
             SheetConfig(
                 competition_id=comp.id,
@@ -185,6 +185,8 @@ def _seed_competition_with_n_cps(n_cps: int, groups_per_cp: int = 5, teams_per_g
                 },
             )
         )
+    for g in groups:
+        set_group_route(g, cps)
     db.session.commit()
     return comp
 
@@ -202,7 +204,7 @@ def test_sync_auto_heals_missing_worksheet(sheets_app, monkeypatch):
         comp = _seed_competition_with_n_cps(n_cps=2, groups_per_cp=2, teams_per_group=3)
         fake = _install_fake_client(monkeypatch, strict_worksheet=True)
 
-        # Pre-condition: the fake spreadsheet has no worksheets — every
+        # Pre-condition: the fake spreadsheet has no worksheets - every
         # tab lookup will raise WorksheetNotFound.
         assert fake.spreadsheet._ws == {}
 
@@ -215,7 +217,7 @@ def test_sync_auto_heals_missing_worksheet(sheets_app, monkeypatch):
         assert {"CP-0", "CP-1"} <= set(fake.spreadsheet._ws.keys())
 
         # Each healed tab got the full grid written at A1 (headers + team
-        # rows from _build_local_cp_grid) — proves auto-heal did a real
+        # rows from _build_local_cp_grid) - proves auto-heal did a real
         # rebuild, not just a no-op add_tab.
         for title in ("CP-0", "CP-1"):
             ws = fake.spreadsheet._ws[title]
@@ -224,13 +226,32 @@ def test_sync_auto_heals_missing_worksheet(sheets_app, monkeypatch):
 
 
 def test_sync_team_numbers_route_also_rebuilds_ekipe_tab(sheets_app, monkeypatch, client):
-    """The /sheets/sync-team-numbers/<id> route must rebuild the Ekipe
-    (Teams) summary tab in addition to the per-CP tabs. Without this
-    the team-number column and members (Člani) on the Ekipe tab go stale
-    after any roster change — the user-facing "sync team numbers" label
-    implies a roster-wide refresh, not just CP tabs."""
+    """The /sheets/sync-team-numbers/<id> route must rebuild the recorded
+    summary tabs (SheetConfig rows with tab_type teams/arrivals/total) in
+    addition to the per-CP tabs. Without this the team-number column and
+    members (Clani) on the Ekipe tab go stale after any roster change -
+    the user-facing "sync team numbers" label implies a roster-wide
+    refresh, not just CP tabs. The rebuild targets the RECORDED tab names
+    and layouts, never lang-default names (which used to reset custom
+    layouts and could create duplicate default-named tabs)."""
     with sheets_app.app_context():
         comp = _seed_competition_with_n_cps(n_cps=2, groups_per_cp=2, teams_per_group=3)
+        # The summary rows a publish records; the route rebuilds these.
+        for tab_type, tab_name in (
+            ("teams", "Ekipe"),
+            ("arrivals", "Prihodi"),
+            ("total", "Skupni sestevek"),
+        ):
+            db.session.add(
+                SheetConfig(
+                    competition_id=comp.id,
+                    spreadsheet_id="REAL-SHEET",
+                    spreadsheet_name="Sheet",
+                    tab_name=tab_name,
+                    tab_type=tab_type,
+                )
+            )
+        db.session.commit()
         admin = (
             db.session.query(__import__("app.models", fromlist=["User"]).User)
             .filter_by(username=f"sync-admin-{2}")
@@ -244,9 +265,9 @@ def test_sync_team_numbers_route_also_rebuilds_ekipe_tab(sheets_app, monkeypatch
         from tests.support import login_as
         login_as(client, admin, comp)
 
-        # Pick any CP config — the route only uses it as a guard against
+        # Pick any CP config - the route only uses it as a guard against
         # syncing a competition with no configs.
-        cfg = SheetConfig.query.filter_by(competition_id=comp.id).first()
+        cfg = SheetConfig.query.filter_by(competition_id=comp.id, tab_type="checkpoint").first()
         resp = client.post(
             f"/sheets/sync-team-numbers/{cfg.id}",
             follow_redirects=False,
@@ -258,18 +279,14 @@ def test_sync_team_numbers_route_also_rebuilds_ekipe_tab(sheets_app, monkeypatch
         cp_tabs_synced = {tab for tab, _cols in fake.batch_update_columns_calls}
         assert "CP-0" in cp_tabs_synced and "CP-1" in cp_tabs_synced, fake.batch_update_columns_calls
 
-        # New behaviour: all three summary tabs were rebuilt — Ekipe
-        # (Teams), Prihodi (Arrivals), and Skupni seštevek (Score). We
-        # don't pin the exact tab names because they come from
-        # sheets_lang.json (Ekipe/Teams, Prihodi/Arrivals, etc.), but we
-        # do expect three non-CP worksheets, each with an A1 grid write.
+        # All three RECORDED summary tabs were rebuilt under their stored
+        # names, each with an A1 grid write.
         cp_tab_names = {f"CP-{i}" for i in range(2)}
         summary_tabs = [
             (name, ws) for name, ws in fake.spreadsheet._ws.items() if name not in cp_tab_names
         ]
-        assert len(summary_tabs) == 3, (
-            f"Expected 3 summary tabs (Ekipe / Prihodi / Skupni seštevek); "
-            f"got {[n for n, _ in summary_tabs]}"
+        assert sorted(n for n, _ in summary_tabs) == ["Ekipe", "Prihodi", "Skupni sestevek"], (
+            f"Expected the recorded summary tabs; got {[n for n, _ in summary_tabs]}"
         )
         for name, ws in summary_tabs:
             a1_writes = [u for u in ws.updates if u.get("range_name") == "A1"]
@@ -303,7 +320,7 @@ def test_sync_uses_one_batch_call_per_cp_not_one_per_group(sheets_app, monkeypat
 
 def test_sync_writes_correct_team_numbers_per_group(sheets_app, monkeypatch):
     """The batched payload must carry the right team numbers for each
-    group block — regression guard against shuffling rows across groups."""
+    group block - regression guard against shuffling rows across groups."""
     with sheets_app.app_context():
         comp = _seed_competition_with_n_cps(n_cps=1, groups_per_cp=3, teams_per_group=3)
         fake = _install_fake_client(monkeypatch)
@@ -317,7 +334,7 @@ def test_sync_writes_correct_team_numbers_per_group(sheets_app, monkeypatch):
         # Group G1 has prefix "1" => 100, 101, 102
         # Group G2 has prefix "2" => 200, 201, 202
         nums_by_col = {c["col"]: c["values"] for c in cols}
-        # Find the column for G0 (start_col=1), G1, G2 — block width = 1+1+1+1 = 4
+        # Find the column for G0 (start_col=1), G1, G2 - block width = 1+1+1+1 = 4
         # (name + time + task1 + points)
         # So G0 starts at col 1, G1 at col 5, G2 at col 9.
         # Team numbers per helper: (g_idx+1)*100 + t_idx+1

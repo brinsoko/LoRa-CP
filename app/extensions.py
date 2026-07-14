@@ -44,5 +44,15 @@ def _set_sqlite_pragma(dbapi_connection, connection_record):
     cur = dbapi_connection.cursor()
     try:
         cur.execute("PRAGMA foreign_keys=ON")
+        # Three writer processes share the file in prod (2 gunicorn
+        # workers + the sheets-worker, which can hold a write transaction
+        # across throttled Google API calls). WAL lets readers proceed
+        # during a write, and a generous busy_timeout makes writer-writer
+        # contention queue instead of failing the request with
+        # 'database is locked' (pysqlite's driver default is only 5s).
+        # In-memory test DBs report 'memory' for journal_mode; harmless.
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA busy_timeout=15000")
+        cur.execute("PRAGMA synchronous=NORMAL")
     finally:
         cur.close()

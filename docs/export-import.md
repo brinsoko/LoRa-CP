@@ -2,7 +2,7 @@
 
 > **Experimental.** This feature is functional but still maturing. Back up
 > your database before importing or merging. The JSON schema (currently
-> version `1.0.0`) may change in future releases.
+> version `1.2.0`) may change in future releases.
 
 ---
 
@@ -39,14 +39,18 @@ curl -b cookies.txt \
 |---|---|
 | `competition` | Name, settings (public_results, hide_gps_map) |
 | `teams` | Name, number, organization, DNF flag |
-| `groups` | Name, prefix, description, position |
+| `groups` | Name, prefix, description, position, path name, direction |
 | `checkpoints` | Name, location, description, coordinates |
 | `checkins` | Team name, checkpoint name, timestamp |
 | `devices` | Device number, name, note, model, active flag |
 | `scores` | Team name, checkpoint name, raw fields, total |
 | `rfid_cards` | UID, team name, number |
 | `team_groups` | Team-to-group assignments with active flag |
-| `group_checkpoint_links` | Group-to-checkpoint links with position |
+| `paths` | Ordered courses: name, notes, stops (checkpoint name, position, expected leg minutes) |
+| `score_fields` | Judged inputs per checkpoint: key, label, hint, rule type/params, max input, counts-in-total, per-group enable/override |
+| `timed_segments` | Time trials per path: endpoints (checkpoint names), name, max/min points |
+| `group_scoring` | Category rules: found points per checkpoint, race time rule (threshold + stepped penalty) |
+| `group_checkpoint_links` | Legacy derived view of each group's resolved route (kept for old tooling; import prefers `paths`) |
 
 **What is NOT exported:**
 
@@ -54,13 +58,13 @@ curl -b cookies.txt \
 - Audit events
 - Google Sheets configuration
 - Firmware files
-- Score rules (only score entries are exported)
+
 
 ### JSON structure
 
 ```json
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.2.0",
   "exported_at": "2025-10-17T14:30:00Z",
   "competition": {
     "name": "Fall Rally 2025",
@@ -73,7 +77,12 @@ curl -b cookies.txt \
     {"name": "Alpha", "number": 101, "organization": "Troop 1", "dnf": false}
   ],
   "groups": [
-    {"name": "Category A", "prefix": "1xx", "description": null, "position": 0}
+    {"name": "Category A", "prefix": "1xx", "description": null, "position": 0,
+     "path_name": "Main course", "direction": "forward"}
+  ],
+  "paths": [
+    {"name": "Main course", "notes": null,
+     "stops": [{"checkpoint_name": "Forest Gate", "position": 0, "expected_leg_minutes": null}]}
   ],
   "checkpoints": [
     {"name": "Forest Gate", "location": "North", "description": null, "easting": 14.5, "northing": 46.1}
@@ -197,7 +206,7 @@ curl -b cookies.txt -X POST \
   http://localhost:5001/api/competition/1/merge \
   -H "Content-Type: application/json" \
   -d '{
-    "schema_version": "1.0.0",
+    "schema_version": "1.2.0",
     "competition": {"name": "Fall Rally 2025", "settings": {}},
     "teams": [
       {"name": "Alpha", "number": 102, "organization": "Troop 1", "dnf": false},

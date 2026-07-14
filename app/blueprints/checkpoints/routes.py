@@ -27,15 +27,17 @@ def _checkpoint_error_message(payload: dict, default_msg: str) -> str:
         return _("Checkpoint name already exists.")
     if payload.get("detail"):
         return payload.get("detail")
-    return _(default_msg)
+    # default_msg arrives already translated: callers wrap their literal
+    # in _() so Babel can extract it (_(variable) is invisible to it).
+    return default_msg
 
 
-def _fetch_groups():
-    resp, payload = api_json("GET", "/api/groups")
+def _fetch_paths():
+    resp, payload = api_json("GET", "/api/paths")
     if resp.status_code != 200:
-        flash(_("Could not load groups."), "warning")
+        flash(_("Could not load paths."), "warning")
         return []
-    return payload.get("groups", [])
+    return payload.get("paths", [])
 
 
 def _fetch_devices():
@@ -60,7 +62,9 @@ def _parse_optional_int(raw_value, field_label: str) -> tuple[int | None, str | 
     try:
         return int(str(raw_value).strip()), None
     except (TypeError, ValueError):
-        return None, _(f"{field_label} must be an integer.")
+        # Named placeholder, not an f-string: Babel cannot extract
+        # _(f"...") (CLAUDE.md), so the message could never be translated.
+        return None, _("%(field)s must be an integer.", field=field_label)
 
 
 def _parse_int_list(values, field_label: str) -> tuple[list[int], str | None]:
@@ -84,10 +88,13 @@ def _normalize_checkpoint_form(form):
     northing_raw = form.get("northing")
     easting = float(easting_raw) if easting_raw else None
     northing = float(northing_raw) if northing_raw else None
-    lora_device_id, lora_device_error = _parse_optional_int(form.get("lora_device_id"), "Device ID")
-    group_ids, group_ids_error = _parse_int_list(form.getlist("group_ids"), "Group ID")
+    lora_device_id, lora_device_error = _parse_optional_int(form.get("lora_device_id"), _("Device ID"))
+    path_ids, path_ids_error = _parse_int_list(form.getlist("path_ids"), _("Path ID"))
 
     is_virtual = form.get("is_virtual") in ("on", "true", "True", "1")
+    counts_for_found = form.get("counts_for_found") in ("on", "true", "True", "1")
+    dead_time_enabled = form.get("dead_time_enabled") in ("on", "true", "True", "1")
+    bulk_entry_enabled = form.get("bulk_entry_enabled") in ("on", "true", "True", "1")
 
     return {
         "name": name,
@@ -98,9 +105,12 @@ def _normalize_checkpoint_form(form):
         "easting": easting,
         "northing": northing,
         "lora_device_id": lora_device_id,
-        "group_ids": group_ids,
+        "path_ids": path_ids,
         "is_virtual": is_virtual,
-    }, lora_device_error or group_ids_error
+        "counts_for_found": counts_for_found,
+        "dead_time_enabled": dead_time_enabled,
+        "bulk_entry_enabled": bulk_entry_enabled,
+    }, lora_device_error or path_ids_error
 
 
 def _fetch_competition_members() -> list[dict]:
@@ -225,7 +235,7 @@ def update_checkpoint_judges(cp_id: int):
 @checkpoints_bp.route("/add", methods=["GET", "POST"])
 @roles_required("judge", "admin")
 def add_checkpoint():
-    groups = _fetch_groups()
+    paths = _fetch_paths()
     devices = _fetch_devices()
 
     form_data, form_error = _normalize_checkpoint_form(request.form) if request.method == "POST" else (None, None)
@@ -235,18 +245,18 @@ def add_checkpoint():
             flash(form_error, "warning")
             return render_template(
                 "add_checkpoint.html",
-                groups=groups,
+                paths=paths,
                 devices=devices,
-                selected_group_ids=form_data["group_ids"] if form_data else [],
+                selected_path_ids=form_data["path_ids"] if form_data else [],
                 selected_device_id=(form_data["lora_device_id"] if form_data else "") or "",
             )
         if not form_data["name"]:
             flash(_("Name is required."), "warning")
             return render_template(
                 "add_checkpoint.html",
-                groups=groups,
+                paths=paths,
                 devices=devices,
-                selected_group_ids=form_data["group_ids"],
+                selected_path_ids=form_data["path_ids"],
                 selected_device_id=form_data["lora_device_id"] or "",
             )
 
@@ -255,13 +265,13 @@ def add_checkpoint():
             flash(_("Checkpoint added."), "success")
             return redirect(url_for("checkpoints.list_checkpoints"))
 
-        flash(_checkpoint_error_message(payload, "Could not add checkpoint."), "warning")
+        flash(_checkpoint_error_message(payload, _("Could not add checkpoint.")), "warning")
 
     return render_template(
         "add_checkpoint.html",
-        groups=groups,
+        paths=paths,
         devices=devices,
-        selected_group_ids=form_data["group_ids"] if form_data else [],
+        selected_path_ids=form_data["path_ids"] if form_data else [],
         selected_device_id=form_data["lora_device_id"] if form_data else "",
     )
 
@@ -277,43 +287,43 @@ def edit_checkpoint(cp_id: int):
     checkpoint = cp_payload or {}
     if not isinstance(checkpoint, dict):
         checkpoint = {}
-    groups = _fetch_groups()
+    paths = _fetch_paths()
     devices = _fetch_devices()
 
-    existing_group_ids = [g.get("id") for g in checkpoint.get("groups", []) if isinstance(g, dict)]
+    existing_path_ids = [p.get("id") for p in checkpoint.get("paths", []) if isinstance(p, dict)]
 
     if request.method == "POST":
         form_data, form_error = _normalize_checkpoint_form(request.form)
 
         if form_error:
             flash(form_error, "warning")
-            checkpoint.update({k: v for k, v in form_data.items() if k != "group_ids"})
-            checkpoint["groups"] = [
-                next((g for g in groups if g.get("id") == gid), {"id": gid, "name": "Unknown"})
-                for gid in form_data["group_ids"]
+            checkpoint.update({k: v for k, v in form_data.items() if k != "path_ids"})
+            checkpoint["paths"] = [
+                next((p for p in paths if p.get("id") == gid), {"id": gid, "name": "Unknown"})
+                for gid in form_data["path_ids"]
             ]
             return render_template(
                 "checkpoint_edit.html",
                 cp=checkpoint,
-                groups=groups,
+                paths=paths,
                 devices=devices,
-                selected_group_ids=form_data["group_ids"],
+                selected_path_ids=form_data["path_ids"],
                 selected_device_id=form_data["lora_device_id"] or "",
             )
 
         if not form_data["name"]:
             flash(_("Name is required."), "warning")
-            checkpoint.update({k: v for k, v in form_data.items() if k != "group_ids"})
-            checkpoint["groups"] = [
-                next((g for g in groups if g.get("id") == gid), {"id": gid, "name": "Unknown"})
-                for gid in form_data["group_ids"]
+            checkpoint.update({k: v for k, v in form_data.items() if k != "path_ids"})
+            checkpoint["paths"] = [
+                next((p for p in paths if p.get("id") == gid), {"id": gid, "name": "Unknown"})
+                for gid in form_data["path_ids"]
             ]
             return render_template(
                 "checkpoint_edit.html",
                 cp=checkpoint,
-                groups=groups,
+                paths=paths,
                 devices=devices,
-                selected_group_ids=form_data["group_ids"],
+                selected_path_ids=form_data["path_ids"],
                 selected_device_id=form_data["lora_device_id"] or "",
             )
 
@@ -322,16 +332,16 @@ def edit_checkpoint(cp_id: int):
             flash(_("Checkpoint updated."), "success")
             return redirect(url_for("checkpoints.list_checkpoints"))
 
-        flash(_checkpoint_error_message(payload, "Could not update checkpoint."), "warning")
-        checkpoint.update({k: v for k, v in form_data.items() if k != "group_ids"})
-        checkpoint["groups"] = [
-            next((g for g in groups if g.get("id") == gid), {"id": gid, "name": "Unknown"})
-            for gid in form_data["group_ids"]
+        flash(_checkpoint_error_message(payload, _("Could not update checkpoint.")), "warning")
+        checkpoint.update({k: v for k, v in form_data.items() if k != "path_ids"})
+        checkpoint["paths"] = [
+            next((p for p in paths if p.get("id") == gid), {"id": gid, "name": "Unknown"})
+            for gid in form_data["path_ids"]
         ]
-        selected_ids = form_data["group_ids"]
+        selected_ids = form_data["path_ids"]
         selected_device_id = form_data["lora_device_id"] or ""
     else:
-        selected_ids = existing_group_ids
+        selected_ids = existing_path_ids
         lora_info = checkpoint.get("lora_device") or {}
         if not isinstance(lora_info, dict):
             lora_info = {}
@@ -340,9 +350,9 @@ def edit_checkpoint(cp_id: int):
     return render_template(
         "checkpoint_edit.html",
         cp=checkpoint,
-        groups=groups,
+        paths=paths,
         devices=devices,
-        selected_group_ids=selected_ids,
+        selected_path_ids=selected_ids,
         selected_device_id=selected_device_id,
     )
 

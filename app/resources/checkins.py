@@ -28,7 +28,7 @@ def _parse_date_range(date_from_str: str | None, date_to_str: str | None) -> tup
     """Build an inclusive range for YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS inputs.
 
     Raises ValueError for malformed inputs. Callers must catch this and
-    return a 400 — silently ignoring a typo would expand the result set
+    return a 400 - silently ignoring a typo would expand the result set
     (e.g. exporting *all* check-ins instead of one day's)."""
     start = end = None
     if date_from_str:
@@ -299,11 +299,11 @@ def checkin_create():
         details=_checkin_snapshot(c),
         created_at=ts,
     )
-    db.session.commit()
     try:
         mark_arrival_checkbox(team_id, checkpoint_id, ts)
     except Exception:
         pass
+    db.session.commit()
     return {"ok": True, "created": True, "checkin": _serialize_checkin(c)}, 201
 
 
@@ -435,11 +435,11 @@ def _update_checkin(checkin_id: int, partial: bool):
         details={"before": before, "after": _checkin_snapshot(c)},
         created_at=utcnow_naive(),
     )
-    db.session.commit()
     try:
         mark_arrival_checkbox(new_team_id, new_cp_id, new_ts)
     except Exception:
         pass
+    db.session.commit()
     return {"ok": True, "updated": True, "checkin": _serialize_checkin(c)}, 200
 
 

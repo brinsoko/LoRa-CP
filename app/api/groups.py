@@ -11,9 +11,10 @@ from sqlalchemy.orm import joinedload
 
 from app.api.helpers import json_ok
 from app.extensions import db
-from app.models import Checkpoint, CheckpointGroup, CheckpointGroupLink, TeamGroup
+from app.models import CheckpointGroup, Path, PathStop, TeamGroup
 from app.utils.audit import record_audit_event
 from app.utils.competition import require_current_competition_id
+from app.utils.paths import resolve_route_ids
 from app.utils.rest_auth import json_login_required, json_roles_required
 from app.utils.validators import validate_text
 
@@ -76,16 +77,21 @@ def _serialize_group(group: CheckpointGroup, include_checkpoints: bool = True) -
         "prefix": group.prefix,
         "description": group.description,
         "position": group.position,
-        "reverse": bool(group.reverse),
+        "path_id": group.path_id,
+        "path_name": group.path.name if group.path else None,
+        "direction": group.direction,
     }
     if include_checkpoints:
-        data["checkpoints"] = [
-            {
-                "id": link.checkpoint_id,
-                "name": link.checkpoint.name if link.checkpoint else None,
-                "position": link.position,
+        # Read-only resolved route (direction applied) for display.
+        name_by_id: dict[int, str | None] = {}
+        if group.path:
+            name_by_id = {
+                stop.checkpoint_id: (stop.checkpoint.name if stop.checkpoint else None)
+                for stop in group.path.stops
             }
-            for link in group.checkpoint_links
+        data["checkpoints"] = [
+            {"id": cp_id, "name": name_by_id.get(cp_id), "position": position}
+            for position, cp_id in enumerate(resolve_route_ids(group))
         ]
     return data
 
@@ -94,7 +100,7 @@ def _group_snapshot(group: CheckpointGroup) -> dict:
     return _serialize_group(group)
 
 
-def _parse_checkpoint_ids(values: Iterable) -> list[int]:
+def _parse_id_list(values: Iterable) -> list[int]:
     ids: list[int] = []
     for value in values or []:
         try:
@@ -106,26 +112,32 @@ def _parse_checkpoint_ids(values: Iterable) -> list[int]:
     return ids
 
 
-def _sync_group_checkpoints(group: CheckpointGroup, ordered_ids: list[int]) -> None:
-    existing = {link.checkpoint_id: link for link in group.checkpoint_links}
-    new_links: list[CheckpointGroupLink] = []
+def _resolve_path(comp_id: int, payload: dict) -> tuple[Path | None, tuple | None]:
+    """Resolve payload['path_id'] to a Path or an (error response) tuple."""
+    raw = payload.get("path_id")
+    if raw in (None, "", "null", 0, "0"):
+        return None, None
+    try:
+        path_id = int(raw)
+    except (TypeError, ValueError):
+        return None, (jsonify({"error": "validation_error", "detail": "path_id must be an integer"}), 400)
+    path = db.session.query(Path).filter(Path.id == path_id, Path.competition_id == comp_id).first()
+    if not path:
+        return None, (jsonify({"error": "validation_error", "detail": _("Unknown path.")}), 400)
+    return path, None
 
-    for position, cp_id in enumerate(ordered_ids):
-        link = existing.pop(cp_id, None)
-        if link is None:
-            checkpoint = db.session.get(Checkpoint, cp_id)
-            if not checkpoint:
-                continue
-            if checkpoint.competition_id != group.competition_id:
-                continue
-            link = CheckpointGroupLink(group=group, checkpoint=checkpoint)
-        link.position = position
-        new_links.append(link)
 
-    for obsolete in existing.values():
-        db.session.delete(obsolete)
-
-    group.checkpoint_links = new_links
+def _parse_direction(payload: dict) -> tuple[str | None, tuple | None]:
+    raw = payload.get("direction")
+    if raw is None:
+        return None, None
+    value = str(raw).strip().lower()
+    if value not in ("forward", "reverse"):
+        return None, (
+            jsonify({"error": "validation_error", "detail": "direction must be 'forward' or 'reverse'"}),
+            400,
+        )
+    return value, None
 
 
 def _group_query(comp_id: int):
@@ -140,7 +152,7 @@ def group_list():
         return jsonify({"error": "no_competition"}), 400
     groups = (
         _group_query(comp_id)
-        .options(joinedload(CheckpointGroup.checkpoint_links).joinedload(CheckpointGroupLink.checkpoint))
+        .options(joinedload(CheckpointGroup.path).joinedload(Path.stops).joinedload(PathStop.checkpoint))
         .order_by(CheckpointGroup.position.asc(), CheckpointGroup.name.asc())
         .all()
     )
@@ -162,14 +174,19 @@ def group_create():
         max_length=2000,
         multiline=True,
     )
-    checkpoint_ids = _parse_checkpoint_ids(payload.get("checkpoint_ids"))
-
     if name_error:
         return jsonify({"error": "validation_error", "detail": name_error}), 400
     if prefix_error:
         return jsonify({"error": "validation_error", "detail": prefix_error}), 400
     if description_error:
         return jsonify({"error": "validation_error", "detail": description_error}), 400
+
+    path, path_error = _resolve_path(comp_id, payload)
+    if path_error:
+        return path_error
+    direction, direction_error = _parse_direction(payload)
+    if direction_error:
+        return direction_error
 
     # Validate prefix format and overlap
     if prefix:
@@ -191,15 +208,36 @@ def group_create():
         description=description,
         competition_id=comp_id,
         position=next_position,
-        reverse=bool(payload.get("reverse")),
+        path=path,
+        direction=direction or "forward",
     )
     db.session.add(group)
     db.session.flush()
 
-    if checkpoint_ids:
-        _sync_group_checkpoints(group, checkpoint_ids)
+    # Same invariant _update_group enforces: attaching this group's
+    # (path, direction) must not make a dead-time checkpoint a timed
+    # segment's directed end (a reverse group swaps the endpoints).
+    if path is not None:
+        from app.models import Checkpoint
+        from app.utils.scoring import segment_end_checkpoint_ids
 
-    db.session.flush()
+        blocked = segment_end_checkpoint_ids(comp_id)
+        if blocked and Checkpoint.query.filter(
+            Checkpoint.competition_id == comp_id,
+            Checkpoint.id.in_(blocked),
+            Checkpoint.dead_time_enabled.is_(True),
+        ).first():
+            db.session.rollback()
+            return jsonify(
+                {
+                    "error": "validation_error",
+                    "detail": _(
+                        "This path/direction would put a dead-time checkpoint at a timed "
+                        "segment's end. Disable dead time there or adjust the segment first."
+                    ),
+                }
+            ), 400
+
     record_audit_event(
         competition_id=comp_id,
         event_type="group_created",
@@ -222,7 +260,7 @@ def group_get(group_id: int):
     group = (
         _group_query(comp_id)
         .filter(CheckpointGroup.id == group_id)
-        .options(joinedload(CheckpointGroup.checkpoint_links).joinedload(CheckpointGroupLink.checkpoint))
+        .options(joinedload(CheckpointGroup.path).joinedload(Path.stops).joinedload(PathStop.checkpoint))
         .first()
     )
     if not group:
@@ -236,7 +274,7 @@ def _update_group(group_id: int, partial: bool):
         return jsonify({"error": "no_competition"}), 400
     group = (
         _group_query(comp_id)
-        .options(joinedload(CheckpointGroup.checkpoint_links))
+        .options(joinedload(CheckpointGroup.path).joinedload(Path.stops))
         .filter(CheckpointGroup.id == group_id)
         .first()
     )
@@ -275,14 +313,46 @@ def _update_group(group_id: int, partial: bool):
             return jsonify({"error": "validation_error", "detail": description_error}), 400
         group.description = description or None
 
-    if "checkpoint_ids" in payload:
-        checkpoint_ids = _parse_checkpoint_ids(payload.get("checkpoint_ids"))
-        _sync_group_checkpoints(group, checkpoint_ids)
+    if "path_id" in payload or not partial:
+        path, path_error = _resolve_path(comp_id, payload)
+        if path_error:
+            return path_error
+        group.path = path
 
-    if "reverse" in payload or not partial:
-        group.reverse = bool(payload.get("reverse"))
+    if "direction" in payload or not partial:
+        direction, direction_error = _parse_direction(payload)
+        if direction_error:
+            return direction_error
+        group.direction = direction or "forward"
 
     db.session.flush()
+
+    # Changing a group's path or direction re-derives which checkpoints
+    # are timed-segment ends (endpoints swap for reverse groups). Enforce
+    # the same invariant the checkpoint and segment writes enforce: a
+    # dead-time checkpoint must never become a segment end. Checked after
+    # the flush so segment_end_checkpoint_ids sees the new path/direction.
+    if "path_id" in payload or "direction" in payload or not partial:
+        from app.models import Checkpoint
+        from app.utils.scoring import segment_end_checkpoint_ids
+
+        blocked = segment_end_checkpoint_ids(comp_id)
+        if blocked and Checkpoint.query.filter(
+            Checkpoint.competition_id == comp_id,
+            Checkpoint.id.in_(blocked),
+            Checkpoint.dead_time_enabled.is_(True),
+        ).first():
+            db.session.rollback()
+            return jsonify(
+                {
+                    "error": "validation_error",
+                    "detail": _(
+                        "This path/direction would put a dead-time checkpoint at a timed "
+                        "segment's end. Disable dead time there or adjust the segment first."
+                    ),
+                }
+            ), 400
+
     record_audit_event(
         competition_id=comp_id,
         event_type="group_updated",
@@ -349,7 +419,7 @@ def group_order():
     if not comp_id:
         return jsonify({"error": "no_competition"}), 400
     payload = request.get_json(silent=True) or {}
-    ordered_ids = _parse_checkpoint_ids(payload.get("group_ids"))
+    ordered_ids = _parse_id_list(payload.get("group_ids"))
     if not ordered_ids:
         return jsonify({"error": "validation_error", "detail": "group_ids are required"}), 400
     if len(set(ordered_ids)) != len(ordered_ids):
