@@ -26,3 +26,7 @@ services:
     depends_on:
       - web
     restart: unless-stopped
+
+networks:
+  app:
+    driver: bridge
