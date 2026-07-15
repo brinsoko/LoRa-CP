@@ -7,7 +7,11 @@ services:
       - ../instance:/app/instance
       - ../data:/app/data
     networks:
-      - app
+      app: {}
+      caddy_net:
+        # Distinct name on the shared proxy network ("web" is too generic).
+        aliases:
+          - lorakt-web
     restart: unless-stopped
 
   # The one and only Sheets writer: drains the sheets_sync_jobs outbox
@@ -30,3 +34,6 @@ services:
 networks:
   app:
     driver: bridge
+  caddy_net:
+    name: caddy_net
+    external: true
